@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { PatientsModule } from './patients/patients.module';
@@ -18,6 +19,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     ConfigModule.forRoot({
       isGlobal: true, // Makes process.env available everywhere without re-importing
     }),
+    PrismaModule,           // ← must be first after ConfigModule
     AuthModule,
     AccountsModule,
     PatientsModule,

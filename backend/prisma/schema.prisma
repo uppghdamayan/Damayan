@@ -1,0 +1,381 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  DOCTOR
+  NURSE
+  ADMIN
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum VisitType {
+  INITIAL
+  PROGRESS
+}
+
+enum NoteStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ProblemStatus {
+  ACTIVE
+  RESOLVED
+  REMOVED
+}
+
+enum MedUnit {
+  MG
+  G
+  MCG
+  ML
+  UNITS
+}
+
+enum DocumentType {
+  MEDICAL_CERTIFICATE
+  LAB_REQUEST
+  PRESCRIPTION
+  CHARGE_SLIP
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  GENERATE
+}
+
+enum NoteType {
+  INITIAL_NOTE
+  PROGRESS_NOTE
+}
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model User {
+  id         String   @id @db.Uuid
+  email      String   @unique
+  firstName  String   @map("first_name")  @db.VarChar(30)
+  lastName   String   @map("last_name")   @db.VarChar(30)
+  middleName String?  @map("middle_name") @db.VarChar(30)
+  extension  String?  @db.VarChar(3)
+  role       Role
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt      @map("updated_at")
+
+  // Relations
+  visits          Visit[]      @relation("VisitPhysician")
+  createdPatients Patient[]    @relation("PatientCreatedBy")
+  vitalSigns      VitalSign[]  @relation("VitalMeasuredBy")
+  initialNotes    InitialNote[] @relation("InitialNoteAuthor")
+  initialEdits    InitialNote[] @relation("InitialNoteEditor")
+  progressNotes   ProgressNote[] @relation("ProgressNoteAuthor")
+  progressEdits   ProgressNote[] @relation("ProgressNoteEditor")
+  problems        Problem[]    @relation("ProblemAddedBy")
+  medications     Medication[] @relation("MedicationAddedBy")
+  documents       Document[]   @relation("DocumentGeneratedBy")
+  attachments     Attachment[] @relation("AttachmentUploadedBy")
+  auditLogs       AuditLog[]   @relation("AuditLogUser")
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// PATIENT
+// ─────────────────────────────────────────────
+
+model Patient {
+  id              String   @id @default(uuid()) @db.Uuid
+  patientCode     String   @unique @map("patient_code") @db.VarChar(12)
+  lastName        String   @map("last_name")   @db.VarChar(30)
+  firstName       String   @map("first_name")  @db.VarChar(30)
+  middleName      String?  @map("middle_name") @db.VarChar(30)
+  extension       String?  @db.VarChar(3)
+  dateOfBirth     DateTime @map("date_of_birth") @db.Date
+  sex             Sex
+  addressStreet   String?  @map("address_street")
+  addressBarangay String?  @map("address_barangay") @db.VarChar(100)
+  addressCity     String?  @map("address_city")     @db.VarChar(100)
+  addressRegion   String?  @map("address_region")   @db.VarChar(100)
+  addressCountry  String   @default("Philippines")  @map("address_country") @db.VarChar(50)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdBy       String?  @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  // Relations
+  creator     User?        @relation("PatientCreatedBy", fields: [createdBy], references: [id])
+  visits      Visit[]
+  problems    Problem[]
+  medications Medication[]
+  vitalSigns  VitalSign[]
+  documents   Document[]
+  attachments Attachment[]
+  auditLogs   AuditLog[]   @relation("AuditLogPatient")
+
+  @@index([lastName, firstName])
+  @@map("patients")
+}
+
+// ─────────────────────────────────────────────
+// VISIT
+// ─────────────────────────────────────────────
+
+model Visit {
+  id                 String    @id @default(uuid()) @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  physicianId        String    @map("physician_id") @db.Uuid
+  visitDatetime      DateTime  @map("visit_datetime")
+  visitType          VisitType @map("visit_type")
+  status             NoteStatus @default(DRAFT)
+  problemChanges     Json?     @map("problem_changes")
+  medicationChanges  Json?     @map("medication_changes")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt      @map("updated_at")
+
+  // Relations
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  physician    User          @relation("VisitPhysician", fields: [physicianId], references: [id])
+  initialNote  InitialNote?
+  progressNote ProgressNote?
+  vitalSigns   VitalSign[]
+  documents    Document[]
+
+  @@index([patientId, visitDatetime(sort: Desc)])
+  @@map("visits")
+}
+
+// ─────────────────────────────────────────────
+// INITIAL NOTE
+// ─────────────────────────────────────────────
+
+model InitialNote {
+  id                   String     @id @default(uuid()) @db.Uuid
+  visitId              String     @unique @map("visit_id") @db.Uuid
+  authorId             String?    @map("author_id") @db.Uuid
+  chiefComplaint       String     @map("chief_complaint") @db.VarChar(50)
+  hpi                  String     @map("hpi")
+  pmhComorbidities     String?    @map("pmh_comorbidities")
+  pmhSurgeries         String?    @map("pmh_surgeries")
+  pmhHospitalizations  String?    @map("pmh_hospitalizations")
+  allergies            String?
+  familyHistory        String?    @map("family_history")
+  socialHistory        String?    @map("social_history")
+  obHistory            String?    @map("ob_history")
+  psychosocialHistory  String?    @map("psychosocial_history")
+  physicalExam         String     @map("physical_exam")
+  assessment           Json
+  mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  diagnostics          Json?
+  status               NoteStatus @default(DRAFT)
+  lastEditedBy         String?    @map("last_edited_by") @db.Uuid
+  lastEditedAt         DateTime?  @map("last_edited_at")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt      @map("updated_at")
+
+  // Relations
+  visit       Visit        @relation(fields: [visitId], references: [id])
+  author      User?        @relation("InitialNoteAuthor", fields: [authorId], references: [id])
+  lastEditor  User?        @relation("InitialNoteEditor", fields: [lastEditedBy], references: [id])
+  attachments Attachment[]
+
+  @@map("initial_notes")
+}
+
+// ─────────────────────────────────────────────
+// PROGRESS NOTE
+// ─────────────────────────────────────────────
+
+model ProgressNote {
+  id                   String     @id @default(uuid()) @db.Uuid
+  visitId              String     @unique @map("visit_id") @db.Uuid
+  authorId             String?    @map("author_id") @db.Uuid
+  subjective           String
+  objective            String
+  mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  diagnostics          Json?
+  problemListSnapshot  Json?      @map("problem_list_snapshot")
+  medicationSnapshot   Json?      @map("medication_snapshot")
+  status               NoteStatus @default(DRAFT)
+  lastEditedBy         String?    @map("last_edited_by") @db.Uuid
+  lastEditedAt         DateTime?  @map("last_edited_at")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt      @map("updated_at")
+
+  // Relations
+  visit       Visit        @relation(fields: [visitId], references: [id])
+  author      User?        @relation("ProgressNoteAuthor", fields: [authorId], references: [id])
+  lastEditor  User?        @relation("ProgressNoteEditor", fields: [lastEditedBy], references: [id])
+  attachments Attachment[]
+
+  @@map("progress_notes")
+}
+
+// ─────────────────────────────────────────────
+// PROBLEM
+// ─────────────────────────────────────────────
+
+model Problem {
+  id        String        @id @default(uuid()) @db.Uuid
+  patientId String        @map("patient_id") @db.Uuid
+  parentId  String?       @map("parent_id") @db.Uuid
+  title     String
+  status    ProblemStatus @default(ACTIVE)
+  sortOrder Int           @map("sort_order")
+  addedBy   String?       @map("added_by") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt      @map("updated_at")
+
+  // Relations
+  patient  Patient   @relation(fields: [patientId], references: [id])
+  parent   Problem?  @relation("ProblemNesting", fields: [parentId], references: [id])
+  children Problem[] @relation("ProblemNesting")
+  addedByUser User?  @relation("ProblemAddedBy", fields: [addedBy], references: [id])
+
+  @@index([patientId, sortOrder])
+  @@map("problems")
+}
+
+// ─────────────────────────────────────────────
+// MEDICATION
+// ─────────────────────────────────────────────
+
+model Medication {
+  id           String   @id @default(uuid()) @db.Uuid
+  patientId    String   @map("patient_id") @db.Uuid
+  name         String   @db.VarChar(255)
+  dose         Decimal  @db.Decimal(8, 2)
+  unit         MedUnit  @default(MG)
+  instructions String?  @db.VarChar(50)
+  quantity     Int?
+  isActive     Boolean  @default(true) @map("is_active")
+  addedBy      String?  @map("added_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt      @map("updated_at")
+
+  // Relations
+  patient     Patient @relation(fields: [patientId], references: [id])
+  addedByUser User?   @relation("MedicationAddedBy", fields: [addedBy], references: [id])
+
+  @@index([patientId, isActive])
+  @@map("medications")
+}
+
+// ─────────────────────────────────────────────
+// VITAL SIGN
+// ─────────────────────────────────────────────
+
+model VitalSign {
+  id                String   @id @default(uuid()) @db.Uuid
+  patientId         String   @map("patient_id") @db.Uuid
+  visitId           String?  @map("visit_id") @db.Uuid
+  sbp               Int?
+  dbp               Int?
+  heartRate         Int?     @map("heart_rate")
+  respiratoryRate   Int?     @map("respiratory_rate")
+  temperature       Decimal? @db.Decimal(4, 1)
+  oxygenSaturation  Int?     @map("oxygen_saturation")
+  measuredBy        String?  @map("measured_by") @db.Uuid
+  measuredAt        DateTime @map("measured_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  visit      Visit?    @relation(fields: [visitId], references: [id])
+  measuredByUser User? @relation("VitalMeasuredBy", fields: [measuredBy], references: [id])
+
+  @@index([patientId, measuredAt(sort: Desc)])
+  @@map("vital_signs")
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT
+// ─────────────────────────────────────────────
+
+model Document {
+  id           String       @id @default(uuid()) @db.Uuid
+  patientId    String       @map("patient_id") @db.Uuid
+  visitId      String?      @map("visit_id") @db.Uuid
+  documentType DocumentType @map("document_type")
+  storageKey   String       @map("storage_key")
+  generatedBy  String?      @map("generated_by") @db.Uuid
+  generatedAt  DateTime     @default(now()) @map("generated_at")
+
+  // Relations
+  patient         Patient @relation(fields: [patientId], references: [id])
+  visit           Visit?  @relation(fields: [visitId], references: [id])
+  generatedByUser User?   @relation("DocumentGeneratedBy", fields: [generatedBy], references: [id])
+
+  @@map("documents")
+}
+
+// ─────────────────────────────────────────────
+// ATTACHMENT
+// ─────────────────────────────────────────────
+
+model Attachment {
+  id             String   @id @default(uuid()) @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  noteType       NoteType @map("note_type")
+  noteId         String   @map("note_id") @db.Uuid
+  tag            String   @db.VarChar(100)
+  storageKey     String   @map("storage_key")
+  mimeType       String?  @map("mime_type") @db.VarChar(50)
+  textResult     String?  @map("text_result")
+  uploadedBy     String?  @map("uploaded_by") @db.Uuid
+  uploadedAt     DateTime @default(now()) @map("uploaded_at")
+
+  // Relations (polymorphic via noteType + noteId — no direct FK)
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  uploadedByUser User?        @relation("AttachmentUploadedBy", fields: [uploadedBy], references: [id])
+  initialNote    InitialNote? @relation(fields: [noteId], references: [id], map: "attachment_initial_note_fk")
+  progressNote   ProgressNote? @relation(fields: [noteId], references: [id], map: "attachment_progress_note_fk")
+
+  @@map("attachments")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  userRole  Role        @map("user_role")
+  action    AuditAction
+  tableName String      @map("table_name") @db.VarChar(50)
+  recordId  String      @map("record_id") @db.Uuid
+  patientId String?     @map("patient_id") @db.Uuid
+  changes   Json?
+  ipAddress String?     @map("ip_address")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation("AuditLogUser", fields: [userId], references: [id])
+  patient Patient? @relation("AuditLogPatient", fields: [patientId], references: [id])
+
+  @@index([patientId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
