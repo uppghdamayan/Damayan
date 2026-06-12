@@ -47,6 +47,7 @@ async function bootstrap() {
       'access_token',
     )
     .addTag('Auth', 'User authentication and provisioning')
+    .addTag('Accounts', 'Admin-only user account management')
     .addTag('Patients', 'Patient management')
     .addTag('Visits', 'Visit records')
     .addTag('Initial Notes', 'Initial consultation SOAP notes')
@@ -59,14 +60,8 @@ async function bootstrap() {
     .addTag('Audit Logs', 'Complete audit trail')
     .build();
 
-  if (process.env.NODE_ENV !== 'production') {
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
-  } else {
-    // Keep swagger enabled in production for MVP as instructed
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
-  }
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
   // ─────────────────────────────────────────────
   // START SERVER
