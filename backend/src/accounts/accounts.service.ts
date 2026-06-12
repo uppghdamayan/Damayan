@@ -1,0 +1,267 @@
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient } from '@supabase/supabase-js';
+import { Role, Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
+
+@Injectable()
+export class AccountsService implements OnModuleInit {
+  private supabase: ReturnType<typeof createClient>;
+  private readonly logger = new Logger(AccountsService.name);
+
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {
+    this.supabase = createClient(
+      this.configService.get<string>('SUPABASE_URL')!,
+      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // ADMIN SEED — runs once on application startup
+  // ─────────────────────────────────────────────
+
+  async onModuleInit() {
+    await this.seedAdminAccount();
+  }
+
+  async seedAdminAccount() {
+    const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
+    const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
+
+    if (!adminEmail || !adminPassword) {
+      this.logger.warn(
+        'ADMIN_EMAIL or ADMIN_PASSWORD not set. Skipping admin seed.',
+      );
+      return;
+    }
+
+    // Check if an Admin already exists in the users table
+    const existing = await this.prisma.user.findFirst({
+      where: { role: Role.ADMIN },
+    });
+
+    if (existing) {
+      this.logger.log('Admin account already exists. Seed skipped.');
+      return;
+    }
+
+    this.logger.log(`Seeding admin account: ${adminEmail}`);
+
+    let adminUserId: string | undefined;
+
+    const { data: createData, error: createError } =
+      await this.supabase.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { must_change_password: false },
+      });
+
+    if (createError) {
+      if (createError.message.includes('already been registered')) {
+        // Find existing user
+        const { data: listData } = await this.supabase.auth.admin.listUsers();
+        const existingSupabaseUser = listData?.users.find(
+          (u: any) => u.email === adminEmail,
+        );
+        if (existingSupabaseUser) {
+          adminUserId = existingSupabaseUser.id;
+        } else {
+          this.logger.error(
+            `Supabase user exists but could not be found in list.`,
+          );
+          return;
+        }
+      } else {
+        this.logger.error(
+          `Failed to create Supabase auth user for admin: ${createError.message}`,
+        );
+        return;
+      }
+    } else {
+      adminUserId = createData.user.id;
+    }
+
+    await this.prisma.user.create({
+      data: {
+        id: adminUserId,
+        email: adminEmail,
+        firstName: 'System',
+        lastName: 'Admin',
+        role: Role.ADMIN,
+        isActive: true,
+      },
+    });
+
+    this.logger.log('Admin account seeded successfully.');
+  }
+
+  // ─────────────────────────────────────────────
+  // CRUD
+  // ─────────────────────────────────────────────
+
+  async findAll(filters: {
+    role?: Role;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
+    const { role, isActive, page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.UserWhereInput = {};
+    if (role) where.role = role;
+    if (isActive !== undefined) where.isActive = isActive;
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException(`Account ${id} not found.`);
+    return user;
+  }
+
+  async create(dto: CreateAccountDto) {
+    // Check for existing email in users table
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existing) throw new ConflictException('Email already in use.');
+
+    // Generate cryptographically random 16-char temp password
+    const tempPassword = this.generateTempPassword();
+
+    const { data, error } = await this.supabase.auth.admin.createUser({
+      email: dto.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { must_change_password: true },
+    });
+
+    if (error) {
+      throw new ConflictException(
+        `Supabase account creation failed: ${error.message}`,
+      );
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        id: data.user.id,
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        middleName: dto.middleName,
+        role: dto.role,
+        isActive: true,
+      },
+    });
+
+    // Return temp password only once — it is never stored
+    return {
+      user,
+      tempPassword,
+      note: 'Temporary password must be shared securely. It will not be shown again.',
+    };
+  }
+
+  async update(id: string, dto: UpdateAccountDto) {
+    await this.findOne(id); // throws if not found
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        ...(dto.firstName && { firstName: dto.firstName }),
+        ...(dto.lastName && { lastName: dto.lastName }),
+        ...(dto.middleName !== undefined && { middleName: dto.middleName }),
+        ...(dto.role && { role: dto.role }),
+      },
+    });
+  }
+
+  async deactivate(id: string) {
+    const user = await this.findOne(id);
+    if (user.role === Role.ADMIN) {
+      // Prevent deactivating the last Admin
+      const adminCount = await this.prisma.user.count({
+        where: { role: Role.ADMIN, isActive: true },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException(
+          'Cannot deactivate the last active Admin account.',
+        );
+      }
+    }
+
+    // Disable Supabase Auth login by applying an effectively permanent ban
+    await this.supabase.auth.admin.updateUserById(id, {
+      ban_duration: '876600h', // 100 years
+    });
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  async resetPassword(id: string) {
+    const user = await this.findOne(id);
+
+    // Generate cryptographically random 16-char temp password
+    const tempPassword = this.generateTempPassword();
+
+    const { error } = await this.supabase.auth.admin.updateUserById(id, {
+      password: tempPassword,
+      user_metadata: { must_change_password: true },
+    });
+
+    if (error) {
+      throw new ConflictException(`Failed to reset password: ${error.message}`);
+    }
+
+    return {
+      user,
+      tempPassword,
+      note: 'Temporary password must be shared securely. It will not be shown again.',
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────
+
+  private generateTempPassword(): string {
+    // 16 chars: letters + digits + symbols, guaranteed mixed
+    const chars =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    const bytes = randomBytes(16);
+    return Array.from(bytes)
+      .map((b) => chars[b % chars.length])
+      .join('');
+  }
+}
