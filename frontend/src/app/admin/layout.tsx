@@ -9,11 +9,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user, clear, requiresPasswordChange } = useAuthStore();
 
-  // Passive guard: redirect to change-password if required
+  // Active guard: check session and redirect if necessary
   useEffect(() => {
-    if (user && requiresPasswordChange) {
-      router.replace('/change-password');
-    }
+    const checkAuth = async () => {
+      const { createSupabaseClient } = await import('@/lib/supabase/client');
+      const supabase = createSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.replace('/login');
+        return;
+      }
+      
+      if (user === null) return;
+      
+      if (requiresPasswordChange) {
+        router.replace('/change-password');
+        return;
+      }
+      
+      if (user.role !== 'ADMIN') {
+        router.replace('/dashboard');
+      }
+    };
+    checkAuth();
   }, [user, requiresPasswordChange, router]);
 
   const handleSignOut = async () => {

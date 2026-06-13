@@ -12,13 +12,14 @@ import { NewPatientModal } from '@/components/patients/NewPatientModal';
 import { SidebarSkeleton } from '@/components/layout/SidebarSkeleton';
 import { apiRequest } from '@/lib/api';
 import type { Patient } from '@/types/patient';
+import { cn } from '@/lib/utils';
+import { Search, Plus } from 'lucide-react';
 
 export function Sidebar() {
   const { sidebarCollapsed } = useUiStore();
   const { activePatient, setActivePatient } = usePatientStore();
   const { user } = useAuthStore();
   const router = useRouter();
-  const params = useParams();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -48,26 +49,30 @@ export function Sidebar() {
     <>
       <aside
         suppressHydrationWarning
-        className={`bg-white flex flex-col h-full shrink-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? 'w-0 border-r border-transparent' : 'w-[280px] border-r border-[#D1D5E0]'}`}
+        className={cn(
+          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border",
+          sidebarCollapsed ? "w-0 border-r-transparent" : "w-[var(--sidebar-w)]"
+        )}
       >
         {/* Inner wrapper to prevent content from squishing during collapse */}
-        <div className="w-[280px] min-w-[280px] flex flex-col h-full">
-          {/* Search + Add zone */}
-          <div className="pt-2.5 pb-1.5 px-2.5 border-b border-[#D1D5E0] shrink-0">
-            {/* Search */}
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search patients…"
-              className="w-full h-[34px] px-2.5 bg-[#F7F8FA] border border-[#D1D5E0] rounded-md text-xs text-[#0D1117] outline-none box-border mb-2 font-sans focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
-            />
-            {/* Add new patient */}
+        <div className="w-[var(--sidebar-w)] min-w-[var(--sidebar-w)] flex flex-col h-full">
+          {/* Search + Add zone (Section 5.2) */}
+          <div className="sticky top-0 z-10 flex flex-col gap-2 p-3 border-b border-border bg-surface shrink-0">
+            <div className="flex items-center gap-2 h-[34px] bg-surface-2 border border-border rounded-btn px-3 focus-within:border-accent focus-within:shadow-accent-focus transition-all">
+              <Search className="w-4 h-4 text-text-muted shrink-0" strokeWidth={2} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-muted font-sans"
+                placeholder="Search patients…"
+              />
+            </div>
             {canCreatePatient && (
               <button
                 onClick={() => setNewPatientOpen(true)}
-                className="w-full h-[30px] bg-[#0A6E5F] text-white border border-[#085A4E] rounded-md text-[11px] font-semibold cursor-pointer box-border font-sans"
+                className="w-full h-[28px] bg-accent hover:bg-accent-hover text-white text-[11px] font-semibold justify-center gap-1 inline-flex items-center rounded-btn cursor-pointer transition-colors duration-150"
               >
-                + New Patient
+                <Plus className="w-3 h-3" /> New Patient
               </button>
             )}
           </div>
@@ -76,12 +81,12 @@ export function Sidebar() {
           <div className="flex-1 overflow-y-auto py-1">
             {isLoading && <SidebarSkeleton />}
             {!isLoading && patients.length === 0 && (
-              <p className="px-3 py-4 text-xs text-[#6B7280]">No patients found.</p>
+              <p className="px-3.5 py-4 text-xs text-text-muted">No patients found.</p>
             )}
             {grouped.map(({ letter, patients: group }) => (
               <div key={letter}>
                 {/* Letter marker */}
-                <div className="pt-1.5 pb-0.5 px-3 text-[10px] font-bold uppercase tracking-[0.6px] text-[#6B7280] sticky top-0 bg-white z-10">
+                <div className="pt-2.5 pb-0.5 px-3.5 text-[10px] font-bold uppercase tracking-[0.6px] text-text-muted sticky top-0 bg-surface z-10">
                   {letter}
                 </div>
 
@@ -97,36 +102,48 @@ export function Sidebar() {
                       key={p.id}
                       onClick={() => handleSelect(p)}
                       onMouseEnter={() => handlePrefetch(p.id)}
-                      className={`w-full flex items-center gap-2 py-[7px] px-3 border-none border-l-[3px] cursor-pointer text-left font-sans ${isActive ? 'border-l-[#0A6E5F] bg-[#F7F8FA]' : 'border-l-transparent bg-transparent hover:bg-[#F7F8FA]'}`}
+                      className={cn(
+                        "flex items-center gap-2.5 mx-3.5 my-[6px] px-3 py-2.5 rounded-card border cursor-pointer transition-all duration-150 text-left w-[calc(100%-28px)] font-sans",
+                        isActive
+                          ? "bg-accent-light border-accent shadow-sm"
+                          : "bg-surface border-border hover:bg-surface-2 hover:border-border-strong"
+                      )}
                     >
                       {/* Avatar */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isActive ? 'bg-[#085A4E] text-white' : 'bg-[#D4EDE9] text-[#0A6E5F]'}`}>
+                      <div
+                        className={cn(
+                          "w-8 h-8 text-[11px] font-bold flex-shrink-0 rounded-full flex items-center justify-center border transition-colors duration-150",
+                          isActive
+                            ? "bg-accent text-white border-accent"
+                            : "bg-surface-2 text-text-secondary border-border"
+                        )}
+                      >
                         {ini}
                       </div>
 
+                      {/* Info details */}
                       <div className="flex-1 min-w-0">
-                        <div className={`text-xs whitespace-nowrap overflow-hidden text-ellipsis ${isActive ? 'font-semibold text-[#0D1117]' : 'font-normal text-[#374151]'}`}>
+                        <div className="text-[12px] font-semibold text-text-primary truncate">
                           {p.lastName}, {p.firstName}
                         </div>
-                        <div className="text-[11px] text-[#6B7280] flex gap-1">
-                          <span>{sexLabel}</span>
-                          <span>·</span>
-                          <span>{age}y</span>
-                          <span>·</span>
-                          <span className="font-mono">{p.patientCode}</span>
+                        <div className="font-mono text-[10px] text-text-muted truncate mt-0.5">
+                          {sexLabel} · {age} yrs · #{p.patientCode}
                         </div>
                       </div>
 
-                      {/* Allergy indicator */}
-                      {hasAllergy && (
-                        <span
-                          title={`Allergies: ${p.allergies}`}
-                          className="text-[13px] shrink-0 text-[#F59E0B]"
-                          aria-label={`Allergies: ${p.allergies}`}
-                        >
-                          ⚠
-                        </span>
-                      )}
+                      {/* Status indicators */}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {hasAllergy && (
+                          <span
+                            className="text-red text-[12px] font-bold"
+                            title={`Allergies: ${p.allergies}`}
+                            aria-label={`Allergies: ${p.allergies}`}
+                          >
+                            ⚠
+                          </span>
+                        )}
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+                      </div>
                     </button>
                   );
                 })}

@@ -3,13 +3,15 @@
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
+import { usePatientStore } from '@/stores/patientStore';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { initials } from '@/lib/patient-utils';
-import { PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { PanelRightOpen, PanelRightClose, Menu } from 'lucide-react';
 
 export function Topbar() {
   const { user, clear } = useAuthStore();
-  const { toggleSidebar, documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
+  const { toggleSidebar, sidebarCollapsed, documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
+  const { activePatient } = usePatientStore();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -20,72 +22,101 @@ export function Topbar() {
   };
 
   const userInitials = user ? initials(user.firstName, user.lastName) : '??';
-  const roleLabel = user?.role ?? 'USER';
 
   return (
-    <header className="h-14 bg-white border-b border-[#D1D5E0] flex items-center px-4 gap-2.5 sticky top-0 z-[200] shrink-0">
+    <header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 sticky top-0 z-[200] shrink-0">
       {/* Sidebar toggle */}
       <button
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
         title="Toggle sidebar"
-        className="w-8 h-8 border-none bg-transparent hover:bg-[#F7F8FA] cursor-pointer flex flex-col items-center justify-center gap-[5px] rounded-md shrink-0 transition-colors"
+        className="w-8 h-8 bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center rounded-btn cursor-pointer shrink-0"
       >
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="w-4 h-0.5 bg-[#374151] rounded-sm" />
-        ))}
+        <Menu className="w-[18px] h-[18px] text-text-secondary" />
       </button>
 
       {/* Logo */}
-      <div className="w-[22px] h-[22px] bg-[#0A6E5F] rounded-[5px] shrink-0" />
-      <span className="text-base font-bold text-[#0D1117] tracking-[-0.3px] shrink-0">
-        DAMAYAN
-      </span>
+      <div className="flex items-center gap-2 w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
+        <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12 8V16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M8 12H16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap text-text-primary">
+          DAMAYAN <small className="text-[9px] font-semibold text-text-muted tracking-[1px] uppercase mt-[3px]">EMR</small>
+        </span>
+      </div>
 
-      {/* Role pill */}
-      <span className="text-[10px] font-bold uppercase tracking-[0.6px] bg-[#D4EDE9] text-[#0A6E5F] border border-[#0A6E5F] rounded-[20px] px-2 py-0.5 shrink-0">
-        {roleLabel}
-      </span>
+      {/* Active patient chip (centered) */}
+      {activePatient && (
+        <div
+          onClick={() => router.push(`/dashboard/${activePatient.id}`)}
+          className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 cursor-pointer shadow-sm z-10"
+        >
+          <div className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center text-[9px] font-bold">
+            {initials(activePatient.firstName, activePatient.lastName)}
+          </div>
+          <span className="text-[11px] font-semibold text-text-primary">
+            {activePatient.lastName}, {activePatient.firstName}
+          </span>
+          <span className="font-mono text-[9px] text-text-muted">
+            {activePatient.patientCode}
+          </span>
+        </div>
+      )}
 
       <div className="flex-1" />
 
-      {/* + New Note button */}
-      <button
-        onClick={() => {/* Phase 6+ — note creation flow */}}
-        className="h-[34px] px-3.5 bg-[#0A6E5F] text-white border border-[#085A4E] rounded-md text-[11px] font-semibold cursor-pointer shrink-0 shadow-[0_2px_4px_rgba(10,110,95,0.15)] font-sans"
-      >
-        + New Note
-      </button>
+      {/* Right zone */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* + New Note button */}
+        <button
+          onClick={() => {/* Phase 6+ — note creation flow */}}
+          className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0"
+        >
+          ＋ New Note
+        </button>
 
-      {/* Documentation panel toggle */}
-      <button
-        onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
-        aria-label="Toggle documentation panel"
-        title={documentationPanelOpen ? 'Close documentation panel' : 'Open documentation panel'}
-        className="h-[34px] px-2.5 bg-[#F7F8FA] border border-transparent rounded-md cursor-pointer flex items-center justify-center shrink-0 transition-all duration-150 ease-in hover:bg-[#EFF1F5] hover:border-[#D1D5E0]"
-      >
-        {documentationPanelOpen ? (
-          <PanelRightClose size={16} color="#374151" strokeWidth={1.5} />
-        ) : (
-          <PanelRightOpen size={16} color="#374151" strokeWidth={1.5} />
-        )}
-      </button>
+        {/* Documentation panel toggle */}
+        <button
+          onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
+          aria-label="Toggle documentation panel"
+          title={documentationPanelOpen ? 'Close documentation panel' : 'Open documentation panel'}
+          className="w-8 h-8 bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center rounded-btn cursor-pointer shrink-0"
+        >
+          {documentationPanelOpen ? (
+            <PanelRightClose size={16} className="text-text-secondary" />
+          ) : (
+            <PanelRightOpen size={16} className="text-text-secondary" />
+          )}
+        </button>
 
-      {/* User avatar */}
-      <div 
-        className="w-8 h-8 rounded-full bg-[#085A4E] text-white flex items-center justify-center text-xs font-semibold shrink-0 cursor-default"
-        title={user ? `${user.firstName} ${user.lastName}` : ''}
-      >
-        {userInitials}
+        {/* User name + avatar */}
+        <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border shrink-0">
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-[12px] font-semibold text-text-primary">
+              {user ? `${user.firstName} ${user.lastName}` : ''}
+            </span>
+            <span className="text-[10px] text-text-muted">
+              {user?.role === 'DOCTOR' ? 'Attending Physician' : user?.role === 'NURSE' ? 'Attending Nurse' : 'System Administrator'}
+            </span>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-accent-hover text-white text-[11px] font-bold border-2 border-border flex items-center justify-center shrink-0 cursor-default">
+            {userInitials}
+          </div>
+        </div>
+
+        {/* Sign out */}
+        <button
+          onClick={handleSignOut}
+          className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0"
+        >
+          Sign Out
+        </button>
       </div>
-
-      {/* Sign out */}
-      <button
-        onClick={handleSignOut}
-        className="h-7 px-3 bg-[#F7F8FA] border border-[#D1D5E0] rounded-md text-[11px] font-semibold text-[#374151] cursor-pointer shrink-0 font-sans"
-      >
-        Sign Out
-      </button>
     </header>
   );
 }
+
