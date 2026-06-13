@@ -1,3 +1,3 @@
 export default function VitalsPage() {
-  return <div style={{ padding: 20, fontSize: 13, color: '#6B7280' }}>Vital Signs — Phase 10</div>;
+  return <div className="p-5 text-[13px] text-[#6B7280]">Vital Signs — Phase 10</div>;
 }

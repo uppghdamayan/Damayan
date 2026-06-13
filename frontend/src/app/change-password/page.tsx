@@ -89,90 +89,43 @@ export default function ChangePasswordPage() {
   // Don't render until we know who the user is
   if (!user) return null;
 
-  const inputStyle = {
-    height: 34,
-    width: '100%' as const,
-    padding: '0 10px',
-    background: '#FFFFFF',
-    border: '1px solid #D1D5E0',
-    borderRadius: 6,
-    fontSize: 13,
-    color: '#0D1117',
-    outline: 'none' as const,
-    boxSizing: 'border-box' as const,
-    fontFamily: "'IBM Plex Sans', sans-serif",
-  };
+  const inputClassName = "h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans";
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#F0F2F5',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'IBM Plex Sans', sans-serif",
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+    <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
+      <div className="flex flex-col items-center gap-4">
         {/* Card */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            border: '1px solid #D1D5E0',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            padding: '40px 36px',
-            width: '100%',
-            maxWidth: 400,
-          }}
-        >
+        <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] px-9 py-10 w-full max-w-[400px]">
           {/* Logo + App name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                background: '#0A6E5F',
-                borderRadius: 6,
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#0D1117', letterSpacing: '-0.3px' }}>
+          <div className="flex items-center gap-2.5 mb-7">
+            <div className="w-8 h-8 bg-[#0A6E5F] rounded-md shrink-0" />
+            <span className="text-lg font-bold text-[#0D1117] tracking-[-0.3px]">
               DAMAYAN
             </span>
           </div>
 
           {/* User identity */}
-          <div style={{ marginBottom: 20 }}>
-            <h1 style={{ fontSize: 15, fontWeight: 700, color: '#0D1117', marginBottom: 4, margin: 0 }}>
+          <div className="mb-5">
+            <h1 className="text-[15px] font-bold text-[#0D1117] mb-1 mt-0">
               Change Temporary Password
             </h1>
-            <p style={{ fontSize: 12, color: '#6B7280', margin: '4px 0 0' }}>
+            <p className="text-xs text-[#6B7280] mt-1 mb-0">
               {user.firstName} {user.lastName} · {user.email}
             </p>
           </div>
 
           {/* Explanation */}
-          <div
-            style={{
-              background: '#FEF3C7',
-              border: '1px solid #F59E0B',
-              borderRadius: 6,
-              padding: '10px 12px',
-              marginBottom: 20,
-            }}
-          >
-            <p style={{ fontSize: 11, color: '#92400E', margin: 0, lineHeight: 1.5 }}>
+          <div className="bg-[#FEF3C7] border border-[#F59E0B] rounded-md px-3 py-2.5 mb-5">
+            <p className="text-[11px] text-[#92400E] m-0 leading-relaxed">
               Your account was provisioned with a temporary password. Set a permanent password to continue.
             </p>
           </div>
 
           {/* New Password */}
-          <div style={{ marginBottom: 14 }}>
+          <div className="mb-3.5">
             <label
               htmlFor="new-password"
-              style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 6 }}
+              className="block text-[11px] font-semibold text-[#374151] mb-1.5"
             >
               New Password
             </label>
@@ -182,23 +135,15 @@ export default function ChangePasswordPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Min 12 chars, mixed case, digit, special"
-              style={inputStyle}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#0A6E5F';
-                e.target.style.boxShadow = '0 0 0 3px rgba(10,110,95,0.12)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#D1D5E0';
-                e.target.style.boxShadow = 'none';
-              }}
+              className={inputClassName}
             />
           </div>
 
           {/* Confirm Password */}
-          <div style={{ marginBottom: 20 }}>
+          <div className="mb-5">
             <label
               htmlFor="confirm-password"
-              style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 6 }}
+              className="block text-[11px] font-semibold text-[#374151] mb-1.5"
             >
               Confirm Password
             </label>
@@ -209,35 +154,27 @@ export default function ChangePasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter your new password"
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              style={inputStyle}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#0A6E5F';
-                e.target.style.boxShadow = '0 0 0 3px rgba(10,110,95,0.12)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#D1D5E0';
-                e.target.style.boxShadow = 'none';
-              }}
+              className={inputClassName}
             />
           </div>
 
           {/* Password requirements hint */}
-          <div style={{ marginBottom: 16, padding: '0 2px' }}>
-            <p style={{ fontSize: 10, color: '#6B7280', margin: 0, lineHeight: 1.6 }}>
+          <div className="mb-4 px-0.5">
+            <p className="text-[10px] text-[#6B7280] m-0 leading-relaxed">
               Password requirements: at least 12 characters, one uppercase, one lowercase, one digit, one special character.
             </p>
           </div>
 
           {/* Error */}
           {error && (
-            <p style={{ fontSize: 12, color: '#991B1B', marginBottom: 14 }}>
+            <p className="text-xs text-[#991B1B] mb-3.5">
               {error}
             </p>
           )}
 
           {/* Success */}
           {success && (
-            <p style={{ fontSize: 12, color: '#14532D', marginBottom: 14 }}>
+            <p className="text-xs text-[#14532D] mb-3.5">
               Password changed successfully. Redirecting to login…
             </p>
           )}
@@ -246,20 +183,7 @@ export default function ChangePasswordPage() {
           <button
             onClick={handleSubmit}
             disabled={loading || !newPassword || !confirmPassword}
-            style={{
-              height: 34,
-              width: '100%',
-              background: loading ? '#085A4E' : '#0A6E5F',
-              color: '#FFFFFF',
-              border: '1px solid #085A4E',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
-              transition: 'background 0.15s',
-              fontFamily: "'IBM Plex Sans', sans-serif",
-            }}
+            className={`h-[34px] w-full text-white border border-[#085A4E] rounded-md text-[11px] font-semibold shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-colors duration-150 font-sans ${loading ? 'bg-[#085A4E] cursor-not-allowed' : 'bg-[#0A6E5F] cursor-pointer hover:bg-[#085A4E]'}`}
           >
             {loading ? 'Changing Password…' : 'Set New Password'}
           </button>
@@ -268,18 +192,7 @@ export default function ChangePasswordPage() {
         {/* Sign Out button — below the card */}
         <button
           onClick={handleSignOut}
-          style={{
-            height: 28,
-            padding: '0 16px',
-            background: 'transparent',
-            border: '1px solid #D1D5E0',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#6B7280',
-            cursor: 'pointer',
-            fontFamily: "'IBM Plex Sans', sans-serif",
-          }}
+          className="h-7 px-4 bg-transparent border border-[#D1D5E0] rounded-md text-[11px] font-semibold text-[#6B7280] cursor-pointer font-sans hover:bg-[#F7F8FA]"
         >
           Sign Out
         </button>

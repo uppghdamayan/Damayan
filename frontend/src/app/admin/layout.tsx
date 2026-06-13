@@ -26,77 +26,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'AD';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F2F5', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-
+    <div className="min-h-screen bg-[#F0F2F5] font-sans">
       {/* Topbar */}
-      <header
-        style={{
-          height: 56,
-          background: '#FFFFFF',
-          borderBottom: '1px solid #D1D5E0',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 20px',
-          gap: 12,
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
+      <header className="h-14 bg-white border-b border-[#D1D5E0] flex items-center px-5 gap-3 sticky top-0 z-[100]">
         {/* Logo */}
-        <div style={{ width: 22, height: 22, background: '#0A6E5F', borderRadius: 5 }} />
-        <span style={{ fontSize: 16, fontWeight: 700, color: '#0D1117' }}>DAMAYAN</span>
+        <div className="w-[22px] h-[22px] bg-[#0A6E5F] rounded-[5px]" />
+        <span className="text-base font-bold text-[#0D1117]">DAMAYAN</span>
 
         {/* Role pill */}
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.6px',
-            background: '#D4EDE9',
-            color: '#0A6E5F',
-            border: '1px solid #0A6E5F',
-            borderRadius: 20,
-            padding: '2px 8px',
-          }}
-        >
+        <span className="text-[10px] font-bold uppercase tracking-[0.6px] bg-[#D4EDE9] text-[#0A6E5F] border border-[#0A6E5F] rounded-[20px] px-2 py-0.5">
           {user?.role ?? 'Admin'}
         </span>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="ml-auto flex items-center gap-2.5">
           {/* User avatar */}
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: '#085A4E',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
+          <div className="w-8 h-8 rounded-full bg-[#085A4E] text-white flex items-center justify-center text-xs font-semibold">
             {initials}
           </div>
 
           {/* Sign out button */}
           <button
             onClick={handleSignOut}
-            style={{
-              height: 28,
-              padding: '0 12px',
-              background: '#F7F8FA',
-              border: '1px solid #D1D5E0',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#374151',
-              cursor: 'pointer',
-            }}
+            className="h-7 px-3 bg-[#F7F8FA] border border-[#D1D5E0] rounded-md text-[11px] font-semibold text-[#374151] cursor-pointer"
           >
             Sign Out
           </button>
@@ -104,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </header>
 
       {/* Main */}
-      <main style={{ padding: '24px 20px', maxWidth: 1200, margin: '0 auto' }}>
+      <main className="py-6 px-5 max-w-[1200px] mx-auto">
         {children}
       </main>
     </div>

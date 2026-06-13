@@ -16,44 +16,32 @@ function VisitRow({ visit }: { visit: Visit }) {
     : visit.progressNote?.subjective?.slice(0, 80)
     ? visit.progressNote.subjective.slice(0, 80) + '…'
     : null;
-  const statusColor = visit.status === 'PUBLISHED' ? '#4C1D95' : '#92400E';
-  const statusBg    = visit.status === 'PUBLISHED' ? '#EDE9FE' : '#FEF3C7';
-  const statusBorder= visit.status === 'PUBLISHED' ? '#8B5CF6' : '#F59E0B';
+
+  const statusClasses = visit.status === 'PUBLISHED' 
+    ? 'bg-[#EDE9FE] text-[#4C1D95] border-[#8B5CF6]' 
+    : 'bg-[#FEF3C7] text-[#92400E] border-[#F59E0B]';
 
   return (
-    <div style={{
-      padding: '10px 14px', borderBottom: '1px solid #D1D5E0',
-      display: 'flex', gap: 12, alignItems: 'flex-start',
-    }}>
+    <div className="px-3.5 py-2.5 border-b border-[#D1D5E0] flex gap-3 items-start">
       {/* Date column */}
-      <div style={{ width: 90, flexShrink: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#0D1117' }}>{dateStr}</div>
-        <div style={{ fontSize: 11, color: '#6B7280', fontFamily: "'IBM Plex Mono', monospace" }}>{timeStr}</div>
+      <div className="w-[90px] shrink-0">
+        <div className="text-xs font-semibold text-[#0D1117]">{dateStr}</div>
+        <div className="text-[11px] text-[#6B7280] font-mono">{timeStr}</div>
       </div>
 
       {/* Detail column */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
-          <span style={{ fontSize: 12, color: '#374151' }}>{physician}</span>
-          <span style={{
-            fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
-            padding: '1px 5px', borderRadius: 4,
-            background: visit.visitType === 'INITIAL' ? '#DBEAFE' : '#D4EDE9',
-            color: visit.visitType === 'INITIAL' ? '#1E3A8A' : '#085A4E',
-            border: `1px solid ${visit.visitType === 'INITIAL' ? '#3B82F6' : '#0A6E5F'}`,
-          }}>
+      <div className="flex-1 min-w-0">
+        <div className="flex gap-1.5 items-center flex-wrap mb-0.5">
+          <span className="text-xs text-[#374151]">{physician}</span>
+          <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-[5px] py-[1px] rounded border ${visit.visitType === 'INITIAL' ? 'bg-[#DBEAFE] text-[#1E3A8A] border-[#3B82F6]' : 'bg-[#D4EDE9] text-[#085A4E] border-[#0A6E5F]'}`}>
             {visit.visitType === 'INITIAL' ? 'Initial' : 'Progress'}
           </span>
-          <span style={{
-            fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
-            padding: '1px 5px', borderRadius: 4,
-            background: statusBg, color: statusColor, border: `1px solid ${statusBorder}`,
-          }}>
+          <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-[5px] py-[1px] rounded border ${statusClasses}`}>
             {visit.status}
           </span>
         </div>
         {notePreview && (
-          <div style={{ fontSize: 12, color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div className="text-xs text-[#6B7280] whitespace-nowrap overflow-hidden text-ellipsis">
             {notePreview}
           </div>
         )}
@@ -69,14 +57,14 @@ export function VisitHistoryCard({ patientId }: { patientId: string }) {
   const total  = data?.meta.total ?? 0;
 
   return (
-    <div style={{ background: '#FFFFFF', border: '1px solid #D1D5E0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+    <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
       {/* Card header */}
-      <div style={{ background: '#F7F8FA', borderBottom: '1px solid #D1D5E0', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, background: '#EFF1F5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🗒</div>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#374151' }}>Visit History</span>
+      <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-[26px] h-[26px] bg-[#EFF1F5] rounded-md flex items-center justify-center text-[13px]">🗒</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">Visit History</span>
           {total > 0 && (
-            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', padding: '2px 6px', borderRadius: 4, background: '#D4EDE9', color: '#085A4E', border: '1px solid #0A6E5F' }}>
+            <span className="text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded bg-[#D4EDE9] text-[#085A4E] border border-[#0A6E5F]">
               {total} visit{total !== 1 ? 's' : ''}
             </span>
           )}
@@ -85,19 +73,19 @@ export function VisitHistoryCard({ patientId }: { patientId: string }) {
 
       {/* Body */}
       {isLoading ? (
-        <div style={{ padding: '16px 14px', fontSize: 12, color: '#6B7280' }}>Loading visit history…</div>
+        <div className="px-3.5 py-4 text-xs text-[#6B7280]">Loading visit history…</div>
       ) : visits.length === 0 ? (
-        <div style={{ padding: '20px 14px', fontSize: 12, color: '#6B7280', textAlign: 'center' }}>
+        <div className="py-5 px-3.5 text-xs text-[#6B7280] text-center">
           No visits recorded yet.
         </div>
       ) : (
         <>
           {visits.map((v) => <VisitRow key={v.id} visit={v} />)}
           {total > 5 && (
-            <div style={{ padding: '10px 14px', borderTop: '1px solid #D1D5E0' }}>
+            <div className="px-3.5 py-2.5 border-t border-[#D1D5E0]">
               <button
                 onClick={() => setExpanded(!expanded)}
-                style={{ background: 'none', border: 'none', fontSize: 12, color: '#0A6E5F', cursor: 'pointer', fontWeight: 600 }}
+                className="bg-transparent border-none text-xs text-[#0A6E5F] cursor-pointer font-semibold"
               >
                 {expanded ? '▲ Show less' : `▼ Show all ${total} visits`}
               </button>

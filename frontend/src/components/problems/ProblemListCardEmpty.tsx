@@ -1,16 +1,16 @@
 export function ProblemListCardEmpty() {
   return (
-    <div style={{ background: '#FFFFFF', border: '1px solid #D1D5E0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-      <div style={{ background: '#F7F8FA', borderBottom: '1px solid #D1D5E0', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, background: '#EFF1F5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>📋</div>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#374151' }}>Problem List</span>
+    <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+      <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-[26px] h-[26px] bg-[#EFF1F5] rounded-md flex items-center justify-center text-[13px]">📋</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">Problem List</span>
         </div>
-        <button style={{ height: 28, padding: '0 12px', background: '#F7F8FA', color: '#374151', border: '1px solid #D1D5E0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+        <button className="h-7 px-3 bg-[#F7F8FA] text-[#374151] border border-[#D1D5E0] rounded-md text-[11px] font-semibold cursor-pointer">
           Manage
         </button>
       </div>
-      <div style={{ padding: '20px 14px', fontSize: 12, color: '#6B7280', textAlign: 'center' }}>
+      <div className="py-5 px-3.5 text-xs text-[#6B7280] text-center">
         No problems recorded. Problems are added when the Initial Note assessment is published.
       </div>
     </div>

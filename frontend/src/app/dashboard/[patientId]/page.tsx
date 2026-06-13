@@ -18,8 +18,8 @@ function PatientBannerSection({ patientId }: { patientId: string }) {
   if (isLoading) return <PatientBannerSkeleton />;
   if (isError || !patient) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-        <span style={{ fontSize: 13, color: '#991B1B' }}>Patient record not found.</span>
+      <div className="flex justify-center p-10">
+        <span className="text-[13px] text-[#991B1B]">Patient record not found.</span>
       </div>
     );
   }
@@ -33,7 +33,7 @@ function VitalsSection({ patientId }: { patientId: string }) {
 
 function ProblemsAndMedsSection() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+    <div className="grid grid-cols-2 gap-4">
       <ProblemListCardEmpty />
       <MedicationListCardEmpty />
     </div>

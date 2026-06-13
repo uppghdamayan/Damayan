@@ -34,15 +34,11 @@ export function Skeleton({ width, height, borderRadius = 6, className, style }: 
 
   return (
     <div
-      className={className}
+      className={`shrink-0 bg-[linear-gradient(90deg,#EFF1F5_25%,#F7F8FA_50%,#EFF1F5_75%)] bg-[length:200%_100%] animate-[shimmer_1.5s_infinite_linear] ${className || ''}`}
       style={{
         width,
         height,
         borderRadius,
-        background: 'linear-gradient(90deg, #EFF1F5 25%, #F7F8FA 50%, #EFF1F5 75%)',
-        backgroundSize: '200% 100%',
-        animation: 'shimmer 1.5s infinite linear',
-        flexShrink: 0,
         ...style,
       }}
     />

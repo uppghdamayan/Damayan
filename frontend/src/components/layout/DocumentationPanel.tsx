@@ -46,148 +46,43 @@ export function DocumentationPanel() {
       ref={panelRef}
       style={{
         width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0,
-        overflow: 'hidden',
-        borderLeft: documentationPanelOpen ? '1px solid #D1D5E0' : '1px solid transparent',
-        background: '#F7F8FA',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-        transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-left-color 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        position: 'relative',
       }}
+      className={`overflow-hidden bg-[#F7F8FA] flex flex-col shrink-0 relative ${documentationPanelOpen ? 'border-l border-[#D1D5E0]' : 'border-l border-transparent'} ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]'}`}
     >
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 5,
-          cursor: 'ew-resize',
-          background: 'transparent',
-          zIndex: 10,
-          transition: 'background 0.15s',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#0A6E5F'; }}
-        onMouseLeave={(e) => { if (!isResizing) e.currentTarget.style.background = 'transparent'; }}
+        className={`absolute left-0 top-0 bottom-0 w-[5px] cursor-ew-resize z-10 transition-colors duration-150 ${isResizing ? 'bg-[#0A6E5F]' : 'bg-transparent hover:bg-[#0A6E5F]'}`}
       />
 
       {/* Header */}
-      <div
-        style={{
-          minWidth: 420,
-          background: '#D4EDE9',
-          borderBottom: '1px solid #0D9E8C',
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#085A4E',
-            flex: 1,
-          }}
-        >
+      <div className="min-w-[420px] bg-[#D4EDE9] border-b border-[#0D9E8C] px-3.5 py-2.5 flex items-center gap-2.5 shrink-0">
+        <span className="text-[13px] font-bold text-[#085A4E] flex-1">
           Progress Note
         </span>
 
         {/* Autosave indicator */}
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            background: '#DCFCE7',
-            color: '#14532D',
-            border: '1px solid #22C55E',
-            padding: '2px 6px',
-            borderRadius: 4,
-          }}
-        >
+        <span className="text-[9px] font-bold uppercase tracking-[0.5px] bg-[#DCFCE7] text-[#14532D] border border-[#22C55E] px-1.5 py-0.5 rounded">
           Saved
         </span>
 
         {/* Status badge */}
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            background: '#FEF3C7',
-            color: '#92400E',
-            border: '1px solid #F59E0B',
-            padding: '2px 6px',
-            borderRadius: 4,
-          }}
-        >
+        <span className="text-[9px] font-bold uppercase tracking-[0.5px] bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B] px-1.5 py-0.5 rounded">
           Draft
         </span>
       </div>
 
       {/* Body — scrollable */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: 16,
-          minWidth: 420,
-        }}
-      >
+      <div className="flex-1 overflow-y-auto p-4 min-w-[420px]">
         {/* Placeholder for Phase 6–9 work */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              background: '#D4EDE9',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 18,
-              color: '#0A6E5F',
-            }}
-          >
+        <div className="flex flex-col items-center justify-center h-full gap-3">
+          <div className="w-10 h-10 bg-[#D4EDE9] rounded-lg flex items-center justify-center text-lg text-[#0A6E5F]">
             📝
           </div>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#0D1117',
-              margin: 0,
-            }}
-          >
+          <p className="text-[13px] font-semibold text-[#0D1117] m-0">
             Progress Note Workspace
           </p>
-          <p
-            style={{
-              fontSize: 12,
-              color: '#6B7280',
-              textAlign: 'center',
-              maxWidth: 280,
-              margin: 0,
-              lineHeight: 1.5,
-            }}
-          >
+          <p className="text-xs text-[#6B7280] text-center max-w-[280px] m-0 leading-relaxed">
             The note-writing workspace will be available in Phase 6. Select a patient and create a visit to get started.
           </p>
         </div>

@@ -26,46 +26,31 @@ interface CreateResult {
 }
 
 // ─── Badge ────────────────────────────────────
-const roleBadgeStyle = (role: string): React.CSSProperties => {
-  const map: Record<string, React.CSSProperties> = {
-    ADMIN:  { background: '#EDE9FE', color: '#4C1D95', border: '1px solid #8B5CF6' },
-    DOCTOR: { background: '#D4EDE9', color: '#085A4E', border: '1px solid #0A6E5F' },
-    NURSE:  { background: '#DBEAFE', color: '#1E3A8A', border: '1px solid #3B82F6' },
+const RoleBadge = ({ role }: { role: string }) => {
+  const map: Record<string, string> = {
+    ADMIN: 'bg-[#EDE9FE] text-[#4C1D95] border-[#8B5CF6]',
+    DOCTOR: 'bg-[#D4EDE9] text-[#085A4E] border-[#0A6E5F]',
+    NURSE: 'bg-[#DBEAFE] text-[#1E3A8A] border-[#3B82F6]',
   };
-  return {
-    ...( map[role] ?? {}),
-    fontSize: 9,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.6px',
-    padding: '2px 6px',
-    borderRadius: 4,
-    display: 'inline-block',
-  };
+  return (
+    <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded border inline-block ${map[role] || ''}`}>
+      {role}
+    </span>
+  );
 };
 
-const statusBadgeStyle = (isActive: boolean): React.CSSProperties => isActive
-  ? { background: '#DCFCE7', color: '#14532D', border: '1px solid #22C55E', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }
-  : { background: '#F7F8FA', color: '#6B7280', border: '1px solid #D1D5E0', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', padding: '2px 6px', borderRadius: 4, display: 'inline-block' };
+const StatusBadge = ({ isActive }: { isActive: boolean }) => (
+  <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded border inline-block ${isActive ? 'bg-[#DCFCE7] text-[#14532D] border-[#22C55E]' : 'bg-[#F7F8FA] text-[#6B7280] border-[#D1D5E0]'}`}>
+    {isActive ? 'Active' : 'Inactive'}
+  </span>
+);
 
 // ─── Button ───────────────────────────────────
 const PrimaryBtn = ({ children, onClick, disabled = false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    style={{
-      height: 28,
-      padding: '0 14px',
-      background: disabled ? '#6B7280' : '#0A6E5F',
-      color: '#FFFFFF',
-      border: `1px solid ${disabled ? '#6B7280' : '#085A4E'}`,
-      borderRadius: 6,
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
-      flexShrink: 0,
-    }}
+    className={`h-7 px-3.5 rounded-md text-[11px] font-semibold shrink-0 shadow-[0_2px_4px_rgba(10,110,95,0.15)] ${disabled ? 'bg-[#6B7280] text-white border border-[#6B7280] cursor-not-allowed' : 'bg-[#0A6E5F] text-white border border-[#085A4E] cursor-pointer'}`}
   >
     {children}
   </button>
@@ -74,17 +59,7 @@ const PrimaryBtn = ({ children, onClick, disabled = false }: { children: React.R
 const SecBtn = ({ children, onClick, danger = false }: { children: React.ReactNode; onClick?: () => void; danger?: boolean }) => (
   <button
     onClick={onClick}
-    style={{
-      height: 28,
-      padding: '0 12px',
-      background: danger ? '#FEE2E2' : '#F7F8FA',
-      color: danger ? '#991B1B' : '#374151',
-      border: `1px solid ${danger ? '#EF4444' : '#D1D5E0'}`,
-      borderRadius: 6,
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: 'pointer',
-    }}
+    className={`h-7 px-3 rounded-md text-[11px] font-semibold cursor-pointer border ${danger ? 'bg-[#FEE2E2] text-[#991B1B] border-[#EF4444]' : 'bg-[#F7F8FA] text-[#374151] border-[#D1D5E0]'}`}
   >
     {children}
   </button>
@@ -94,20 +69,15 @@ const SecBtn = ({ children, onClick, danger = false }: { children: React.ReactNo
 const Field = ({
   label, required = false, children,
 }: { label: string; required?: boolean; children: React.ReactNode }) => (
-  <div style={{ marginBottom: 14 }}>
-    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-      {label} {required && <span style={{ color: '#991B1B' }}>*</span>}
+  <div className="mb-3.5">
+    <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">
+      {label} {required && <span className="text-[#991B1B]">*</span>}
     </label>
     {children}
   </div>
 );
 
-const inputStyle: React.CSSProperties = {
-  height: 34, width: '100%', padding: '0 10px',
-  background: '#FFFFFF', border: '1px solid #D1D5E0',
-  borderRadius: 6, fontSize: 13, color: '#0D1117',
-  outline: 'none', boxSizing: 'border-box',
-};
+const inputClassName = "h-[34px] w-full px-2.5 bg-white border rounded-md text-[13px] text-[#0D1117] outline-none box-border";
 
 // ─── Modal ────────────────────────────────────
 function CreateAccountModal({
@@ -164,24 +134,18 @@ function CreateAccountModal({
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
+      className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: '#FFFFFF', borderRadius: 10, maxWidth: 520, width: '100%',
-          margin: '0 16px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        }}
+        className="bg-white rounded-[10px] max-w-[520px] w-full mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
       >
         {/* Modal header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #D1D5E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#0D1117' }}>Create User Account</span>
+        <div className="px-5 py-4 border-b border-[#D1D5E0] flex justify-between items-center">
+          <span className="text-[15px] font-bold text-[#0D1117]">Create User Account</span>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#6B7280', lineHeight: 1 }}
+            className="bg-transparent border-none text-lg cursor-pointer text-[#6B7280] leading-none"
             aria-label="Close modal"
           >
             ×
@@ -189,51 +153,51 @@ function CreateAccountModal({
         </div>
 
         {/* Modal body */}
-        <div style={{ padding: '16px 20px' }}>
+        <div className="px-5 py-4">
           {errors.submit && (
-            <div style={{ background: '#FEE2E2', border: '1px solid #EF4444', borderRadius: 6, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#991B1B' }}>
+            <div className="bg-[#FEE2E2] border border-[#EF4444] rounded-md px-3 py-2 mb-3.5 text-xs text-[#991B1B]">
               {errors.submit}
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="First Name" required>
-              <input style={{ ...inputStyle, borderColor: errors.firstName ? '#EF4444' : '#D1D5E0' }} value={form.firstName} onChange={set('firstName')} maxLength={30} />
-              {errors.firstName && <p style={{ fontSize: 12, color: '#991B1B', marginTop: 4 }}>{errors.firstName}</p>}
+              <input className={`${inputClassName} ${errors.firstName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} value={form.firstName} onChange={set('firstName')} maxLength={30} />
+              {errors.firstName && <p className="text-xs text-[#991B1B] mt-1">{errors.firstName}</p>}
             </Field>
             <Field label="Last Name" required>
-              <input style={{ ...inputStyle, borderColor: errors.lastName ? '#EF4444' : '#D1D5E0' }} value={form.lastName} onChange={set('lastName')} maxLength={30} />
-              {errors.lastName && <p style={{ fontSize: 12, color: '#991B1B', marginTop: 4 }}>{errors.lastName}</p>}
+              <input className={`${inputClassName} ${errors.lastName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} value={form.lastName} onChange={set('lastName')} maxLength={30} />
+              {errors.lastName && <p className="text-xs text-[#991B1B] mt-1">{errors.lastName}</p>}
             </Field>
           </div>
 
           <Field label="Middle Name">
-            <input style={inputStyle} value={form.middleName} onChange={set('middleName')} maxLength={30} placeholder="Optional" />
+            <input className={`${inputClassName} border-[#D1D5E0]`} value={form.middleName} onChange={set('middleName')} maxLength={30} placeholder="Optional" />
           </Field>
 
           <Field label="Email Address" required>
-            <input style={{ ...inputStyle, borderColor: errors.email ? '#EF4444' : '#D1D5E0' }} type="email" value={form.email} onChange={set('email')} />
-            {errors.email && <p style={{ fontSize: 12, color: '#991B1B', marginTop: 4 }}>{errors.email}</p>}
+            <input className={`${inputClassName} ${errors.email ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} type="email" value={form.email} onChange={set('email')} />
+            {errors.email && <p className="text-xs text-[#991B1B] mt-1">{errors.email}</p>}
           </Field>
 
           <Field label="Role" required>
             <select
               value={form.role}
               onChange={set('role')}
-              style={{ ...inputStyle, appearance: 'none', cursor: 'pointer' }}
+              className={`${inputClassName} border-[#D1D5E0] appearance-none cursor-pointer`}
             >
               <option value="DOCTOR">Doctor</option>
               <option value="NURSE">Nurse</option>
             </select>
           </Field>
 
-          <p style={{ fontSize: 11, color: '#6B7280', marginTop: -6 }}>
+          <p className="text-[11px] text-[#6B7280] mt-[-6px]">
             A 16-character temporary password will be generated. Share it securely — it is shown only once.
           </p>
         </div>
 
         {/* Modal footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #D1D5E0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="px-5 py-3 border-t border-[#D1D5E0] flex justify-end gap-2">
           <SecBtn onClick={onClose}>Cancel</SecBtn>
           <PrimaryBtn onClick={handleSubmit} disabled={loading}>
             {loading ? 'Creating…' : 'Create Account'}
@@ -247,30 +211,23 @@ function CreateAccountModal({
 // ─── Temp Password Display ───────────────────
 function TempPasswordToast({ result, onDismiss }: { result: CreateResult; onDismiss: () => void }) {
   return (
-    <div
-      style={{
-        position: 'fixed', bottom: 24, right: 24, zIndex: 2000,
-        background: '#FFFFFF', border: '1px solid #22C55E', borderRadius: 8,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '16px 20px',
-        maxWidth: 380,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#14532D' }}>Password Generated</span>
-        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', fontSize: 16, lineHeight: 1 }}>×</button>
+    <div className="fixed bottom-6 right-6 z-[2000] bg-white border border-[#22C55E] rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.12)] px-5 py-4 max-w-[380px]">
+      <div className="flex justify-between items-start mb-2.5">
+        <span className="text-[13px] font-bold text-[#14532D]">Password Generated</span>
+        <button onClick={onDismiss} className="bg-transparent border-none cursor-pointer text-[#6B7280] text-base leading-none">×</button>
       </div>
-      <p style={{ fontSize: 12, color: '#374151', marginBottom: 10 }}>
+      <p className="text-xs text-[#374151] mb-2.5">
         {result.user.firstName} {result.user.lastName} ({result.user.role}) — {result.user.email}
       </p>
-      <div style={{ background: '#F7F8FA', border: '1px solid #D1D5E0', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
-        <p style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>
+      <div className="bg-[#F7F8FA] border border-[#D1D5E0] rounded-md px-3 py-2 mb-2.5">
+        <p className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.6px] mb-1">
           Temporary Password (shown once)
         </p>
-        <code style={{ fontSize: 15, fontWeight: 700, color: '#0D1117', fontFamily: "'IBM Plex Mono', monospace" }}>
+        <code className="text-[15px] font-bold text-[#0D1117] font-mono">
           {result.tempPassword}
         </code>
       </div>
-      <p style={{ fontSize: 11, color: '#6B7280' }}>{result.note}</p>
+      <p className="text-[11px] text-[#6B7280]">{result.note}</p>
     </div>
   );
 }
@@ -335,10 +292,10 @@ export default function AccountsPage() {
   return (
     <>
       {/* Page header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div className="flex justify-between items-center mb-5">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0D1117', marginBottom: 4 }}>User Accounts</h1>
-          <p style={{ fontSize: 12, color: '#6B7280' }}>
+          <h1 className="text-xl font-bold text-[#0D1117] mb-1">User Accounts</h1>
+          <p className="text-xs text-[#6B7280]">
             {meta.total} account{meta.total !== 1 ? 's' : ''} total
           </p>
         </div>
@@ -346,23 +303,23 @@ export default function AccountsPage() {
       </div>
 
       {/* Accounts table card */}
-      <div style={{ background: '#FFFFFF', border: '1px solid #D1D5E0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+      <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
         {/* Card header */}
-        <div style={{ background: '#F7F8FA', borderBottom: '1px solid #D1D5E0', padding: '10px 14px' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#374151' }}>
+        <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">
             All Accounts
           </span>
         </div>
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>Loading…</div>
+          <div className="p-8 text-center text-[#6B7280] text-[13px]">Loading…</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ background: '#F7F8FA' }}>
+              <tr className="bg-[#F7F8FA]">
                 {['Name', 'Email', 'Role', 'Status', 'Created', 'Actions'].map((h) => (
-                  <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#374151', borderBottom: '1px solid #D1D5E0' }}>
+                  <th key={h} className="px-2.5 py-2 text-left text-[9px] font-bold uppercase tracking-[0.6px] text-[#374151] border-b border-[#D1D5E0]">
                     {h}
                   </th>
                 ))}
@@ -372,31 +329,27 @@ export default function AccountsPage() {
               {accounts.map((account, i) => (
                 <tr
                   key={account.id}
-                  style={{ borderBottom: i < accounts.length - 1 ? '1px solid #D1D5E0' : 'none' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#EFF1F5')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  className={`hover:bg-[#EFF1F5] ${i < accounts.length - 1 ? 'border-b border-[#D1D5E0]' : ''}`}
                 >
-                  <td style={{ padding: '8px 10px', fontSize: 12, color: '#374151', fontWeight: 500 }}>
+                  <td className="px-2.5 py-2 text-xs text-[#374151] font-medium">
                     {account.lastName}, {account.firstName}
                     {account.middleName ? ` ${account.middleName[0]}.` : ''}
                   </td>
-                  <td style={{ padding: '8px 10px', fontSize: 12, color: '#374151' }}>
+                  <td className="px-2.5 py-2 text-xs text-[#374151]">
                     {account.email}
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
-                    <span style={roleBadgeStyle(account.role)}>{account.role}</span>
+                  <td className="px-2.5 py-2">
+                    <RoleBadge role={account.role} />
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
-                    <span style={statusBadgeStyle(account.isActive)}>
-                      {account.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                  <td className="px-2.5 py-2">
+                    <StatusBadge isActive={account.isActive} />
                   </td>
-                  <td style={{ padding: '8px 10px', fontSize: 11, color: '#6B7280', fontFamily: "'IBM Plex Mono', monospace" }}>
+                  <td className="px-2.5 py-2 text-[11px] text-[#6B7280] font-mono">
                     {new Date(account.createdAt).toLocaleDateString('en-PH')}
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
+                  <td className="px-2.5 py-2">
                     {account.isActive && account.role !== 'ADMIN' && (
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div className="flex gap-1.5">
                         <SecBtn
                           onClick={() => handleResetPassword(account.id)}
                         >
@@ -415,7 +368,7 @@ export default function AccountsPage() {
               ))}
               {accounts.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', fontSize: 13, color: '#6B7280' }}>
+                  <td colSpan={6} className="p-8 text-center text-[13px] text-[#6B7280]">
                     No accounts found.
                   </td>
                 </tr>
@@ -426,18 +379,12 @@ export default function AccountsPage() {
 
         {/* Pagination */}
         {meta.totalPages > 1 && (
-          <div style={{ padding: '10px 14px', borderTop: '1px solid #D1D5E0', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="px-3.5 py-2.5 border-t border-[#D1D5E0] flex gap-2 justify-end">
             {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
                 onClick={() => fetchAccounts(p)}
-                style={{
-                  height: 28, width: 28,
-                  background: p === meta.page ? '#0A6E5F' : '#F7F8FA',
-                  color: p === meta.page ? '#FFFFFF' : '#374151',
-                  border: `1px solid ${p === meta.page ? '#085A4E' : '#D1D5E0'}`,
-                  borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}
+                className={`w-7 h-7 rounded-md text-[11px] font-semibold cursor-pointer border ${p === meta.page ? 'bg-[#0A6E5F] text-white border-[#085A4E]' : 'bg-[#F7F8FA] text-[#374151] border-[#D1D5E0]'}`}
               >
                 {p}
               </button>

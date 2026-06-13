@@ -55,55 +55,28 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#F0F2F5',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'IBM Plex Sans', sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid #D1D5E0',
-          borderRadius: 8,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-          padding: '40px 36px',
-          width: '100%',
-          maxWidth: 400,
-        }}
-      >
+    <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
+      <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] px-9 py-10 w-full max-w-[400px]">
         {/* Logo + App name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              background: '#0A6E5F',
-              borderRadius: 6,
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ fontSize: 18, fontWeight: 700, color: '#0D1117', letterSpacing: '-0.3px' }}>
+        <div className="flex items-center gap-2.5 mb-7">
+          <div className="w-8 h-8 bg-[#0A6E5F] rounded-md shrink-0" />
+          <span className="text-lg font-bold text-[#0D1117] tracking-[-0.3px]">
             DAMAYAN
           </span>
         </div>
 
-        <h1 style={{ fontSize: 15, fontWeight: 700, color: '#0D1117', marginBottom: 4 }}>
+        <h1 className="text-[15px] font-bold text-[#0D1117] mb-1">
           Sign in to your account
         </h1>
-        <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 24 }}>
+        <p className="text-xs text-[#6B7280] mb-6">
           Use the credentials provided by your administrator.
         </p>
 
         {/* Email field */}
-        <div style={{ marginBottom: 14 }}>
+        <div className="mb-3.5">
           <label
             htmlFor="email"
-            style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 6 }}
+            className="block text-[11px] font-semibold text-[#374151] mb-1.5"
           >
             Email address
           </label>
@@ -113,34 +86,15 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@damayan.ph"
-            style={{
-              height: 34,
-              width: '100%',
-              padding: '0 10px',
-              background: '#FFFFFF',
-              border: '1px solid #D1D5E0',
-              borderRadius: 6,
-              fontSize: 13,
-              color: '#0D1117',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#0A6E5F';
-              e.target.style.boxShadow = '0 0 0 3px rgba(10,110,95,0.12)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#D1D5E0';
-              e.target.style.boxShadow = 'none';
-            }}
+            className="h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
           />
         </div>
 
         {/* Password field */}
-        <div style={{ marginBottom: 20 }}>
+        <div className="mb-5">
           <label
             htmlFor="password"
-            style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 6 }}
+            className="block text-[11px] font-semibold text-[#374151] mb-1.5"
           >
             Password
           </label>
@@ -151,32 +105,13 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••••••"
             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            style={{
-              height: 34,
-              width: '100%',
-              padding: '0 10px',
-              background: '#FFFFFF',
-              border: '1px solid #D1D5E0',
-              borderRadius: 6,
-              fontSize: 13,
-              color: '#0D1117',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#0A6E5F';
-              e.target.style.boxShadow = '0 0 0 3px rgba(10,110,95,0.12)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#D1D5E0';
-              e.target.style.boxShadow = 'none';
-            }}
+            className="h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
           />
         </div>
 
         {/* Error message */}
         {error && (
-          <p style={{ fontSize: 12, color: '#991B1B', marginBottom: 14 }}>
+          <p className="text-xs text-[#991B1B] mb-3.5">
             {error}
           </p>
         )}
@@ -185,24 +120,12 @@ export default function LoginPage() {
         <button
           onClick={handleLogin}
           disabled={loading || !email || !password}
-          style={{
-            height: 34,
-            width: '100%',
-            background: loading ? '#085A4E' : '#0A6E5F',
-            color: '#FFFFFF',
-            border: '1px solid #085A4E',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
-            transition: 'background 0.15s',
-          }}
+          className={`h-[34px] w-full text-white border border-[#085A4E] rounded-md text-[11px] font-semibold shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-colors duration-150 ${loading ? 'bg-[#085A4E] cursor-not-allowed' : 'bg-[#0A6E5F] cursor-pointer hover:bg-[#085A4E]'}`}
         >
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
 
-        <p style={{ marginTop: 20, fontSize: 11, color: '#6B7280', textAlign: 'center' }}>
+        <p className="mt-5 text-[11px] text-[#6B7280] text-center">
           Accounts are provisioned by your system administrator.
         </p>
       </div>

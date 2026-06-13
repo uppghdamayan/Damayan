@@ -34,29 +34,14 @@ export function ScreenNav({ patientId }: { patientId: string }) {
   };
 
   return (
-    <nav style={{
-      height: 52, background: '#FFFFFF', borderBottom: '1px solid #D1D5E0',
-      display: 'flex', alignItems: 'center', padding: '0 16px', gap: 6,
-      flexShrink: 0, overflowX: 'auto',
-    }}>
+    <nav className="h-[52px] bg-white border-b border-[#D1D5E0] flex items-center px-4 gap-1.5 shrink-0 overflow-x-auto">
       {tabs.map((tab) => {
         const active = isActive(tab);
         return (
           <button
             key={tab.id}
             onClick={() => router.push(`${basePath}${tab.path}`)}
-            style={{
-              height: 32, padding: '0 12px', border: '1px solid',
-              borderColor: active ? 'transparent' : '#D1D5E0',
-              borderRadius: 6, fontSize: 12, fontWeight: 500,
-              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              background: active ? '#0A6E5F' : '#F7F8FA',
-              color: active ? '#FFFFFF' : '#374151',
-              boxShadow: active ? '0 4px 12px rgba(10,110,95,0.25)' : 'none',
-              transition: 'all 0.12s',
-            }}
-            onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = '#EFF1F5'; e.currentTarget.style.borderColor = '#9BA3B5'; } }}
-            onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = '#F7F8FA'; e.currentTarget.style.borderColor = '#D1D5E0'; } }}
+            className={`h-8 px-3 border rounded-md text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 transition-all duration-[120ms] ${active ? 'border-transparent bg-[#0A6E5F] text-white shadow-[0_4px_12px_rgba(10,110,95,0.25)]' : 'border-[#D1D5E0] bg-[#F7F8FA] text-[#374151] hover:bg-[#EFF1F5] hover:border-[#9BA3B5]'}`}
           >
             {tab.label}
           </button>

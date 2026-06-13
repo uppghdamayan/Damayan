@@ -29,33 +29,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div
       id="shell"
-      style={{
-        height: '100vh',
-        background: '#F0F2F5',
-        fontFamily: "'IBM Plex Sans', sans-serif",
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
+      className="h-screen bg-[#F0F2F5] font-sans flex flex-col overflow-hidden"
     >
       <Topbar />
       <div
         id="body"
-        style={{
-          display: 'flex',
-          flex: 1,
-          overflow: 'hidden',
-        }}
+        className="flex flex-1 overflow-hidden"
       >
         <Sidebar />
         <div
           id="middle-column"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
+          className="flex-1 flex flex-col overflow-hidden"
         >
           {children}
         </div>

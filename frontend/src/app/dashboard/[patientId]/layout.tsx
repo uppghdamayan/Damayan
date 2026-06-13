@@ -17,9 +17,9 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
   }, [patient, setActivePatient]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div className="flex flex-col flex-1 overflow-hidden">
       <ScreenNav patientId={patientId} />
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
         {children}
       </div>
     </div>

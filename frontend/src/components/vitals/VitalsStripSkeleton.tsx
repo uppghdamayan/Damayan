@@ -4,19 +4,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function VitalsStripSkeleton() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+    <div className="grid grid-cols-5 gap-3">
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          style={{
-            background: '#F7F8FA',
-            border: '1px solid #D1D5E0',
-            borderRadius: 8,
-            padding: '10px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-          }}
+          className="bg-[#F7F8FA] border border-[#D1D5E0] rounded-lg px-3 py-2.5 flex flex-col gap-1.5"
         >
           <Skeleton width={60} height={9} borderRadius={4} />
           <Skeleton width={70} height={18} borderRadius={4} />

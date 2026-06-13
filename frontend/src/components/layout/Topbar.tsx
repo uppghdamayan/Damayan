@@ -23,68 +23,36 @@ export function Topbar() {
   const roleLabel = user?.role ?? 'USER';
 
   return (
-    <header
-      style={{
-        height: 56,
-        background: '#FFFFFF',
-        borderBottom: '1px solid #D1D5E0',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        gap: 10,
-        position: 'sticky',
-        top: 0,
-        zIndex: 200,
-        flexShrink: 0,
-      }}
-    >
+    <header className="h-14 bg-white border-b border-[#D1D5E0] flex items-center px-4 gap-2.5 sticky top-0 z-[200] shrink-0">
       {/* Sidebar toggle */}
       <button
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
         title="Toggle sidebar"
-        style={{
-          width: 32, height: 32, border: 'none', background: 'none',
-          cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 5,
-          borderRadius: 6, flexShrink: 0,
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#F7F8FA')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+        className="w-8 h-8 border-none bg-transparent hover:bg-[#F7F8FA] cursor-pointer flex flex-col items-center justify-center gap-[5px] rounded-md shrink-0 transition-colors"
       >
         {[0, 1, 2].map((i) => (
-          <span key={i} style={{ width: 16, height: 2, background: '#374151', borderRadius: 2 }} />
+          <span key={i} className="w-4 h-0.5 bg-[#374151] rounded-sm" />
         ))}
       </button>
 
       {/* Logo */}
-      <div style={{ width: 22, height: 22, background: '#0A6E5F', borderRadius: 5, flexShrink: 0 }} />
-      <span style={{ fontSize: 16, fontWeight: 700, color: '#0D1117', letterSpacing: '-0.3px', flexShrink: 0 }}>
+      <div className="w-[22px] h-[22px] bg-[#0A6E5F] rounded-[5px] shrink-0" />
+      <span className="text-base font-bold text-[#0D1117] tracking-[-0.3px] shrink-0">
         DAMAYAN
       </span>
 
       {/* Role pill */}
-      <span style={{
-        fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-        letterSpacing: '0.6px', background: '#D4EDE9', color: '#0A6E5F',
-        border: '1px solid #0A6E5F', borderRadius: 20, padding: '2px 8px',
-        flexShrink: 0,
-      }}>
+      <span className="text-[10px] font-bold uppercase tracking-[0.6px] bg-[#D4EDE9] text-[#0A6E5F] border border-[#0A6E5F] rounded-[20px] px-2 py-0.5 shrink-0">
         {roleLabel}
       </span>
 
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
       {/* + New Note button */}
       <button
         onClick={() => {/* Phase 6+ — note creation flow */}}
-        style={{
-          height: 34, padding: '0 14px', background: '#0A6E5F', color: '#FFFFFF',
-          border: '1px solid #085A4E', borderRadius: 6, fontSize: 11,
-          fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-          boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
-          fontFamily: "'IBM Plex Sans', sans-serif",
-        }}
+        className="h-[34px] px-3.5 bg-[#0A6E5F] text-white border border-[#085A4E] rounded-md text-[11px] font-semibold cursor-pointer shrink-0 shadow-[0_2px_4px_rgba(10,110,95,0.15)] font-sans"
       >
         + New Note
       </button>
@@ -94,20 +62,7 @@ export function Topbar() {
         onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
         aria-label="Toggle documentation panel"
         title={documentationPanelOpen ? 'Close documentation panel' : 'Open documentation panel'}
-        style={{
-          height: 34, padding: '0 10px',
-          background: '#F7F8FA',
-          border: '1px solid transparent',
-          borderRadius: 6,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          transition: 'all 0.15s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#EFF1F5'; e.currentTarget.style.borderColor = '#D1D5E0'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = '#F7F8FA'; e.currentTarget.style.borderColor = 'transparent'; }}
+        className="h-[34px] px-2.5 bg-[#F7F8FA] border border-transparent rounded-md cursor-pointer flex items-center justify-center shrink-0 transition-all duration-150 ease-in hover:bg-[#EFF1F5] hover:border-[#D1D5E0]"
       >
         {documentationPanelOpen ? (
           <PanelRightClose size={16} color="#374151" strokeWidth={1.5} />
@@ -117,12 +72,8 @@ export function Topbar() {
       </button>
 
       {/* User avatar */}
-      <div style={{
-        width: 32, height: 32, borderRadius: '50%', background: '#085A4E',
-        color: '#FFFFFF', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0,
-        cursor: 'default',
-      }}
+      <div 
+        className="w-8 h-8 rounded-full bg-[#085A4E] text-white flex items-center justify-center text-xs font-semibold shrink-0 cursor-default"
         title={user ? `${user.firstName} ${user.lastName}` : ''}
       >
         {userInitials}
@@ -131,12 +82,7 @@ export function Topbar() {
       {/* Sign out */}
       <button
         onClick={handleSignOut}
-        style={{
-          height: 28, padding: '0 12px', background: '#F7F8FA',
-          border: '1px solid #D1D5E0', borderRadius: 6, fontSize: 11,
-          fontWeight: 600, color: '#374151', cursor: 'pointer', flexShrink: 0,
-          fontFamily: "'IBM Plex Sans', sans-serif",
-        }}
+        className="h-7 px-3 bg-[#F7F8FA] border border-[#D1D5E0] rounded-md text-[11px] font-semibold text-[#374151] cursor-pointer shrink-0 font-sans"
       >
         Sign Out
       </button>

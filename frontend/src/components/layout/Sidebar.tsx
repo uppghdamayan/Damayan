@@ -48,47 +48,24 @@ export function Sidebar() {
     <>
       <aside
         suppressHydrationWarning
-        style={{
-          width: sidebarCollapsed ? 0 : 280,
-          background: '#FFFFFF',
-          borderRight: sidebarCollapsed ? '1px solid transparent' : '1px solid #D1D5E0',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          flexShrink: 0,
-          overflow: 'hidden',
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-right-color 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
+        className={`bg-white flex flex-col h-full shrink-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${sidebarCollapsed ? 'w-0 border-r border-transparent' : 'w-[280px] border-r border-[#D1D5E0]'}`}
       >
         {/* Inner wrapper to prevent content from squishing during collapse */}
-        <div style={{ width: 280, minWidth: 280, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="w-[280px] min-w-[280px] flex flex-col h-full">
           {/* Search + Add zone */}
-          <div style={{ padding: '10px 10px 6px', borderBottom: '1px solid #D1D5E0', flexShrink: 0 }}>
+          <div className="pt-2.5 pb-1.5 px-2.5 border-b border-[#D1D5E0] shrink-0">
             {/* Search */}
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search patients…"
-              style={{
-                width: '100%', height: 34, padding: '0 10px',
-                background: '#F7F8FA', border: '1px solid #D1D5E0',
-                borderRadius: 6, fontSize: 12, color: '#0D1117',
-                outline: 'none', boxSizing: 'border-box', marginBottom: 8,
-                fontFamily: "'IBM Plex Sans', sans-serif",
-              }}
-              onFocus={(e) => { e.target.style.borderColor = '#0A6E5F'; e.target.style.boxShadow = '0 0 0 3px rgba(10,110,95,0.12)'; }}
-              onBlur={(e)  => { e.target.style.borderColor = '#D1D5E0'; e.target.style.boxShadow = 'none'; }}
+              className="w-full h-[34px] px-2.5 bg-[#F7F8FA] border border-[#D1D5E0] rounded-md text-xs text-[#0D1117] outline-none box-border mb-2 font-sans focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
             />
             {/* Add new patient */}
             {canCreatePatient && (
               <button
                 onClick={() => setNewPatientOpen(true)}
-                style={{
-                  width: '100%', height: 30, background: '#0A6E5F', color: '#FFFFFF',
-                  border: '1px solid #085A4E', borderRadius: 6, fontSize: 11,
-                  fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box',
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                }}
+                className="w-full h-[30px] bg-[#0A6E5F] text-white border border-[#085A4E] rounded-md text-[11px] font-semibold cursor-pointer box-border font-sans"
               >
                 + New Patient
               </button>
@@ -96,20 +73,15 @@ export function Sidebar() {
           </div>
 
           {/* Patient list */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+          <div className="flex-1 overflow-y-auto py-1">
             {isLoading && <SidebarSkeleton />}
             {!isLoading && patients.length === 0 && (
-              <p style={{ padding: '16px 12px', fontSize: 12, color: '#6B7280' }}>No patients found.</p>
+              <p className="px-3 py-4 text-xs text-[#6B7280]">No patients found.</p>
             )}
             {grouped.map(({ letter, patients: group }) => (
               <div key={letter}>
                 {/* Letter marker */}
-                <div style={{
-                  padding: '6px 12px 2px',
-                  fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '0.6px', color: '#6B7280',
-                  position: 'sticky', top: 0, background: '#FFFFFF', zIndex: 1,
-                }}>
+                <div className="pt-1.5 pb-0.5 px-3 text-[10px] font-bold uppercase tracking-[0.6px] text-[#6B7280] sticky top-0 bg-white z-10">
                   {letter}
                 </div>
 
@@ -124,45 +96,24 @@ export function Sidebar() {
                     <button
                       key={p.id}
                       onClick={() => handleSelect(p)}
-                      onMouseEnter={(e) => {
-                        if (!isActive) e.currentTarget.style.background = '#F7F8FA';
-                        handlePrefetch(p.id);
-                      }}
-                      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center',
-                        gap: 8, padding: '7px 12px', border: 'none',
-                        borderLeft: isActive ? '3px solid #0A6E5F' : '3px solid transparent',
-                        background: isActive ? '#F7F8FA' : 'transparent',
-                        cursor: 'pointer', textAlign: 'left',
-                        fontFamily: "'IBM Plex Sans', sans-serif",
-                      }}
+                      onMouseEnter={() => handlePrefetch(p.id)}
+                      className={`w-full flex items-center gap-2 py-[7px] px-3 border-none border-l-[3px] cursor-pointer text-left font-sans ${isActive ? 'border-l-[#0A6E5F] bg-[#F7F8FA]' : 'border-l-transparent bg-transparent hover:bg-[#F7F8FA]'}`}
                     >
                       {/* Avatar */}
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: isActive ? '#085A4E' : '#D4EDE9',
-                        color: isActive ? '#FFFFFF' : '#0A6E5F',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 11, fontWeight: 700, flexShrink: 0,
-                      }}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isActive ? 'bg-[#085A4E] text-white' : 'bg-[#D4EDE9] text-[#0A6E5F]'}`}>
                         {ini}
                       </div>
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 12, fontWeight: isActive ? 600 : 400,
-                          color: isActive ? '#0D1117' : '#374151',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-xs whitespace-nowrap overflow-hidden text-ellipsis ${isActive ? 'font-semibold text-[#0D1117]' : 'font-normal text-[#374151]'}`}>
                           {p.lastName}, {p.firstName}
                         </div>
-                        <div style={{ fontSize: 11, color: '#6B7280', display: 'flex', gap: 4 }}>
+                        <div className="text-[11px] text-[#6B7280] flex gap-1">
                           <span>{sexLabel}</span>
                           <span>·</span>
                           <span>{age}y</span>
                           <span>·</span>
-                          <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{p.patientCode}</span>
+                          <span className="font-mono">{p.patientCode}</span>
                         </div>
                       </div>
 
@@ -170,7 +121,7 @@ export function Sidebar() {
                       {hasAllergy && (
                         <span
                           title={`Allergies: ${p.allergies}`}
-                          style={{ fontSize: 13, flexShrink: 0, color: '#F59E0B' }}
+                          className="text-[13px] shrink-0 text-[#F59E0B]"
                           aria-label={`Allergies: ${p.allergies}`}
                         >
                           ⚠

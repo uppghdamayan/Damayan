@@ -9,22 +9,22 @@ export function VitalsStripEmpty({ patientId }: { patientId: string }) {
 
   // This component renders a placeholder until Phase 10 implements real vitals.
   return (
-    <div style={{ background: '#FFFFFF', border: '1px solid #D1D5E0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-      <div style={{ background: '#F7F8FA', borderBottom: '1px solid #D1D5E0', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, background: '#EFF1F5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>❤️</div>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#374151' }}>Latest Vital Signs</span>
+    <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+      <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-[26px] h-[26px] bg-[#EFF1F5] rounded-md flex items-center justify-center text-[13px]">❤️</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">Latest Vital Signs</span>
         </div>
-        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', padding: '2px 6px', borderRadius: 4, background: '#FEF3C7', color: '#92400E', border: '1px solid #F59E0B' }}>
+        <span className="text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B]">
           No reading today
         </span>
       </div>
-      <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+      <div className="p-3.5 grid grid-cols-5 gap-2">
         {VITALS.map((v) => (
-          <div key={v.label} style={{ background: '#F7F8FA', border: '1px solid #D1D5E0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#6B7280', marginBottom: 6 }}>{v.label}</div>
-            <div style={{ fontSize: 18, fontWeight: 500, color: '#9BA3B5', fontFamily: "'IBM Plex Mono', monospace", marginBottom: 2 }}>{v.placeholder}</div>
-            <div style={{ fontSize: 10, color: '#6B7280' }}>{v.unit}</div>
+          <div key={v.label} className="bg-[#F7F8FA] border border-[#D1D5E0] rounded-lg px-3 py-2.5 text-center">
+            <div className="text-[9px] font-bold uppercase tracking-[0.6px] text-[#6B7280] mb-1.5">{v.label}</div>
+            <div className="text-lg font-medium text-[#9BA3B5] font-mono mb-0.5">{v.placeholder}</div>
+            <div className="text-[10px] text-[#6B7280]">{v.unit}</div>
           </div>
         ))}
       </div>

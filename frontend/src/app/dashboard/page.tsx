@@ -34,70 +34,21 @@ export default function DashboardIndexPage() {
 
   return (
     <>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          height: '100%',
-          fontFamily: "'IBM Plex Sans', sans-serif",
-        }}
-      >
+      <div className="flex flex-col items-center h-full font-sans">
         {/* Zone A — Primary Action Area */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 0,
-            width: '100%',
-            maxWidth: 600,
-            padding: '0 20px',
-          }}
-        >
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[600px] px-5 gap-0">
           {/* Icon container */}
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              background: 'var(--accent-light, #D4EDE9)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <UserSearch size={22} color="var(--accent, #0A6E5F)" strokeWidth={1.5} />
+          <div className="w-10 h-10 rounded-lg bg-[#D4EDE9] flex items-center justify-center mb-3">
+            <UserSearch size={22} color="#0A6E5F" strokeWidth={1.5} />
           </div>
 
           {/* Headline */}
-          <h2
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: 'var(--text-primary, #0D1117)',
-              margin: 0,
-              marginBottom: 8,
-            }}
-          >
+          <h2 className="text-xl font-bold text-[#0D1117] m-0 mb-2">
             Select a patient to begin
           </h2>
 
           {/* Subline */}
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--text-muted, #6B7280)',
-              textAlign: 'center',
-              maxWidth: 340,
-              margin: 0,
-              marginBottom: 20,
-              lineHeight: 1.5,
-            }}
-          >
+          <p className="text-[13px] text-[#6B7280] text-center max-w-[340px] m-0 mb-5 leading-relaxed">
             Search the sidebar or register a new patient to open their clinical record.
           </p>
 
@@ -105,28 +56,7 @@ export default function DashboardIndexPage() {
           {canCreatePatient && (
             <button
               onClick={() => setNewPatientOpen(true)}
-              style={{
-                height: 34,
-                padding: '0 18px',
-                background: 'var(--accent, #0A6E5F)',
-                color: '#FFFFFF',
-                border: '1px solid var(--accent-hover, #085A4E)',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
-                transition: 'all 0.15s ease',
-                fontFamily: "'IBM Plex Sans', sans-serif",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--accent-hover, #085A4E)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(10,110,95,0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--accent, #0A6E5F)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(10,110,95,0.15)';
-              }}
+              className="h-[34px] px-[18px] bg-[#0A6E5F] text-white border border-[#085A4E] rounded-md text-xs font-semibold cursor-pointer shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-all duration-150 font-sans hover:bg-[#085A4E] hover:shadow-[0_4px_8px_rgba(10,110,95,0.2)]"
             >
               + New Patient
             </button>
@@ -134,85 +64,29 @@ export default function DashboardIndexPage() {
         </div>
 
         {/* Separator */}
-        <div
-          style={{
-            height: 1,
-            background: 'var(--border, #D1D5E0)',
-            width: '100%',
-            maxWidth: 600,
-            margin: '0 auto 24px',
-          }}
-        />
+        <div className="h-px bg-[#D1D5E0] w-full max-w-[600px] mx-auto mb-6" />
 
         {/* Zone B — Feature Orientation Grid */}
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 600,
-            padding: '0 20px 32px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 16,
-          }}
-        >
+        <div className="w-full max-w-[600px] px-5 pb-8 grid grid-cols-3 gap-4">
           {capabilityCards.map((card) => (
             <div
               key={card.title}
-              style={{
-                background: 'var(--surface, #FFFFFF)',
-                border: '1px solid var(--border, #D1D5E0)',
-                borderRadius: 8,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-              }}
+              className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden"
             >
               {/* Card header */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '10px 14px',
-                  background: 'var(--surface-2, #F7F8FA)',
-                  borderBottom: '1px solid var(--border, #D1D5E0)',
-                }}
-              >
+              <div className="flex items-center gap-[9px] px-3.5 py-2.5 bg-[#F7F8FA] border-b border-[#D1D5E0]">
                 {/* Icon container */}
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 6,
-                    background: 'var(--accent-light, #D4EDE9)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <card.icon size={20} color="var(--accent, #0A6E5F)" strokeWidth={1.5} />
+                <div className="w-8 h-8 rounded-md bg-[#D4EDE9] flex items-center justify-center shrink-0">
+                  <card.icon size={20} color="#0A6E5F" strokeWidth={1.5} />
                 </div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--text-primary, #0D1117)',
-                  }}
-                >
+                <span className="text-xs font-semibold text-[#0D1117]">
                   {card.title}
                 </span>
               </div>
 
               {/* Card body */}
-              <div style={{ padding: '12px 14px' }}>
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--text-muted, #6B7280)',
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
+              <div className="px-3.5 py-3">
+                <p className="text-[11px] text-[#6B7280] m-0 leading-relaxed">
                   {card.description}
                 </p>
               </div>

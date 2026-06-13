@@ -9,16 +9,8 @@ interface NewPatientModalProps {
   onCreated: (patient: unknown) => void;
 }
 
-const inputStyle: React.CSSProperties = {
-  height: 34, width: '100%', padding: '0 10px',
-  background: '#FFFFFF', border: '1px solid #D1D5E0',
-  borderRadius: 6, fontSize: 13, color: '#0D1117',
-  outline: 'none', boxSizing: 'border-box',
-};
-
-const errorStyle: React.CSSProperties = {
-  fontSize: 12, color: '#991B1B', marginTop: 4,
-};
+const inputClassName = "h-[34px] w-full px-2.5 bg-white border rounded-md text-[13px] text-[#0D1117] outline-none box-border";
+const errorClassName = "text-xs text-[#991B1B] mt-1";
 
 function Field({
   label, required = false, error, children,
@@ -26,12 +18,12 @@ function Field({
   label: string; required?: boolean; error?: string; children: React.ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 5 }}>
-        {label} {required && <span style={{ color: '#991B1B' }}>*</span>}
+    <div className="mb-3">
+      <label className="block text-[11px] font-semibold text-[#374151] mb-1">
+        {label} {required && <span className="text-[#991B1B]">*</span>}
       </label>
       {children}
-      {error && <p style={errorStyle}>{error}</p>}
+      {error && <p className={errorClassName}>{error}</p>}
     </div>
   );
 }
@@ -109,62 +101,54 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
+      className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: '#FFFFFF', borderRadius: 10, maxWidth: 560,
-          width: '100%', margin: '0 16px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        }}
+        className="bg-white rounded-[10px] max-w-[560px] w-full mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.2)] max-h-[90vh] flex flex-col"
       >
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #D1D5E0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#0D1117' }}>Register New Patient</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6B7280', lineHeight: 1 }} aria-label="Close">×</button>
+        <div className="px-5 py-4 border-b border-[#D1D5E0] flex justify-between items-center shrink-0">
+          <span className="text-[15px] font-bold text-[#0D1117]">Register New Patient</span>
+          <button onClick={onClose} className="bg-transparent border-none text-xl cursor-pointer text-[#6B7280] leading-none" aria-label="Close">×</button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
+        <div className="px-5 py-4 overflow-y-auto flex-1">
           {errors.submit && (
-            <div style={{ background: '#FEE2E2', border: '1px solid #EF4444', borderRadius: 6, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#991B1B' }}>
+            <div className="bg-[#FEE2E2] border border-[#EF4444] rounded-md px-3 py-2 mb-3.5 text-xs text-[#991B1B]">
               {errors.submit}
             </div>
           )}
 
           {/* Name row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Field label="Last Name" required error={errors.lastName}>
-              <input style={{ ...inputStyle, borderColor: errors.lastName ? '#EF4444' : '#D1D5E0' }}
+              <input className={`${inputClassName} ${errors.lastName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`}
                 value={form.lastName} onChange={set('lastName')} maxLength={30} />
             </Field>
             <Field label="First Name" required error={errors.firstName}>
-              <input style={{ ...inputStyle, borderColor: errors.firstName ? '#EF4444' : '#D1D5E0' }}
+              <input className={`${inputClassName} ${errors.firstName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`}
                 value={form.firstName} onChange={set('firstName')} maxLength={30} />
             </Field>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10 }}>
+          <div className="grid grid-cols-[1fr_80px] gap-2.5">
             <Field label="Middle Name" error={errors.middleName}>
-              <input style={inputStyle} value={form.middleName} onChange={set('middleName')} maxLength={30} placeholder="Optional" />
+              <input className={`${inputClassName} border-[#D1D5E0]`} value={form.middleName} onChange={set('middleName')} maxLength={30} placeholder="Optional" />
             </Field>
             <Field label="Ext." error={errors.extension}>
-              <input style={inputStyle} value={form.extension} onChange={set('extension')} maxLength={3} placeholder="Jr." />
+              <input className={`${inputClassName} border-[#D1D5E0]`} value={form.extension} onChange={set('extension')} maxLength={3} placeholder="Jr." />
             </Field>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Field label="Date of Birth" required error={errors.dateOfBirth}>
-              <input type="date" style={{ ...inputStyle, borderColor: errors.dateOfBirth ? '#EF4444' : '#D1D5E0' }}
+              <input type="date" className={`${inputClassName} ${errors.dateOfBirth ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`}
                 value={form.dateOfBirth} onChange={set('dateOfBirth')} max={new Date().toISOString().split('T')[0]} />
             </Field>
             <Field label="Sex" required error={errors.sex}>
-              <select style={{ ...inputStyle, appearance: 'none', cursor: 'pointer', borderColor: errors.sex ? '#EF4444' : '#D1D5E0' }}
+              <select className={`${inputClassName} appearance-none cursor-pointer ${errors.sex ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`}
                 value={form.sex} onChange={set('sex')}>
                 <option value="">— Select —</option>
                 <option value="MALE">Male</option>
@@ -175,42 +159,42 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
           </div>
 
           {/* Address section */}
-          <div style={{ marginTop: 4, marginBottom: 10, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#6B7280' }}>
+          <div className="mt-1 mb-2.5 text-[10px] font-bold uppercase tracking-[0.6px] text-[#6B7280]">
             Address (Optional)
           </div>
 
           <Field label="Street">
-            <input style={inputStyle} value={form.addressStreet} onChange={set('addressStreet')} placeholder="House No., Street" />
+            <input className={`${inputClassName} border-[#D1D5E0]`} value={form.addressStreet} onChange={set('addressStreet')} placeholder="House No., Street" />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Field label="Barangay">
-              <input style={inputStyle} value={form.addressBarangay} onChange={set('addressBarangay')} maxLength={100} />
+              <input className={`${inputClassName} border-[#D1D5E0]`} value={form.addressBarangay} onChange={set('addressBarangay')} maxLength={100} />
             </Field>
             <Field label="City / Municipality">
-              <input style={inputStyle} value={form.addressCity} onChange={set('addressCity')} maxLength={100} />
+              <input className={`${inputClassName} border-[#D1D5E0]`} value={form.addressCity} onChange={set('addressCity')} maxLength={100} />
             </Field>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="grid grid-cols-2 gap-2.5">
             <Field label="Region">
-              <input style={inputStyle} value={form.addressRegion} onChange={set('addressRegion')} maxLength={100} />
+              <input className={`${inputClassName} border-[#D1D5E0]`} value={form.addressRegion} onChange={set('addressRegion')} maxLength={100} />
             </Field>
             <Field label="Country">
-              <input style={{ ...inputStyle, background: '#F7F8FA', color: '#6B7280' }} value="Philippines" readOnly />
+              <input className={`${inputClassName} bg-[#F7F8FA] text-[#6B7280] border-[#D1D5E0]`} value="Philippines" readOnly />
             </Field>
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #D1D5E0', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-          <button onClick={onClose} style={{ height: 28, padding: '0 12px', background: '#F7F8FA', color: '#374151', border: '1px solid #D1D5E0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+        <div className="px-5 py-3 border-t border-[#D1D5E0] flex justify-end gap-2 shrink-0">
+          <button onClick={onClose} className="h-7 px-3 bg-[#F7F8FA] text-[#374151] border border-[#D1D5E0] rounded-md text-[11px] font-semibold cursor-pointer">
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={createPatient.isPending}
-            style={{ height: 28, padding: '0 14px', background: createPatient.isPending ? '#6B7280' : '#0A6E5F', color: '#FFFFFF', border: `1px solid ${createPatient.isPending ? '#6B7280' : '#085A4E'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: createPatient.isPending ? 'not-allowed' : 'pointer' }}
+            className={`h-7 px-3.5 rounded-md text-[11px] font-semibold ${createPatient.isPending ? 'bg-[#6B7280] text-white border border-[#6B7280] cursor-not-allowed' : 'bg-[#0A6E5F] text-white border border-[#085A4E] cursor-pointer'}`}
           >
             {createPatient.isPending ? 'Saving…' : 'Register Patient'}
           </button>

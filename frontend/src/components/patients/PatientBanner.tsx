@@ -17,44 +17,34 @@ export function PatientBanner({ patient }: { patient: Patient }) {
   ].filter(Boolean);
 
   return (
-    <div style={{
-      background: '#FFFFFF', border: '1px solid #D1D5E0',
-      borderRadius: 8, padding: 16,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-      display: 'flex', gap: 16, alignItems: 'flex-start',
-    }}>
+    <div className="bg-white border border-[#D1D5E0] rounded-lg p-4 shadow-[0_4px_12px_rgba(0,0,0,0.05)] flex gap-4 items-start">
       {/* Avatar */}
-      <div style={{
-        width: 48, height: 48, borderRadius: '50%',
-        background: '#085A4E', color: '#FFFFFF',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, fontWeight: 700, flexShrink: 0,
-      }}>
+      <div className="w-12 h-12 rounded-full bg-[#085A4E] text-white flex items-center justify-center text-base font-bold shrink-0">
         {ini}
       </div>
 
       {/* Main info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-          <span style={{ fontSize: 18, fontWeight: 700, color: '#0D1117' }}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2.5 flex-wrap mb-1">
+          <span className="text-lg font-bold text-[#0D1117]">
             {patient.lastName}, {patient.firstName}
             {patient.middleName ? ` ${patient.middleName}` : ''}
             {patient.extension ? ` ${patient.extension}` : ''}
           </span>
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: '#6B7280', background: '#F7F8FA', border: '1px solid #D1D5E0', borderRadius: 4, padding: '1px 6px' }}>
+          <span className="font-mono text-[11px] text-[#6B7280] bg-[#F7F8FA] border border-[#D1D5E0] rounded px-1.5 py-[1px]">
             {patient.patientCode}
           </span>
         </div>
 
-        <div style={{ fontSize: 12, color: '#374151', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="text-xs text-[#374151] flex gap-3 flex-wrap">
           <span>{patient.sex === 'MALE' ? 'Male' : patient.sex === 'FEMALE' ? 'Female' : 'Other'}</span>
-          <span style={{ color: '#D1D5E0' }}>|</span>
+          <span className="text-[#D1D5E0]">|</span>
           <span>DOB: {dob}</span>
-          <span style={{ color: '#D1D5E0' }}>|</span>
+          <span className="text-[#D1D5E0]">|</span>
           <span>{age} years old</span>
           {addressParts.length > 0 && (
             <>
-              <span style={{ color: '#D1D5E0' }}>|</span>
+              <span className="text-[#D1D5E0]">|</span>
               <span>{addressParts.join(', ')}</span>
             </>
           )}
@@ -62,13 +52,10 @@ export function PatientBanner({ patient }: { patient: Patient }) {
 
         {/* Allergy tags */}
         {allergyList.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#6B7280', alignSelf: 'center' }}>Allergies:</span>
+          <div className="flex gap-1.5 flex-wrap mt-2">
+            <span className="text-[10px] font-bold uppercase text-[#6B7280] self-center">Allergies:</span>
             {allergyList.map((a) => (
-              <span key={a} style={{
-                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                background: '#FEE2E2', color: '#991B1B', border: '1px solid #EF4444',
-              }}>
+              <span key={a} className="text-[11px] font-semibold px-2 py-0.5 rounded-[20px] bg-[#FEE2E2] text-[#991B1B] border border-[#EF4444]">
                 {a}
               </span>
             ))}
