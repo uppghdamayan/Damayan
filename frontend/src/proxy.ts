@@ -23,17 +23,20 @@ export default async function proxy(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
   const pathname = new URL(request.url).pathname;
 
-  const isAuthRoute = pathname === '/login' || pathname === '/';
-  const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard');
+  const isLoginRoute     = pathname === '/login' || pathname === '/';
+  const isAdminRoute     = pathname.startsWith('/admin');
+  const isDashboardRoute = pathname.startsWith('/dashboard');
+  const isProtected      = isAdminRoute || isDashboardRoute;
 
-  if (!session && (isProtectedRoute || pathname === '/')) {
+  // Unauthenticated: redirect to login
+  if (!session && isProtected) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (session && isAuthRoute) {
-    // We don't have the user role here efficiently, so we redirect to a central entry or assume admin/dashboard. 
-    // Ideally we redirect to /dashboard and let dashboard decide, or /admin/accounts
-    return NextResponse.redirect(new URL('/admin/accounts', request.url));
+  // Authenticated on login/root: redirect to appropriate workspace
+  if (session && isLoginRoute) {
+    // Default redirect for authenticated users — login page handles role-based routing
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return response;
