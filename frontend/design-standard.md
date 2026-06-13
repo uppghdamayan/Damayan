@@ -1,7 +1,7 @@
 # DAMAYAN EMR — Design Standards
 
-**Version 1.0 · Based on Wireframe3 + Compiled Requirements v02**
-*Problem-Oriented Dynamic Clinical Note Interface for Primary Care*
+**Version 2.0 · Tailwind CSS + shadcn/ui + Next.js**  
+*Aligned with Wireframe3 · Problem-Oriented Dynamic Clinical Note Interface for Primary Care*
 
 ---
 
@@ -9,114 +9,240 @@
 
 DAMAYAN is used primarily by doctors and medical personnel in a clinical setting. The interface must be designed with the following priorities:
 
-1. **Clarity over cleverness.** Every label, button, and section should be immediately understandable without prior training. Doctors — including senior physicians who may not be accustomed to digital tools — should never need to guess what something does.
-2. **Reduce cognitive load.** The system organizes information by problem, not by visit. Users should never have to scroll through previous notes to understand the current state of a patient.
-3. **Large, readable text.** Minimum body font size of 13px, with all critical values (vitals, problem names) rendered at 15–18px. The interface must support browser zoom up to 150% without breaking layouts.
-4. **High contrast.** Text colors against backgrounds must meet WCAG 2.2 AA contrast ratios at all times. Never use light-on-light or muted-on-muted color combinations for clinical data.
-5. **Keyboard navigability.** All forms should be completable using only the keyboard. Tab order must be logical and match the visual reading flow of the form.
-6. **Single-page, no multi-window.** Each patient's workspace is contained in one screen. Doctors should never need to open multiple tabs to cross-reference data.
-7. **Auto-save always on.** Doctors should never lose note progress. Drafts are saved continuously in the background.
+1. **Clarity over cleverness.** Every label, button, and section must be immediately understandable without prior training.
+2. **Reduce cognitive load.** The system organizes information by problem, not by visit. Users should never scroll through previous notes to understand the current state of a patient.
+3. **Large, readable text.** Minimum body font size of `text-[13px]`, with all critical values (vitals, problem names) at `text-[15px]` to `text-lg`. The interface must support browser zoom up to 150% without breaking layouts.
+4. **High contrast.** All text/background combinations must meet WCAG 2.2 AA (4.5:1 for body, 3:1 for large text).
+5. **Keyboard navigability.** All forms must be completable using only the keyboard. Tab order must match the visual reading flow.
+6. **Single-page, no multi-window.** Each patient's workspace is contained in one screen.
+7. **Auto-save always on.** Drafts are saved continuously in the background. Doctors should never lose note progress.
 
 ---
 
-## 2. Design Tokens
+## 2. Tailwind Configuration
 
-All visual properties derive from these CSS custom properties. Never hardcode color or size values in components.
+### 2.1 `tailwind.config.ts`
 
-### 2.1 Color Palette
+Extend Tailwind's theme to map all design tokens as CSS custom properties. Use `hsl()` values with Tailwind's standard `<alpha-value>` convention so opacity modifiers work (e.g. `bg-accent/20`).
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--bg` | `#F0F2F5` | Page background |
-| `--surface` | `#FFFFFF` | Cards, sidebar, topbar |
-| `--surface-2` | `#F7F8FA` | Card headers, input fields, muted areas |
-| `--surface-3` | `#EFF1F5` | Hover states, selected rows |
-| `--border` | `#D1D5E0` | Default borders |
-| `--border-strong` | `#9BA3B5` | Focus rings on non-accent elements, hover borders |
-| `--text-primary` | `#0D1117` | Page titles, patient names, primary labels |
-| `--text-secondary` | `#374151` | Body text, form values, card content |
-| `--text-muted` | `#6B7280` | Meta labels, timestamps, helper text |
-| `--accent` | `#0A6E5F` | Primary action color (teal-green) |
-| `--accent-hover` | `#085A4E` | Hover state of primary actions |
-| `--accent-light` | `#D4EDE9` | Accent backgrounds, role pills |
-| `--accent-mid` | `#0D9E8C` | Screen nav labels, secondary accent |
-| `--amber` | `#92400E` | Warning text |
-| `--amber-bg` | `#FEF3C7` | Warning backgrounds (draft, caution) |
-| `--amber-border` | `#F59E0B` | Warning borders |
-| `--red` | `#991B1B` | Error/critical text |
-| `--red-bg` | `#FEE2E2` | Error/critical backgrounds |
-| `--red-border` | `#EF4444` | Error/critical borders |
-| `--blue` | `#1E3A8A` | Info text |
-| `--blue-bg` | `#DBEAFE` | Info backgrounds |
-| `--blue-border` | `#3B82F6` | Info borders |
-| `--green` | `#14532D` | Success/normal-range text |
-| `--green-bg` | `#DCFCE7` | Success/saved backgrounds |
-| `--green-border` | `#22C55E` | Success/saved borders |
-| `--purple` | `#4C1D95` | Published/inherited text |
-| `--purple-bg` | `#EDE9FE` | Published/inherited backgrounds |
-| `--purple-border` | `#8B5CF6` | Published/inherited borders |
+```ts
+// tailwind.config.ts
+import type { Config } from "tailwindcss";
 
-### 2.2 Spacing Scale
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // Surface hierarchy
+        bg:         "var(--bg)",
+        surface:    "var(--surface)",
+        "surface-2": "var(--surface-2)",
+        "surface-3": "var(--surface-3)",
 
-Use multiples of 4px. Common values:
+        // Borders
+        border:        "var(--border)",
+        "border-strong": "var(--border-strong)",
 
-| Name | Value | Usage |
-|---|---|---|
-| xs | 4px | Icon-to-label gap, tight inline gaps |
-| sm | 8px | Compact padding, between-row gaps |
-| md | 12px | Standard padding for cards and form fields |
-| lg | 14–16px | Section padding, form group spacing |
-| xl | 24px | Between major sections |
+        // Text hierarchy
+        "text-primary":   "var(--text-primary)",
+        "text-secondary": "var(--text-secondary)",
+        "text-muted":     "var(--text-muted)",
 
-### 2.3 Layout Dimensions
+        // Brand / accent
+        accent:       "var(--accent)",
+        "accent-hover": "var(--accent-hover)",
+        "accent-light": "var(--accent-light)",
+        "accent-mid":   "var(--accent-mid)",
 
-| Token | Value | Usage |
-|---|---|---|
-| `--topbar-h` | `56px` | Fixed top navigation bar |
-| `--sidebar-w` | `280px` | Patient list sidebar (collapsible) |
-| `--documentation-panel-width` | `420px` | Right-side documentation panel |
-| `--timeline-w` | `260px` | Note timeline rail |
+        // Semantic palettes
+        amber:        "var(--amber)",
+        "amber-bg":   "var(--amber-bg)",
+        "amber-border": "var(--amber-border)",
 
-### 2.4 Border Radius
+        red:          "var(--red)",
+        "red-bg":     "var(--red-bg)",
+        "red-border": "var(--red-border)",
 
-| Usage | Value |
-|---|---|
-| Cards, containers | `8px` |
-| Buttons, inputs, small badges | `6px` |
-| Pill badges (role, allergy, status) | `20px` |
-| Avatar circles | `50%` |
-| Icon containers | `5–6px` |
+        blue:         "var(--blue)",
+        "blue-bg":    "var(--blue-bg)",
+        "blue-border": "var(--blue-border)",
+
+        green:        "var(--green)",
+        "green-bg":   "var(--green-bg)",
+        "green-border": "var(--green-border)",
+
+        purple:       "var(--purple)",
+        "purple-bg":  "var(--purple-bg)",
+        "purple-border": "var(--purple-border)",
+      },
+      fontFamily: {
+        sans:  ["IBM Plex Sans", "sans-serif"],
+        mono:  ["IBM Plex Mono", "monospace"],
+      },
+      borderRadius: {
+        card:   "8px",
+        btn:    "6px",
+        pill:   "20px",
+        avatar: "50%",
+        icon:   "6px",
+      },
+      height: {
+        topbar:  "var(--topbar-h)",
+        "snav":  "52px",
+        "tb-btn": "34px",
+        "sec-btn": "28px",
+      },
+      width: {
+        sidebar:   "var(--sidebar-w)",
+        "doc-panel": "var(--documentation-panel-width)",
+        timeline:  "var(--timeline-w)",
+      },
+      boxShadow: {
+        card:   "0 4px 12px rgba(0,0,0,0.05)",
+        "btn-primary": "0 2px 4px rgba(10,110,95,0.15)",
+        "btn-primary-hover": "0 4px 8px rgba(10,110,95,0.20)",
+        "accent-focus": "0 0 0 3px rgba(10,110,95,0.12)",
+        modal:  "0 20px 60px rgba(0,0,0,0.20)",
+      },
+      fontSize: {
+        "page-title":    ["20px", { fontWeight: "700" }],
+        "section-title": ["15px", { fontWeight: "700" }],
+        "vital-value":   ["18px", { fontWeight: "500" }],
+        "body":          ["13px", { fontWeight: "400" }],
+        "label":         ["12px", { fontWeight: "500" }],
+        "meta":          ["11px", { fontWeight: "400" }],
+        "badge":         ["9px",  { fontWeight: "700" }],
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+
+export default config;
+```
+
+### 2.2 CSS Custom Properties (`globals.css`)
+
+```css
+/* app/globals.css */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surface */
+    --bg:          #F0F2F5;
+    --surface:     #FFFFFF;
+    --surface-2:   #F7F8FA;
+    --surface-3:   #EFF1F5;
+
+    /* Borders */
+    --border:        #D1D5E0;
+    --border-strong: #9BA3B5;
+
+    /* Text */
+    --text-primary:   #0D1117;
+    --text-secondary: #374151;
+    --text-muted:     #6B7280;
+
+    /* Accent */
+    --accent:       #0A6E5F;
+    --accent-hover: #085A4E;
+    --accent-light: #D4EDE9;
+    --accent-mid:   #0D9E8C;
+
+    /* Semantic */
+    --amber:        #92400E;
+    --amber-bg:     #FEF3C7;
+    --amber-border: #F59E0B;
+
+    --red:          #991B1B;
+    --red-bg:       #FEE2E2;
+    --red-border:   #EF4444;
+
+    --blue:         #1E3A8A;
+    --blue-bg:      #DBEAFE;
+    --blue-border:  #3B82F6;
+
+    --green:        #14532D;
+    --green-bg:     #DCFCE7;
+    --green-border: #22C55E;
+
+    --purple:       #4C1D95;
+    --purple-bg:    #EDE9FE;
+    --purple-border:#8B5CF6;
+
+    /* Layout dimensions */
+    --topbar-h:                   56px;
+    --sidebar-w:                  280px;
+    --documentation-panel-width:  420px;
+    --timeline-w:                 260px;
+  }
+
+  /* Minimum viewport breakpoint (1280px) */
+  @media (max-width: 1439px) {
+    :root {
+      --sidebar-w:                 220px;
+      --documentation-panel-width: 340px;
+      --timeline-w:                200px;
+      --topbar-h:                  52px;
+    }
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    @apply font-sans text-[13px] leading-[1.5] bg-bg text-[var(--text-primary)] overflow-hidden;
+    height: 100vh;
+  }
+
+  /* WCAG 2.2 AA focus ring */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  /* Thin scrollbars */
+  ::-webkit-scrollbar { @apply w-[5px] h-[5px]; }
+  ::-webkit-scrollbar-track { @apply bg-surface; }
+  ::-webkit-scrollbar-thumb { @apply bg-border-strong rounded-[10px]; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-text-muted; }
+}
+```
 
 ---
 
 ## 3. Typography
 
-**Primary typeface:** IBM Plex Sans (all UI text)
-**Monospace typeface:** IBM Plex Mono (timestamps, patient IDs, lab values)
+**Primary:** IBM Plex Sans · **Monospace:** IBM Plex Mono
 
-Both are loaded from Google Fonts. Never substitute with system fonts in production.
+Both loaded via Google Fonts. Never substitute with system fonts in production.
 
-### 3.1 Type Scale
-
-| Role | Size | Weight | Usage |
+| Role | Tailwind Class | Size | Weight |
 |---|---|---|---|
-| Page Title | 20px | 700 | Screen headings (e.g., "Patient Dashboard") |
-| Section Title | 15px | 700 | Card-level section names |
-| Vital Value | 18px | 500 | Large vitals display (BP, HR, Temp) |
-| Body | 13px | 400 | Default text, notes content |
-| Label | 12px | 500–600 | Form labels, sidebar items, nav tabs |
-| Meta / Caption | 11px | 400–600 | Timestamps, patient meta row |
-| Badge / Uppercase Label | 9–10px | 700 | Card headers (ALL CAPS), badges |
+| Page Title | `text-[20px] font-bold` | 20px | 700 |
+| Section Title | `text-[15px] font-bold` | 15px | 700 |
+| Vital Value | `font-mono text-[18px] font-medium` | 18px | 500 |
+| Body | `text-[13px] font-normal` | 13px | 400 |
+| Label / Nav Tab | `text-[12px] font-medium` | 12px | 500 |
+| Meta / Caption | `text-[11px]` | 11px | 400–600 |
+| Badge / Uppercase Label | `text-[9px] font-bold uppercase tracking-[0.5px]` | 9px | 700 |
 
-**Minimum body text: 13px.** Do not use anything smaller than 9px anywhere. Timestamps and meta labels at 11px are the practical minimum for dense layouts.
+**Text color hierarchy:**
+- Critical clinical data: `text-[var(--text-primary)]`
+- Body and form text: `text-[var(--text-secondary)]`
+- Meta / timestamps: `text-[var(--text-muted)]`
 
-### 3.2 Text Color Hierarchy
-
-- **Critical clinical data** (vital values, problem names, patient names): `--text-primary` (`#0D1117`)
-- **Body and form text**: `--text-secondary` (`#374151`)
-- **Supporting info** (dates, section labels, metadata): `--text-muted` (`#6B7280`)
-
-Never use `--text-muted` for mandatory fields or primary data. Never display clinical values in muted color.
+Never use `text-muted` for mandatory fields or primary clinical data.
 
 ---
 
@@ -135,95 +261,117 @@ Never use `--text-muted` for mandatory fields or primary data. Never display cli
 │  List        │  (scrollable)                │
 │              │                              │
 │  (collapsed  ├──────────────────────────────┤
-│  = 0px)      │ DOCUMENTATION PANEL (420px,  │
-│              │ right, toggleable)           │
+│  = 0px)      │ DOC PANEL (420px, right,     │
+│              │ toggleable + resizable)      │
 └──────────────┴──────────────────────────────┘
 ```
 
-- The **topbar** is always visible and never scrolls.
-- The **sidebar** is collapsible. When collapsed, it reduces to `0px` width and the main area expands.
-- The **screen nav tabs** sit just below the topbar and above the main area. They represent the current patient's available views.
-- The **documentation panel** is a resizable right panel that can be toggled open for document generation.
+```tsx
+// app/layout-shell.tsx — structural skeleton
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col h-screen overflow-hidden">
+      <Topbar />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          <ScreenNav />
+          <main id="main" className="flex-1 overflow-y-auto p-5 max-[1439px]:p-[14px] flex flex-col gap-4">
+            {children}
+          </main>
+        </div>
+        <DocumentationPanel />
+      </div>
+    </div>
+  );
+}
+```
 
-### 4.2 Main Content Area
+### 4.2 Responsive Breakpoints
 
-The main area uses a single-column layout with a maximum content width. Content is padded `16–20px` from the container edges. Sections stack vertically with `16px` between major cards.
+DAMAYAN supports a **minimum viewport of 1280×800px**.
 
-The main area scrolls independently. The topbar, sidebar, and screen nav do not scroll with the content.
-
-### 4.3 Responsive Behavior
-
-DAMAYAN supports a minimum viewport of **1280×800px** (smallest common laptop resolution). No horizontal scrolling is ever introduced on the main content area at any supported size.
-
-#### Breakpoints
-
-| Name | Viewport Width | Target Device |
+| Breakpoint | Width | Notes |
 |---|---|---|
-| `desktop-lg` | ≥ 1440px | Large monitors, external displays |
-| `desktop` | 1280px – 1439px | Standard laptops (13"–14"), minimum supported |
+| `desktop-lg` | ≥ 1440px | Default layout |
+| `desktop` | 1280px–1439px | Reduced sidebar/panel widths, compact padding |
 
-> No support is required below 1280px. If the viewport is narrower, display a fullscreen notice: *"DAMAYAN is designed for laptop or desktop screens. Please use a device with a screen width of at least 1280px."*
+Below 1280px, show a fullscreen notice:
 
-#### Layout Tokens at 1280px
+```tsx
+// components/narrow-screen-notice.tsx
+export function NarrowScreenNotice() {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg p-8 text-center hidden max-[1279px]:flex">
+      <div className="max-w-sm">
+        <p className="text-[15px] font-bold text-[var(--text-primary)] mb-2">
+          Screen too narrow
+        </p>
+        <p className="text-[13px] text-[var(--text-muted)]">
+          DAMAYAN is designed for laptop or desktop screens.
+          Please use a device with a screen width of at least 1280px.
+        </p>
+      </div>
+    </div>
+  );
+}
+```
 
-At the minimum supported width, the following dimension reductions apply automatically:
+#### Responsive Adaptations at 1280px
 
-| Token | Default (≥1440px) | At 1280px |
-|---|---|---|
-| `--sidebar-w` | 280px | 220px |
-| `--documentation-panel-width` | 420px | 340px |
-| `--timeline-w` | 260px | 200px |
-| `--topbar-h` | 56px | 52px |
-| Main content padding | 20px | 14px |
+**Sidebar (220px at 1280px):**
+- Patient name: `max-w-[130px] truncate`
+- Meta row: hide patient ID (`hidden` on `#ID` span)
+- "Add New Patient" → "New Patient"
+- Sidebar defaults to **collapsed on first load** at 1280px
 
-#### Component Adaptations at 1280px
+**Screen Nav Tabs at 1280px:**
+- Labels shorten: "Note Timeline ★" → "Timeline", "Medications" → "Meds", "Documents" → "Docs"
+- Tabs scroll horizontally: `overflow-x-auto` with hidden scrollbar
 
-**Sidebar (220px):**
-- Patient name truncates with ellipsis at 130px max-width
-- Meta row (sex · age · ID) clips to sex · age only; ID hidden
-- "Add New Patient" button text shortens to "New Patient"
-- Sidebar section label padding reduces to `10px 10px 4px`
+**Vitals Strip at 1280px:**
+- Sidebar open: `grid-cols-3` (row 1) + `grid-cols-2` (row 2)
+- Sidebar collapsed: `grid-cols-5` (single row restored)
+- Vital value: `text-[16px]`, vital label: `text-[8px]`
 
-**Screen Nav Tabs:**
-- Tab labels shorten: "Note Timeline ★" → "Timeline", "Medications" → "Meds", "Documents" → "Docs"
-- Overflow tabs scroll horizontally (no wrapping, no clipping)
+**Dashboard Cards at 1280px:**
+- Medication + Problem List: `grid-cols-2` → `grid-cols-1` (sidebar open), restore `grid-cols-2` when collapsed
 
-**Vitals Strip:**
-- At 1280px with sidebar open: `grid-template-columns: repeat(3, 1fr)` for first 3 vitals, `repeat(2, 1fr)` for the remaining 2 (wraps into 2 rows)
-- At 1280px with sidebar collapsed: `repeat(5, 1fr)` — single row is restored
-- Vital value font size reduces from 18px to 16px; vital label from 9px to 8px
+**Documentation Panel at 1280px:**
+- Reduces to 340px
+- When open with sidebar open: sidebar auto-collapses; show notice: "Sidebar hidden while document panel is open"
 
-**Patient Banner:**
-- Switches from a horizontal multi-column layout to a 2-column layout: avatar + name/DOB on the left, address + tags on the right
+**Form fields at 1280px:**
+- `.field-row` gap: `gap-3` → `gap-2`
+- `.field-row-3`: `grid-cols-3` → `grid-cols-2` (sidebar open)
 
-**Dashboard Cards:**
-- Medication List and Problem List side-by-side columns (`repeat(2, 1fr)`) stack to single column at 1280px with sidebar open; restore to 2 columns when sidebar is collapsed
+**Modal at 1280px:** `max-w-[460px]` (default `max-w-[520px]`)
 
-**Documentation Panel:**
-- Reduces to 340px at 1280px
-- When open at 1280px with sidebar open: sidebar auto-collapses to give the panel room
-- A visual notice appears: "Sidebar hidden while document panel is open" with a link to re-open
+#### Sidebar Collapse
 
-**Topbar:**
-- Patient search input max-width reduces from 400px to 280px
-- "New Note" button text shortens to "+ Note" at 1280px
+```tsx
+// Sidebar toggle — persisted to localStorage
+const [sidebarOpen, setSidebarOpen] = useState(() => {
+  if (typeof window === "undefined") return true;
+  const saved = localStorage.getItem("damayan-sidebar");
+  if (saved !== null) return saved === "open";
+  return window.innerWidth >= 1440; // default collapsed at 1280
+});
+```
 
-**Form fields (Initial Note / Progress Note):**
-- `.field-row` (2 columns) reduces column gap from 12px to 8px
-- `.field-row-3` (3 columns) collapses to 2 columns at 1280px with sidebar open; stays 3 columns when collapsed
-
-**Modal:**
-- Max-width reduces from 520px to 460px
-
-#### Sidebar Collapse Behavior
-
-The sidebar toggles between expanded and collapsed via the topbar hamburger button. Collapsed state is `width: 0px` with `overflow: hidden`. The toggle state is persisted in `localStorage` so the last state is restored on page reload.
-
-At 1280px viewport, the sidebar defaults to **collapsed** on initial load (first visit only). After that, the user's last preference is used.
-
-#### No Horizontal Scroll Rule
-
-Every layout change at 1280px must be verified to produce zero horizontal overflow. Use `overflow-x: hidden` on `#body` as a safeguard, but never rely on it to mask a broken layout — fix the source of overflow instead.
+```tsx
+<aside
+  className={cn(
+    "bg-surface border-r border-border flex-shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-300 ease-in-out",
+    sidebarOpen ? "w-[var(--sidebar-w)]" : "w-0 border-r-transparent"
+  )}
+>
+  {/* inner content fixed at --sidebar-w so it doesn't reflow */}
+  <div className="w-[var(--sidebar-w)]">
+    {/* sidebar content */}
+  </div>
+</aside>
+```
 
 ---
 
@@ -231,57 +379,134 @@ Every layout change at 1280px must be verified to produce zero horizontal overfl
 
 ### 5.1 Topbar
 
-Contains:
-- **Sidebar toggle button** (leftmost, transparent, 24×24px)
-- **Logo mark** (teal square, 22×22px, `border-radius: 5px`)
-- **App name** "DAMAYAN" in 16px/700 weight
-- **Role pill** — displays current user role (Doctor / Admin / Nurse)
-- **Switch Role button** (demo only; remove in production)
-- **+ New Note button** (primary accent button, always visible)
-- **User avatar** (32px circle, initials, `--accent-hover` background)
+```tsx
+// components/topbar.tsx
+<header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-[200]">
+  {/* Sidebar toggle */}
+  <Button variant="ghost" size="icon" onClick={toggleSidebar} className="w-6 h-6 -ml-1.5 mr-1">
+    <MenuIcon className="w-[18px] h-[18px]" />
+  </Button>
 
-The role pill uses `--accent-light` background and `--accent` border. It is 10px/700/uppercase. This tells users their permission level at a glance.
+  {/* Logo — fixed width matching sidebar */}
+  <div className="flex items-center gap-2 w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
+    <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
+      {/* logo mark SVG */}
+    </div>
+    <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap">
+      DAMAYAN <small className="text-[9px] font-semibold text-[var(--text-muted)] tracking-[1px] uppercase mt-[3px]">EMR</small>
+    </span>
+  </div>
+
+  {/* Active patient chip (centered) */}
+  <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 cursor-pointer shadow-sm">
+    {/* avatar + name + meta */}
+  </div>
+
+  {/* Right zone */}
+  <div className="ml-auto flex items-center gap-2">
+    <Button className="h-[34px] bg-accent hover:bg-accent-hover text-white border-accent-hover shadow-btn-primary text-[12px] font-medium">
+      ＋ New Note
+    </Button>
+    {/* Doctor name + avatar */}
+    <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
+      <div className="flex flex-col items-end leading-tight">
+        <span className="text-[12px] font-semibold text-[var(--text-primary)]">Dr. Ana M. Reyes</span>
+        <span className="text-[10px] text-[var(--text-muted)]">Attending Physician</span>
+      </div>
+      <Avatar className="w-8 h-8 bg-accent-hover text-white text-[11px] font-bold border-2 border-border">
+        AR
+      </Avatar>
+    </div>
+  </div>
+</header>
+```
+
+**Role pill:**
+```tsx
+<span className="text-[10px] font-bold uppercase tracking-[0.6px] px-2 py-[3px] rounded-full bg-accent-light text-[var(--text-primary)] border border-accent">
+  Doctor
+</span>
+```
 
 ### 5.2 Patient Sidebar
 
-The sidebar has two zones:
+```tsx
+// components/sidebar.tsx
+<div className="sticky top-0 z-10 flex flex-col gap-2 p-3 border-b border-border bg-surface">
+  <div className="flex items-center gap-2 h-[34px] bg-surface-2 border border-border rounded-btn px-3">
+    <SearchIcon className="w-4 h-4 text-[var(--text-muted)]" />
+    <input
+      className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+      placeholder="Search patients…"
+    />
+  </div>
+  <Button className="w-full h-[28px] bg-accent hover:bg-accent-hover text-white text-[11px] font-semibold justify-center gap-1">
+    <PlusIcon className="w-2.5 h-2.5" /> New Patient
+  </Button>
+</div>
 
-**Search and Add zone** (pinned to top):
-- Patient search input (`height: 34px`, `border-radius: 6px`)
-- "Add New Patient" button (full-width, primary accent)
+{/* Patient rows */}
+<div
+  className={cn(
+    "flex items-center gap-2.5 mx-3.5 my-[6px] px-3 py-2.5 rounded-card border cursor-pointer transition-all duration-150",
+    active
+      ? "bg-accent-light border-accent shadow-sm"
+      : "bg-surface border-border hover:bg-surface-2 hover:border-border-strong"
+  )}
+>
+  <Avatar className={cn("w-8 h-8 text-[11px] font-bold flex-shrink-0", active ? "bg-accent text-white border-accent" : "bg-surface-2 text-[var(--text-secondary)] border border-border")}>
+    MC
+  </Avatar>
+  <div className="flex-1 min-w-0 flex flex-col">
+    <span className={cn("text-[12px] font-semibold truncate", active ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]")}>
+      Cruz, Maria Santos
+    </span>
+    <span className="font-mono text-[10px] text-[var(--text-muted)] truncate">
+      F · 34 yrs · #PT-0012
+    </span>
+  </div>
+  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+    {hasAllergy && <span className="text-red text-[12px] font-bold" title="Allergy: Penicillin">⚠</span>}
+    <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+  </div>
+</div>
+```
 
-**Patient list zone** (scrollable):
-- Grouped alphabetically with sticky letter markers
-- Each patient row shows: initials avatar (32×32px circle), full name (Last, First format), sex · age · ID, allergy warning icon (⚠ amber), and a status dot
-
-**Patient row states:**
-- Default: `--surface`, no left border
-- Hover: `--surface-2`
-- Active/selected: `--surface-2`, `3px solid --accent` left border, `--text-primary` name color
-
-**Allergy indicator:** An amber ⚠ icon with tooltip showing the allergen name. Must always be visible in the sidebar row when present.
+**Active state:** replace `border-border` with `border-accent`, `bg-surface` with `bg-accent-light`.
 
 ### 5.3 Screen Navigation Tabs
 
-A horizontal strip of tabs below the topbar. For each selected patient:
+```tsx
+<nav className="flex items-center gap-1.5 bg-surface border-b border-border px-4 h-[52px] flex-shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  <span className="text-[11px] font-bold text-accent-mid uppercase tracking-[1px] mr-3.5 whitespace-nowrap flex-shrink-0">
+    {patientName}
+  </span>
+  {tabs.map((tab) => (
+    <button
+      key={tab.id}
+      onClick={() => setActiveTab(tab.id)}
+      className={cn(
+        "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0",
+        activeTab === tab.id
+          ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
+          : "bg-surface-2 text-[var(--text-secondary)] border-border hover:bg-surface-3 hover:border-border-strong hover:text-[var(--text-primary)]"
+      )}
+    >
+      {tab.label}
+    </button>
+  ))}
+  {/* Toggle doc panel button — far right */}
+  <button onClick={toggleDocPanel} className="ml-auto h-8 px-3 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 flex-shrink-0">
+    <XIcon className="w-3.5 h-3.5" />
+  </button>
+</nav>
+```
 
-| Tab | Role Access |
-|---|---|
-| Dashboard | All |
-| Vital Signs | All |
-| Note Timeline | All |
-| Initial Note | Doctor (create/edit), Nurse (view) |
-| Problem List | Doctor (edit), Nurse (view) |
-| Medications | Doctor (edit), Nurse (view) |
-| Documents | All |
-| Logs | Admin only |
-
-**Tab styling:**
-- Default: `height: 32px`, `border: 1px solid --border`, `background: --surface-2`, `font-size: 12px/500`, `border-radius: 6px`, `color: --text-secondary`
-- Hover: `--surface-3`, `--border-strong`
-- Active: `background: --accent`, `color: #fff`, `box-shadow: 0 4px 12px rgba(10,110,95,0.25)`
-
-Tabs scroll horizontally on overflow. No wrapping. The "New Patient" and "Login" tabs are positioned at the far right (`margin-left: auto`).
+Tab label shortening at 1280px is handled with a `shortLabel` prop:
+```tsx
+const label = isCompact ? tab.shortLabel : tab.label;
+// e.g. { label: "Note Timeline ★", shortLabel: "Timeline" }
+```
 
 ---
 
@@ -289,383 +514,544 @@ Tabs scroll horizontally on overflow. No wrapping. The "New Patient" and "Login"
 
 ### 6.1 Cards
 
-Cards are the primary container for all sections on a screen.
+```tsx
+// Base card
+<div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
+  {/* card.updated variant */}
+  {/* add: border-l-[3px] border-l-accent */}
 
+  {/* card.alert variant */}
+  {/* add: border-l-[3px] border-l-red */}
+</div>
+
+// Card Header
+<div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
+  {/* Icon container */}
+  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
+    🫀
+  </div>
+  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+    Latest Vital Signs
+  </span>
+  {/* optional badge or action */}
+</div>
+
+// Card Body
+<div className="p-3 px-3.5">
+  {/* content */}
+</div>
 ```
-.card {
-  background: --surface;
-  border: 1px solid --border;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  overflow: hidden;
-}
+
+**Last-updated timestamp** on time-sensitive cards (Vital Signs, Problem List, Medication List):
+
+```tsx
+<span className="font-mono text-[9px] text-[var(--text-muted)]">Jun 3, 2026 · 09:14</span>
 ```
 
-**Card states:**
-- `.card.updated` — `border-left: 3px solid --accent` — used when a section was recently modified (within 48 hours)
-- `.card.alert` — `border-left: 3px solid --red` — used for allergy alerts or critical flags
-
-**Card header (`.card-header`):**
-- Background: `--surface-2`
-- Border bottom: `1px solid --border`
-- Padding: `10px 14px`
-- Contains: icon (26×26px, `--surface-3` background, `border-radius: 6px`), title (10px/700/UPPERCASE, `letter-spacing: 0.6px`), optional badge, optional action button
-
-**Card body (`.card-body`):**
-- Padding: `12px 14px`
-
-A "last updated" timestamp in `--text-muted` must appear in the card header corner for all time-sensitive sections (Vital Signs, Problem List, Medication List). If updated within 48 hours, apply a visual indicator (green dot or accent border).
+If updated within 48 hours: prepend a `<span className="w-2 h-2 rounded-full bg-accent-mid inline-block mr-1" />` dot and upgrade text to `text-[var(--text-secondary)]`.
 
 ### 6.2 Buttons
 
-**Primary button (`.sec-btn.primary`):**
-- Background: `--accent`
-- Text: `#fff`, 11px/600
-- Border: `--accent-hover`
-- Shadow: `0 2px 4px rgba(10,110,95,0.15)`
-- Hover: `--accent-hover` background, elevated shadow
-- Use for: "Save Note", "New Progress Note", "Save as Draft"
+```tsx
+// cn() utility assumed available
 
-**Secondary button (`.sec-btn`):**
-- Background: `--surface-2`
-- Text: `--text-secondary`, 11px/600
-- Border: `--border`
-- Hover: `--surface-3`, `--border-strong`
-- Use for: "Record Vitals", "Edit", secondary actions
+// Primary
+<button className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap">
+  Save Note
+</button>
 
-**Destructive button (`.sec-btn.destructive`):**
-- Background: `--red-bg`
-- Text: `--red`
-- Border: `--red-border`
-- Use for: "Remove Problem", "Delete Record" — always require a confirmation step
+// Secondary (default)
+<button className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-[var(--text-secondary)] border border-border hover:bg-surface-3 hover:text-[var(--text-primary)] hover:border-border-strong transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap">
+  Record Vitals
+</button>
 
-**Ghost button (`.sec-btn.ghost`):**
-- Background: transparent
-- Border: transparent
-- Hover: `--surface-2` background
-- Use for: icon-only actions, collapse toggles
+// Destructive
+<button className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red/15 hover:border-red/80 transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap">
+  Remove Problem
+</button>
 
-**Topbar buttons (`.tb-btn`):**
-- Height: 34px (slightly taller than sec-btn for topbar prominence)
-- Same color rules as sec-btn
+// Ghost (icon-only or toggles)
+<button className="h-[28px] px-2 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center gap-[5px]">
+  <ChevronIcon />
+</button>
 
-**Button sizing:** All buttons are `height: 28px` for section buttons, `height: 34px` for topbar buttons. Labels are never truncated. Buttons must have a minimum tap width of 80px.
+// Topbar button (taller)
+<button className="h-[34px] px-3.5 rounded-btn ...">
+  ...
+</button>
+```
+
+All buttons: min tap width `min-w-[80px]`. Labels never truncate.
 
 ### 6.3 Badges
 
-Badges are `9px/700/UPPERCASE` with `padding: 2px 6px`, `border-radius: 4px`.
+```tsx
+// Base badge class
+const badgeBase = "text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] border inline-flex items-center";
 
-| Badge | Background | Text | Border | Usage |
-|---|---|---|---|---|
-| `.badge-draft` | `--amber-bg` | `--amber` | `--amber-border` | Unsaved/draft note |
-| `.badge-active` | `--accent-light` | `--accent-hover` | `--accent` | Active problem |
-| `.badge-resolved` | `--surface-2` | `--text-secondary` | `--border` | Resolved problem |
-| `.badge-critical` | `--red-bg` | `--red` | `--red-border` | Critical alert |
-| `.badge-saved` | `--green-bg` | `--green` | `--green-border` | Saved confirmation |
-| `.badge-published` | `--purple-bg` | `--purple` | `--purple-border` | Published/finalized note |
-| `.badge-info` | `--blue-bg` | `--blue` | `--blue-border` | Informational (e.g., inherited) |
-| `.badge-removed` | `--surface-2` | `--text-muted` | `--border` | Removed/deleted item |
+const variants = {
+  draft:     "bg-amber-bg text-amber border-amber-border",
+  active:    "bg-accent-light text-accent-hover border-accent",
+  resolved:  "bg-surface-2 text-[var(--text-secondary)] border-border",
+  critical:  "bg-red-bg text-red border-red-border",
+  saved:     "bg-green-bg text-green border-green-border",
+  published: "bg-purple-bg text-purple border-purple-border",
+  info:      "bg-blue-bg text-blue border-blue-border",
+  removed:   "bg-surface-2 text-[var(--text-muted)] border-border",
+};
+
+// Usage
+<span className={cn(badgeBase, variants.draft)}>Draft</span>
+```
+
+With shadcn/ui `Badge`, override variants in `components/ui/badge.tsx`:
+
+```tsx
+const badgeVariants = cva(
+  "text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] border inline-flex items-center",
+  {
+    variants: {
+      variant: {
+        draft:     "bg-[var(--amber-bg)] text-[var(--amber)] border-[var(--amber-border)]",
+        active:    "bg-[var(--accent-light)] text-[var(--accent-hover)] border-[var(--accent)]",
+        resolved:  "bg-[var(--surface-2)] text-[var(--text-secondary)] border-[var(--border)]",
+        critical:  "bg-[var(--red-bg)] text-[var(--red)] border-[var(--red-border)]",
+        saved:     "bg-[var(--green-bg)] text-[var(--green)] border-[var(--green-border)]",
+        published: "bg-[var(--purple-bg)] text-[var(--purple)] border-[var(--purple-border)]",
+        info:      "bg-[var(--blue-bg)] text-[var(--blue)] border-[var(--blue-border)]",
+        removed:   "bg-[var(--surface-2)] text-[var(--text-muted)] border-[var(--border)]",
+      },
+    },
+    defaultVariants: { variant: "info" },
+  }
+);
+```
 
 ### 6.4 Form Fields
 
-All clinical data input uses a consistent field system.
+```tsx
+// Field group
+<div className="flex flex-col gap-1.5 mb-3">
+  {/* Label */}
+  <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
+    Chief Complaint <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+  </label>
 
-**Field group (`.field-group`):**
-- Vertical stack: label on top, input below
-- Gap: `6px`
-- Margin bottom between groups: `12px`
+  {/* Text input */}
+  <input
+    className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150
+      focus:bg-surface focus:border-accent focus:shadow-accent-focus
+      placeholder:text-[var(--text-muted)]"
+    placeholder="e.g. Persistent headaches for 2 weeks"
+  />
 
-**Field label (`.field-label`):**
-- Size: 11px/600
-- Color: `--text-secondary`
-- Required fields are marked with a red asterisk (*) in `--red`
+  {/* Textarea */}
+  <textarea
+    className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150
+      focus:bg-surface focus:border-accent focus:shadow-accent-focus"
+  />
+</div>
 
-**Text input (`.field-input`):**
-- Height: 34px
-- Padding: `0 10px`
-- Background: `--surface`
-- Border: `1px solid --border`
-- Border-radius: 6px
-- Font: 13px, `--text-primary`
-- Focus: `border-color: --accent`, `box-shadow: 0 0 0 3px rgba(10,110,95,0.12)`, no default browser outline
+// Input with unit addon (vitals)
+<div className="flex bg-surface-2 border border-border rounded-btn overflow-hidden focus-within:bg-surface focus-within:border-accent focus-within:shadow-accent-focus transition-all duration-150">
+  <input className="flex-1 min-w-0 bg-transparent px-2.5 py-[7px] text-[13px] text-[var(--text-primary)] outline-none" />
+  <span className="px-2.5 py-[7px] text-[11px] text-[var(--text-muted)] flex items-center">mmHg</span>
+</div>
 
-**Textarea (`.field-textarea`):**
-- Padding: `8px 10px`
-- Min-height: `80px`
-- Resize: vertical only
-- Same border/focus as `.field-input`
-- Free-text clinical fields (HPI, PMH, etc.) should have `min-height: 100px`
+// Field row layouts
+<div className="grid grid-cols-2 gap-3 max-[1439px]:gap-2">…</div>             // .field-row
+<div className="grid grid-cols-3 gap-3 max-[1439px]:grid-cols-2">…</div>        // .field-row-3 (compact at 1280px with sidebar open)
+```
 
-**Input with unit addon (`.input-with-addon`):**
-- Used for vital signs, medication doses
-- The input and unit label share a joined container
-- Unit label sits inside the right edge: `11px/500`, `--text-muted`
+**Shadcn/ui `Input` override** in `components/ui/input.tsx`:
+```tsx
+// Replace className defaults to match above field-input styles
+```
 
-**Field row layouts:**
-- `.field-row` — 2-column grid, `gap: 12px`
-- `.field-row-3` — 3-column grid, `gap: 12px`
-
-Use field rows for compact data like vital signs entry (BP systolic / BP diastolic / HR on one row).
+**Validation errors** appear inline directly below the field:
+```tsx
+<p className="text-[12px] text-red mt-1">Field is required.</p>
+// also add: border-red-border on the input
+```
 
 ### 6.5 Tables
 
-**Data table (`.data-table`):**
-- Full width, `border-collapse: collapse`
-- Header: 9px/700/UPPERCASE, `--text-secondary`, `padding: 8px 10px`, `--surface-2` background, bottom border
-- Rows: 12px, `--text-secondary`, `padding: 8px 10px`, bottom `1px solid --border`
-- Last row: no bottom border
-- Row hover: `--surface-3` background
+```tsx
+<table className="w-full border-collapse">
+  <thead>
+    <tr>
+      <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] px-2.5 py-2 text-left bg-surface-2 border-b border-border">
+        Medication
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr className="hover:bg-surface-3 transition-colors">
+      <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] border-b border-border last:border-b-0">
+        {/* value */}
+      </td>
+    </tr>
+  </tbody>
+</table>
 
-**Value coloring in tables:**
-- Critical out-of-range value: `--red`, weight 600 (`.val-critical`)
-- Warning value: `--amber`, weight 500 (`.val-warn`)
-- Normal value: `--green` (`.val-normal`)
-- Accent highlight: `--accent`, weight 500 (`.val-teal`)
-- Timestamps, IDs: IBM Plex Mono (`.mono`)
+// Value coloring utilities (apply to <td> or <span>):
+// Critical: text-red font-semibold
+// Warning:  text-amber font-medium
+// Normal:   text-green
+// Accent:   text-accent font-medium
+// Mono:     font-mono
+```
 
 ### 6.6 Status Dots
 
-Used in the patient list and problem list to show at-a-glance status.
+```tsx
+const dotColors = {
+  green:  "bg-[#22C55E]",
+  amber:  "bg-[var(--amber)]",
+  red:    "bg-[var(--red)]",
+  teal:   "bg-accent-mid",
+  gray:   "bg-border-strong",
+};
 
-| Class | Color | Usage |
-|---|---|---|
-| `.sd-green` | `#22C55E` | Active / Normal |
-| `.sd-amber` | `#F59E0B` | Pending / Warning |
-| `.sd-red` | `#EF4444` | Critical / Urgent |
-| `.sd-teal` | `--accent` | Recently updated |
-| `.sd-gray` | `--border-strong` | Inactive / Resolved |
+<span className={cn("w-2 h-2 rounded-full flex-shrink-0", dotColors.green)} title="Active" />
+```
 
-Status dots are `8×8px` circles. Never rely on color alone — pair with a tooltip or text label.
+Always pair color with a tooltip or text label. Never rely on color alone.
 
 ### 6.7 Modals
 
-Used for confirmations, document generation, and patient registration.
+```tsx
+// Overlay
+<div className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150">
+  {/* Modal box */}
+  <div className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal">
+    {/* Header */}
+    <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
+      <h2 className="text-[15px] font-bold flex-1 text-[var(--text-primary)]">Modal Title</h2>
+      <Button variant="ghost" size="icon" onClick={onClose}><XIcon /></Button>
+    </div>
+    {/* Body */}
+    <div className="px-[18px] py-[18px]">{children}</div>
+    {/* Footer */}
+    <div className="flex justify-end gap-2 px-[18px] py-3 border-t border-border">{actions}</div>
+  </div>
+</div>
+```
 
-- **Overlay:** `rgba(0,0,0,0.45)`, full-screen, `z-index: 1000`
-- **Modal box:** `background: --surface`, `border-radius: 10px`, `max-width: 520px`, `box-shadow: 0 20px 60px rgba(0,0,0,0.2)`
-- **Modal header:** `padding: 16px 20px`, bottom border, title 15px/700, close button (ghost, top-right)
-- **Modal body:** `padding: 16px 20px`
-- **Modal footer:** right-aligned buttons, `gap: 8px`
-
-Always close a modal when clicking the overlay background or pressing Escape. Require explicit confirmation for destructive actions.
+Closes on overlay click or `Escape`. Focus trapped within while open; restores to trigger on close (use shadcn `Dialog` — it handles this automatically).
 
 ---
 
 ## 7. Screens
 
-### 7.1 Patient Dashboard (Landing Page)
+### 7.1 Patient Dashboard
 
-The dashboard is the first screen a doctor sees when selecting a patient. It must display all current patient information at a glance without requiring navigation to other tabs.
+```tsx
+// Required section order:
+// 1. Patient Banner
+// 2. Vitals Strip
+// 3. grid-cols-2: Problem List | Medication List
+// 4. Non-pharmacologic Management (full width)
+// 5. Consultation History
 
-**Required sections, in order:**
+// Patient Banner
+<div className="bg-surface border border-border rounded-card p-4 flex gap-5 items-stretch flex-wrap">
+  {/* Left: avatar + name */}
+  <div className="flex gap-3.5 items-center flex-[1.2] min-w-[250px] border-r border-border pr-5">
+    <div className="w-11 h-11 rounded-full bg-accent-light border-2 border-accent flex items-center justify-center text-[15px] font-bold text-accent-hover flex-shrink-0">
+      MC
+    </div>
+    <div className="text-[12px] flex flex-col gap-1">
+      <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.5px]">Patient Name</span>
+      <span className="text-[18px] font-bold text-[var(--text-primary)] leading-tight">Cruz, Maria Santos</span>
+      {/* name grid, tags */}
+    </div>
+  </div>
+  {/* Middle: demographics */}
+  <div className="flex flex-col gap-1 flex-1 min-w-[220px] border-r border-border pr-5 text-[12px]">…</div>
+  {/* Right: clinical profile */}
+  <div className="flex flex-col gap-1 flex-[0.8] min-w-[180px] text-[12px]">…</div>
+</div>
+```
 
-1. **Patient Banner** — persistent strip at the top
-2. **Vitals Strip** — 5-card grid of latest readings
-3. **Problem List** — current active problems, with status and hierarchy
-4. **Medication List** — current medications
-5. **Non-pharmacologic Management** — free text
-6. **Visit History** — 5 most recent visits (expandable)
-7. **Initial Note shortcut** — tab link to view the full initial note
+**Allergy pill:**
+```tsx
+<span className="text-[9px] font-bold bg-red-bg text-red border border-red-border px-[7px] py-[2px] rounded-[4px] inline-flex items-center gap-[3px]">
+  ⚠ Penicillin
+</span>
+```
 
-**Patient Banner (`.patient-banner`):**
-- Background: `--surface`
-- Border: `1px solid --border`, `border-radius: 8px`
-- Contains: avatar (48×48px circle, initials, `--accent-hover` background), full name (18px/700), DOB + age, address, sex, allergy tags
-- Allergy tags use `--red-bg` / `--red` / `--red-border` pill styling
-- Padding: `16px`
+### 7.2 Vitals Strip
 
-**Vitals Strip (`.vitals-strip`):**
-- Grid: `repeat(5, 1fr)`, `gap: 8px`
-- Each vital card shows: label (9px/700/UPPERCASE), value (18px/500, IBM Plex Mono), unit (10px/`--text-muted`), timestamp (9px/`--text-muted`)
-- Normal state: `--surface`, `1px solid --border`, `border-radius: 8px`
-- Warning state (`.vital-card.warn`): `--amber-bg` background, `--amber-border` border
-- Critical state (`.vital-card.critical`): `--red-bg` background, `--red-border` border, text in `--red`
-- Vital cards must show the datetime of the last reading. If older than 24 hours, apply warning state to the timestamp.
+```tsx
+<div className={cn(
+  "grid gap-2",
+  sidebarOpen
+    ? "grid-cols-5 max-[1439px]:grid-cols-3"
+    : "grid-cols-5"
+)}>
+  {/* Vital card */}
+  <div className={cn(
+    "border rounded-card p-[9px_11px]",
+    status === "critical" ? "bg-red-bg border-red-border" :
+    status === "warn"     ? "bg-amber-bg border-amber-border" :
+    "bg-surface-2 border-border"
+  )}>
+    <div className={cn(
+      "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5 max-[1439px]:text-[8px]",
+      status === "critical" ? "text-red" :
+      status === "warn"     ? "text-amber" :
+      "text-[var(--text-muted)]"
+    )}>
+      Blood Pressure
+    </div>
+    <div className={cn(
+      "font-mono text-[18px] font-medium leading-[1.1] max-[1439px]:text-[16px]",
+      status === "critical" ? "text-red" :
+      status === "warn"     ? "text-amber" :
+      "text-[var(--text-primary)]"
+    )}>
+      152<span className="text-[10px] text-[var(--text-muted)] ml-[1px]">mmHg</span>
+    </div>
+    <div className="font-mono text-[9px] text-[var(--text-muted)] mt-0.5">/ 94 diastolic</div>
+  </div>
+</div>
+```
 
-**Vitals to display:**
+Vitals cards show the datetime of the last reading. If older than 24 hours, apply `warn` state to the timestamp.
 
-| Label | Unit | Field |
-|---|---|---|
-| Blood Pressure | mmHg | Systolic / Diastolic |
-| Heart Rate | bpm | Integer |
-| Resp. Rate | breaths/min | Integer |
-| Temperature | °C | Float |
-| O₂ Sat | % | Integer |
+### 7.3 Initial Note & Progress Notes
 
-Blood pressure is displayed as `SBP / DBP` on a single card.
+Auto-save behavior:
 
-### 7.2 Vital Signs Entry
+```tsx
+// Debounced 3s auto-save
+useEffect(() => {
+  const timer = setTimeout(() => {
+    saveDraft();
+  }, 3000);
+  return () => clearTimeout(timer);
+}, [formValues]);
+```
 
-Used by Admin, Doctor, and Nurse to record a new set of vital signs.
+Auto-save states:
 
-- Form displays patient identifiers at the top (read-only): Last name, First name, Middle, Extension, DOB, Age
-- Fields use `.field-row` and `.field-row-3` layouts
-- Each vital sign input uses `.input-with-addon` with the unit shown inline
-- Author and datetime are auto-populated and displayed (read-only) at the bottom
-- "Save Vital Signs" is a primary button
-- On save, redirect back to Dashboard and refresh the vitals strip
-
-**Validation:**
-- Systolic BP: integer, 50–300
-- Diastolic BP: integer, 20–200
-- Heart rate: integer, 20–300
-- Respiratory rate: integer, 5–60
-- Temperature: float, 30.0–45.0
-- Oxygen saturation: integer, 50–100
-
-Display inline error messages in `--red` directly below the offending field on submit. Never block submission with a modal unless all fields are missing.
-
-### 7.3 Initial Note
-
-The initial SOAP-format note. Only one Initial Note exists per patient. Only the Author/Doctor can create or edit it. Non-author doctors and nurses can view only.
-
-**Sections of the Initial Note (in order):**
-
-1. **Latest Vital Signs** — pre-filled read-only strip from the vitals table, with datetime. Shows "No vital signs recorded" if absent.
-2. **Chief Complaint** *(required)* — single-line text, max 50 characters
-3. **History of Present Illness** *(required)* — free text, textarea
-4. **Past Medical History** *(required)* — collapsible section containing:
-   - Comorbidities — free text
-   - Previous Surgeries — free text
-   - Previous Hospitalizations — free text
-   - Allergies — free text
-5. **Medication List** — editable list of entries (see Medication List component below)
-6. **Family Medical History** *(required)* — free text, collapsible
-7. **Personal and Social History** *(required)* — free text, collapsible
-8. **OB/Menstrual History** — free text, collapsible; shown only if patient sex is Female
-9. **Psychosocial History** *(required)* — free text, collapsible
-10. **Physical Examination** *(required)* — free text, textarea
-11. **Labs and Imaging Results** — file upload button (JPEG, PNG, PDF accepted) and/or free text input; each entry tagged by the author
-12. **Assessment** *(required)* — list of editable problem entries; feeds into the Problem List
-13. **Management** *(required)* — collapsible section containing:
-    - Non-pharmacologic — free text
-    - Diagnostics — searchable selection list
-    - Medication List — copy-forwarded from PMH medication list, editable
-
-Required fields are marked with a red asterisk in the section header label.
-
-**Collapsible sections:**
-- Collapsed by default when the patient has no data in that section
-- Expanded if content exists
-- Use a chevron icon (▶ / ▼) to indicate state, placed before the section title
-- Section header uses the `.card-header` style
-
-**Auto-save behavior:**
-- Debounced auto-save triggers 3 seconds after the user stops typing
-- A `.badge-draft` badge appears in the card header area while unsaved changes exist
-- On successful auto-save, replace draft badge with `.badge-saved` briefly (3 seconds), then remove
-- If offline, save to localStorage with a visual warning banner: "⚠ Offline — changes saved locally"
-
-**Edit state:**
-- Edited sections show a colored left border (`--amber-border`) to indicate uncommitted changes
-- The editor name and datetime last edited appear in muted text below the card header
-- A history of edits per section is accessible via a "View edits" link (opens a modal or expandable log)
-
-**Save as Draft:**
-- Draft notes are not visible to Non-Author/Doctors
-- Draft badge appears in the Note Timeline tab
-
-**Publish / Finalize:**
-- Replaces the draft badge with `.badge-published`
-- Note becomes visible to all authorized users
-
-### 7.4 Progress Notes
-
-Progress notes are created per visit. The first progress note's Problem List is seeded from the Assessment of the Initial Note.
-
-**Sections of the Progress Note (in order):**
-
-1. **Latest Vital Signs** — same as Initial Note, pre-filled read-only
-2. **Subjective** *(required)* — free text
-3. **Objective** *(required)* — free text
-4. **Labs and Imaging Results** — upload or text; displays a table of prior labs grouped by tag with dates
-5. **Problem List** — read-only view of current problems with inline edit option
-6. **Non-pharmacologic Management** — editable, carries forward from last note
-7. **Diagnostics** — pre-filled with tags from the previous consult; author can add, edit, or remove
-8. **Medication List** — editable, carries forward from last note's medication list
-
-All auto-save, draft, edit history, and publish behaviors are identical to the Initial Note.
-
-### 7.5 Note Timeline
-
-The Note Timeline is the primary longitudinal view. It shows all notes in reverse chronological order (newest first).
-
-- Each entry shows: date, time, physician name, note type (Initial / Progress), status badge, and a link to view the full note
-- Changes to the Problem List and Medication List during that visit are summarized (first line only, expandable on click)
-- The timeline rail width is `260px` on large viewports; hidden on collapse
-- Clicking a note entry opens the note in the main area (read or edit depending on role and authorship)
-
-### 7.6 Problem List
-
-Each patient has exactly one Problem List. It is shared across all notes and always reflects the latest state.
-
-**Problem entry fields:**
-- Problem name (text)
-- Status: Active (default) / Resolved / Removed
-- Priority order (drag to reorder, or up/down arrow buttons — arrow buttons preferred for older users)
-- Hierarchy: a child problem can be nested under a parent; indicated by indentation and a connecting line
-
-**Status behavior:**
-- **Active** — shown at the top, `.badge-active`
-- **Resolved** — moved to the end of the list, `.badge-resolved`, shown in muted text
-- **Removed** — deleted from the list entirely (soft-delete for audit; removed from display)
-
-**Nesting behavior:**
-- A child problem is indented `16px` and connected to its parent with a vertical accent line (`--accent-light`)
-- A child can be promoted to a standalone problem (removes nesting) or re-nested under a different parent
-- Maximum nesting depth: 2 levels (parent → child only; no grandchild nesting)
-
-**Keyboard controls:**
-- Tab to move between problem entries
-- Arrow Up/Down to change sort order
-- Enter to open the edit dialog for that entry
-
-### 7.7 Medication List
-
-Each patient has one Medication List, shared across notes.
-
-**Each medication entry contains:**
-- **Name** — selected from a standardized drug list (searchable dropdown)
-- **Dose** — float input
-- **Unit** — dropdown: mg (default), g, mcg, ml, units
-- **Instructions** — free text, max 50 characters
-- **Quantity** — integer input
-
-**List behavior:**
-- Entries can be added, edited, and deleted by Doctor; Admin has full access; Nurse can view only
-- In the Initial Note and Progress Note, the Medication List is pre-filled (copy-forward) from the most recent prior list; the author can modify it
-- Deleted entries are soft-deleted (retained for audit log)
-
-### 7.8 Document Generation
-
-Available to all roles. Generates PDF files from the patient record.
-
-**Document types:**
-
-| Document | Roles |
+| State | Component |
 |---|---|
-| Medical Certificate | Doctor, Admin |
-| Lab Test Request List | Doctor, Admin |
-| Prescription | Doctor, Admin |
-| Charge Slip (Diagnostics) | Nurse, Admin |
-| Charge Slip (Medications) | Nurse, Admin |
+| Unsaved | `<Badge variant="draft">Draft</Badge>` in card header |
+| Saving | Spinner + `text-[10px] text-[var(--text-muted)]` "Saving…" |
+| Saved | `<Badge variant="saved">Saved</Badge>` for 3s then remove |
+| Offline | Amber banner: `bg-amber-bg border border-amber-border text-amber text-[11px] px-3 py-1.5 rounded-btn` |
 
-Doctor role cannot generate Charge Slips. Nurse role can generate all including Charge Slips. Admin can generate all types.
+**Collapsible sections** use shadcn `Collapsible`:
 
-Document generation opens in the Documentation Panel (right side, 420px wide, toggleable). The panel shows a preview before downloading. Output is a downloadable PDF.
+```tsx
+<Collapsible>
+  <CollapsibleTrigger asChild>
+    <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border cursor-pointer hover:bg-surface-3">
+      {/* icon + title */}
+      <ChevronDownIcon className="ml-auto w-3 h-3 text-[var(--text-muted)] transition-transform data-[state=open]:rotate-180" />
+    </div>
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    <div className="p-3 px-3.5">{/* content */}</div>
+  </CollapsibleContent>
+</Collapsible>
+```
 
-### 7.9 Audit Logs
+Required fields block **publishing** but not auto-save as draft.
 
-Available to Admin only. Accessible via the Logs tab.
+### 7.4 Problem List
 
-- Shows all create, edit, and delete actions across all patient records
-- Columns: DateTime, User, Role, Action, Patient, Section affected
-- Filterable by date range, user, and action type
-- Rendered as a `.data-table` with monospace timestamps
+```tsx
+// Problem row
+<div className={cn(
+  "flex items-center gap-2 px-2.5 py-1.5 border-b border-border last:border-b-0 cursor-grab active:cursor-grabbing",
+  dragOver && "bg-accent-light border-t-2 border-t-accent",
+  mergeOver && "bg-green-bg border-2 border-dashed border-green-border"
+)}>
+  <span className="text-border-strong text-[15px] cursor-grab">⠿</span>
+  <div className={cn("w-2 h-2 rounded-full flex-shrink-0", status === "Active" ? "bg-accent-mid" : "bg-[var(--text-muted)]")} />
+  <div className="flex-1 text-[12px] text-[var(--text-primary)]">
+    {problem.name}
+    {problem.code && <span className="font-mono text-[10px] text-[var(--text-muted)] ml-1.5">{problem.code}</span>}
+  </div>
+  {/* actions */}
+</div>
+
+// Nested child (indent + accent line)
+<div className="ml-6 border-l-2 border-accent-light pl-2.5">
+  {/* child row */}
+</div>
+```
+
+Keyboard: Arrow Up/Down to reorder; Enter to open edit dialog.
+
+### 7.5 Documentation Panel
+
+```tsx
+<aside
+  className={cn(
+    "bg-surface border-l border-border flex flex-col flex-shrink-0 h-full overflow-hidden transition-[width] duration-300 ease-in-out relative",
+    panelOpen ? "w-[var(--documentation-panel-width)]" : "w-0 border-l-transparent"
+  )}
+>
+  {/* Resize handle */}
+  <div
+    onMouseDown={startResize}
+    className="absolute top-0 left-0 w-[5px] h-full cursor-ew-resize hover:bg-accent z-10 transition-colors"
+  />
+  {/* Inner content — fixed width to prevent reflow */}
+  <div className="w-[var(--documentation-panel-width)] flex flex-col h-full overflow-hidden">
+    {/* Panel header */}
+    <div className="flex items-center gap-2 px-4 py-3 bg-accent-light border-b border-accent-mid flex-shrink-0">
+      <PenIcon className="w-3.5 h-3.5 text-accent-hover" />
+      <span className="font-bold text-accent-hover flex-1">Progress Note</span>
+      {/* autosave indicator + badges + action buttons */}
+    </div>
+    {/* Scrollable body */}
+    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-surface-2">
+      {/* patient context collapsible, note fields */}
+    </div>
+  </div>
+</aside>
+```
+
+Resize is client-side only:
+
+```tsx
+function useResizablePanel(defaultWidth: number, min = 300, max = 0.6) {
+  const [width, setWidth] = useState(defaultWidth);
+  const startResize = (e: React.MouseEvent) => {
+    const startX = e.clientX;
+    const startWidth = width;
+    const onMove = (e: MouseEvent) => {
+      const newWidth = startWidth - (e.clientX - startX);
+      const maxW = window.innerWidth * max;
+      setWidth(Math.min(maxW, Math.max(min, newWidth)));
+    };
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  return { width, startResize };
+}
+```
 
 ---
 
-## 8. Role-Based Access
+## 8. Notifications & Feedback
+
+### 8.1 Toast Notifications
+
+Use **Sonner** (shadcn/ui recommended):
+
+```tsx
+// In layout:
+<Toaster position="bottom-right" richColors />
+
+// Usage:
+toast.success("Note published successfully");
+toast.warning("Vital signs not recorded today");
+toast.error("Failed to save — check connection");
+toast.info("Viewing note authored by Dr. Reyes");
+```
+
+Max 3 stacked toasts. Auto-dismiss after 5s. Include `×` close button.
+
+### 8.2 RBAC Banner
+
+```tsx
+<div className="flex items-center gap-2 px-3 py-1.5 bg-blue-bg border border-blue-border rounded-btn text-[11px] text-blue font-medium mb-0.5">
+  <LockIcon className="w-3.5 h-3.5 flex-shrink-0" />
+  <span>
+    You are viewing as <strong>Doctor</strong> — showing clinical note fields only.
+  </span>
+</div>
+```
+
+---
+
+## 9. shadcn/ui Component Mapping
+
+| Design Element | Shadcn Component | Key Override |
+|---|---|---|
+| `.card` | `Card`, `CardHeader`, `CardContent` | `rounded-[8px]`, remove default shadow, add `shadow-card` |
+| Primary button | `Button` (default variant) | bg → `--accent`, border → `--accent-hover` |
+| Secondary button | `Button` (outline variant) | Match `h-[28px]`, `text-[11px]`, `font-semibold` |
+| Destructive button | `Button` (destructive variant) | bg → `--red-bg`, text → `--red`, border → `--red-border` |
+| Ghost button | `Button` (ghost variant) | Use as-is, adjust sizing |
+| Text input | `Input` | `h-[34px]`, `text-[13px]`, `border-border`, `rounded-btn`, focus ring → `--accent` |
+| Textarea | `Textarea` | `min-h-[80px]`, `resize-y`, match input border/focus |
+| Select / Combobox | `Select`, `Command + Popover` | Barangay lists, medication name search |
+| Modal | `Dialog` | `max-w-[520px]` (460 at 1280), overlay `bg-black/45 backdrop-blur-[4px]` |
+| Badges | `Badge` | Custom variants per Section 6.3 |
+| Collapsible | `Collapsible` | Chevron rotate transition via `data-[state]` |
+| Date input | `Popover` + `Calendar` | DOB, visit datetime |
+| Toasts | `Sonner` | `position="bottom-right"`, `richColors` |
+| Tables | `Table` | TH `text-[9px]` uppercase, row hover `bg-surface-3` |
+| Tabs (screen nav) | Custom `<button>` | Do **not** use shadcn Tabs — screen nav needs horizontal scroll + custom styling |
+| Drag handles | Native HTML5 drag or `@dnd-kit/core` | Problem list reordering |
+
+Override shadcn defaults in `components/ui/` files. Never touch the CSS variables shadcn uses internally — use `[var(--token)]` references in Tailwind classes instead so both systems coexist.
+
+---
+
+## 10. Accessibility
+
+```css
+/* Already in globals.css */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+```
+
+- All icon-only buttons: `aria-label` + `title` attributes
+- All inputs: linked `<label>` via `htmlFor` / `id`
+- Collapsibles: `aria-expanded` on trigger
+- Status badges: `title` tooltip when color is the only differentiator
+- Allergy icons: `title="Allergy: Penicillin"` on the ⚠ element
+- Modal focus trap: handled by shadcn `Dialog` automatically
+- `Escape` closes modals, dropdowns, and the doc panel
+- Screen nav tabs: arrow-key navigation with `onKeyDown`
+- Problem list reorder: arrow-key buttons in addition to drag
+
+---
+
+## 11. Validation Rules
+
+All errors display inline below the offending field. Never use `alert()`.
+
+```tsx
+// Error state
+<input className="... border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]" />
+<p className="text-[12px] text-red mt-1">Systolic BP must be between 50 and 300.</p>
+```
+
+| Field | Rule |
+|---|---|
+| Last / First / Middle name | max 30 chars |
+| Extension | max 3 chars |
+| DOB | valid date, in the past |
+| Age | derived from DOB, read-only |
+| Systolic BP | integer 50–300 |
+| Diastolic BP | integer 20–200 |
+| Heart Rate | integer 20–300 |
+| Resp. Rate | integer 5–60 |
+| Temperature | float 30.0–45.0 |
+| O₂ Saturation | integer 50–100 |
+| Chief Complaint | free text, max 50 chars |
+| Medication Dose | float > 0 |
+| Medication Unit | `mg` \| `g` \| `mcg` \| `ml` \| `units` |
+| Medication Instructions | free text, max 50 chars |
+| Medication Quantity | integer > 0 |
+| Lab/Imaging uploads | JPEG, PNG, PDF only |
+
+Required fields (`*`) block note publishing but not auto-save as draft.
+
+---
+
+## 12. Role-Based Access
 
 | Action | Admin | Doctor | Nurse |
 |---|---|---|---|
@@ -673,8 +1059,8 @@ Available to Admin only. Accessible via the Logs tab.
 | Add/Edit Vital Signs | ✓ | ✓ | ✓ |
 | Delete Vital Signs | ✓ | ✓ | ✗ |
 | View Notes | ✓ | ✓ | ✓ |
-| Create/Edit Initial Note | ✓ | ✓ (author only) | ✗ |
-| Create/Edit Progress Note | ✓ | ✓ (author only) | ✗ |
+| Create/Edit Initial Note | ✓ | ✓ (author) | ✗ |
+| Create/Edit Progress Note | ✓ | ✓ (author) | ✗ |
 | Edit Problem List | ✓ | ✓ | ✗ |
 | Edit Medication List | ✓ | ✓ | ✗ |
 | Generate Medical Certificate | ✓ | ✓ | ✗ |
@@ -683,171 +1069,53 @@ Available to Admin only. Accessible via the Logs tab.
 | View Audit Logs | ✓ | ✗ | ✗ |
 | New Patient Registration | ✓ | ✓ | ✗ |
 
-The active role is always displayed in the **role pill** in the topbar. UI elements that the current role cannot access are hidden entirely — not disabled/grayed out — unless the visibility of the control itself communicates important state to the user.
+UI elements the current role cannot access are **hidden entirely** — not disabled or greyed out — unless visibility itself communicates important state.
+
+Active role is always displayed in the **role pill** in the topbar.
 
 ---
 
-## 9. New Patient Form
+## 13. New Patient Form
 
-**Patient registration fields:**
-
-| Field | Type | Constraint |
-|---|---|---|
-| Last Name | Text | 30 characters |
-| First Name | Text | 30 characters |
-| Middle Name | Text | 30 characters |
-| Extension (Jr., Sr., III) | Text | 3 characters |
-| Date of Birth | Date picker | |
-| Age | Derived (read-only) | Auto-calculated from DOB |
-| Sex | Select | Male / Female |
-| Street Address | Free text | |
-| Barangay | Searchable list | |
-| City / Municipality | Searchable list | |
-| Region | Searchable list | |
-| Country | Read-only | Philippines (fixed) |
-
-Physician fields (same name format constraints) are auto-populated from the logged-in user's profile. Visit date and time default to current datetime.
-
----
-
-## 10. Accessibility
-
-### 10.1 Focus States
-
-All interactive elements (buttons, inputs, tabs, sidebar items) must have a visible focus ring:
-
-```css
-*:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
+```tsx
+// Required fields and constraints:
+// Last Name, First Name, Middle Name — text, max 30 chars each (required: Last, First)
+// Extension — text, max 3 chars
+// Date of Birth — shadcn Calendar + Popover (required)
+// Age — derived, read-only input
+// Sex — shadcn Select: Female | Male (required)
+// Blood Type — shadcn Select: Unknown | A+ | A- | B+ | B- | AB+ | AB- | O+ | O-
+// Known Allergies — text input
+// Street Address — free text
+// Barangay — shadcn Combobox (searchable)
+// City / Municipality — shadcn Combobox (searchable)
+// Region — shadcn Select (searchable)
+// Country — read-only: Philippines
 ```
 
-Never remove focus outlines entirely. The default browser outline is replaced by the accent-colored outline above.
-
-### 10.2 ARIA Labels
-
-- All icon-only buttons must have `title` and `aria-label` attributes
-- All form inputs must have corresponding `<label>` elements linked via `for`/`id`
-- Collapsible sections must use `aria-expanded` to indicate open/closed state
-- Status badges must include a text equivalent (tooltip or visually hidden span) when color is the only differentiator
-- Allergy warning icons must have `title` attributes with the allergen name
-
-### 10.3 Contrast
-
-All text/background combinations must meet WCAG 2.2 AA (4.5:1 for body text, 3:1 for large text). The color palette defined in Section 2.1 is pre-validated for these ratios. Do not introduce custom colors without running a contrast check.
-
-### 10.4 Text Zoom Support
-
-The layout must remain usable when the browser is zoomed to 150%. Use relative units (`rem`, `em`, `%`) for font sizes in accessible components. Fixed pixel values for layout dimensions (`--topbar-h`, `--sidebar-w`) are acceptable as long as they do not clip zoomed text.
-
-### 10.5 Keyboard Navigation
-
-- Tab order must follow visual reading order (left-to-right, top-to-bottom)
-- Screen nav tabs are keyboard-accessible with arrow keys
-- Problem list reordering supports keyboard via arrow-key buttons (not drag-only)
-- Modal focus must be trapped within the modal when open; restores focus to the trigger on close
-- Pressing Escape closes modals, dropdowns, and the documentation panel
+Physician fields auto-populated from the logged-in user's profile. Visit datetime defaults to `new Date()`.
 
 ---
 
-## 11. Validation Rules
+## 14. Audit Logs
 
-All validation errors must be displayed inline, directly below the offending field. Never use alert() dialogs for validation. Errors use `--red` text (12px/400) with a `--red-border` field border highlight.
+```tsx
+// Screen: Admin only. Columns:
+// DateTime (font-mono text-[11px]) | Type (Badge) | User (avatar + name) | Description (HTML)
 
-| Field | Rule |
-|---|---|
-| Patient / Physician names | Last, First, Middle: 30 chars max; Extension: 3 chars max |
-| Date of Birth | Valid date, must be in the past |
-| Age | Auto-derived from DOB, not editable |
-| Address | Barangay/City/Region from dropdown lists; Country fixed to Philippines |
-| Visit datetime | Valid datetime, not in the future |
-| Systolic BP | Integer, 50–300 |
-| Diastolic BP | Integer, 20–200 |
-| Heart Rate | Integer, 20–300 |
-| Respiratory Rate | Integer, 5–60 |
-| Temperature | Float, 30.0–45.0 |
-| O₂ Saturation | Integer, 50–100 |
-| Chief Complaint | Free text, max 50 characters |
-| Medication Dose | Float, greater than 0 |
-| Medication Unit | One of: mg, g, mcg, ml, units |
-| Medication Instructions | Free text, max 50 characters |
-| Medication Quantity | Integer, greater than 0 |
-| Lab/Imaging attachments | JPEG, PNG, PDF only |
-
-Required fields (marked with *) block note publishing but not auto-save as draft.
-
----
-
-## 12. Scrollbar Styling
-
-```css
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+// Filter controls
+<div className="flex gap-2 flex-wrap items-center">
+  {/* Search input */}
+  <div className="flex items-center gap-2 h-8 bg-surface border border-border rounded-btn px-3 max-w-[200px]">
+    <SearchIcon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+    <input className="flex-1 bg-transparent text-[11px] outline-none" placeholder="Search logs..." />
+  </div>
+  {/* Type / Time / Date filters — shadcn Select, height h-8 */}
+</div>
 ```
 
-Thin scrollbars keep the interface clean. Never hide scrollbars from scrollable areas — this disorients older users who rely on them as wayfinding cues.
-
 ---
 
-## 13. Notifications and Feedback
-
-### 13.1 Auto-save States
-
-| State | Visual | Duration |
-|---|---|---|
-| Unsaved changes | `.badge-draft` in card header | Until saved |
-| Saving in progress | Spinner + "Saving…" text, muted | During request |
-| Saved | `.badge-saved` briefly | 3 seconds, then removed |
-| Offline | Amber banner at top of note workspace: "⚠ Offline — changes saved locally" | Until reconnected |
-
-### 13.2 Toast Notifications
-
-Use for non-blocking feedback: successful publishes, errors, and system messages. Toasts appear in the bottom-right corner. Maximum 3 stacked toasts at once.
-
-| Type | Background | Border | Usage |
-|---|---|---|---|
-| Success | `--green-bg` | `--green-border` | "Note published successfully" |
-| Warning | `--amber-bg` | `--amber-border` | "Vital signs not recorded today" |
-| Error | `--red-bg` | `--red-border` | "Failed to save — check connection" |
-| Info | `--blue-bg` | `--blue-border` | "Viewing note authored by Dr. Reyes" |
-
-Toasts auto-dismiss after 5 seconds. Include an × close button.
-
-### 13.3 48-Hour Visual Indicator
-
-On the Dashboard, sections that were edited within the last 48 hours display:
-- A teal status dot (`.sd-teal`) next to the section title
-- A `.card.updated` left border (3px accent teal)
-- The "Last updated" timestamp in `--text-secondary` (not muted) for emphasis
-
----
-
-## 14. Shadcn/UI Component Mapping
-
-Since the production stack uses shadcn/ui with Tailwind CSS, below are the recommended mappings from this design system to shadcn components:
-
-| Design Element | Shadcn Component | Notes |
-|---|---|---|
-| `.card` | `Card`, `CardHeader`, `CardContent` | Override border-radius to 8px |
-| `.sec-btn` | `Button` variant="outline" | Match sizing and font weight |
-| `.sec-btn.primary` | `Button` variant="default" | Override to `--accent` color |
-| `.sec-btn.destructive` | `Button` variant="destructive" | Use as-is |
-| `.field-input` | `Input` | Match height to 34px |
-| `.field-textarea` | `Textarea` | Match resize behavior |
-| Dropdowns | `Select`, `Combobox` | Use for Barangay, Medication Name |
-| `.modal` | `Dialog` | Match sizing and overlay |
-| `.badge-*` | `Badge` | Custom variants per color |
-| Collapsible sections | `Collapsible` | Pair with ChevronDown icon |
-| Date inputs | `Popover` + `Calendar` | Use for DOB and visit datetime |
-| Toasts | `Sonner` or `Toast` | Configure position to bottom-right |
-| Tables | `Table` | Override header size to 9px |
-
-All shadcn components must have their default colors overridden in `tailwind.config.ts` to use the design token values from Section 2.1.
-
----
-
-*End of DAMAYAN Design Standards v1.0*
-*Prepared for DAMAYAN project at UP-PGH · Primary Care Clinical Note Interface*
+*End of DAMAYAN Design Standards v2.0*  
+*Prepared for DAMAYAN project at UP-PGH · Primary Care Clinical Note Interface*  
+*Tech stack: Next.js · Tailwind CSS · shadcn/ui · Prisma · PostgreSQL · Azure*

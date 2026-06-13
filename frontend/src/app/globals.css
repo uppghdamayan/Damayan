@@ -46,41 +46,158 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* DAMAYAN Custom Surface hierarchy */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  /* DAMAYAN Custom Borders */
+  --color-border-strong: var(--border-strong);
+
+  /* DAMAYAN Custom Text hierarchy */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* DAMAYAN Custom Brand / accent */
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-accent-mid: var(--accent-mid);
+
+  /* DAMAYAN Custom Semantic palettes */
+  --color-amber: var(--amber);
+  --color-amber-bg: var(--amber-bg);
+  --color-amber-border: var(--amber-border);
+
+  --color-red: var(--red);
+  --color-red-bg: var(--red-bg);
+  --color-red-border: var(--red-border);
+
+  --color-blue: var(--blue);
+  --color-blue-bg: var(--blue-bg);
+  --color-blue-border: var(--blue-border);
+
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+  --color-green-border: var(--green-border);
+
+  --color-purple: var(--purple);
+  --color-purple-bg: var(--purple-bg);
+  --color-purple-border: var(--purple-border);
+
+  /* DAMAYAN Custom Border Radii */
+  --radius-card: 8px;
+  --radius-btn: 6px;
+  --radius-pill: 20px;
+  --radius-avatar: 50%;
+  --radius-icon: 6px;
+
+  /* DAMAYAN Custom Heights */
+  --height-topbar: var(--topbar-h);
+  --height-snav: 52px;
+  --height-tb-btn: 34px;
+  --height-sec-btn: 28px;
+
+  /* DAMAYAN Custom Widths */
+  --width-sidebar: var(--sidebar-w);
+  --width-doc-panel: var(--documentation-panel-width);
+  --width-timeline: var(--timeline-w);
+
+  /* DAMAYAN Custom Box Shadows */
+  --shadow-card: 0 4px 12px rgba(0,0,0,0.05);
+  --shadow-btn-primary: 0 2px 4px rgba(10,110,95,0.15);
+  --shadow-btn-primary-hover: 0 4px 8px rgba(10,110,95,0.20);
+  --shadow-accent-focus: 0 0 0 3px rgba(10,110,95,0.12);
+  --shadow-modal: 0 20px 60px rgba(0,0,0,0.20);
+
+  /* DAMAYAN Custom Font Sizes */
+  --font-size-page-title: 20px;
+  --font-size-section-title: 15px;
+  --font-size-vital-value: 18px;
+  --font-size-body: 13px;
+  --font-size-label: 12px;
+  --font-size-meta: 11px;
+  --font-size-badge: 9px;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Redefined shadcn variables to match design standards */
+  --background: #F0F2F5;
+  --foreground: #0D1117;
+  --card: #FFFFFF;
+  --card-foreground: #0D1117;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D1117;
+  --primary: #0A6E5F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F7F8FA;
+  --secondary-foreground: #374151;
+  --muted: #F7F8FA;
+  --muted-foreground: #6B7280;
+  --accent: #0A6E5F;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --border: #D1D5E0;
+  --input: #D1D5E0;
+  --ring: #0D9E8C;
+  --radius: 8px;
+
+  /* Custom Surface hierarchy */
+  --bg:          #F0F2F5;
+  --surface:     #FFFFFF;
+  --surface-2:   #F7F8FA;
+  --surface-3:   #EFF1F5;
+
+  /* Custom Borders */
+  --border-strong: #9BA3B5;
+
+  /* Custom Text hierarchy */
+  --text-primary:   #0D1117;
+  --text-secondary: #374151;
+  --text-muted:     #6B7280;
+
+  /* Custom Accent */
+  --accent-hover: #085A4E;
+  --accent-light: #D4EDE9;
+  --accent-mid:   #0D9E8C;
+
+  /* Custom Semantic */
+  --amber:        #92400E;
+  --amber-bg:     #FEF3C7;
+  --amber-border: #F59E0B;
+
+  --red:          #991B1B;
+  --red-bg:       #FEE2E2;
+  --red-border:   #EF4444;
+
+  --blue:         #1E3A8A;
+  --blue-bg:      #DBEAFE;
+  --blue-border:  #3B82F6;
+
+  --green:        #14532D;
+  --green-bg:     #DCFCE7;
+  --green-border: #22C55E;
+
+  --purple:       #4C1D95;
+  --purple-bg:    #EDE9FE;
+  --purple-border:#8B5CF6;
+
+  /* Layout dimensions */
+  --topbar-h:                   56px;
+  --sidebar-w:                  280px;
+  --documentation-panel-width:  420px;
+  --timeline-w:                 260px;
+}
+
+@media (max-width: 1439px) {
+  :root {
+    --sidebar-w:                 220px;
+    --documentation-panel-width: 340px;
+    --timeline-w:                200px;
+    --topbar-h:                  52px;
+  }
 }
 
 .dark {
@@ -121,10 +238,32 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  html, body {
+    height: 100%;
   }
-  html {
-    @apply font-sans;
+
+  body {
+    @apply font-sans text-[13px] leading-[1.5] bg-bg text-[var(--text-primary)] overflow-hidden;
+    height: 100vh;
+  }
+
+  /* WCAG 2.2 AA focus ring */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  /* Thin scrollbars */
+  ::-webkit-scrollbar {
+    @apply w-[5px] h-[5px];
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-strong rounded-[10px];
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
   }
 }

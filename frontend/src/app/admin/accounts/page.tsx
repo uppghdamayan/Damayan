@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Account {
   id: string;
@@ -25,32 +27,32 @@ interface CreateResult {
   note: string;
 }
 
-// ─── Badge ────────────────────────────────────
+// ─── Badge (Section 6.3) ───────────────────────
 const RoleBadge = ({ role }: { role: string }) => {
   const map: Record<string, string> = {
-    ADMIN: 'bg-[#EDE9FE] text-[#4C1D95] border-[#8B5CF6]',
-    DOCTOR: 'bg-[#D4EDE9] text-[#085A4E] border-[#0A6E5F]',
-    NURSE: 'bg-[#DBEAFE] text-[#1E3A8A] border-[#3B82F6]',
+    ADMIN: 'bg-purple-bg text-purple border-purple-border',
+    DOCTOR: 'bg-accent-light text-accent-hover border-accent',
+    NURSE: 'bg-blue-bg text-blue border-blue-border',
   };
   return (
-    <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded border inline-block ${map[role] || ''}`}>
+    <span className={`text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] border inline-flex items-center ${map[role] || ''}`}>
       {role}
     </span>
   );
 };
 
 const StatusBadge = ({ isActive }: { isActive: boolean }) => (
-  <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded border inline-block ${isActive ? 'bg-[#DCFCE7] text-[#14532D] border-[#22C55E]' : 'bg-[#F7F8FA] text-[#6B7280] border-[#D1D5E0]'}`}>
+  <span className={`text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] border inline-flex items-center ${isActive ? 'bg-green-bg text-green border-green-border' : 'bg-surface-2 text-text-muted border-border'}`}>
     {isActive ? 'Active' : 'Inactive'}
   </span>
 );
 
-// ─── Button ───────────────────────────────────
+// ─── Button (Section 6.2) ──────────────────────
 const PrimaryBtn = ({ children, onClick, disabled = false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`h-7 px-3.5 rounded-md text-[11px] font-semibold shrink-0 shadow-[0_2px_4px_rgba(10,110,95,0.15)] ${disabled ? 'bg-[#6B7280] text-white border border-[#6B7280] cursor-not-allowed' : 'bg-[#0A6E5F] text-white border border-[#085A4E] cursor-pointer'}`}
+    className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap min-w-[80px] cursor-pointer disabled:bg-text-muted disabled:border-border-strong disabled:cursor-not-allowed"
   >
     {children}
   </button>
@@ -59,27 +61,32 @@ const PrimaryBtn = ({ children, onClick, disabled = false }: { children: React.R
 const SecBtn = ({ children, onClick, danger = false }: { children: React.ReactNode; onClick?: () => void; danger?: boolean }) => (
   <button
     onClick={onClick}
-    className={`h-7 px-3 rounded-md text-[11px] font-semibold cursor-pointer border ${danger ? 'bg-[#FEE2E2] text-[#991B1B] border-[#EF4444]' : 'bg-[#F7F8FA] text-[#374151] border-[#D1D5E0]'}`}
+    className={cn(
+      "h-[28px] px-3 rounded-btn text-[11px] font-semibold transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap min-w-[80px] cursor-pointer border",
+      danger
+        ? "bg-red-bg text-red border-red-border hover:bg-red/15 hover:border-red/80"
+        : "bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong"
+    )}
   >
     {children}
   </button>
 );
 
-// ─── Field ────────────────────────────────────
+// ─── Field (Section 6.4) ───────────────────────
 const Field = ({
   label, required = false, children,
 }: { label: string; required?: boolean; children: React.ReactNode }) => (
-  <div className="mb-3.5">
-    <label className="block text-[11px] font-semibold text-[#374151] mb-1.5">
-      {label} {required && <span className="text-[#991B1B]">*</span>}
+  <div className="flex flex-col gap-1.5 mb-3.5">
+    <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
+      {label} {required && <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>}
     </label>
     {children}
   </div>
 );
 
-const inputClassName = "h-[34px] w-full px-2.5 bg-white border rounded-md text-[13px] text-[#0D1117] outline-none box-border";
+const inputClassName = "w-full h-[34px] px-2.5 bg-surface border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface placeholder:text-text-muted";
 
-// ─── Modal ────────────────────────────────────
+// ─── Modal (Section 6.7) ───────────────────────
 function CreateAccountModal({
   open,
   onClose,
@@ -98,9 +105,22 @@ function CreateAccountModal({
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Valid email is required.';
-    if (!form.firstName || form.firstName.length < 2) e.firstName = 'First name must be at least 2 characters.';
-    if (!form.lastName || form.lastName.length < 2) e.lastName = 'Last name must be at least 2 characters.';
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      e.email = 'Valid email is required.';
+    }
+    if (!form.firstName || form.firstName.trim().length < 2) {
+      e.firstName = 'First name must be at least 2 characters.';
+    } else if (form.firstName.length > 30) {
+      e.firstName = 'First name must not exceed 30 characters.';
+    }
+    if (!form.lastName || form.lastName.trim().length < 2) {
+      e.lastName = 'Last name must be at least 2 characters.';
+    } else if (form.lastName.length > 30) {
+      e.lastName = 'Last name must not exceed 30 characters.';
+    }
+    if (form.middleName && form.middleName.length > 30) {
+      e.middleName = 'Middle name must not exceed 30 characters.';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -119,11 +139,13 @@ function CreateAccountModal({
           role: form.role,
         }),
       });
+      toast.success('Account created successfully');
       onCreated(result);
       onClose();
       setForm({ email: '', firstName: '', lastName: '', middleName: '', role: 'DOCTOR' });
     } catch (err: any) {
       setErrors({ submit: err.message });
+      toast.error(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
@@ -134,70 +156,117 @@ function CreateAccountModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center"
+      className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-[10px] max-w-[520px] w-full mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
+        className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal"
       >
         {/* Modal header */}
-        <div className="px-5 py-4 border-b border-[#D1D5E0] flex justify-between items-center">
-          <span className="text-[15px] font-bold text-[#0D1117]">Create User Account</span>
+        <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
+          <h2 className="text-[15px] font-bold flex-1 text-text-primary">Create User Account</h2>
           <button
             onClick={onClose}
-            className="bg-transparent border-none text-lg cursor-pointer text-[#6B7280] leading-none"
+            className="w-6 h-6 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer"
             aria-label="Close modal"
           >
-            ×
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
           </button>
         </div>
 
         {/* Modal body */}
-        <div className="px-5 py-4">
+        <div className="px-[18px] py-[18px]">
           {errors.submit && (
-            <div className="bg-[#FEE2E2] border border-[#EF4444] rounded-md px-3 py-2 mb-3.5 text-xs text-[#991B1B]">
+            <div className="bg-red-bg border border-red-border rounded-btn px-3 py-2 mb-3.5 text-[12px] text-red font-medium">
               {errors.submit}
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="First Name" required>
-              <input className={`${inputClassName} ${errors.firstName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} value={form.firstName} onChange={set('firstName')} maxLength={30} />
-              {errors.firstName && <p className="text-xs text-[#991B1B] mt-1">{errors.firstName}</p>}
+              <input
+                className={cn(
+                  inputClassName,
+                  errors.firstName
+                    ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                    : 'border-border focus:border-accent focus:shadow-accent-focus'
+                )}
+                value={form.firstName}
+                onChange={set('firstName')}
+                maxLength={30}
+              />
+              {errors.firstName && <p className="text-[12px] text-red mt-1">{errors.firstName}</p>}
             </Field>
             <Field label="Last Name" required>
-              <input className={`${inputClassName} ${errors.lastName ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} value={form.lastName} onChange={set('lastName')} maxLength={30} />
-              {errors.lastName && <p className="text-xs text-[#991B1B] mt-1">{errors.lastName}</p>}
+              <input
+                className={cn(
+                  inputClassName,
+                  errors.lastName
+                    ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                    : 'border-border focus:border-accent focus:shadow-accent-focus'
+                )}
+                value={form.lastName}
+                onChange={set('lastName')}
+                maxLength={30}
+              />
+              {errors.lastName && <p className="text-[12px] text-red mt-1">{errors.lastName}</p>}
             </Field>
           </div>
 
           <Field label="Middle Name">
-            <input className={`${inputClassName} border-[#D1D5E0]`} value={form.middleName} onChange={set('middleName')} maxLength={30} placeholder="Optional" />
+            <input
+              className={cn(
+                inputClassName,
+                errors.middleName
+                  ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                  : 'border-border focus:border-accent focus:shadow-accent-focus'
+              )}
+              value={form.middleName}
+              onChange={set('middleName')}
+              maxLength={30}
+              placeholder="Optional"
+            />
+            {errors.middleName && <p className="text-[12px] text-red mt-1">{errors.middleName}</p>}
           </Field>
 
           <Field label="Email Address" required>
-            <input className={`${inputClassName} ${errors.email ? 'border-[#EF4444]' : 'border-[#D1D5E0]'}`} type="email" value={form.email} onChange={set('email')} />
-            {errors.email && <p className="text-xs text-[#991B1B] mt-1">{errors.email}</p>}
+            <input
+              className={cn(
+                inputClassName,
+                errors.email
+                  ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                  : 'border-border focus:border-accent focus:shadow-accent-focus'
+              )}
+              type="email"
+              value={form.email}
+              onChange={set('email')}
+            />
+            {errors.email && <p className="text-[12px] text-red mt-1">{errors.email}</p>}
           </Field>
 
           <Field label="Role" required>
             <select
               value={form.role}
               onChange={set('role')}
-              className={`${inputClassName} border-[#D1D5E0] appearance-none cursor-pointer`}
+              className={cn(
+                inputClassName,
+                "cursor-pointer focus:border-accent focus:shadow-accent-focus border-border"
+              )}
             >
               <option value="DOCTOR">Doctor</option>
               <option value="NURSE">Nurse</option>
             </select>
           </Field>
 
-          <p className="text-[11px] text-[#6B7280] mt-[-6px]">
+          <p className="text-[11px] text-text-muted mt-2">
             A 16-character temporary password will be generated. Share it securely — it is shown only once.
           </p>
         </div>
 
         {/* Modal footer */}
-        <div className="px-5 py-3 border-t border-[#D1D5E0] flex justify-end gap-2">
+        <div className="flex justify-end gap-2 px-[18px] py-3 border-t border-border">
           <SecBtn onClick={onClose}>Cancel</SecBtn>
           <PrimaryBtn onClick={handleSubmit} disabled={loading}>
             {loading ? 'Creating…' : 'Create Account'}
@@ -208,26 +277,34 @@ function CreateAccountModal({
   );
 }
 
-// ─── Temp Password Display ───────────────────
+// ─── Temp Password Display (Section 8.1 / Toast Style) ──
 function TempPasswordToast({ result, onDismiss }: { result: CreateResult; onDismiss: () => void }) {
   return (
-    <div className="fixed bottom-6 right-6 z-[2000] bg-white border border-[#22C55E] rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.12)] px-5 py-4 max-w-[380px]">
+    <div className="fixed bottom-6 right-6 z-[2000] bg-surface border border-green-border rounded-card shadow-[0_8px_24px_rgba(0,0,0,0.12)] px-5 py-4 w-full max-w-[380px] animate-in fade-in slide-in-from-bottom-5 duration-200">
       <div className="flex justify-between items-start mb-2.5">
-        <span className="text-[13px] font-bold text-[#14532D]">Password Generated</span>
-        <button onClick={onDismiss} className="bg-transparent border-none cursor-pointer text-[#6B7280] text-base leading-none">×</button>
+        <span className="text-[13px] font-bold text-green flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-green inline-block" />
+          Password Generated
+        </span>
+        <button
+          onClick={onDismiss}
+          className="w-5 h-5 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer text-sm leading-none"
+        >
+          ×
+        </button>
       </div>
-      <p className="text-xs text-[#374151] mb-2.5">
+      <p className="text-[12px] text-text-secondary mb-2.5">
         {result.user.firstName} {result.user.lastName} ({result.user.role}) — {result.user.email}
       </p>
-      <div className="bg-[#F7F8FA] border border-[#D1D5E0] rounded-md px-3 py-2 mb-2.5">
-        <p className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.6px] mb-1">
+      <div className="bg-surface-2 border border-border rounded-btn px-3 py-2 mb-2.5">
+        <p className="text-[10px] font-semibold text-text-muted uppercase tracking-[0.6px] mb-1">
           Temporary Password (shown once)
         </p>
-        <code className="text-[15px] font-bold text-[#0D1117] font-mono">
+        <code className="text-[15px] font-bold text-text-primary font-mono select-all">
           {result.tempPassword}
         </code>
       </div>
-      <p className="text-[11px] text-[#6B7280]">{result.note}</p>
+      <p className="text-[11px] text-text-muted">{result.note}</p>
     </div>
   );
 }
@@ -250,21 +327,25 @@ export default function AccountsPage() {
       setMeta(res.meta);
     } catch (e) {
       console.error(e);
+      toast.error('Failed to load accounts');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this account? This action cannot be undone.')) return;
     setDeletingId(id);
     try {
       await apiRequest(`/accounts/${id}`, { method: 'DELETE' });
+      toast.success('Account deleted successfully');
       fetchAccounts(meta.page);
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Failed to delete account');
     } finally {
       setDeletingId(null);
     }
@@ -275,9 +356,10 @@ export default function AccountsPage() {
     setResettingId(id);
     try {
       const res = await apiRequest<CreateResult>(`/accounts/${id}/reset-password`, { method: 'POST' });
+      toast.success('Password reset successfully');
       handleCreated(res);
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message || 'Failed to reset password');
     } finally {
       setResettingId(null);
     }
@@ -294,32 +376,38 @@ export default function AccountsPage() {
       {/* Page header */}
       <div className="flex justify-between items-center mb-5">
         <div>
-          <h1 className="text-xl font-bold text-[#0D1117] mb-1">User Accounts</h1>
-          <p className="text-xs text-[#6B7280]">
+          <h1 className="text-[20px] font-bold text-text-primary mb-1">User Accounts</h1>
+          <p className="text-[12px] text-text-muted">
             {meta.total} account{meta.total !== 1 ? 's' : ''} total
           </p>
         </div>
         <PrimaryBtn onClick={() => setModalOpen(true)}>+ New Account</PrimaryBtn>
       </div>
 
-      {/* Accounts table card */}
-      <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+      {/* Accounts table card (Section 6.1 / 6.5) */}
+      <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
         {/* Card header */}
-        <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
+          <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
+            👤
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
             All Accounts
           </span>
         </div>
 
         {/* Table */}
         {loading ? (
-          <div className="p-8 text-center text-[#6B7280] text-[13px]">Loading…</div>
+          <div className="p-8 text-center text-text-muted text-[13px]">Loading…</div>
         ) : (
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-[#F7F8FA]">
+              <tr className="bg-surface-2">
                 {['Name', 'Email', 'Role', 'Status', 'Created', 'Actions'].map((h) => (
-                  <th key={h} className="px-2.5 py-2 text-left text-[9px] font-bold uppercase tracking-[0.6px] text-[#374151] border-b border-[#D1D5E0]">
+                  <th
+                    key={h}
+                    className="px-2.5 py-2 text-left text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary border-b border-border"
+                  >
                     {h}
                   </th>
                 ))}
@@ -329,13 +417,13 @@ export default function AccountsPage() {
               {accounts.map((account, i) => (
                 <tr
                   key={account.id}
-                  className={`hover:bg-[#EFF1F5] ${i < accounts.length - 1 ? 'border-b border-[#D1D5E0]' : ''}`}
+                  className="hover:bg-surface-3 transition-colors border-b border-border last:border-b-0"
                 >
-                  <td className="px-2.5 py-2 text-xs text-[#374151] font-medium">
+                  <td className="px-2.5 py-2 text-[12px] text-text-secondary font-medium">
                     {account.lastName}, {account.firstName}
                     {account.middleName ? ` ${account.middleName[0]}.` : ''}
                   </td>
-                  <td className="px-2.5 py-2 text-xs text-[#374151]">
+                  <td className="px-2.5 py-2 text-[12px] text-text-secondary">
                     {account.email}
                   </td>
                   <td className="px-2.5 py-2">
@@ -344,7 +432,7 @@ export default function AccountsPage() {
                   <td className="px-2.5 py-2">
                     <StatusBadge isActive={account.isActive} />
                   </td>
-                  <td className="px-2.5 py-2 text-[11px] text-[#6B7280] font-mono">
+                  <td className="px-2.5 py-2 text-[11px] text-text-muted font-mono">
                     {new Date(account.createdAt).toLocaleDateString('en-PH')}
                   </td>
                   <td className="px-2.5 py-2">
@@ -368,7 +456,7 @@ export default function AccountsPage() {
               ))}
               {accounts.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-[13px] text-[#6B7280]">
+                  <td colSpan={6} className="p-8 text-center text-[13px] text-text-muted">
                     No accounts found.
                   </td>
                 </tr>
@@ -379,12 +467,17 @@ export default function AccountsPage() {
 
         {/* Pagination */}
         {meta.totalPages > 1 && (
-          <div className="px-3.5 py-2.5 border-t border-[#D1D5E0] flex gap-2 justify-end">
+          <div className="px-3.5 py-2.5 border-t border-border flex gap-2 justify-end bg-surface-2">
             {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
                 onClick={() => fetchAccounts(p)}
-                className={`w-7 h-7 rounded-md text-[11px] font-semibold cursor-pointer border ${p === meta.page ? 'bg-[#0A6E5F] text-white border-[#085A4E]' : 'bg-[#F7F8FA] text-[#374151] border-[#D1D5E0]'}`}
+                className={cn(
+                  "w-7 h-7 rounded-btn text-[11px] font-semibold cursor-pointer border flex items-center justify-center transition-all duration-150",
+                  p === meta.page
+                    ? "bg-accent text-white border-accent-hover shadow-btn-primary"
+                    : "bg-surface text-text-secondary border-border hover:bg-surface-2 hover:border-border-strong hover:text-text-primary"
+                )}
               >
                 {p}
               </button>

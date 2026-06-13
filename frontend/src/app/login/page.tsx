@@ -55,28 +55,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
-      <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] px-9 py-10 w-full max-w-[400px]">
+    <div className="min-h-screen bg-bg flex items-center justify-center font-sans overflow-hidden">
+      <div className="bg-surface border border-border rounded-card shadow-card px-9 py-10 w-full max-w-[400px]">
         {/* Logo + App name */}
-        <div className="flex items-center gap-2.5 mb-7">
-          <div className="w-8 h-8 bg-[#0A6E5F] rounded-md shrink-0" />
-          <span className="text-lg font-bold text-[#0D1117] tracking-[-0.3px]">
-            DAMAYAN
+        <div className="flex items-center gap-2 mb-7">
+          <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 8V16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8 12H16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap text-text-primary">
+            DAMAYAN <small className="text-[9px] font-semibold text-text-muted tracking-[1px] uppercase mt-[3px]">EMR</small>
           </span>
         </div>
 
-        <h1 className="text-[15px] font-bold text-[#0D1117] mb-1">
+        <h1 className="text-[15px] font-bold text-text-primary mb-1">
           Sign in to your account
         </h1>
-        <p className="text-xs text-[#6B7280] mb-6">
+        <p className="text-[12px] text-text-muted mb-6">
           Use the credentials provided by your administrator.
         </p>
 
         {/* Email field */}
-        <div className="mb-3.5">
+        <div className="mb-3.5 flex flex-col">
           <label
             htmlFor="email"
-            className="block text-[11px] font-semibold text-[#374151] mb-1.5"
+            className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px] mb-1.5"
           >
             Email address
           </label>
@@ -86,15 +92,15 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@damayan.ph"
-            className="h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
+            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted"
           />
         </div>
 
         {/* Password field */}
-        <div className="mb-5">
+        <div className="mb-5 flex flex-col">
           <label
             htmlFor="password"
-            className="block text-[11px] font-semibold text-[#374151] mb-1.5"
+            className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px] mb-1.5"
           >
             Password
           </label>
@@ -105,13 +111,13 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••••••"
             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            className="h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all"
+            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted"
           />
         </div>
 
         {/* Error message */}
         {error && (
-          <p className="text-xs text-[#991B1B] mb-3.5">
+          <p className="text-[12px] text-red font-semibold mb-3.5">
             {error}
           </p>
         )}
@@ -120,15 +126,16 @@ export default function LoginPage() {
         <button
           onClick={handleLogin}
           disabled={loading || !email || !password}
-          className={`h-[34px] w-full text-white border border-[#085A4E] rounded-md text-[11px] font-semibold shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-colors duration-150 ${loading ? 'bg-[#085A4E] cursor-not-allowed' : 'bg-[#0A6E5F] cursor-pointer hover:bg-[#085A4E]'}`}
+          className={`h-[34px] w-full text-white border border-accent-hover rounded-btn text-[11px] font-semibold shadow-btn-primary transition-all duration-150 flex items-center justify-center gap-[5px] ${loading ? 'bg-accent-hover cursor-not-allowed' : 'bg-accent cursor-pointer hover:bg-accent-hover hover:shadow-btn-primary-hover'}`}
         >
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
 
-        <p className="mt-5 text-[11px] text-[#6B7280] text-center">
+        <p className="mt-5 text-[11px] text-text-muted text-center">
           Accounts are provisioned by your system administrator.
         </p>
       </div>
     </div>
   );
 }
+
