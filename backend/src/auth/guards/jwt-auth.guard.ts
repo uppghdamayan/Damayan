@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -41,6 +41,24 @@ export class JwtAuthGuard implements CanActivate {
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Account is inactive or does not exist.');
+    }
+
+    // Block restricted users who must change their password first
+    const path = (request.path || request.url) as string;
+    const method = request.method as string;
+
+    if (
+      user.requiresPasswordChange &&
+      !(method === 'POST' && path.includes('/auth/change-password'))
+    ) {
+      // Allow GET /auth/me so the frontend can read the flag
+      if (method === 'GET' && path.includes('/auth/me')) {
+        request.user = user;
+        return true;
+      }
+      throw new ForbiddenException(
+        'Your account requires a password change before you can continue.'
+      );
     }
 
     // Attach user to request for @CurrentUser() decorator

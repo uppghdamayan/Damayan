@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setAccessToken } = useAuthStore();
+  const { setUser, setAccessToken, setRequiresPasswordChange } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -42,9 +42,12 @@ export default function LoginPage() {
     const profile = await res.json();
     setUser(profile);
     setAccessToken(data.session.access_token);
+    setRequiresPasswordChange(profile.requiresPasswordChange);
 
-    // Route by role
-    if (profile.role === 'ADMIN') {
+    // Route: password change required → admin → doctor/nurse dashboard
+    if (profile.requiresPasswordChange) {
+      router.replace('/change-password');
+    } else if (profile.role === 'ADMIN') {
       router.replace('/admin/accounts');
     } else {
       router.replace('/dashboard');

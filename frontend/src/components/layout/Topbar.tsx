@@ -5,10 +5,11 @@ import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { initials } from '@/lib/patient-utils';
+import { PanelRightOpen, PanelRightClose } from 'lucide-react';
 
 export function Topbar() {
   const { user, clear } = useAuthStore();
-  const { toggleSidebar } = useUiStore();
+  const { toggleSidebar, documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -82,9 +83,37 @@ export function Topbar() {
           border: '1px solid #085A4E', borderRadius: 6, fontSize: 11,
           fontWeight: 600, cursor: 'pointer', flexShrink: 0,
           boxShadow: '0 2px 4px rgba(10,110,95,0.15)',
+          fontFamily: "'IBM Plex Sans', sans-serif",
         }}
       >
         + New Note
+      </button>
+
+      {/* Documentation panel toggle */}
+      <button
+        onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
+        aria-label="Toggle documentation panel"
+        title={documentationPanelOpen ? 'Close documentation panel' : 'Open documentation panel'}
+        style={{
+          height: 34, padding: '0 10px',
+          background: '#F7F8FA',
+          border: '1px solid transparent',
+          borderRadius: 6,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          transition: 'all 0.15s ease',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#EFF1F5'; e.currentTarget.style.borderColor = '#D1D5E0'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = '#F7F8FA'; e.currentTarget.style.borderColor = 'transparent'; }}
+      >
+        {documentationPanelOpen ? (
+          <PanelRightClose size={16} color="#374151" strokeWidth={1.5} />
+        ) : (
+          <PanelRightOpen size={16} color="#374151" strokeWidth={1.5} />
+        )}
       </button>
 
       {/* User avatar */}
@@ -106,6 +135,7 @@ export function Topbar() {
           height: 28, padding: '0 12px', background: '#F7F8FA',
           border: '1px solid #D1D5E0', borderRadius: 6, fontSize: 11,
           fontWeight: 600, color: '#374151', cursor: 'pointer', flexShrink: 0,
+          fontFamily: "'IBM Plex Sans', sans-serif",
         }}
       >
         Sign Out

@@ -23,7 +23,9 @@ export async function apiRequest<T = unknown>(
     if (res.status === 401) {
       // Force redirect to login on session expiry or unauthorized
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        supabase.auth.signOut().then(() => {
+          window.location.href = '/login';
+        });
       }
     }
     const body = await res.json().catch(() => ({}));

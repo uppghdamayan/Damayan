@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { Topbar } from '@/components/layout/Topbar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { DocumentationPanel } from '@/components/layout/DocumentationPanel';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
+  const { user, requiresPasswordChange } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -16,27 +17,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       // user is null means not yet loaded from zustand — don't redirect yet
       return;
     }
+    if (requiresPasswordChange) {
+      router.replace('/change-password');
+      return;
+    }
     if (user.role === 'ADMIN') {
       router.replace('/admin/accounts');
     }
-  }, [user, router]);
+  }, [user, requiresPasswordChange, router]);
 
   return (
     <div
+      id="shell"
       style={{
-        minHeight: '100vh',
+        height: '100vh',
         background: '#F0F2F5',
         fontFamily: "'IBM Plex Sans', sans-serif",
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
       <Topbar />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 56px)' }}>
+      <div
+        id="body"
+        style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden',
+        }}
+      >
         <Sidebar />
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+        <div
+          id="middle-column"
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           {children}
-        </main>
+        </div>
+        <DocumentationPanel />
       </div>
     </div>
   );

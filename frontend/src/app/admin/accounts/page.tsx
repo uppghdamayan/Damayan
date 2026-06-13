@@ -282,7 +282,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [tempResult, setTempResult] = useState<CreateResult | null>(null);
-  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
 
   const fetchAccounts = useCallback(async (page = 1) => {
@@ -300,16 +300,16 @@ export default function AccountsPage() {
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
-  const handleDeactivate = async (id: string) => {
-    if (!confirm('Deactivate this account? The user will lose access immediately.')) return;
-    setDeactivatingId(id);
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this account? This action cannot be undone.')) return;
+    setDeletingId(id);
     try {
       await apiRequest(`/accounts/${id}`, { method: 'DELETE' });
       fetchAccounts(meta.page);
     } catch (e: any) {
       alert(e.message);
     } finally {
-      setDeactivatingId(null);
+      setDeletingId(null);
     }
   };
 
@@ -403,10 +403,10 @@ export default function AccountsPage() {
                           {resettingId === account.id ? 'Resetting…' : 'Reset Password'}
                         </SecBtn>
                         <SecBtn
-                          onClick={() => handleDeactivate(account.id)}
+                          onClick={() => handleDelete(account.id)}
                           danger
                         >
-                          {deactivatingId === account.id ? 'Deactivating…' : 'Deactivate'}
+                          {deletingId === account.id ? 'Deleting…' : 'Delete'}
                         </SecBtn>
                       </div>
                     )}

@@ -1,12 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, clear } = useAuthStore();
+  const { user, clear, requiresPasswordChange } = useAuthStore();
+
+  // Passive guard: redirect to change-password if required
+  useEffect(() => {
+    if (user && requiresPasswordChange) {
+      router.replace('/change-password');
+    }
+  }, [user, requiresPasswordChange, router]);
 
   const handleSignOut = async () => {
     const supabase = createSupabaseClient();

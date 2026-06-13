@@ -80,7 +80,8 @@ model User {
   middleName String?  @map("middle_name") @db.VarChar(30)
   extension  String?  @db.VarChar(3)
   role       Role
-  isActive   Boolean  @default(true) @map("is_active")
+  isActive                Boolean  @default(true) @map("is_active")
+  requiresPasswordChange  Boolean  @default(false) @map("requires_password_change")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt      @map("updated_at")
 

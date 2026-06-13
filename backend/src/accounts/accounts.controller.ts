@@ -68,9 +68,9 @@ export class AccountsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Deactivate account (Admin only)' })
-  async deactivate(@Param('id') id: string) {
-    return this.accountsService.deactivate(id);
+  @ApiOperation({ summary: 'Delete account (Admin only)' })
+  async remove(@Param('id') id: string) {
+    return this.accountsService.remove(id);
   }
 
   @Post(':id/reset-password')

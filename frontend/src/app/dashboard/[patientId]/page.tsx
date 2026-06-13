@@ -1,25 +1,21 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { usePatient } from '@/hooks/usePatients';
 import { PatientBanner } from '@/components/patients/PatientBanner';
+import { PatientBannerSkeleton } from '@/components/patients/PatientBannerSkeleton';
 import { VitalsStripEmpty } from '@/components/vitals/VitalsStripEmpty';
+import { VitalsStripSkeleton } from '@/components/vitals/VitalsStripSkeleton';
 import { ProblemListCardEmpty } from '@/components/problems/ProblemListCardEmpty';
 import { MedicationListCardEmpty } from '@/components/medications/MedicationListCardEmpty';
 import { VisitHistoryCard } from '@/components/visits/VisitHistoryCard';
 
-export default function PatientDashboardPage() {
-  const { patientId } = useParams<{ patientId: string }>();
+// Suspense-wrapped data components
+function PatientBannerSection({ patientId }: { patientId: string }) {
   const { data: patient, isLoading, isError } = usePatient(patientId);
 
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-        <span style={{ fontSize: 13, color: '#6B7280' }}>Loading patient record…</span>
-      </div>
-    );
-  }
-
+  if (isLoading) return <PatientBannerSkeleton />;
   if (isError || !patient) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
@@ -28,22 +24,50 @@ export default function PatientDashboardPage() {
     );
   }
 
+  return <PatientBanner patient={patient} />;
+}
+
+function VitalsSection({ patientId }: { patientId: string }) {
+  return <VitalsStripEmpty patientId={patientId} />;
+}
+
+function ProblemsAndMedsSection() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <ProblemListCardEmpty />
+      <MedicationListCardEmpty />
+    </div>
+  );
+}
+
+function VisitHistorySection({ patientId }: { patientId: string }) {
+  return <VisitHistoryCard patientId={patientId} />;
+}
+
+export default function PatientDashboardPage() {
+  const { patientId } = useParams<{ patientId: string }>();
+
   return (
     <>
-      {/* Patient Banner */}
-      <PatientBanner patient={patient} />
+      {/* Suspense 1: Patient Banner */}
+      <Suspense fallback={<PatientBannerSkeleton />}>
+        <PatientBannerSection patientId={patientId} />
+      </Suspense>
 
-      {/* Vitals Strip (empty state — Phase 10 will replace) */}
-      <VitalsStripEmpty patientId={patientId} />
+      {/* Suspense 2: Vitals Strip */}
+      <Suspense fallback={<VitalsStripSkeleton />}>
+        <VitalsSection patientId={patientId} />
+      </Suspense>
 
-      {/* Problem List + Medications — side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <ProblemListCardEmpty />
-        <MedicationListCardEmpty />
-      </div>
+      {/* Suspense 3: Problem List + Medications */}
+      <Suspense fallback={null}>
+        <ProblemsAndMedsSection />
+      </Suspense>
 
-      {/* Visit History */}
-      <VisitHistoryCard patientId={patientId} />
+      {/* Suspense 4: Visit History */}
+      <Suspense fallback={null}>
+        <VisitHistorySection patientId={patientId} />
+      </Suspense>
     </>
   );
 }

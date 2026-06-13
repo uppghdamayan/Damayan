@@ -29,18 +29,26 @@ export class AuthService {
       extension: user.extension,
       role: user.role,
       isActive: user.isActive,
+      requiresPasswordChange: user.requiresPasswordChange,
     };
   }
 
   async changePassword(user: User, dto: ChangePasswordDto) {
     const { error } = await this.supabase.auth.admin.updateUserById(user.id, {
       password: dto.newPassword,
+      user_metadata: { must_change_password: false },
     });
 
     if (error) {
       throw new UnauthorizedException(`Failed to update password: ${error.message}`);
     }
 
-    return { message: 'Password updated successfully.' };
+    // Clear the forced password-change flag
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { requiresPasswordChange: false },
+    });
+
+    return { message: 'Password updated successfully.', requiresPasswordChange: false };
   }
 }

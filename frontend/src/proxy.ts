@@ -23,10 +23,11 @@ export default async function proxy(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
   const pathname = new URL(request.url).pathname;
 
-  const isLoginRoute     = pathname === '/login' || pathname === '/';
-  const isAdminRoute     = pathname.startsWith('/admin');
-  const isDashboardRoute = pathname.startsWith('/dashboard');
-  const isProtected      = isAdminRoute || isDashboardRoute;
+  const isLoginRoute          = pathname === '/login' || pathname === '/';
+  const isChangePasswordRoute = pathname === '/change-password';
+  const isAdminRoute          = pathname.startsWith('/admin');
+  const isDashboardRoute      = pathname.startsWith('/dashboard');
+  const isProtected           = isAdminRoute || isDashboardRoute || isChangePasswordRoute;
 
   // Unauthenticated: redirect to login
   if (!session && isProtected) {
@@ -39,9 +40,11 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // Authenticated on /change-password: allow through (page-level guard handles redirect-if-not-needed)
+
   return response;
 }
 
 export const config = {
-  matcher: ['/', '/login', '/admin/:path*', '/dashboard/:path*'],
+  matcher: ['/', '/login', '/admin/:path*', '/dashboard/:path*', '/change-password'],
 };

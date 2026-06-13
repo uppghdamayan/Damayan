@@ -180,6 +180,7 @@ export class AccountsService implements OnModuleInit {
         middleName: dto.middleName,
         role: dto.role,
         isActive: true,
+        requiresPasswordChange: true,
       },
     });
 
@@ -204,29 +205,37 @@ export class AccountsService implements OnModuleInit {
     });
   }
 
-  async deactivate(id: string) {
+  async remove(id: string) {
     const user = await this.findOne(id);
     if (user.role === Role.ADMIN) {
-      // Prevent deactivating the last Admin
+      // Prevent deleting the last Admin
       const adminCount = await this.prisma.user.count({
-        where: { role: Role.ADMIN, isActive: true },
+        where: { role: Role.ADMIN },
       });
       if (adminCount <= 1) {
         throw new ConflictException(
-          'Cannot deactivate the last active Admin account.',
+          'Cannot delete the last Admin account.',
         );
       }
     }
 
-    // Disable Supabase Auth login by applying an effectively permanent ban
-    await this.supabase.auth.admin.updateUserById(id, {
-      ban_duration: '876600h', // 100 years
-    });
+    try {
+      const deletedUser = await this.prisma.user.delete({
+        where: { id },
+      });
+      
+      const { error } = await this.supabase.auth.admin.deleteUser(id);
+      if (error) {
+        this.logger.error(`Failed to delete Supabase user ${id}: ${error.message}`);
+      }
 
-    return this.prisma.user.update({
-      where: { id },
-      data: { isActive: false },
-    });
+      return deletedUser;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException('Cannot delete account because it is referenced by existing medical records.');
+      }
+      throw error;
+    }
   }
 
   async resetPassword(id: string) {
@@ -243,6 +252,12 @@ export class AccountsService implements OnModuleInit {
     if (error) {
       throw new ConflictException(`Failed to reset password: ${error.message}`);
     }
+
+    // Flag user for mandatory password change on next login
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { requiresPasswordChange: true },
+    });
 
     return {
       user,

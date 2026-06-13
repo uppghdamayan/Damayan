@@ -6,20 +6,25 @@ interface AuthUser {
   firstName: string;
   lastName: string;
   role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  requiresPasswordChange: boolean;
 }
 
 interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
+  requiresPasswordChange: boolean;
   setUser: (user: AuthUser | null) => void;
   setAccessToken: (token: string | null) => void;
+  setRequiresPasswordChange: (v: boolean) => void;
   clear: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
-  setUser: (user) => set({ user }),
+  requiresPasswordChange: false,
+  setUser: (user) => set({ user, requiresPasswordChange: user?.requiresPasswordChange ?? false }),
   setAccessToken: (accessToken) => set({ accessToken }),
-  clear: () => set({ user: null, accessToken: null }),
+  setRequiresPasswordChange: (requiresPasswordChange) => set({ requiresPasswordChange }),
+  clear: () => set({ user: null, accessToken: null, requiresPasswordChange: false }),
 }));
