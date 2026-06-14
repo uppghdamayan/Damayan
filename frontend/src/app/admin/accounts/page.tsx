@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Account {
   id: string;
@@ -398,24 +399,57 @@ export default function AccountsPage() {
         </div>
 
         {/* Table */}
-        {loading ? (
-          <div className="p-8 text-center text-text-muted text-[13px]">Loading…</div>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-surface-2">
-                {['Name', 'Email', 'Role', 'Status', 'Created', 'Actions'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-2.5 py-2 text-left text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary border-b border-border"
-                  >
-                    {h}
-                  </th>
-                ))}
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-surface-2">
+              {['Name', 'Email', 'Role', 'Status', 'Created', 'Actions'].map((h) => (
+                <th
+                  key={h}
+                  className="px-2.5 py-2 text-left text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary border-b border-border"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className="border-b border-border last:border-b-0 animate-pulse"
+                >
+                  <td className="px-2.5 py-3">
+                    <Skeleton width={120} height={12} borderRadius={4} />
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <Skeleton width={160} height={12} borderRadius={4} />
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <Skeleton width={50} height={16} borderRadius={4} />
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <Skeleton width={45} height={16} borderRadius={4} />
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <Skeleton width={70} height={12} borderRadius={4} />
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <div className="flex gap-1.5">
+                      <Skeleton width={92} height={24} borderRadius={6} />
+                      <Skeleton width={48} height={24} borderRadius={6} />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : accounts.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-[13px] text-text-muted">
+                  No accounts found.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account, i) => (
+            ) : (
+              accounts.map((account, i) => (
                 <tr
                   key={account.id}
                   className="hover:bg-surface-3 transition-colors border-b border-border last:border-b-0"
@@ -454,17 +488,10 @@ export default function AccountsPage() {
                     )}
                   </td>
                 </tr>
-              ))}
-              {accounts.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-[13px] text-text-muted">
-                    No accounts found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
 
         {/* Pagination */}
         {meta.totalPages > 1 && (

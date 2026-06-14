@@ -43,9 +43,6 @@ export function ScreenNav({ patientId }: { patientId: string }) {
 
   return (
     <nav className="flex items-center gap-1.5 bg-surface border-b border-border px-4 h-[52px] flex-shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <span className="text-[11px] font-bold text-accent-mid uppercase tracking-[1px] mr-3.5 whitespace-nowrap flex-shrink-0">
-        {patientName}
-      </span>
       
       {tabs.map((tab) => {
         const active = isActive(tab);

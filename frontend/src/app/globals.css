@@ -52,6 +52,7 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
+  --color-skeleton: var(--skeleton);
 
   /* DAMAYAN Custom Borders */
   --color-border-strong: var(--border-strong);
@@ -149,6 +150,7 @@
   --surface:     #FFFFFF;
   --surface-2:   #F7F8FA;
   --surface-3:   #EFF1F5;
+  --skeleton:    #D2D6E2;
 
   /* Custom Borders */
   --border-strong: #9BA3B5;
@@ -232,6 +234,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --skeleton: oklch(0.28 0 0);
 }
 
 @layer base {

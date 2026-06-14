@@ -11,7 +11,7 @@ export function Skeleton({ width, height, borderRadius = 6, className }: Skeleto
   return (
     <div
       className={cn(
-        'shrink-0 bg-surface-3 animate-pulse',
+        'shrink-0 bg-skeleton animate-pulse',
         className
       )}
       style={{ width, height, borderRadius }}
