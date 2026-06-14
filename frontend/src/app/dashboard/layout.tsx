@@ -7,6 +7,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { DocumentationPanel } from '@/components/layout/DocumentationPanel';
 import { NarrowScreenNotice } from '@/components/layout/NarrowScreenNotice';
+import { AppStartupLoader } from '@/components/layout/AppStartupLoader';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, requiresPasswordChange } = useAuthStore();
@@ -41,25 +42,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user, requiresPasswordChange, router]);
 
   return (
-    <div
-      id="shell"
-      className="h-screen bg-bg font-sans flex flex-col overflow-hidden"
-    >
-      <Topbar />
+    <AppStartupLoader>
       <div
-        id="body"
-        className="flex flex-1 overflow-hidden"
+        id="shell"
+        className="h-screen bg-bg font-sans flex flex-col overflow-hidden"
       >
-        <Sidebar />
+        <Topbar />
         <div
-          id="middle-column"
-          className="flex-1 flex flex-col overflow-hidden"
+          id="body"
+          className="flex flex-1 overflow-hidden"
         >
-          {children}
+          <Sidebar />
+          <div
+            id="middle-column"
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            {children}
+          </div>
+          <DocumentationPanel />
         </div>
-        <DocumentationPanel />
+        <NarrowScreenNotice />
       </div>
-      <NarrowScreenNotice />
-    </div>
+    </AppStartupLoader>
   );
 }

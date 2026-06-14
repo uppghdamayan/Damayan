@@ -155,11 +155,12 @@ function CreateAccountModal({
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150"
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal"
       >
         {/* Modal header */}

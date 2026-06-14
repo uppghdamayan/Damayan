@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useVisits } from '@/hooks/useVisits';
+import { useEffect, useRef } from 'react';
+import { useVisitsInfinite } from '@/hooks/useVisitsInfinite';
+import { Spinner } from '@/components/ui/spinner';
 import type { Visit } from '@/types/visit';
 
 function VisitRow({ visit }: { visit: Visit }) {
@@ -51,20 +52,33 @@ function VisitRow({ visit }: { visit: Visit }) {
 }
 
 export function VisitHistoryCard({ patientId }: { patientId: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const { data, isLoading } = useVisits(patientId, 1, expanded ? 20 : 5);
-  const visits = data?.data ?? [];
-  const total  = data?.meta.total ?? 0;
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useVisitsInfinite(patientId);
+
+  const visits = data?.pages.flatMap((p) => p.data) ?? [];
+  const total  = data?.pages[0]?.meta.total ?? 0;
+
+  // Intersection Observer for automatic load-more
+  const loaderRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loaderRef.current || !hasNextPage) return;
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) fetchNextPage(); },
+      { threshold: 0.1 }
+    );
+    obs.observe(loaderRef.current);
+    return () => obs.disconnect();
+  }, [hasNextPage, fetchNextPage]);
 
   return (
-    <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+    <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
       {/* Card header */}
-      <div className="bg-[#F7F8FA] border-b border-[#D1D5E0] px-3.5 py-2.5 flex justify-between items-center">
+      <div className="bg-surface-2 border-b border-border px-3.5 py-2.5 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <div className="w-[26px] h-[26px] bg-[#EFF1F5] rounded-md flex items-center justify-center text-[13px]">🗒</div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[#374151]">Visit History</span>
+          <div className="w-[26px] h-[26px] bg-surface-3 rounded-md flex items-center justify-center text-[13px]">🗒</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary">Visit History</span>
           {total > 0 && (
-            <span className="text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded bg-[#D4EDE9] text-[#085A4E] border border-[#0A6E5F]">
+            <span className="text-[9px] font-bold uppercase tracking-[0.6px] px-1.5 py-0.5 rounded bg-accent-light text-accent border border-accent">
               {total} visit{total !== 1 ? 's' : ''}
             </span>
           )}
@@ -73,22 +87,29 @@ export function VisitHistoryCard({ patientId }: { patientId: string }) {
 
       {/* Body */}
       {isLoading ? (
-        <div className="px-3.5 py-4 text-xs text-[#6B7280]">Loading visit history…</div>
+        <div className="px-3.5 py-4 text-xs text-text-muted">Loading visit history…</div>
       ) : visits.length === 0 ? (
-        <div className="py-5 px-3.5 text-xs text-[#6B7280] text-center">
+        <div className="py-5 px-3.5 text-xs text-text-muted text-center">
           No visits recorded yet.
         </div>
       ) : (
         <>
           {visits.map((v) => <VisitRow key={v.id} visit={v} />)}
-          {total > 5 && (
-            <div className="px-3.5 py-2.5 border-t border-[#D1D5E0]">
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="bg-transparent border-none text-xs text-[#0A6E5F] cursor-pointer font-semibold"
-              >
-                {expanded ? '▲ Show less' : `▼ Show all ${total} visits`}
-              </button>
+
+          {/* Automatic trigger div */}
+          {hasNextPage && <div ref={loaderRef} className="h-px" />}
+
+          {/* Manual fallback */}
+          {isFetchingNextPage && (
+            <div className="px-3.5 py-2.5 flex items-center gap-2 border-t border-border">
+              <Spinner size="xs" className="text-text-muted" />
+              <span className="text-[11px] text-text-muted">Loading more visits…</span>
+            </div>
+          )}
+
+          {!hasNextPage && total > 10 && (
+            <div className="px-3.5 py-2.5 border-t border-border text-center text-[11px] text-text-muted">
+              All {total} visits loaded
             </div>
           )}
         </>

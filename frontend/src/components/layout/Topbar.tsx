@@ -80,18 +80,7 @@ export function Topbar() {
         </button>
 
         {/* Documentation panel toggle */}
-        <button
-          onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
-          aria-label="Toggle documentation panel"
-          title={documentationPanelOpen ? 'Close documentation panel' : 'Open documentation panel'}
-          className="w-8 h-8 bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center rounded-btn cursor-pointer shrink-0"
-        >
-          {documentationPanelOpen ? (
-            <PanelRightClose size={16} className="text-text-secondary" />
-          ) : (
-            <PanelRightOpen size={16} className="text-text-secondary" />
-          )}
-        </button>
+
 
         {/* User name + avatar */}
         <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border shrink-0">

@@ -100,11 +100,12 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 bg-black/45 z-[1000] flex items-center justify-center"
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-[10px] max-w-[560px] w-full mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.2)] max-h-[90vh] flex flex-col"
       >
         {/* Header */}

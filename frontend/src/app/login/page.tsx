@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -126,9 +127,16 @@ export default function LoginPage() {
         <button
           onClick={handleLogin}
           disabled={loading || !email || !password}
-          className={`h-[34px] w-full text-white border border-accent-hover rounded-btn text-[11px] font-semibold shadow-btn-primary transition-all duration-150 flex items-center justify-center gap-[5px] ${loading ? 'bg-accent-hover cursor-not-allowed' : 'bg-accent cursor-pointer hover:bg-accent-hover hover:shadow-btn-primary-hover'}`}
+          className={`h-[34px] w-full text-white border border-accent-hover rounded-btn text-[11px] font-semibold shadow-btn-primary transition-all duration-150 flex items-center justify-center gap-2 ${loading ? 'bg-accent-hover cursor-not-allowed' : 'bg-accent cursor-pointer hover:bg-accent-hover hover:shadow-btn-primary-hover'}`}
         >
-          {loading ? 'Signing in…' : 'Sign In'}
+          {loading ? (
+            <>
+              <Spinner size="sm" className="text-white" />
+              <span>Signing in…</span>
+            </>
+          ) : (
+            'Sign In'
+          )}
         </button>
 
         <p className="mt-5 text-[11px] text-text-muted text-center">

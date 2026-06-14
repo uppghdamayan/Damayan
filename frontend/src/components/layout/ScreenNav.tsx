@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, useParams, usePathname } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
 import { usePatientStore } from '@/stores/patientStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -19,7 +20,6 @@ const ALL_TABS = [
 ] as const;
 
 export function ScreenNav({ patientId }: { patientId: string }) {
-  const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuthStore();
   const { activePatient } = usePatientStore();
@@ -50,18 +50,19 @@ export function ScreenNav({ patientId }: { patientId: string }) {
       {tabs.map((tab) => {
         const active = isActive(tab);
         return (
-          <button
+          <Link
             key={tab.id}
-            onClick={() => router.push(`${basePath}${tab.path}`)}
+            href={`${basePath}${tab.path}`}
+            prefetch={true}
             className={cn(
-              "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0 cursor-pointer",
+              "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0 cursor-pointer flex items-center justify-center",
               active
                 ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
                 : "bg-surface-2 text-text-secondary border-border hover:bg-surface-3 hover:border-border-strong hover:text-text-primary"
             )}
           >
             {tab.label}
-          </button>
+          </Link>
         );
       })}
 

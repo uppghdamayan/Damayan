@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUiStore } from '@/stores/uiStore';
 import { usePatientStore } from '@/stores/patientStore';
@@ -14,12 +15,12 @@ import { apiRequest } from '@/lib/api';
 import type { Patient } from '@/types/patient';
 import { cn } from '@/lib/utils';
 import { Search, Plus } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 export function Sidebar() {
   const { sidebarCollapsed } = useUiStore();
   const { activePatient, setActivePatient } = usePatientStore();
   const { user } = useAuthStore();
-  const router = useRouter();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -34,13 +35,18 @@ export function Sidebar() {
 
   const handleSelect = (p: Patient) => {
     setActivePatient(p);
-    router.push(`/dashboard/${p.id}`);
   };
 
   const handlePrefetch = (patientId: string) => {
     qc.prefetchQuery({
       queryKey: ['patient', patientId],
       queryFn: () => apiRequest(`/patients/${patientId}`),
+      staleTime: 30000,
+    });
+    // First page of visits
+    qc.prefetchQuery({
+      queryKey: ['visits', patientId, 1, 5],
+      queryFn: () => apiRequest(`/patients/${patientId}/visits?page=1&limit=5`),
       staleTime: 30000,
     });
   };
@@ -66,6 +72,9 @@ export function Sidebar() {
                 className="flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-muted font-sans"
                 placeholder="Search patients…"
               />
+              {isLoading && search.length > 0 && (
+                <Spinner size="xs" className="text-text-muted shrink-0" />
+              )}
             </div>
             {canCreatePatient && (
               <button
@@ -98,8 +107,10 @@ export function Sidebar() {
                   const ini = initials(p.firstName, p.lastName);
 
                   return (
-                    <button
+                    <Link
                       key={p.id}
+                      href={`/dashboard/${p.id}`}
+                      prefetch={false}
                       onClick={() => handleSelect(p)}
                       onMouseEnter={() => handlePrefetch(p.id)}
                       className={cn(
@@ -144,7 +155,7 @@ export function Sidebar() {
                         )}
                         <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
                       </div>
-                    </button>
+                    </Link>
                   );
                 })}
               </div>
