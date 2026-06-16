@@ -200,6 +200,7 @@ export class AccountsService implements OnModuleInit {
         role: dto.role,
         isActive: true,
         requiresPasswordChange: true,
+        temporaryPassword: tempPassword,
       },
     });
 
@@ -275,7 +276,10 @@ export class AccountsService implements OnModuleInit {
     // Flag user for mandatory password change on next login
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { requiresPasswordChange: true },
+      data: { 
+        requiresPasswordChange: true,
+        temporaryPassword: tempPassword,
+      },
     });
 
     return {

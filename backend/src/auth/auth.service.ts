@@ -43,10 +43,13 @@ export class AuthService {
       throw new UnauthorizedException(`Failed to update password: ${error.message}`);
     }
 
-    // Clear the forced password-change flag
+    // Clear the forced password-change flag and temporary password
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { requiresPasswordChange: false },
+      data: { 
+        requiresPasswordChange: false,
+        temporaryPassword: null,
+      },
     });
 
     return { message: 'Password updated successfully.', requiresPasswordChange: false };

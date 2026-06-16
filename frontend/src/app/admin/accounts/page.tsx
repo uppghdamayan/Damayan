@@ -14,6 +14,8 @@ interface Account {
   middleName?: string;
   role: 'DOCTOR' | 'NURSE' | 'ADMIN';
   isActive: boolean;
+  requiresPasswordChange: boolean;
+  temporaryPassword?: string;
   createdAt: string;
 }
 
@@ -484,6 +486,16 @@ export default function AccountsPage() {
                         >
                           {deletingId === account.id ? 'Deleting…' : 'Delete'}
                         </SecBtn>
+                        {account.requiresPasswordChange && account.temporaryPassword && (
+                          <SecBtn
+                            onClick={() => {
+                              navigator.clipboard.writeText(account.temporaryPassword!);
+                              toast.success(`Copied temp password: ${account.temporaryPassword}`);
+                            }}
+                          >
+                            Copy Temp PW
+                          </SecBtn>
+                        )}
                       </div>
                     )}
                   </td>

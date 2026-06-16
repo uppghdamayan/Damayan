@@ -82,8 +82,9 @@ model User {
   role       Role
   isActive                Boolean  @default(true) @map("is_active")
   requiresPasswordChange  Boolean  @default(false) @map("requires_password_change")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt      @map("updated_at")
+  temporaryPassword       String?  @map("temporary_password") @db.VarChar(50)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt      @map("updated_at")
 
   // Relations
   visits          Visit[]      @relation("VisitPhysician")
