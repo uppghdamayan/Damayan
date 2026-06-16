@@ -20,38 +20,59 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const authPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 15000)
+      );
 
-    if (authError || !data.session) {
-      setError(authError?.message || 'Login failed. Check your credentials.');
-      setLoading(false);
-      return;
-    }
+      const { data, error: authError } = await Promise.race([authPromise, timeoutPromise]);
 
-    // Fetch user profile from the backend using the JWT
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${data.session.access_token}` },
-    });
+      if (authError || !data?.session) {
+        setError(authError?.message || 'Login failed. Check your credentials.');
+        setLoading(false);
+        return;
+      }
 
-    if (!res.ok) {
-      setError('Account is inactive or not found. Contact your administrator.');
+      // Fetch user profile from the backend using the JWT
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+        signal: controller.signal,
+      });
+
+      clearTimeout(fetchTimeout);
+
+      if (!res.ok) {
+        setError('Account is inactive or not found. Contact your administrator.');
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      const profile = await res.json();
+      setUser(profile);
+      setAccessToken(data.session.access_token);
+      setRequiresPasswordChange(profile.requiresPasswordChange);
+
+      // Route: password change required → admin → doctor/nurse dashboard
+      if (profile.requiresPasswordChange) {
+        router.replace('/change-password');
+      } else if (profile.role === 'ADMIN') {
+        router.replace('/admin/accounts');
+      } else {
+        router.replace('/dashboard');
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Connection timed out while fetching profile. Please try again.');
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
       await supabase.auth.signOut();
       setLoading(false);
-      return;
-    }
-
-    const profile = await res.json();
-    setUser(profile);
-    setAccessToken(data.session.access_token);
-    setRequiresPasswordChange(profile.requiresPasswordChange);
-
-    // Route: password change required → admin → doctor/nurse dashboard
-    if (profile.requiresPasswordChange) {
-      router.replace('/change-password');
-    } else if (profile.role === 'ADMIN') {
-      router.replace('/admin/accounts');
-    } else {
-      router.replace('/dashboard');
     }
   };
 
@@ -92,8 +113,9 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
             placeholder="you@damayan.ph"
-            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted"
+            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-2"
           />
         </div>
 
@@ -110,9 +132,10 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
             placeholder="••••••••••••"
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted"
+            onKeyDown={(e) => e.key === 'Enter' && !loading && handleLogin()}
+            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-2"
           />
         </div>
 

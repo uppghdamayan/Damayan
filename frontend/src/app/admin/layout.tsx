@@ -21,7 +21,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
       
-      if (user === null) return;
+      if (user === null) {
+        if (useAuthStore.persist?.hasHydrated?.()) {
+          await supabase.auth.signOut();
+          useAuthStore.getState().clear();
+          router.replace('/login');
+        }
+        return;
+      }
       
       if (requiresPasswordChange) {
         router.replace('/change-password');

@@ -26,7 +26,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       if (user === null) {
-        // user is null means not yet loaded from zustand — don't redirect yet
+        if (useAuthStore.persist?.hasHydrated?.()) {
+          await supabase.auth.signOut();
+          useAuthStore.getState().clear();
+          router.replace('/login');
+        }
         return;
       }
       
