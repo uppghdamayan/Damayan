@@ -38,75 +38,94 @@ export class AccountsService implements OnModuleInit {
   }
 
   async seedAdminAccount() {
-    const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
-    const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
+    const admins = [
+      {
+        email: this.configService.get<string>('ADMIN_EMAIL'),
+        password: this.configService.get<string>('ADMIN_PASSWORD'),
+      },
+      {
+        email: this.configService.get<string>('ADMIN_EMAIL_2'),
+        password: this.configService.get<string>('ADMIN_PASSWORD_2'),
+      },
+      {
+        email: this.configService.get<string>('ADMIN_EMAIL_3'),
+        password: this.configService.get<string>('ADMIN_PASSWORD_3'),
+      },
+    ];
 
-    if (!adminEmail || !adminPassword) {
-      this.logger.warn(
-        'ADMIN_EMAIL or ADMIN_PASSWORD not set. Skipping admin seed.',
-      );
-      return;
-    }
+    for (let i = 0; i < admins.length; i++) {
+      const adminEmail = admins[i].email;
+      const adminPassword = admins[i].password;
 
-    // Check if an Admin already exists in the users table
-    const existing = await this.prisma.user.findFirst({
-      where: { role: Role.ADMIN },
-    });
+      if (!adminEmail || !adminPassword) {
+        if (i === 0) {
+          this.logger.warn(
+            'ADMIN_EMAIL or ADMIN_PASSWORD not set. Skipping primary admin seed.',
+          );
+        }
+        continue;
+      }
 
-    if (existing) {
-      this.logger.log('Admin account already exists. Seed skipped.');
-      return;
-    }
-
-    this.logger.log(`Seeding admin account: ${adminEmail}`);
-
-    let adminUserId: string | undefined;
-
-    const { data: createData, error: createError } =
-      await this.supabase.auth.admin.createUser({
-        email: adminEmail,
-        password: adminPassword,
-        email_confirm: true,
-        user_metadata: { must_change_password: false },
+      // Check if this specific Admin already exists in the users table
+      const existing = await this.prisma.user.findUnique({
+        where: { email: adminEmail },
       });
 
-    if (createError) {
-      if (createError.message.includes('already been registered')) {
-        // Find existing user
-        const { data: listData } = await this.supabase.auth.admin.listUsers();
-        const existingSupabaseUser = listData?.users.find(
-          (u: any) => u.email === adminEmail,
-        );
-        if (existingSupabaseUser) {
-          adminUserId = existingSupabaseUser.id;
+      if (existing) {
+        this.logger.log(`Admin account ${adminEmail} already exists. Seed skipped.`);
+        continue;
+      }
+
+      this.logger.log(`Seeding admin account: ${adminEmail}`);
+
+      let adminUserId: string | undefined;
+
+      const { data: createData, error: createError } =
+        await this.supabase.auth.admin.createUser({
+          email: adminEmail,
+          password: adminPassword,
+          email_confirm: true,
+          user_metadata: { must_change_password: false },
+        });
+
+      if (createError) {
+        if (createError.message.includes('already been registered')) {
+          // Find existing user
+          const { data: listData } = await this.supabase.auth.admin.listUsers();
+          const existingSupabaseUser = listData?.users.find(
+            (u: any) => u.email === adminEmail,
+          );
+          if (existingSupabaseUser) {
+            adminUserId = existingSupabaseUser.id;
+          } else {
+            this.logger.error(
+              `Supabase user exists but could not be found in list for ${adminEmail}.`,
+            );
+            continue;
+          }
         } else {
           this.logger.error(
-            `Supabase user exists but could not be found in list.`,
+            `Failed to create Supabase auth user for admin ${adminEmail}: ${createError.message}`,
           );
-          return;
+          continue;
         }
       } else {
-        this.logger.error(
-          `Failed to create Supabase auth user for admin: ${createError.message}`,
-        );
-        return;
+        adminUserId = createData.user.id;
       }
-    } else {
-      adminUserId = createData.user.id;
+
+      await this.prisma.user.create({
+        data: {
+          id: adminUserId,
+          email: adminEmail,
+          firstName: 'System',
+          lastName: i === 0 ? 'Admin' : `Admin ${i + 1}`,
+          role: Role.ADMIN,
+          isActive: true,
+        },
+      });
+
+      this.logger.log(`Admin account ${adminEmail} seeded successfully.`);
     }
-
-    await this.prisma.user.create({
-      data: {
-        id: adminUserId,
-        email: adminEmail,
-        firstName: 'System',
-        lastName: 'Admin',
-        role: Role.ADMIN,
-        isActive: true,
-      },
-    });
-
-    this.logger.log('Admin account seeded successfully.');
   }
 
   // ─────────────────────────────────────────────
