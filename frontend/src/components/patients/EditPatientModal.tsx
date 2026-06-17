@@ -7,6 +7,7 @@ import { apiRequest } from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import type { Patient } from '@/types/patient';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +35,7 @@ interface EditPatientModalProps {
 
 const inputCn = (err?: boolean) =>
   cn(
-    'h-[34px] w-full px-2.5 bg-surface border rounded-btn text-[13px] text-text-primary outline-none transition-all focus:border-accent focus:shadow-accent-focus',
+    'h-[34px] w-full px-2.5 bg-surface border rounded-btn text-[13px] text-text-primary outline-none transition-all focus:border-accent focus:shadow-accent-focus disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-2',
     err ? 'border-red-border' : 'border-border',
   );
 
@@ -116,17 +117,18 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
 
         {/* Body */}
         <div className="px-[18px] py-4 overflow-y-auto flex-1">
-          {(errors as any).root?.submit && (
+          <fieldset disabled={isSubmitting} className="border-none p-0 m-0 w-full min-w-0">
+            {(errors as any).root?.submit && (
             <div className="bg-red-bg border border-red-border rounded-btn px-3 py-2 mb-3 text-[12px] text-red">
               {(errors as any).root.submit.message}
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Last Name" required error={errors.lastName?.message}>
-              <input className={inputCn(!!errors.lastName)} {...register('lastName')} maxLength={30} />
-            </Field>
             <Field label="First Name" required error={errors.firstName?.message}>
               <input className={inputCn(!!errors.firstName)} {...register('firstName')} maxLength={30} />
+            </Field>
+            <Field label="Last Name" required error={errors.lastName?.message}>
+              <input className={inputCn(!!errors.lastName)} {...register('lastName')} maxLength={30} />
             </Field>
           </div>
           <div className="grid grid-cols-[1fr_80px] gap-3">
@@ -171,6 +173,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
                 className="h-[34px] w-full px-2.5 bg-surface-2 border border-border rounded-btn text-[13px] text-text-muted outline-none" />
             </Field>
           </div>
+          </fieldset>
         </div>
 
         {/* Footer */}
@@ -180,8 +183,15 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
             Cancel
           </button>
           <button onClick={handleSubmit(onSubmit)} disabled={isSubmitting}
-            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all cursor-pointer disabled:bg-text-muted disabled:border-border-strong disabled:cursor-not-allowed">
-            {isSubmitting ? 'Saving…' : 'Save Changes'}
+            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all cursor-pointer disabled:bg-text-muted disabled:border-border-strong disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {isSubmitting ? (
+              <>
+                <Spinner size="xs" className="text-white" />
+                <span>Saving…</span>
+              </>
+            ) : (
+              'Save Changes'
+            )}
           </button>
         </div>
       </div>
