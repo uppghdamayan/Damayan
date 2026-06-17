@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { Spinner } from '@/components/ui/spinner';
+import { PlusCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const { setUser, setAccessToken, setRequiresPasswordChange } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -82,11 +84,7 @@ export default function LoginPage() {
         {/* Logo + App name */}
         <div className="flex items-center gap-2 mb-7">
           <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 8V16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M8 12H16" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <PlusCircle size={12} color="white" strokeWidth={3} />
           </div>
           <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap text-text-primary">
             DAMAYAN <small className="text-[9px] font-semibold text-text-muted tracking-[1px] uppercase mt-[3px]">EMR</small>
@@ -127,16 +125,30 @@ export default function LoginPage() {
           >
             Password
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            placeholder="••••••••••••"
-            onKeyDown={(e) => e.key === 'Enter' && !loading && handleLogin()}
-            className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-2"
-          />
+          <div className="relative w-full">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              placeholder="••••••••••••"
+              onKeyDown={(e) => e.key === 'Enter' && !loading && handleLogin()}
+              className="h-[34px] w-full px-2.5 pr-9 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-surface focus:border-accent focus:shadow-accent-focus placeholder:text-text-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-2"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors focus:outline-none w-5 h-5 flex items-center justify-center"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                <EyeOff size={14} />
+              ) : (
+                <Eye size={14} />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Error message */}

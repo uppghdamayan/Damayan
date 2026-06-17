@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { apiRequest } from '@/lib/api';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function ChangePasswordPage() {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,7 +92,7 @@ export default function ChangePasswordPage() {
   // Don't render until we know who the user is
   if (!user) return null;
 
-  const inputClassName = "h-[34px] w-full px-2.5 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans";
+  const inputClassName = "h-[34px] w-full px-2.5 pr-9 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans";
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
@@ -129,14 +132,28 @@ export default function ChangePasswordPage() {
             >
               New Password
             </label>
-            <input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Min 12 chars, mixed case, digit, special"
-              className={inputClassName}
-            />
+            <div className="relative w-full">
+              <input
+                id="new-password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min 12 chars, mixed case, digit, special"
+                className={inputClassName}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#0D1117] transition-colors focus:outline-none w-5 h-5 flex items-center justify-center"
+                aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+              >
+                {showNewPassword ? (
+                  <EyeOff size={14} />
+                ) : (
+                  <Eye size={14} />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Confirm Password */}
@@ -147,15 +164,29 @@ export default function ChangePasswordPage() {
             >
               Confirm Password
             </label>
-            <input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter your new password"
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              className={inputClassName}
-            />
+            <div className="relative w-full">
+              <input
+                id="confirm-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your new password"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                className={inputClassName}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#0D1117] transition-colors focus:outline-none w-5 h-5 flex items-center justify-center"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={14} />
+                ) : (
+                  <Eye size={14} />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Password requirements hint */}
