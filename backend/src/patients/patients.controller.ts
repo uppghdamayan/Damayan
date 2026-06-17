@@ -62,4 +62,11 @@ export class PatientsController {
   ) {
     return this.patientsService.update(id, dto);
   }
+  @Patch(':id/deactivate')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Deactivate patient record (Admin only)' })
+  async deactivate(@Param('id') id: string) {
+    return this.patientsService.deactivate(id);
+  }
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { usePatientStore } from '@/stores/patientStore';
 import { NewPatientModal } from '@/components/patients/NewPatientModal';
 import { UserSearch, ClipboardList, Activity, FileText } from 'lucide-react';
 import type { Patient } from '@/types/patient';
@@ -99,8 +100,10 @@ export default function DashboardIndexPage() {
         open={newPatientOpen}
         onClose={() => setNewPatientOpen(false)}
         onCreated={(p) => {
+          const patient = p as Patient;
           setNewPatientOpen(false);
-          router.push(`/dashboard/${(p as Patient).id}`);
+          usePatientStore.getState().setActivePatient(patient);
+          router.push(`/dashboard/${patient.id}`);
         }}
       />
     </>

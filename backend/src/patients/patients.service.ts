@@ -11,15 +11,24 @@ export class PatientsService {
   // ── Patient code generator: PT-XXXX (zero-padded sequential) ──────────────
 
   private async generatePatientCode(): Promise<string> {
-    const last = await this.prisma.patient.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { patientCode: true },
-    });
-    if (!last) return 'PT-0001';
-    const match = last.patientCode.match(/PT-(\d+)/);
-    if (!match) return 'PT-0001';
-    const next = parseInt(match[1], 10) + 1;
-    return `PT-${String(next).padStart(4, '0')}`;
+    let attempts = 0;
+    while (attempts < 5) {
+      const last = await this.prisma.patient.findFirst({
+        orderBy: { patientCode: 'desc' },
+        select: { patientCode: true },
+      });
+      const next = last
+        ? parseInt(last.patientCode.replace('PT-', ''), 10) + 1
+        : 1;
+      const code = `PT-${String(next).padStart(4, '0')}`;
+      // Check it doesn't already exist (handles gaps from deletions)
+      const exists = await this.prisma.patient.findUnique({
+        where: { patientCode: code },
+      });
+      if (!exists) return code;
+      attempts++;
+    }
+    throw new Error('Failed to generate unique patient code after 5 attempts.');
   }
 
   // ── List / search ──────────────────────────────────────────────────────────
@@ -135,6 +144,15 @@ export class PatientsService {
         ...(dto.addressCity     !== undefined && { addressCity:     dto.addressCity }),
         ...(dto.addressRegion   !== undefined && { addressRegion:   dto.addressRegion }),
       },
+    });
+  }
+  // ── Deactivate ─────────────────────────────────────────────────────────────
+
+  async deactivate(id: string) {
+    await this.findOne(id); // throws if not found
+    return this.prisma.patient.update({
+      where: { id },
+      data: { isActive: false },
     });
   }
 }

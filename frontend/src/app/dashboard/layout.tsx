@@ -25,20 +25,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return;
       }
 
-      if (user === null) {
+      const storeState = useAuthStore.getState();
+      const currentUser = storeState.user;
+
+      if (currentUser === null) {
         if (useAuthStore.persist?.hasHydrated?.()) {
           await supabase.auth.signOut();
-          useAuthStore.getState().clear();
+          storeState.clear();
           router.replace('/login');
         }
         return;
       }
       
-      if (requiresPasswordChange) {
+      if (currentUser.requiresPasswordChange) {
         router.replace('/change-password');
         return;
       }
-      if (user.role === 'ADMIN') {
+      if (currentUser.role === 'ADMIN') {
         router.replace('/admin/accounts');
       }
     };

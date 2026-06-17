@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,7 +12,7 @@ import { PanelRightOpen, PanelRightClose } from 'lucide-react';
 const ALL_TABS = [
   { id: 'dashboard',     label: 'Dashboard',     path: '' },
   { id: 'vitals',        label: 'Vital Signs',   path: '/vitals' },
-  { id: 'note-timeline', label: 'Note Timeline ★', path: '/notes' },
+  { id: 'note-timeline', label: 'Note Timeline', path: '/notes' },
   { id: 'initial-note',  label: 'Initial Note',  path: '/initial-note' },
   { id: 'problems',      label: 'Problem List',  path: '/problems' },
   { id: 'medications',   label: 'Medications',   path: '/medications' },
@@ -21,6 +22,12 @@ const ALL_TABS = [
 
 export function ScreenNav({ patientId }: { patientId: string }) {
   const pathname = usePathname();
+  const [optimisticPath, setOptimisticPath] = useState(pathname);
+
+  useEffect(() => {
+    setOptimisticPath(pathname);
+  }, [pathname]);
+
   const { user } = useAuthStore();
   const { activePatient } = usePatientStore();
   const { documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
@@ -34,9 +41,9 @@ export function ScreenNav({ patientId }: { patientId: string }) {
 
   const isActive = (tab: (typeof ALL_TABS)[number]) => {
     if (tab.id === 'dashboard') {
-      return pathname === basePath || pathname === `${basePath}/`;
+      return optimisticPath === basePath || optimisticPath === `${basePath}/`;
     }
-    return pathname.startsWith(`${basePath}${tab.path}`);
+    return optimisticPath.startsWith(`${basePath}${tab.path}`);
   };
 
   const patientName = activePatient ? `${activePatient.lastName}, ${activePatient.firstName}` : '';
@@ -51,6 +58,7 @@ export function ScreenNav({ patientId }: { patientId: string }) {
             key={tab.id}
             href={`${basePath}${tab.path}`}
             prefetch={true}
+            onClick={() => setOptimisticPath(`${basePath}${tab.path}`)}
             className={cn(
               "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0 cursor-pointer flex items-center justify-center",
               active

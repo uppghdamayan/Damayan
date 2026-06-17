@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
@@ -24,9 +24,15 @@ export function Sidebar() {
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newPatientOpen, setNewPatientOpen] = useState(false);
 
-  const { data, isLoading } = usePatients(search, 1, 200);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading } = usePatients(debouncedSearch, 1, 200);
   const patients = data?.data ?? [];
 
   const grouped = useMemo(() => groupByLetter(patients), [patients]);
@@ -90,7 +96,19 @@ export function Sidebar() {
           <div className="flex-1 overflow-y-auto py-1">
             {isLoading && <SidebarSkeleton />}
             {!isLoading && patients.length === 0 && (
-              <p className="px-3.5 py-4 text-xs text-text-muted">No patients found.</p>
+              <div className="px-3.5 py-6 text-center">
+                <p className="text-[12px] text-text-muted">
+                  {search ? `No patients match "${search}"` : 'No patients registered yet.'}
+                </p>
+                {!search && canCreatePatient && (
+                  <button
+                    onClick={() => setNewPatientOpen(true)}
+                    className="mt-2 text-[11px] text-accent hover:underline cursor-pointer"
+                  >
+                    Register first patient →
+                  </button>
+                )}
+              </div>
             )}
             {grouped.map(({ letter, patients: group }) => (
               <div key={letter}>

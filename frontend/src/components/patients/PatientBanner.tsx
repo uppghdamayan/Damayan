@@ -1,9 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import { calcAge, initials } from '@/lib/patient-utils';
+import { useAuthStore } from '@/stores/authStore';
+import { usePatientStore } from '@/stores/patientStore';
+import { EditPatientModal } from './EditPatientModal';
+import { Pencil } from 'lucide-react';
 import type { Patient } from '@/types/patient';
 
 export function PatientBanner({ patient }: { patient: Patient }) {
+  const { user } = useAuthStore();
+  const { setActivePatient } = usePatientStore();
+  const [editOpen, setEditOpen] = useState(false);
+  const canEdit = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
   const age = calcAge(patient.dateOfBirth);
   const dob = new Date(patient.dateOfBirth).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
   const ini = initials(patient.firstName, patient.lastName);
@@ -24,7 +34,7 @@ export function PatientBanner({ patient }: { patient: Patient }) {
   const sexLabel = patient.sex === 'MALE' ? 'Male' : patient.sex === 'FEMALE' ? 'Female' : 'Other';
 
   return (
-    <div className="bg-surface border border-border rounded-card p-4 flex gap-5 items-stretch flex-wrap shadow-card">
+    <div className="relative bg-surface border border-border rounded-card p-4 flex gap-5 items-stretch flex-wrap shadow-card">
       {/* Left Column: Avatar + Name (Section 7.1) */}
       <div className="flex gap-3.5 items-center flex-[1.2] min-w-[250px] border-r border-border pr-5">
         <div className="w-11 h-11 rounded-full bg-accent-light border-2 border-accent flex items-center justify-center text-[15px] font-bold text-accent-hover flex-shrink-0">
@@ -84,6 +94,26 @@ export function PatientBanner({ patient }: { patient: Patient }) {
           </div>
         </div>
       </div>
+      {/* Edit button — top-right of banner */}
+      {canEdit && (
+        <button
+          onClick={() => setEditOpen(true)}
+          title="Edit patient demographics"
+          className="absolute top-3 right-3 h-[28px] px-2.5 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 cursor-pointer"
+        >
+          <Pencil className="w-3 h-3" /> Edit
+        </button>
+      )}
+
+      <EditPatientModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        patient={patient}
+        onUpdated={(updated) => {
+          setActivePatient(updated);
+          setEditOpen(false);
+        }}
+      />
     </div>
   );
 }
