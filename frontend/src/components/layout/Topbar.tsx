@@ -80,13 +80,21 @@ export function Topbar() {
 
         {/* User name + avatar */}
         <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border shrink-0">
-          <div className="flex flex-col items-end leading-tight">
-            <span className="text-[12px] font-semibold text-text-primary">
+          <div className="flex flex-col items-center leading-tight justify-center">
+            <span className="text-[12px] font-semibold text-text-primary mb-1">
               {user ? `${user.firstName} ${user.lastName}` : ''}
             </span>
-            <span className="text-[10px] text-text-muted">
-              {user?.role === 'DOCTOR' ? 'Attending Physician' : user?.role === 'NURSE' ? 'Attending Nurse' : 'System Administrator'}
-            </span>
+            {user && (
+              <span className={`inline-flex items-center justify-center px-1.5 py-[2px] rounded text-[9px] font-bold uppercase tracking-wider border ${
+                user.role === 'DOCTOR' 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : user.role === 'NURSE' 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-purple-50 text-purple-700 border-purple-200'
+              }`}>
+                {user.role === 'DOCTOR' ? 'Doctor' : user.role === 'NURSE' ? 'Nurse' : 'Admin'}
+              </span>
+            )}
           </div>
           <div className="w-8 h-8 rounded-full bg-accent-hover text-white text-[11px] font-bold border-2 border-border flex items-center justify-center shrink-0 cursor-default">
             {userInitials}

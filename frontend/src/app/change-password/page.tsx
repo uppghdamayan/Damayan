@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { apiRequest } from '@/lib/api';
 import { createSupabaseClient } from '@/lib/supabase/client';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -92,7 +92,7 @@ export default function ChangePasswordPage() {
   // Don't render until we know who the user is
   if (!user) return null;
 
-  const inputClassName = "h-[34px] w-full px-2.5 pr-9 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans";
+  const inputClassName = "h-[34px] w-full px-2.5 pr-9 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50";
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
@@ -140,6 +140,7 @@ export default function ChangePasswordPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Min 12 chars, mixed case, digit, special"
                 className={inputClassName}
+                disabled={loading}
               />
               <button
                 type="button"
@@ -173,6 +174,7 @@ export default function ChangePasswordPage() {
                 placeholder="Re-enter your new password"
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                 className={inputClassName}
+                disabled={loading}
               />
               <button
                 type="button"
@@ -214,9 +216,16 @@ export default function ChangePasswordPage() {
           <button
             onClick={handleSubmit}
             disabled={loading || !newPassword || !confirmPassword}
-            className={`h-[34px] w-full text-white border border-[#085A4E] rounded-md text-[11px] font-semibold shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-colors duration-150 font-sans ${loading ? 'bg-[#085A4E] cursor-not-allowed' : 'bg-[#0A6E5F] cursor-pointer hover:bg-[#085A4E]'}`}
+            className={`h-[34px] w-full text-white border border-[#085A4E] rounded-md text-[11px] font-semibold shadow-[0_2px_4px_rgba(10,110,95,0.15)] transition-colors duration-150 font-sans flex items-center justify-center gap-2 ${loading ? 'bg-[#085A4E] cursor-not-allowed' : 'bg-[#0A6E5F] cursor-pointer hover:bg-[#085A4E]'}`}
           >
-            {loading ? 'Changing Password…' : 'Set New Password'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Changing Password…
+              </>
+            ) : (
+              'Set New Password'
+            )}
           </button>
         </div>
 
