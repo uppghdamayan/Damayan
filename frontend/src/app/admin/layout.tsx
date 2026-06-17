@@ -99,8 +99,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main */}
       <main className="py-6 px-5 max-w-[1200px] mx-auto">
+        <div className="mb-6">
+          <AdminTabsNav />
+        </div>
         {children}
       </main>
+    </div>
+  );
+}
+
+function AdminTabsNav() {
+  const pathname = require('next/navigation').usePathname();
+  const router = require('next/navigation').useRouter();
+  const activeTab = pathname.includes('/admin/dashboard') ? 'dashboard' : 'accounts';
+
+  return (
+    <div className="border-b border-border">
+      <div className="flex gap-6">
+        <button
+          onClick={() => router.push('/admin/accounts')}
+          className={`pb-3 text-[13px] font-semibold transition-colors relative ${
+            activeTab === 'accounts'
+              ? 'text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          Accounts
+          {activeTab === 'accounts' && (
+            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+          )}
+        </button>
+        <button
+          onClick={() => router.push('/admin/dashboard')}
+          className={`pb-3 text-[13px] font-semibold transition-colors relative ${
+            activeTab === 'dashboard'
+              ? 'text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          Dashboard
+          {activeTab === 'dashboard' && (
+            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

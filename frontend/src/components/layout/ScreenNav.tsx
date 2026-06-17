@@ -25,9 +25,9 @@ export function ScreenNav({ patientId }: { patientId: string }) {
   const { activePatient } = usePatientStore();
   const { documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
 
-  // Hide Logs tab for non-Admin
+  // Hide Logs tab for non-Admin/Doctor
   const tabs = ALL_TABS.filter(
-    (t) => t.id !== 'logs' || user?.role === 'ADMIN',
+    (t) => t.id !== 'logs' || user?.role === 'ADMIN' || user?.role === 'DOCTOR',
   );
 
   const basePath = `/dashboard/${patientId}`;
