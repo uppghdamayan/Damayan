@@ -23,6 +23,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
+const COLUMN_LAYOUT = '22px 14px 3fr 1.8fr 1.5fr 2.2fr 1.5fr';
+
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
   rootOptions: Problem[];
@@ -73,7 +75,7 @@ function ActiveProblemRow({
         isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
         isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative'
       )}
-      style={{ gridTemplateColumns: '22px 14px 1fr 100px 110px 170px 130px' }}
+      style={{ gridTemplateColumns: COLUMN_LAYOUT }}
     >
       {/* Column 1: Drag handle */}
       <div className="flex items-center justify-center">
@@ -111,12 +113,12 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 4: Date Added */}
-      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap">
+      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-center">
         {new Date(problem.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
       </div>
 
       {/* Column 5: Status */}
-      <div>
+      <div className="flex justify-center">
         <select
           disabled={!canManage}
           value={problem.status}
@@ -130,7 +132,7 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 6: Nest Under */}
-      <div>
+      <div className="flex justify-center">
         <select
           disabled={!canManage || isChild}
           value={problem.parentId || ''}
@@ -147,7 +149,7 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 7: Actions */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-center gap-1.5">
         {canManage && (
           <>
             <button
@@ -355,18 +357,18 @@ export function ActiveProblemTable({
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-auto w-full">
       <div 
-        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-left"
-        style={{ gridTemplateColumns: '22px 14px 1fr 100px 110px 170px 130px' }}
+        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-center"
+        style={{ gridTemplateColumns: COLUMN_LAYOUT }}
       >
         <div className="w-[22px]" />
         <div className="w-[14px]" />
         <div className="text-left">Problem</div>
-        <div className="whitespace-nowrap text-left">Date Added</div>
-        <div className="text-left">Status</div>
-        <div className="text-left">Nest Under</div>
-        <div className="text-left">Actions</div>
+        <div className="whitespace-nowrap text-center">Date Added</div>
+        <div className="text-center">Status</div>
+        <div className="text-center">Nest Under</div>
+        <div className="text-center">Actions</div>
       </div>
       <div className="flex flex-col">
         <DndContext

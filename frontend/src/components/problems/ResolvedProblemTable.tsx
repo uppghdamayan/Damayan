@@ -3,6 +3,8 @@
 import { cn } from '@/lib/utils';
 import type { Problem } from '@/types/problem';
 
+const COLUMN_LAYOUT = '3fr 1.8fr 2.2fr 1.5fr';
+
 interface ResolvedProblemTableProps {
   problems: Problem[];
   canManage: boolean;
@@ -14,28 +16,28 @@ export function ResolvedProblemTable({ problems, canManage, onReactivate, onDele
   if (problems.length === 0) return null;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-auto w-full">
       <div 
-        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary text-left"
-        style={{ gridTemplateColumns: '1fr 120px 140px 130px' }}
+        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary text-center"
+        style={{ gridTemplateColumns: COLUMN_LAYOUT }}
       >
         <div className="text-left">Problem / Diagnosis</div>
-        <div className="text-left">ICD-10 Code</div>
-        <div className="text-left">Date Resolved</div>
-        <div className="text-left">Actions</div>
+        <div className="text-center">ICD-10 Code</div>
+        <div className="text-center">Date Resolved</div>
+        <div className="text-center">Actions</div>
       </div>
       <div className="flex flex-col">
         {problems.map((problem) => (
           <div
             key={problem.id}
             className="grid items-center gap-4 px-[14px] py-3 border-b border-border last:border-b-0 bg-surface"
-            style={{ gridTemplateColumns: '1fr 120px 140px 130px' }}
+            style={{ gridTemplateColumns: COLUMN_LAYOUT }}
           >
             <div className="text-[13px] font-bold text-text-muted line-through truncate">
               {problem.title}
             </div>
             
-            <div className="font-mono text-[11px] text-text-muted">
+            <div className="font-mono text-[11px] text-text-muted text-center">
               {problem.icdCode ? (
                 <span className="bg-surface-2 px-1.5 py-0.5 rounded border border-border">
                   {problem.icdCode}
@@ -45,11 +47,11 @@ export function ResolvedProblemTable({ problems, canManage, onReactivate, onDele
               )}
             </div>
 
-            <div className="text-[12px] font-mono text-text-muted whitespace-nowrap">
+            <div className="text-[12px] font-mono text-text-muted whitespace-nowrap text-center">
               {new Date(problem.updatedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-center gap-1.5">
               {canManage && (
                 <>
                   <button
