@@ -1,3 +1,9 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { ProblemListScreen } from '@/components/problems/ProblemListScreen';
+
 export default function ProblemsPage() {
-  return <div className="p-5 text-[13px] text-[#6B7280]">Problem List — Phase 8</div>;
+  const { patientId } = useParams<{ patientId: string }>();
+  return <ProblemListScreen patientId={patientId} />;
 }

@@ -1,5 +1,5 @@
-import { TabContentSkeleton } from '@/components/layout/TabContentSkeleton';
+import { ProblemListSkeleton } from '@/components/problems/ProblemListSkeleton';
 
 export default function Loading() {
-  return <TabContentSkeleton />;
+  return <ProblemListSkeleton />;
 }

@@ -7,7 +7,7 @@ import { PatientBanner } from '@/components/patients/PatientBanner';
 import { PatientBannerSkeleton } from '@/components/patients/PatientBannerSkeleton';
 import { VitalsStripEmpty } from '@/components/vitals/VitalsStripEmpty';
 import { VitalsStripSkeleton } from '@/components/vitals/VitalsStripSkeleton';
-import { ProblemListCardEmpty } from '@/components/problems/ProblemListCardEmpty';
+import { ProblemListCard } from '@/components/problems/ProblemListCard';
 import { MedicationListCardEmpty } from '@/components/medications/MedicationListCardEmpty';
 import { VisitHistoryCard } from '@/components/visits/VisitHistoryCard';
 
@@ -31,10 +31,10 @@ function VitalsSection({ patientId }: { patientId: string }) {
   return <VitalsStripEmpty patientId={patientId} />;
 }
 
-function ProblemsAndMedsSection() {
+function ProblemsAndMedsSection({ patientId }: { patientId: string }) {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <ProblemListCardEmpty />
+      <ProblemListCard patientId={patientId} />
       <MedicationListCardEmpty />
     </div>
   );
@@ -61,7 +61,7 @@ export default function PatientDashboardPage() {
 
       {/* Suspense 3: Problem List + Medications */}
       <Suspense fallback={null}>
-        <ProblemsAndMedsSection />
+        <ProblemsAndMedsSection patientId={patientId} />
       </Suspense>
 
       {/* Suspense 4: Visit History */}
