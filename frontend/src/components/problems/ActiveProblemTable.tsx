@@ -21,13 +21,14 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
+import { isDescendant } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 const COLUMN_LAYOUT = '22px 14px 3fr 1.8fr 1.5fr 2.2fr 1.5fr';
 
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
-  rootOptions: Problem[];
+  allOptions: Problem[];
   canManage: boolean;
   onEdit: (p: Problem) => void;
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
@@ -38,11 +39,11 @@ interface ActiveProblemTableProps {
 
 function ActiveProblemRow({
   problem,
-  isChild = false,
+  depth = 0,
   canManage,
   dragHandleProps,
   isDragging,
-  rootOptions,
+  allOptions,
   dragOverState,
   onEdit,
   onStatusChange,
@@ -50,19 +51,23 @@ function ActiveProblemRow({
   onParentChange,
 }: {
   problem: Problem;
-  isChild?: boolean;
+  depth?: number;
   canManage: boolean;
   dragHandleProps?: { attributes: any; listeners: any };
   isDragging?: boolean;
-  rootOptions: Problem[];
+  allOptions: Problem[];
   dragOverState: { id: string; isMerge: boolean } | null;
   onEdit: () => void;
   onStatusChange: (status: ProblemStatusValue) => void;
   onDelete: () => void;
   onParentChange: (newParentId: string | null) => void;
 }) {
-  // Exclude non-active parents
-  const selectableParents = rootOptions.filter((p) => p.id !== problem.id && p.status === 'ACTIVE');
+  const selectableParents = allOptions.filter((p) => {
+    if (p.status !== 'ACTIVE') return false;
+    if (p.id === problem.id) return false;
+    if (isDescendant(allOptions, p.id, problem.id)) return false;
+    return true;
+  });
 
   const isMergeHover = dragOverState?.id === problem.id && dragOverState.isMerge;
   const isReorderHover = dragOverState?.id === problem.id && !dragOverState.isMerge;
@@ -99,9 +104,9 @@ function ActiveProblemRow({
       {/* Column 3: Problem name and code with nesting indentation */}
       <div 
         className="flex items-center gap-2 truncate text-text-primary"
-        style={isChild ? { paddingLeft: '24px' } : undefined}
+        style={depth > 0 ? { paddingLeft: `${depth * 24}px` } : undefined}
       >
-        {isChild && (
+        {depth > 0 && (
           <span className="font-mono text-text-muted mr-1 select-none">↳</span>
         )}
         <span className="text-[13px] font-semibold truncate">{problem.title}</span>
@@ -134,7 +139,7 @@ function ActiveProblemRow({
       {/* Column 6: Nest Under */}
       <div className="flex justify-center">
         <select
-          disabled={!canManage || isChild}
+          disabled={!canManage}
           value={problem.parentId || ''}
           onChange={(e) => onParentChange(e.target.value || null)}
           className="h-6 w-full max-w-[150px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate"
@@ -181,16 +186,16 @@ function ActiveProblemRow({
 function SortableRow({
   item,
   canManage,
-  rootOptions,
+  allOptions,
   dragOverState,
   onEdit,
   onStatusChange,
   onDelete,
   onParentChange,
 }: {
-  item: { problem: ProblemNode; isChild: boolean };
+  item: { problem: ProblemNode; depth: number };
   canManage: boolean;
-  rootOptions: Problem[];
+  allOptions: Problem[];
   dragOverState: { id: string; isMerge: boolean } | null;
   onEdit: (p: Problem) => void;
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
@@ -211,11 +216,11 @@ function SortableRow({
     <div ref={setNodeRef} style={style} id={`row-${item.problem.id}`}>
       <ActiveProblemRow
         problem={item.problem}
-        isChild={item.isChild}
+        depth={item.depth}
         canManage={canManage}
         dragHandleProps={{ attributes, listeners }}
         isDragging={isDragging}
-        rootOptions={rootOptions}
+        allOptions={allOptions}
         dragOverState={dragOverState}
         onEdit={() => onEdit(item.problem)}
         onStatusChange={(status) => onStatusChange(item.problem, status)}
@@ -228,7 +233,7 @@ function SortableRow({
 
 export function ActiveProblemTable({
   nodes,
-  rootOptions,
+  allOptions,
   canManage,
   onEdit,
   onStatusChange,
@@ -254,13 +259,14 @@ export function ActiveProblemTable({
   );
 
   const flatProblems = useMemo(() => {
-    const list: { problem: ProblemNode; isChild: boolean }[] = [];
-    nodes.forEach(node => {
-      list.push({ problem: node, isChild: false });
-      node.children.forEach(child => {
-        list.push({ problem: child, isChild: true });
+    const list: { problem: ProblemNode; depth: number }[] = [];
+    const traverse = (nodesList: ProblemNode[], depth: number) => {
+      nodesList.forEach(node => {
+        list.push({ problem: node, depth });
+        traverse(node.children, depth + 1);
       });
-    });
+    };
+    traverse(nodes, 0);
     return list;
   }, [nodes]);
 
@@ -315,10 +321,8 @@ export function ActiveProblemTable({
       const newParentId = targetParentId || targetProblem.id;
 
       if (activeProblem.id === newParentId) return;
-
-      // Check if activeProblem has children (cannot nest parent with children)
-      if (activeProblem.children && activeProblem.children.length > 0) {
-        toast.error('Cannot nest a problem that already has sub-problems.');
+      if (isDescendant(allOptions, newParentId, activeProblem.id)) {
+        toast.error('Cannot nest a problem under its own descendant.');
         return;
       }
 
@@ -331,8 +335,8 @@ export function ActiveProblemTable({
     } else {
       // Reordering - adopt target's parent level
       if (activeProblem.parentId !== targetProblem.parentId) {
-        if (activeProblem.children && activeProblem.children.length > 0 && targetProblem.parentId !== null) {
-          toast.error('Cannot nest a problem that already has sub-problems.');
+        if (targetProblem.parentId && isDescendant(allOptions, targetProblem.parentId, activeProblem.id)) {
+          toast.error('Cannot nest a problem under its own descendant.');
           return;
         }
         try {
@@ -384,7 +388,7 @@ export function ActiveProblemTable({
                 key={item.problem.id}
                 item={item}
                 canManage={canManage}
-                rootOptions={rootOptions}
+                allOptions={allOptions}
                 dragOverState={dragOverState}
                 onEdit={onEdit}
                 onStatusChange={onStatusChange}

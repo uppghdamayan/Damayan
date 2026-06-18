@@ -52,7 +52,22 @@ export function useUpdateProblem(patientId: string) {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => invalidateProblems(qc, patientId),
+    onMutate: async (variables) => {
+      await qc.cancelQueries({ queryKey: ['problems', patientId] });
+      const previous = qc.getQueryData<ProblemsResponse>(['problems', patientId]);
+      if (previous) {
+        qc.setQueryData<ProblemsResponse>(['problems', patientId], {
+          data: previous.data.map((p) => (p.id === variables.id ? { ...p, ...variables } : p)),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['problems', patientId], context.previous);
+      }
+    },
+    onSettled: () => invalidateProblems(qc, patientId),
   });
 }
 

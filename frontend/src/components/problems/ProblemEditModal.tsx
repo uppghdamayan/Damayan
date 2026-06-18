@@ -3,18 +3,19 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isDescendant } from '@/lib/problem-utils';
 import type { Problem } from '@/types/problem';
 
 interface ProblemEditModalProps {
   open: boolean;
   onClose: () => void;
   editing: Problem | null;
-  rootOptions: Problem[];
+  allOptions: Problem[];
   saving: boolean;
   onSave: (values: { title: string; icdCode?: string | null; parentId?: string | null }) => void;
 }
 
-export function ProblemEditModal({ open, onClose, editing, rootOptions, saving, onSave }: ProblemEditModalProps) {
+export function ProblemEditModal({ open, onClose, editing, allOptions, saving, onSave }: ProblemEditModalProps) {
   const [title, setTitle] = useState('');
   const [icdCode, setIcdCode] = useState('');
   const [parentId, setParentId] = useState('');
@@ -31,9 +32,15 @@ export function ProblemEditModal({ open, onClose, editing, rootOptions, saving, 
 
   if (!open) return null;
 
-  // Backend enforces one-level nesting — only root-level, non-removed, and non-resolved problems
-  // (excluding the problem being edited itself) are valid parent choices.
-  const selectableParents = rootOptions.filter((p) => p.id !== editing?.id && p.status === 'ACTIVE');
+  // Filter out the problem being edited itself, any of its descendants, and non-active problems.
+  const selectableParents = allOptions.filter((p) => {
+    if (p.status !== 'ACTIVE') return false;
+    if (editing) {
+      if (p.id === editing.id) return false;
+      if (isDescendant(allOptions, p.id, editing.id)) return false;
+    }
+    return true;
+  });
 
   const handleSubmit = () => {
     if (!title.trim()) {
@@ -115,9 +122,6 @@ export function ProblemEditModal({ open, onClose, editing, rootOptions, saving, 
                 </option>
               ))}
             </select>
-            <p className="text-[11px] text-text-muted mt-1">
-              Nesting is limited to one level — only root-level problems can be selected as a parent.
-            </p>
           </div>
         </div>
 

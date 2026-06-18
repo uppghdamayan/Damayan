@@ -19,6 +19,13 @@ export function buildProblemTree(problems: Problem[]): ProblemNode[] {
   return roots;
 }
 
+export function isDescendant(problems: Problem[], potentialDescendantId: string, ancestorId: string): boolean {
+  if (potentialDescendantId === ancestorId) return true;
+  const descendant = problems.find(p => p.id === potentialDescendantId);
+  if (!descendant || !descendant.parentId) return false;
+  return isDescendant(problems, descendant.parentId, ancestorId);
+}
+
 export function isRecentlyUpdated(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;
   return Date.now() - new Date(dateStr).getTime() < 48 * 60 * 60 * 1000;

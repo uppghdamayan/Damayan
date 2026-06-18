@@ -39,7 +39,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const resolvedProblems = useMemo(() => problems.filter(p => p.status === 'RESOLVED'), [problems]);
   
   const tree = useMemo(() => buildProblemTree(activeProblems), [activeProblems]);
-  const rootOptions = useMemo(() => problems.filter((p) => p.parentId === null), [problems]);
 
   const handleAdd = () => {
     setEditing(null);
@@ -138,7 +137,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         ) : (
           <ActiveProblemTable
             nodes={tree}
-            rootOptions={rootOptions}
+            allOptions={activeProblems}
             canManage={canManage}
             onEdit={handleEdit}
             onStatusChange={handleStatusChange}
@@ -182,7 +181,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         editing={editing}
-        rootOptions={rootOptions}
+        allOptions={activeProblems}
         onSave={handleSave}
         saving={createProblem.isPending || updateProblem.isPending}
       />
