@@ -82,13 +82,16 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
     <PatientProvider value={{ patient, isLoading }}>
       <div className="flex flex-col flex-1 overflow-hidden">
         <ScreenNav patientId={patientId} />
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="page-title">{title}</h1>
-              <div className="page-sub">
-                {patientName ? `${patientName} · ${subtitle}` : subtitle}
-              </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
+          <div className="border-b border-border/40 pb-3">
+            <div className="flex flex-col gap-0.5">
+      
+              <h1 className="text-[20px] font-bold tracking-tight text-text-primary leading-tight font-sans">
+                {title}
+              </h1>
+              <span className="text-[11px] text-text-muted font-medium mt-0.5">
+                {subtitle}
+              </span>
             </div>
           </div>
           {children}
