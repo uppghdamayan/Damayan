@@ -81,7 +81,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const handleParentChange = async (p: Problem, newParentId: string | null) => {
     try {
       await updateProblem.mutateAsync({ id: p.id, parentId: newParentId });
-      toast.success('Problem nesting updated.');
+      if (newParentId) {
+        const parent = activeProblems.find((x) => x.id === newParentId);
+        toast.success(`'${p.title}' nested under '${parent?.title || 'Unknown'}'.`);
+      } else {
+        toast.success(`'${p.title}' moved to top level.`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update nesting.');
     }
@@ -115,7 +120,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
       {/* MASTER PROBLEM LIST */}
       <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-lg">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
           <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
             📋
           </div>
@@ -150,7 +155,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
       {/* RESOLVED PROBLEMS */}
       <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-lg">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
           <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
             ✅
           </div>

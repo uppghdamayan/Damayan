@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   KeyboardSensor,
@@ -75,7 +76,7 @@ function ActiveProblemRow({
   return (
     <div
       className={cn(
-        'grid items-center gap-4 px-[14px] py-3 border-b border-border last:border-b-0 bg-surface transition-all duration-150',
+        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
         isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative'
@@ -207,13 +208,15 @@ function SortableRow({
     disabled: !canManage,
   });
 
+  const isMergeTarget = dragOverState?.id === item.problem.id && dragOverState.isMerge;
+
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(isMergeTarget ? null : transform),
     transition,
   };
 
   return (
-    <div ref={setNodeRef} style={style} id={`row-${item.problem.id}`}>
+    <div ref={setNodeRef} style={style} id={`row-${item.problem.id}`} className="relative after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] last:after:hidden">
       <ActiveProblemRow
         problem={item.problem}
         depth={item.depth}
@@ -242,6 +245,8 @@ export function ActiveProblemTable({
   onParentChange,
 }: ActiveProblemTableProps) {
   const [dragOverState, setDragOverState] = useState<{ id: string; isMerge: boolean } | null>(null);
+  const [isTableDragging, setIsTableDragging] = useState(false);
+  const [activeDragItem, setActiveDragItem] = useState<{ problem: ProblemNode; depth: number } | null>(null);
 
   // Track global pointer coordinates to check relative x offset within elements
   const pointerPosition = useRef({ x: 0, y: 0 });
@@ -272,10 +277,10 @@ export function ActiveProblemTable({
 
   const ids = useMemo(() => flatProblems.map(item => item.problem.id), [flatProblems]);
 
-  const findProblemById = (id: string): ProblemNode | undefined => {
-    for (const node of nodes) {
+  const findProblemById = (id: string, currentNodes: ProblemNode[] = nodes): ProblemNode | undefined => {
+    for (const node of currentNodes) {
       if (node.id === id) return node;
-      const child = node.children.find(c => c.id === id);
+      const child = findProblemById(id, node.children);
       if (child) return child;
     }
     return undefined;
@@ -298,7 +303,9 @@ export function ActiveProblemTable({
     }
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
+    setIsTableDragging(false);
+    setActiveDragItem(null);
     const { active, over } = event;
     setDragOverState(null);
     if (!over || active.id === over.id) return;
@@ -316,9 +323,8 @@ export function ActiveProblemTable({
     }
 
     if (isMerge) {
-      // Nesting (Merge) - target's parent if target is already nested, otherwise target itself
-      const targetParentId = targetProblem.parentId;
-      const newParentId = targetParentId || targetProblem.id;
+      // Nesting (Merge) - target itself
+      const newParentId = targetProblem.id;
 
       if (activeProblem.id === newParentId) return;
       if (isDescendant(allOptions, newParentId, activeProblem.id)) {
@@ -327,8 +333,7 @@ export function ActiveProblemTable({
       }
 
       try {
-        await onParentChange(activeProblem, newParentId);
-        toast.success(`'${activeProblem.title}' nested under '${targetParentId ? 'sibling parent' : targetProblem.title}'.`);
+        onParentChange(activeProblem, newParentId);
       } catch (err) {
         // Parent screen handles mutation errors
       }
@@ -340,7 +345,7 @@ export function ActiveProblemTable({
           return;
         }
         try {
-          await onParentChange(activeProblem, targetProblem.parentId);
+          onParentChange(activeProblem, targetProblem.parentId);
         } catch (err) {
           return;
         }
@@ -361,9 +366,9 @@ export function ActiveProblemTable({
   };
 
   return (
-    <div className="flex flex-col overflow-x-auto w-full">
+    <div className={cn("flex flex-col w-full", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
       <div 
-        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-center"
+        className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-center"
         style={{ gridTemplateColumns: COLUMN_LAYOUT }}
       >
         <div className="w-[22px]" />
@@ -378,9 +383,19 @@ export function ActiveProblemTable({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          autoScroll={false}
+          onDragStart={(event) => {
+            setIsTableDragging(true);
+            const activeItem = flatProblems.find((p) => p.problem.id === event.active.id);
+            setActiveDragItem(activeItem || null);
+          }}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setDragOverState(null)}
+          onDragCancel={() => {
+            setDragOverState(null);
+            setIsTableDragging(false);
+            setActiveDragItem(null);
+          }}
         >
           <SortableContext items={ids} strategy={verticalListSortingStrategy}>
             {flatProblems.map((item) => (
@@ -397,6 +412,24 @@ export function ActiveProblemTable({
               />
             ))}
           </SortableContext>
+          <DragOverlay>
+            {activeDragItem ? (
+              <div className="bg-surface shadow-lg border border-accent rounded ring-2 ring-accent/20 opacity-60">
+                <ActiveProblemRow
+                  problem={activeDragItem.problem}
+                  depth={activeDragItem.depth}
+                  canManage={canManage}
+                  isDragging={false}
+                  allOptions={allOptions}
+                  dragOverState={null}
+                  onEdit={() => {}}
+                  onStatusChange={() => {}}
+                  onDelete={() => {}}
+                  onParentChange={() => {}}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>

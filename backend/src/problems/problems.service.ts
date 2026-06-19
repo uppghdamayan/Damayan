@@ -80,7 +80,7 @@ export class ProblemsService {
         if (dto.parentId === id) {
           throw new BadRequestException('A problem cannot be its own parent.');
         }
-        await this.assertValidParent(patientId, dto.parentId, tx);
+        await this.assertValidParent(patientId, dto.parentId, tx, id);
       }
 
       const data: Prisma.ProblemUpdateInput = {};
@@ -208,15 +208,19 @@ export class ProblemsService {
     patientId: string,
     parentId: string,
     client: PrismaTx | PrismaService = this.prisma,
+    currentProblemId?: string,
   ): Promise<void> {
-    const parent = await client.problem.findFirst({ where: { id: parentId, patientId } });
-    if (!parent) {
-      throw new NotFoundException('Parent problem not found for this patient.');
-    }
-    if (parent.parentId !== null) {
-      throw new BadRequestException(
-        'MVP nesting is limited to one level — the selected parent is itself a child problem.',
-      );
+    let curr: string | null = parentId;
+    while (curr) {
+      if (curr === currentProblemId) {
+        throw new BadRequestException('Cannot nest a problem under its own descendant.');
+      }
+      const node = await client.problem.findFirst({ where: { id: curr, patientId } });
+      if (!node) {
+        if (curr === parentId) throw new NotFoundException('Parent problem not found for this patient.');
+        break;
+      }
+      curr = node.parentId;
     }
   }
 }

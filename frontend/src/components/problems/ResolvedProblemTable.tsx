@@ -18,7 +18,7 @@ export function ResolvedProblemTable({ problems, canManage, onReactivate, onDele
   return (
     <div className="flex flex-col overflow-x-auto w-full">
       <div 
-        className="grid items-center gap-4 px-[14px] py-2 bg-surface-2 border-b border-border text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary text-center"
+        className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary text-center"
         style={{ gridTemplateColumns: COLUMN_LAYOUT }}
       >
         <div className="text-left">Problem / Diagnosis</div>
@@ -30,7 +30,7 @@ export function ResolvedProblemTable({ problems, canManage, onReactivate, onDele
         {problems.map((problem) => (
           <div
             key={problem.id}
-            className="grid items-center gap-4 px-[14px] py-3 border-b border-border last:border-b-0 bg-surface"
+            className="relative grid items-center gap-4 px-[14px] py-3 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] last:after:hidden bg-surface"
             style={{ gridTemplateColumns: COLUMN_LAYOUT }}
           >
             <div className="text-[13px] font-bold text-text-muted line-through truncate">
