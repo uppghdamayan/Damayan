@@ -75,21 +75,22 @@ function ActiveProblemRow({
 
   return (
     <div
+      {...(canManage ? dragHandleProps?.attributes : {})}
+      {...(canManage ? dragHandleProps?.listeners : {})}
       className={cn(
         'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150',
+        canManage && 'cursor-grab active:cursor-grabbing',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
         isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative'
       )}
       style={{ gridTemplateColumns: COLUMN_LAYOUT }}
     >
-      {/* Column 1: Drag handle */}
+      {/* Column 1: Drag handle indicator */}
       <div className="flex items-center justify-center">
-        {canManage && dragHandleProps ? (
+        {canManage ? (
           <span
-            {...dragHandleProps.attributes}
-            {...dragHandleProps.listeners}
-            className="text-border-strong cursor-grab active:cursor-grabbing touch-none flex-shrink-0 select-none text-[15px] font-bold"
+            className="text-border-strong flex-shrink-0 select-none text-[15px] font-bold"
             title="Drag to reorder"
           >
             ⠿

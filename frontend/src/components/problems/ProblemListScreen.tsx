@@ -162,7 +162,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
             Resolved Problems
           </span>
-          <span className="ch-badge badge-resolved ml-auto text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-2">
+          <span className="ch-badge badge-resolved text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-green-border text-green bg-green-bg">
             {resolvedProblems.length} Resolved
           </span>
         </div>
