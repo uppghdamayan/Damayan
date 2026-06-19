@@ -18,6 +18,7 @@ interface CreateMedicationInput {
   name: string;
   dose: number;
   unit: MedUnitValue;
+  formulation?: string;
   instructions?: string;
   quantity?: number;
 }
@@ -26,6 +27,7 @@ interface UpdateMedicationInput {
   name?: string;
   dose?: number;
   unit?: MedUnitValue;
+  formulation?: string | null;
   instructions?: string | null;
   quantity?: number | null;
 }

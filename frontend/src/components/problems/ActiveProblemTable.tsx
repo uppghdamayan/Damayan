@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { isDescendant } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px 3fr 1.8fr 1.5fr 2.2fr 1.5fr';
+const COLUMN_LAYOUT = '22px 14px 3fr 1.5fr 1.2fr 2fr 120px 1.5fr';
 
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
@@ -120,12 +120,12 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 4: Date Added */}
-      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-center">
+      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-left">
         {new Date(problem.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
       </div>
 
       {/* Column 5: Status */}
-      <div className="flex justify-center">
+      <div className="flex justify-start">
         <select
           disabled={!canManage}
           value={problem.status}
@@ -139,7 +139,7 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 6: Nest Under */}
-      <div className="flex justify-center">
+      <div className="flex justify-start">
         <select
           disabled={!canManage}
           value={problem.parentId || ''}
@@ -156,7 +156,7 @@ function ActiveProblemRow({
       </div>
 
       {/* Column 7: Actions */}
-      <div className="flex items-center justify-center gap-1.5">
+      <div className="flex items-center justify-start gap-1.5">
         {canManage && (
           <>
             <button
@@ -369,16 +369,16 @@ export function ActiveProblemTable({
   return (
     <div className={cn("flex flex-col w-full", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
       <div 
-        className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-center"
+        className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-left"
         style={{ gridTemplateColumns: COLUMN_LAYOUT }}
       >
         <div className="w-[22px]" />
         <div className="w-[14px]" />
         <div className="text-left">Problem</div>
-        <div className="whitespace-nowrap text-center">Date Added</div>
-        <div className="text-center">Status</div>
-        <div className="text-center">Nest Under</div>
-        <div className="text-center">Actions</div>
+        <div className="whitespace-nowrap text-left">Date Added</div>
+        <div className="text-left">Status</div>
+        <div className="text-left">Nest Under</div>
+        <div className="text-left">Actions</div>
       </div>
       <div className="flex flex-col">
         <DndContext

@@ -9,7 +9,7 @@ import {
   useDeleteMedication,
 } from '@/hooks/useMedications';
 import { useAuthStore } from '@/stores/authStore';
-import { MedicationEntry } from './MedicationEntry';
+import { MedicationEntry, MED_COLUMN_LAYOUT } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
 import type { Medication, MedUnitValue } from '@/types/medication';
@@ -33,7 +33,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const handleAdd = () => { setEditing(null); setModalOpen(true); };
   const handleEdit = (m: Medication) => { setEditing(m); setModalOpen(true); };
 
-  const handleSave = async (values: { name: string; dose: number; unit: MedUnitValue; instructions?: string; quantity?: number }) => {
+  const handleSave = async (values: { name: string; dose: number; unit: MedUnitValue; formulation?: string; instructions?: string; quantity?: number }) => {
     try {
       if (editing) {
         await updateMedication.mutateAsync({ id: editing.id, ...values });
@@ -72,37 +72,70 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       )}
 
       <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2">
-          <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">💊</div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Active Medications</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
+          <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">💊</div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Current Medications</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-[#2B7A78] text-[#2B7A78] bg-[#DEF2F1] ml-auto">
             {active.length} Active
           </span>
         </div>
+
+        {active.length > 0 && (
+          <div 
+            className="relative grid items-center gap-4 pl-[14px] pr-[28px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary"
+            style={{ gridTemplateColumns: MED_COLUMN_LAYOUT }}
+          >
+            <div className="text-left">Medication</div>
+            <div className="text-left">Formulation</div>
+            <div className="text-left">Dose</div>
+            <div className="text-left">Unit</div>
+            <div className="text-left">Instructions</div>
+            <div className="text-left">Qty</div>
+            <div className="text-left">Actions</div>
+          </div>
+        )}
 
         {active.length === 0 ? (
           <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic">
             No active medications recorded.
           </div>
         ) : (
-          active.map((m) => (
-            <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => handleEdit(m)} onDelete={() => handleDelete(m)} />
-          ))
+          <div className="flex flex-col">
+            {active.map((m) => (
+              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => handleEdit(m)} onDelete={() => handleDelete(m)} />
+            ))}
+          </div>
         )}
       </div>
 
       {inactive.length > 0 && (
         <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2">
-            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
-            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-2 ml-auto">
-              {inactive.length}
+          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
+            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2 ml-auto">
+              {inactive.length} Discontinued
             </span>
           </div>
-          {inactive.map((m) => (
-            <MedicationEntry key={m.id} medication={m} canManage={false} onEdit={() => {}} onDelete={() => {}} />
-          ))}
+
+          <div 
+            className="relative grid items-center gap-4 pl-[14px] pr-[28px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary"
+            style={{ gridTemplateColumns: MED_COLUMN_LAYOUT }}
+          >
+            <div className="text-left">Medication</div>
+            <div className="text-left">Formulation</div>
+            <div className="text-left">Dose</div>
+            <div className="text-left">Unit</div>
+            <div className="text-left">Instructions</div>
+            <div className="text-left">Qty</div>
+            <div className="text-left">Actions</div>
+          </div>
+
+          <div className="flex flex-col">
+            {inactive.map((m) => (
+              <MedicationEntry key={m.id} medication={m} canManage={false} onEdit={() => {}} onDelete={() => {}} />
+            ))}
+          </div>
         </div>
       )}
 
