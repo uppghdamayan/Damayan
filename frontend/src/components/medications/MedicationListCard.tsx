@@ -50,6 +50,7 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
           <thead>
             <tr className="bg-surface-2 border-b border-border">
               <th className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary">Medication</th>
+              <th className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary">Formulation</th>
               <th className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary">Dose</th>
               <th className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary">Instructions</th>
             </tr>
@@ -59,7 +60,9 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
               <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface-3 transition-colors">
                 <td className="px-3.5 py-2 text-[12px] text-text-primary font-medium">
                   {m.name}
-                  {m.formulation && <span className="font-normal text-text-secondary ml-1">{m.formulation}</span>}
+                </td>
+                <td className="px-3.5 py-2 text-[11px] text-text-secondary">
+                  {m.formulation || '—'}
                 </td>
                 <td className="px-3.5 py-2 font-mono text-[11px] text-accent font-medium whitespace-nowrap">
                   {formatDose(m)}
