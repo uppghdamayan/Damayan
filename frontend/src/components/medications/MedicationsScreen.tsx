@@ -1,0 +1,119 @@
+'use client';
+
+import { useState } from 'react';
+import { toast } from 'sonner';
+import {
+  useMedications,
+  useCreateMedication,
+  useUpdateMedication,
+  useDeleteMedication,
+} from '@/hooks/useMedications';
+import { useAuthStore } from '@/stores/authStore';
+import { MedicationEntry } from './MedicationEntry';
+import { MedicationFormModal } from './MedicationForm';
+import { MedicationListSkeleton } from './MedicationListSkeleton';
+import type { Medication, MedUnitValue } from '@/types/medication';
+
+export function MedicationsScreen({ patientId }: { patientId: string }) {
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  const { data, isLoading } = useMedications(patientId, true); // full history for autocomplete + inactive rows
+  const createMedication = useCreateMedication(patientId);
+  const updateMedication = useUpdateMedication(patientId);
+  const deleteMedication = useDeleteMedication(patientId);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Medication | null>(null);
+
+  const all = data?.data ?? [];
+  const active = all.filter((m) => m.isActive);
+  const inactive = all.filter((m) => !m.isActive);
+
+  const handleAdd = () => { setEditing(null); setModalOpen(true); };
+  const handleEdit = (m: Medication) => { setEditing(m); setModalOpen(true); };
+
+  const handleSave = async (values: { name: string; dose: number; unit: MedUnitValue; instructions?: string; quantity?: number }) => {
+    try {
+      if (editing) {
+        await updateMedication.mutateAsync({ id: editing.id, ...values });
+        toast.success('Medication updated.');
+      } else {
+        await createMedication.mutateAsync(values);
+        toast.success('Medication added to the list.');
+      }
+      setModalOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save medication.');
+    }
+  };
+
+  const handleDelete = (m: Medication) => {
+    if (!confirm(`Remove ${m.name} from the active medication list?`)) return;
+    deleteMedication.mutate(m.id, {
+      onSuccess: () => toast.success('Medication removed.'),
+      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to remove medication.'),
+    });
+  };
+
+  if (isLoading) return <MedicationListSkeleton />;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {canManage && (
+        <div className="flex justify-end -mb-2">
+          <button
+            onClick={handleAdd}
+            className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer"
+          >
+            + Add Medication
+          </button>
+        </div>
+      )}
+
+      <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2">
+          <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">💊</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Active Medications</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
+            {active.length} Active
+          </span>
+        </div>
+
+        {active.length === 0 ? (
+          <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic">
+            No active medications recorded.
+          </div>
+        ) : (
+          active.map((m) => (
+            <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => handleEdit(m)} onDelete={() => handleDelete(m)} />
+          ))
+        )}
+      </div>
+
+      {inactive.length > 0 && (
+        <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2">
+            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-2 ml-auto">
+              {inactive.length}
+            </span>
+          </div>
+          {inactive.map((m) => (
+            <MedicationEntry key={m.id} medication={m} canManage={false} onEdit={() => {}} onDelete={() => {}} />
+          ))}
+        </div>
+      )}
+
+      <MedicationFormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        editing={editing}
+        suggestions={all}
+        onSave={handleSave}
+        saving={createMedication.isPending || updateMedication.isPending}
+      />
+    </div>
+  );
+}

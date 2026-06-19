@@ -8,7 +8,7 @@ import { PatientBannerSkeleton } from '@/components/patients/PatientBannerSkelet
 import { VitalsStripEmpty } from '@/components/vitals/VitalsStripEmpty';
 import { VitalsStripSkeleton } from '@/components/vitals/VitalsStripSkeleton';
 import { ProblemListCard } from '@/components/problems/ProblemListCard';
-import { MedicationListCardEmpty } from '@/components/medications/MedicationListCardEmpty';
+import { MedicationListCard } from '@/components/medications/MedicationListCard';
 import { VisitHistoryCard } from '@/components/visits/VisitHistoryCard';
 
 // Suspense-wrapped data components
@@ -35,7 +35,7 @@ function ProblemsAndMedsSection({ patientId }: { patientId: string }) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <ProblemListCard patientId={patientId} />
-      <MedicationListCardEmpty />
+      <MedicationListCard patientId={patientId} />
     </div>
   );
 }

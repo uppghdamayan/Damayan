@@ -270,6 +270,7 @@ model Medication {
   name         String   @db.VarChar(255)
   dose         Decimal  @db.Decimal(8, 2)
   unit         MedUnit  @default(MG)
+  formulation  String?  @db.VarChar(50)
   instructions String?  @db.VarChar(50)
   quantity     Int?
   isActive     Boolean  @default(true) @map("is_active")

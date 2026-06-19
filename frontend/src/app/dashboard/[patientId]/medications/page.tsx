@@ -1,3 +1,9 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { MedicationsScreen } from '@/components/medications/MedicationsScreen';
+
 export default function MedicationsPage() {
-  return <div className="p-5 text-[13px] text-[#6B7280]">Medications — Phase 9</div>;
+  const { patientId } = useParams<{ patientId: string }>();
+  return <MedicationsScreen patientId={patientId} />;
 }

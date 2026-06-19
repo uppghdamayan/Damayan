@@ -1,0 +1,144 @@
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Prisma, Medication } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateMedicationDto } from './dto/create-medication.dto';
+import { UpdateMedicationDto } from './dto/update-medication.dto';
+
+type PrismaTx = Prisma.TransactionClient;
+
+@Injectable()
+export class MedicationsService {
+  constructor(private prisma: PrismaService) {}
+
+  // ─────────────────────────────────────────────
+  // LIST — active by default; ?includeInactive=true returns the full history
+  // (used by the frontend autocomplete merge and by Visit History detail views).
+  // ─────────────────────────────────────────────
+  async findAll(patientId: string, includeInactive = false): Promise<Medication[]> {
+    return this.prisma.medication.findMany({
+      where: { patientId, ...(includeInactive ? {} : { isActive: true }) },
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  /**
+   * Internal helper — NOT exposed as a route. Used by:
+   *  - Phase 8 (Initial Note) to seed the medication list on publish
+   *  - Phase 9 (Progress Notes) to build medicationSnapshot on note creation/publish
+   * See Section 2 ("Cross-Module Integration Contract") below.
+   */
+  async findActiveForPatient(
+    patientId: string,
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<Medication[]> {
+    return client.medication.findMany({
+      where: { patientId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async findOne(patientId: string, id: string): Promise<Medication> {
+    const med = await this.prisma.medication.findFirst({ where: { id, patientId } });
+    if (!med) throw new NotFoundException(`Medication ${id} not found for this patient.`);
+    return med;
+  }
+
+  // ─────────────────────────────────────────────
+  // CREATE
+  // ─────────────────────────────────────────────
+  async create(patientId: string, dto: CreateMedicationDto, userId: string): Promise<Medication> {
+    return this.prisma.medication.create({
+      data: {
+        patientId,
+        name: dto.name.trim(),
+        dose: dto.dose,
+        unit: dto.unit,
+        formulation: dto.formulation?.trim() || null,
+        instructions: dto.instructions?.trim() || null,
+        quantity: dto.quantity ?? null,
+        isActive: true,
+        addedBy: userId,
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // UPDATE
+  // ─────────────────────────────────────────────
+  async update(patientId: string, id: string, dto: UpdateMedicationDto): Promise<Medication> {
+    await this.findOne(patientId, id); // throws if not found / not owned by patient
+
+    const data: Prisma.MedicationUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name.trim();
+    if (dto.dose !== undefined) data.dose = dto.dose;
+    if (dto.unit !== undefined) data.unit = dto.unit;
+    if (dto.formulation !== undefined) data.formulation = dto.formulation?.trim() || null;
+    if (dto.instructions !== undefined) data.instructions = dto.instructions?.trim() || null;
+    if (dto.quantity !== undefined) data.quantity = dto.quantity ?? null;
+
+    return this.prisma.medication.update({ where: { id }, data });
+  }
+
+  // ─────────────────────────────────────────────
+  // SOFT DELETE — sets is_active = false; row is retained for audit/history.
+  // ─────────────────────────────────────────────
+  async remove(patientId: string, id: string): Promise<Medication> {
+    await this.findOne(patientId, id);
+    return this.prisma.medication.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // PHASE 8/9 INTEGRATION POINT — see Section 2 of this file for the full contract.
+  //
+  // Upserts medications from a note's medication list on publish/save.
+  // Case-insensitive match on (name, dose, unit) against the patient's existing
+  // ACTIVE medications:
+  //   - exact match (name+dose+unit) → no-op (already on the list)
+  //   - name matches but dose/unit differs → treated as a NEW entry (dose
+  //     changes are clinically significant; never silently overwrite a dose)
+  //   - no match → create new active medication
+  // Medications removed from the note's list compared to the patient's current
+  // active list are NOT auto-deactivated here — deactivation is always an
+  // explicit clinician action via DELETE, performed by the calling module if
+  // its own business rules require it (Initial Note does not; see Section 2).
+  // ─────────────────────────────────────────────
+  async upsertFromNoteMedications(
+    patientId: string,
+    items: { name: string; dose: number; unit: string; formulation?: string; instructions?: string; quantity?: number }[],
+    userId: string,
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<void> {
+    if (!items?.length) return;
+
+    const existing = await client.medication.findMany({
+      where: { patientId, isActive: true },
+    });
+
+    for (const item of items) {
+      const match = existing.find(
+        (m) =>
+          m.name.toLowerCase() === item.name.trim().toLowerCase() &&
+          Number(m.dose) === Number(item.dose) &&
+          m.unit === item.unit,
+      );
+      if (match) continue;
+
+      await client.medication.create({
+        data: {
+          patientId,
+          name: item.name.trim(),
+          dose: item.dose,
+          unit: item.unit as any,
+          formulation: item.formulation?.trim() || null,
+          instructions: item.instructions?.trim() || null,
+          quantity: item.quantity ?? null,
+          isActive: true,
+          addedBy: userId,
+        },
+      });
+    }
+  }
+}
