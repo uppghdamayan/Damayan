@@ -61,15 +61,23 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
           No active problems. {allProblems.length} resolved/removed entr{allProblems.length === 1 ? 'y' : 'ies'} on file.
         </div>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="flex flex-col">
           {active.slice(0, 6).map((p) => (
-            <div key={p.id} className="flex items-center gap-2 px-3.5 py-2">
+            <div key={p.id} className="flex items-center gap-2 px-3.5 py-2 border-b border-border last:border-0">
               <div className={cn('w-2 h-2 rounded-full flex-shrink-0', statusDotClass[p.status])} />
-              <span className="text-[12px] text-text-primary truncate">{p.title}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] text-text-primary font-medium truncate">{p.title}</div>
+                <div className="font-mono text-[10px] text-text-muted mt-0.5 truncate">
+                  {p.icdCode ? `${p.icdCode} · ` : ''}Since {new Date(p.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-0.5 rounded flex-shrink-0 bg-accent-light text-accent-hover border border-accent">
+                {p.status}
+              </span>
             </div>
           ))}
           {active.length > 6 && (
-            <div className="px-3.5 py-2 text-[11px] text-text-muted text-center">
+            <div className="px-3.5 py-2 text-[11px] text-text-muted text-center border-t border-border">
               +{active.length - 6} more — view full list
             </div>
           )}
