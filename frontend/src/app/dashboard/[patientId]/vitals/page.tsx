@@ -1,3 +1,9 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { VitalsScreen } from '@/components/vitals/VitalsScreen';
+
 export default function VitalsPage() {
-  return <div className="p-5 text-[13px] text-[#6B7280]">Vital Signs — Phase 10</div>;
+  const { patientId } = useParams<{ patientId: string }>();
+  return <VitalsScreen patientId={patientId} />;
 }

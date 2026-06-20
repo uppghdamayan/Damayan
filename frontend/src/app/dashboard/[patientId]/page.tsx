@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { usePatient } from '@/hooks/usePatients';
 import { PatientBanner } from '@/components/patients/PatientBanner';
 import { PatientBannerSkeleton } from '@/components/patients/PatientBannerSkeleton';
-import { VitalsStripEmpty } from '@/components/vitals/VitalsStripEmpty';
+import { VitalsCard } from '@/components/vitals/VitalsCard';
 import { VitalsStripSkeleton } from '@/components/vitals/VitalsStripSkeleton';
 import { ProblemListCard } from '@/components/problems/ProblemListCard';
 import { MedicationListCard } from '@/components/medications/MedicationListCard';
@@ -28,7 +28,7 @@ function PatientBannerSection({ patientId }: { patientId: string }) {
 }
 
 function VitalsSection({ patientId }: { patientId: string }) {
-  return <VitalsStripEmpty patientId={patientId} />;
+  return <VitalsCard patientId={patientId} />;
 }
 
 function ProblemsAndMedsSection({ patientId }: { patientId: string }) {
