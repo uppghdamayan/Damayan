@@ -79,6 +79,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
             <input
               autoFocus
               value={title}
+              disabled={saving}
               onChange={(e) => {
                 setTitle(e.target.value);
                 setError('');
@@ -88,7 +89,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
                 'h-[34px] w-full px-2.5 bg-surface border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150',
                 error
                   ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
-                  : 'border-border focus:border-accent focus:shadow-accent-focus',
+                  : 'border-border focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed',
               )}
             />
             {error && <p className="text-[12px] text-red mt-1">{error}</p>}
@@ -100,9 +101,10 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
             </label>
             <input
               value={icdCode}
+              disabled={saving}
               onChange={(e) => setIcdCode(e.target.value)}
               placeholder="e.g. I10"
-              className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
+              className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed"
             />
           </div>
 
@@ -112,8 +114,9 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
             </label>
             <select
               value={parentId}
+              disabled={saving}
               onChange={(e) => setParentId(e.target.value)}
-              className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none cursor-pointer focus:border-accent focus:shadow-accent-focus"
+              className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none cursor-pointer focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed"
             >
               <option value="">— None (root-level problem) —</option>
               {selectableParents.map((p) => (
@@ -135,9 +138,17 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:bg-text-muted disabled:border-border-strong disabled:cursor-not-allowed"
+            className={`h-[28px] px-3 rounded-btn text-[11px] font-semibold text-white border transition-all duration-150 flex items-center justify-center gap-1.5 ${saving ? 'bg-accent-hover border-accent-hover cursor-not-allowed' : 'bg-accent border-accent-hover shadow-btn-primary hover:bg-accent-hover cursor-pointer'}`}
           >
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Problem'}
+            {saving ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving…
+              </>
+            ) : editing ? 'Save Changes' : 'Add Problem'}
           </button>
         </div>
       </div>

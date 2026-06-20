@@ -157,7 +157,8 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Date <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <input
                 type="date"
-                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors`}
+                disabled={saving}
+                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
                 value={measureDate}
                 onChange={(e) => { setMeasureDate(e.target.value); setErrors(er => ({ ...er, measuredAt: '' })); }}
               />
@@ -168,7 +169,8 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Time <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <input
                 type="time"
-                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors`}
+                disabled={saving}
+                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
                 value={measureTime}
                 onChange={(e) => { setMeasureTime(e.target.value); setErrors(er => ({ ...er, measuredAt: '' })); }}
               />
@@ -178,10 +180,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Systolic BP</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.sbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.sbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={sbp}
                     onChange={(e) => setSbp(e.target.value)}
                   />
@@ -194,10 +197,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Diastolic BP</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.dbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.dbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={dbp}
                     onChange={(e) => setDbp(e.target.value)}
                   />
@@ -210,10 +214,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Heart Rate</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.heartRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.heartRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={heartRate}
                     onChange={(e) => setHeartRate(e.target.value)}
                   />
@@ -226,10 +231,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Resp Rate</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.respiratoryRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.respiratoryRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={respiratoryRate}
                     onChange={(e) => setRespiratoryRate(e.target.value)}
                   />
@@ -242,11 +248,12 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Temperature</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.temperature ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.temperature ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={temperature}
                     onChange={(e) => setTemperature(e.target.value)}
                   />
@@ -259,10 +266,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">O2 Saturation</label>
               <div className="flex items-center gap-2">
-                <div className={`flex flex-1 items-center border ${errors.oxygenSaturation ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] bg-surface transition-all h-[34px]`}>
+                <div className={`flex flex-1 items-center border ${errors.oxygenSaturation ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
                     type="number"
-                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none"
+                    disabled={saving}
+                    className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={oxygenSaturation}
                     onChange={(e) => setOxygenSaturation(e.target.value)}
                   />
@@ -290,9 +298,17 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             <button
               type="submit"
               disabled={saving}
-              className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:opacity-50"
+              className={`h-[28px] px-3 rounded-btn text-[11px] font-semibold text-white border transition-all duration-150 flex items-center justify-center gap-1.5 ${saving ? 'bg-accent-hover border-accent-hover cursor-not-allowed' : 'bg-accent border-accent-hover shadow-btn-primary hover:bg-accent-hover cursor-pointer'}`}
             >
-              {saving ? 'Saving...' : editing ? 'Save Changes' : 'Record Vitals'}
+              {saving ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : editing ? 'Save Changes' : 'Record Vitals'}
             </button>
           </div>
         </form>

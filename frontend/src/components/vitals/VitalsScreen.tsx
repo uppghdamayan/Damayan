@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { VitalsFormModal } from './VitalsForm';
 import { VitalsHistoryTable } from './VitalsHistoryTable';
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { VitalSign, CreateVitalsInput, UpdateVitalsInput } from '@/types/vitals';
 
 export function VitalsScreen({ patientId }: { patientId: string }) {
@@ -26,6 +27,8 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
 
   const [editing, setEditing] = useState<VitalSign | null>(null);
   const [formVisible, setFormVisible] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [vitalToDelete, setVitalToDelete] = useState<VitalSign | null>(null);
 
   const handleSave = async (values: CreateVitalsInput | (UpdateVitalsInput & { id: string })) => {
     try {
@@ -44,10 +47,21 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (v: VitalSign) => {
-    if (!confirm('Delete this vital signs record?')) return;
-    deleteVitals.mutate(v.id, {
-      onSuccess: () => toast.success('Vitals record deleted.'),
-      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to delete vitals.'),
+    setVitalToDelete(v);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!vitalToDelete) return;
+    deleteVitals.mutate(vitalToDelete.id, {
+      onSuccess: () => {
+        toast.success('Vitals record deleted.');
+        setDeleteModalOpen(false);
+        setVitalToDelete(null);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete vitals.');
+      },
     });
   };
 
@@ -76,6 +90,18 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
         saving={createVitals.isPending || updateVitals.isPending}
       />
 
+      <DeleteConfirmModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setVitalToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Vitals Record"
+        message="Are you sure you want to delete this vital signs record? This action cannot be undone."
+        isDeleting={deleteVitals.isPending}
+      />
+
       {isLoading ? (
         <div className="animate-pulse bg-surface border border-border rounded-lg h-64"></div>
       ) : (
@@ -85,6 +111,7 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
           onDelete={handleDelete}
           page={meta.page}
           totalPages={meta.totalPages}
+          total={meta.total}
           onPageChange={setPage}
         />
       )}

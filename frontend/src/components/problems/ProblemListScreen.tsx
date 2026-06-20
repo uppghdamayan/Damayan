@@ -17,6 +17,7 @@ import { ActiveProblemTable } from './ActiveProblemTable';
 import { ResolvedProblemTable } from './ResolvedProblemTable';
 import { ProblemEditModal } from './ProblemEditModal';
 import { ProblemListSkeleton } from './ProblemListSkeleton';
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { Problem, ProblemStatusValue } from '@/types/problem';
 
 export function ProblemListScreen({ patientId }: { patientId: string }) {
@@ -32,6 +33,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Problem | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [problemToDelete, setProblemToDelete] = useState<Problem | null>(null);
 
   const problems = data?.data ?? [];
   
@@ -93,9 +96,21 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (p: Problem) => {
-    deleteProblem.mutate(p.id, {
-      onSuccess: () => toast.success('Problem removed.'),
-      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to remove problem.'),
+    setProblemToDelete(p);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!problemToDelete) return;
+    deleteProblem.mutate(problemToDelete.id, {
+      onSuccess: () => {
+        toast.success('Problem removed.');
+        setDeleteModalOpen(false);
+        setProblemToDelete(null);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Failed to remove problem.');
+      },
     });
   };
 
@@ -189,6 +204,18 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         allOptions={activeProblems}
         onSave={handleSave}
         saving={createProblem.isPending || updateProblem.isPending}
+      />
+
+      <DeleteConfirmModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setProblemToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Remove Problem"
+        message={`Are you sure you want to remove "${problemToDelete?.title}" from the problem list? This action cannot be undone.`}
+        isDeleting={deleteProblem.isPending}
       />
     </div>
   );

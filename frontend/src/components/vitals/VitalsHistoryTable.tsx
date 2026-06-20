@@ -18,10 +18,11 @@ interface VitalsHistoryTableProps {
   onDelete: (vital: VitalSign) => void;
   page: number;
   totalPages: number;
+  total?: number;
   onPageChange: (page: number) => void;
 }
 
-export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages, onPageChange }: VitalsHistoryTableProps) {
+export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages, total, onPageChange }: VitalsHistoryTableProps) {
   const { user } = useAuthStore();
   const canEdit = user?.role === 'DOCTOR' || user?.role === 'NURSE' || user?.role === 'ADMIN';
   const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
@@ -33,10 +34,15 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
   };
 
   return (
-    <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+    <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
       <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border">
         <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">📈</div>
-        <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Vitals History</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Vitals History</span>
+        {total !== undefined && (
+          <span className="ch-badge badge-active text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
+            {total} Recorded
+          </span>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -50,7 +56,7 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
               <th className="py-2.5 px-4">Temp</th>
               <th className="py-2.5 px-4">SpO2</th>
               <th className="py-2.5 px-4">Recorded By</th>
-              <th className="py-2.5 px-4 text-right">Actions</th>
+              <th className="py-2.5 px-4">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -95,12 +101,12 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                         <span className="text-text-muted italic">—</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-2">
+                    <td className="py-2.5 px-4">
+                      <div className="flex items-center justify-start gap-1.5">
                         {canEdit && (
                           <button
                             onClick={() => onEdit(v)}
-                            className="text-text-secondary hover:text-accent font-medium text-[11px]"
+                            className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer"
                           >
                             Edit
                           </button>
@@ -108,7 +114,7 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                         {canDelete && (
                           <button
                             onClick={() => onDelete(v)}
-                            className="text-text-secondary hover:text-red font-medium text-[11px]"
+                            className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer"
                           >
                             Delete
                           </button>

@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { MedicationEntry, MED_COLUMN_LAYOUT } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { Medication, MedUnitValue } from '@/types/medication';
 
 export function MedicationsScreen({ patientId }: { patientId: string }) {
@@ -25,6 +26,8 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Medication | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [medicationToDelete, setMedicationToDelete] = useState<Medication | null>(null);
 
   const all = data?.data ?? [];
   const active = all.filter((m) => m.isActive);
@@ -49,10 +52,21 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (m: Medication) => {
-    if (!confirm(`Remove ${m.name} from the active medication list?`)) return;
-    deleteMedication.mutate(m.id, {
-      onSuccess: () => toast.success('Medication removed.'),
-      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to remove medication.'),
+    setMedicationToDelete(m);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!medicationToDelete) return;
+    deleteMedication.mutate(medicationToDelete.id, {
+      onSuccess: () => {
+        toast.success('Medication removed.');
+        setDeleteModalOpen(false);
+        setMedicationToDelete(null);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Failed to remove medication.');
+      },
     });
   };
 
@@ -146,6 +160,18 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         suggestions={all}
         onSave={handleSave}
         saving={createMedication.isPending || updateMedication.isPending}
+      />
+
+      <DeleteConfirmModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setMedicationToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Remove Medication"
+        message={`Are you sure you want to remove "${medicationToDelete?.name}" from the active medication list? This action cannot be undone.`}
+        isDeleting={deleteMedication.isPending}
       />
     </div>
   );
