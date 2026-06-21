@@ -32,8 +32,8 @@ function VisitRow({ visit }: { visit: Visit }) {
 
       {/* Detail column */}
       <div className="flex-1 min-w-0">
-        <div className="flex gap-1.5 items-center flex-wrap mb-0.5">
-          <span className="text-xs text-[#374151]">{physician}</span>
+        <div className="flex gap-1.5 items-center flex-wrap mb-1">
+          <span className="text-[12px] font-medium text-[var(--text-primary)]">{physician}</span>
           <span className={`text-[9px] font-bold uppercase tracking-[0.6px] px-[5px] py-[1px] rounded border ${visit.visitType === 'INITIAL' ? 'bg-[#DBEAFE] text-[#1E3A8A] border-[#3B82F6]' : 'bg-[#D4EDE9] text-[#085A4E] border-[#0A6E5F]'}`}>
             {visit.visitType === 'INITIAL' ? 'Initial' : 'Progress'}
           </span>
@@ -42,8 +42,41 @@ function VisitRow({ visit }: { visit: Visit }) {
           </span>
         </div>
         {notePreview && (
-          <div className="text-xs text-[#6B7280] whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap overflow-hidden text-ellipsis mb-1.5">
             {notePreview}
+          </div>
+        )}
+        
+        {/* Render Diffs */}
+        {visit.problemChanges && (visit.problemChanges.added.length > 0 || visit.problemChanges.removed.length > 0) && (
+          <div className="flex flex-wrap gap-1 mb-1 items-center">
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mr-1">Problems:</span>
+            {visit.problemChanges.added.map((p, i) => (
+              <span key={`p-a-${i}`} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-1 rounded flex items-center">
+                + {p.title}
+              </span>
+            ))}
+            {visit.problemChanges.removed.map((p, i) => (
+              <span key={`p-r-${i}`} className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1 rounded flex items-center line-through">
+                - {p.title}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {visit.medicationChanges && (visit.medicationChanges.added.length > 0 || visit.medicationChanges.removed.length > 0) && (
+          <div className="flex flex-wrap gap-1 items-center">
+            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mr-1">Meds:</span>
+            {visit.medicationChanges.added.map((m, i) => (
+              <span key={`m-a-${i}`} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-1 rounded flex items-center">
+                + {m.name}
+              </span>
+            ))}
+            {visit.medicationChanges.removed.map((m, i) => (
+              <span key={`m-r-${i}`} className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1 rounded flex items-center line-through">
+                - {m.name}
+              </span>
+            ))}
           </div>
         )}
       </div>

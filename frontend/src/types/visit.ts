@@ -11,8 +11,8 @@ export interface Visit {
   visitDatetime: string;
   visitType: 'INITIAL' | 'PROGRESS';
   status: 'DRAFT' | 'PUBLISHED';
-  problemChanges?: unknown;
-  medicationChanges?: unknown;
+  problemChanges?: { added: any[]; removed: any[] } | null;
+  medicationChanges?: { added: any[]; removed: any[] } | null;
   createdAt: string;
   updatedAt: string;
   physician?: VisitPhysician;

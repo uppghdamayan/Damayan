@@ -69,8 +69,13 @@ export function Topbar() {
       <div className="flex items-center gap-2 shrink-0">
         {/* + New Note button */}
         <button
-          onClick={() => {/* Phase 6+ — note creation flow */}}
-          className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0"
+          onClick={() => {
+            if (activePatient) {
+              router.push(`/dashboard/${activePatient.id}/notes`);
+            }
+          }}
+          disabled={!activePatient}
+          className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50"
         >
           ＋ New Note
         </button>

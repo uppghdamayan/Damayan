@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVisitDto } from './dto/create-visit.dto';
-import { VisitType } from '@prisma/client';
+import { VisitType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class VisitsService {
@@ -54,8 +54,9 @@ export class VisitsService {
     physicianId: string,
     visitType: VisitType,
     visitDatetime: Date,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    return this.prisma.visit.create({
+    return client.visit.create({
       data: {
         patientId,
         physicianId,
@@ -70,8 +71,9 @@ export class VisitsService {
     visitId: string,
     problemChanges?: object,
     medicationChanges?: object,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    return this.prisma.visit.update({
+    return client.visit.update({
       where: { id: visitId },
       data: {
         ...(problemChanges    && { problemChanges }),

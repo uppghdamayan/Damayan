@@ -1,3 +1,15 @@
+'use client';
+
+import { InitialNoteForm } from '@/components/notes/InitialNoteForm';
+import { useParams } from 'next/navigation';
+
 export default function InitialNotePage() {
-  return <div className="p-5 text-[13px] text-[#6B7280]">Initial Note — Phase 6</div>;
+  const params = useParams();
+  const patientId = params.patientId as string;
+
+  return (
+    <div className="h-full bg-bg">
+      <InitialNoteForm patientId={patientId} />
+    </div>
+  );
 }
