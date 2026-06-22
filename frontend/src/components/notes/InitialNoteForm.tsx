@@ -21,7 +21,7 @@ import { TagInputField } from './TagInputField';
 import { MedicationListEditor } from './MedicationListEditor';
 import { AttachmentUploader } from './AttachmentUploader';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { 
@@ -32,10 +32,12 @@ import {
 
 interface NoteActionBarProps {
   isSaving: boolean;
-  isPublishing: boolean;
-  onSaveDraft: () => void;
-  onPublish: () => void;
-  onClear: () => void;
+  isPublishing?: boolean;
+  onSaveDraft?: () => void;
+  onPublish?: () => void;
+  onClear?: () => void;
+  showSaveAndClear?: boolean;
+  showPublish?: boolean;
 }
 
 function NoteActionBar({ 
@@ -43,21 +45,29 @@ function NoteActionBar({
   isPublishing, 
   onSaveDraft, 
   onPublish, 
-  onClear 
+  onClear,
+  showSaveAndClear = true,
+  showPublish = true
 }: NoteActionBarProps) {
   return (
     <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
       <span className="text-[11px] text-[var(--text-muted)]">
-        {isSaving ? 'Saving…' : 'Draft auto-saves every 30s'}
+        {showSaveAndClear ? (isSaving ? 'Saving…' : 'Draft auto-saves every 30s') : ''}
       </span>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onClear} className="sec-btn destructive">Clear Form</button>
-        <button type="button" onClick={onSaveDraft} disabled={isSaving} className="sec-btn">
-          <SaveIcon className="w-3.5 h-3.5" /> Save Draft
-        </button>
-        <button type="button" onClick={onPublish} disabled={isPublishing} className="sec-btn primary">
-          <SendIcon className="w-3.5 h-3.5" /> Publish Note
-        </button>
+        {showSaveAndClear && onClear && (
+          <button type="button" onClick={onClear} className="sec-btn destructive">Clear Form</button>
+        )}
+        {showSaveAndClear && onSaveDraft && (
+          <button type="button" onClick={onSaveDraft} disabled={isSaving} className="sec-btn">
+            <SaveIcon className="w-3.5 h-3.5" /> Save Draft
+          </button>
+        )}
+        {showPublish && onPublish && (
+          <button type="button" onClick={onPublish} disabled={isPublishing} className="sec-btn primary">
+            <SendIcon className="w-3.5 h-3.5" /> Publish Note
+          </button>
+        )}
       </div>
     </div>
   );
@@ -75,24 +85,24 @@ function VitalMiniCell({
   status: 'normal' | 'warn' | 'critical' | 'unknown';
 }) {
   const valueColorClass =
-    status === 'critical' ? 'text-[var(--red)] font-semibold' :
-    status === 'warn' ? 'text-[var(--amber)] font-semibold' :
-    'text-[var(--text-primary)] font-bold';
+    status === 'critical' ? 'text-red font-semibold' :
+    status === 'warn' ? 'text-amber font-semibold' :
+    'text-text-primary font-bold';
 
   const dotColor =
-    status === 'critical' ? 'bg-[var(--red)]' :
-    status === 'warn' ? 'bg-[var(--amber)]' :
+    status === 'critical' ? 'bg-red' :
+    status === 'warn' ? 'bg-amber' :
     null;
 
   return (
     <div className="border border-border rounded-card px-2.5 py-2 flex flex-col bg-surface-2">
-      <span className="text-[9.5px] font-bold uppercase tracking-[0.6px] mb-1 text-[var(--text-muted)]">
+      <span className="text-[9.5px] font-bold uppercase tracking-[0.6px] mb-1 text-text-muted">
         {label}
       </span>
       <div className="flex items-center justify-between gap-1">
         <span className={cn("font-mono text-[15px] leading-none", valueColorClass)}>
           {value}
-          {value !== '—' && <span className="text-[10px] text-[var(--text-muted)] ml-[2.5px] font-normal">{unit}</span>}
+          {value !== '—' && <span className="text-[10px] text-text-muted ml-[2.5px] font-normal">{unit}</span>}
         </span>
         {dotColor && (
           <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse", dotColor)} />
@@ -148,7 +158,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const isFemale = patient?.sex?.toLowerCase() === 'female';
 
   const form = useForm<InitialNoteDraftValues>({
-    resolver: zodResolver(initialNoteDraftSchema),
+    resolver: zodResolver(initialNotePublishSchema) as any,
+    mode: 'onChange',
     defaultValues: {
       chiefComplaint: '',
       hpi: '',
@@ -212,8 +223,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const handlePublish = async () => {
     setPublishError(null);
-    const publishCheck = initialNotePublishSchema.safeParse(formValues);
-    if (!publishCheck.success) {
+    const isValid = await form.trigger();
+    if (!isValid) {
       setPublishError("Please fill out all required fields: Chief Complaint, HPI, Physical Exam, and at least one Assessment.");
       return;
     }
@@ -245,7 +256,16 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   };
 
   if (isLoading) {
-    return <div className="p-6 animate-pulse text-[var(--text-muted)]">Loading note...</div>;
+    return (
+      <div className="flex flex-col gap-6 w-full animate-pulse pb-10">
+        <div className="h-[90px] bg-surface border border-border rounded-card shadow-card" />
+        <div className="h-[180px] bg-surface border border-border rounded-card shadow-card" />
+        <div className="h-[140px] bg-surface border border-border rounded-card shadow-card" />
+        <div className="h-[180px] bg-surface border border-border rounded-card shadow-card" />
+        <div className="h-[130px] bg-surface border border-border rounded-card shadow-card" />
+        <div className="h-[160px] bg-surface border border-border rounded-card shadow-card" />
+      </div>
+    );
   }
 
   const isSaving = updateMutation.isPending || createMutation.isPending;
@@ -281,7 +301,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     : '';
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-32">
       {note?.status === 'PUBLISHED' ? (
         // ==================== READ-ONLY PUBLISHED VIEW ====================
         <div className="flex flex-col gap-6 w-full">
@@ -553,309 +573,399 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
           <NoteActionBar 
             isSaving={isSaving}
-            isPublishing={publishMutation.isPending}
             onSaveDraft={() => handleSave(formValues)}
-            onPublish={handlePublish}
             onClear={() => form.reset()}
+            showPublish={false}
           />
 
-          <form className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 w-full items-start" onSubmit={(e) => e.preventDefault()}>
-            {/* LEFT COLUMN: Subjective, History, Objective, Assessment */}
-            <div className="flex flex-col gap-6">
-              {/* Subjective Card */}
-              <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
-                    Subjective Entry
-                  </span>
+          <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
+            {/* Latest Vitals Snapshot Strip */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <Heart className="w-3.5 h-3.5 text-accent" />
                 </div>
-                <div className="p-4 flex flex-col gap-4">
-                  {/* Chief Complaint */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      Chief Complaint <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
-                    </label>
-                    <input
-                      {...form.register('chiefComplaint')}
-                      className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
-                      placeholder="e.g. Persistent headaches and dizziness for 2 weeks"
-                    />
-                  </div>
-
-                  {/* HPI */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      History of Present Illness (HPI) <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
-                    </label>
-                    <textarea
-                      {...form.register('hpi')}
-                      className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[100px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                      placeholder="Describe HPI in detail..."
-                    />
-                  </div>
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
+                  Latest Vital Signs
+                </span>
+                <span className="font-mono text-[10px] text-text-muted mr-2">
+                  {measuredAt ? `Recorded ${measuredAt} · by ${measuredBy}` : 'No vitals recorded'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/${patientId}/vitals`)}
+                  className="h-[26px] px-3 rounded-btn text-[10px] font-semibold bg-accent text-white border border-accent-hover hover:bg-accent-hover transition-all cursor-pointer"
+                >
+                  Update ↗
+                </button>
               </div>
-
-              {/* History Card (Combined) */}
-              <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0">
-                    <History className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
-                    History
-                  </span>
+              {/* Vitals grid — horizontal, compact */}
+              <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50">
+                <VitalMiniCell 
+                  label="BP" 
+                  value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'} 
+                  unit="mmHg" 
+                  status={bpStatus} 
+                />
+                <VitalMiniCell 
+                  label="HR" 
+                  value={latestVitals?.heartRate ?? '—'} 
+                  unit="bpm" 
+                  status={hrStatus} 
+                />
+                <VitalMiniCell 
+                  label="Temp" 
+                  value={latestVitals?.temperature ? formatTemperature(Number(latestVitals.temperature)) : '—'} 
+                  unit="°C" 
+                  status={tempStatus} 
+                />
+                <VitalMiniCell 
+                  label="SpO2" 
+                  value={latestVitals?.oxygenSaturation ?? '—'} 
+                  unit="%" 
+                  status={o2Status} 
+                />
+                <VitalMiniCell 
+                  label="RR" 
+                  value={latestVitals?.respiratoryRate ?? '—'} 
+                  unit="/min" 
+                  status={rrStatus} 
+                />
+              </div>
+              {!latestVitals && (
+                <div className="px-4 pb-3 text-[11px] text-amber font-medium text-center">
+                  ⚠ No vitals on record. Record vitals before publishing this note.
                 </div>
-                <div className="divide-y divide-border">
-                  <CollapsibleSection title="Past Medical History (PMH)" variant="row" defaultOpen>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Comorbidities</label>
-                        <input
-                          {...form.register('pmhComorbidities')}
-                          className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
-                          placeholder="e.g. Diabetes Mellitus (2018), Asthma"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Previous Surgeries</label>
-                        <input
-                          {...form.register('pmhSurgeries')}
-                          className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
-                          placeholder="e.g. Appendectomy (2015)"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Previous Hospitalizations</label>
-                        <input
-                          {...form.register('pmhHospitalizations')}
-                          className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
-                          placeholder="e.g. Dengue (2022)"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Allergies</label>
-                        <input
-                          {...form.register('allergies')}
-                          className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
-                          placeholder="e.g. Penicillin (rash), Sulfa"
-                        />
-                      </div>
-                    </div>
-                  </CollapsibleSection>
+              )}
+            </div>
 
-                  <CollapsibleSection title="Family Medical History" variant="row">
-                    <div className="flex flex-col gap-1.5">
-                      <textarea
-                        {...form.register('familyHistory')}
-                        className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                        placeholder="e.g. Father: Hypertension, CVA. Mother: DM."
-                      />
-                    </div>
-                  </CollapsibleSection>
-
-                  <CollapsibleSection title="Personal & Social History" variant="row">
-                    <div className="flex flex-col gap-1.5">
-                      <textarea
-                        {...form.register('socialHistory')}
-                        className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                        placeholder="e.g. Non-smoker, occasional alcohol. Sedentary lifestyle."
-                      />
-                    </div>
-                  </CollapsibleSection>
-
-                  {isFemale && (
-                    <CollapsibleSection title="OB / Menstrual History" variant="row">
-                      <div className="flex flex-col gap-1.5">
-                        <textarea
-                          {...form.register('obHistory')}
-                          className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                          placeholder="e.g. G0P0. Regular menses. LMP: May 12, 2026."
-                        />
-                      </div>
-                    </CollapsibleSection>
+            {/* 1. Subjective Card */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden">
+              {/* Card Header */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-blue-bg/40 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <MessageSquare className="w-3.5 h-3.5 text-blue" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
+                  Subjective
+                </span>
+                <span className="text-[10px] text-blue/70 font-medium">Patient's reported complaints and history</span>
+              </div>
+              {/* Card Body */}
+              <div className="p-4 flex flex-col gap-4 bg-surface">
+                {/* Chief Complaint field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    Chief Complaint {!formValues.chiefComplaint && <span className="text-red font-bold ml-[2px] align-top">*</span>}
+                  </label>
+                  <input
+                    {...form.register('chiefComplaint')}
+                    className={cn(
+                      "h-[36px] w-full px-3 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      form.formState.errors.chiefComplaint
+                        ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
+                        : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
+                    )}
+                    placeholder="e.g. Persistent headaches and dizziness for 2 weeks"
+                    maxLength={50}
+                  />
+                  {form.formState.errors.chiefComplaint ? (
+                    <p className="text-[10px] text-red font-medium">{form.formState.errors.chiefComplaint.message}</p>
+                  ) : (
+                    <p className="text-[10px] text-text-muted">Max 50 characters. Required to publish.</p>
                   )}
+                </div>
 
-                  <CollapsibleSection title="Psychosocial History" variant="row">
+                {/* HPI field */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    History of Present Illness (HPI) {!formValues.hpi && <span className="text-red font-bold ml-[2px] align-top">*</span>}
+                  </label>
+                  <textarea
+                    {...form.register('hpi')}
+                    className={cn(
+                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      form.formState.errors.hpi
+                        ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
+                        : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
+                    )}
+                    placeholder="Describe onset, character, duration, associated symptoms, relieving/aggravating factors…"
+                  />
+                  {form.formState.errors.hpi && (
+                    <p className="text-[10px] text-red font-medium">{form.formState.errors.hpi.message}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. History Card */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-amber rounded-card shadow-card overflow-hidden">
+              {/* Card Header */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <History className="w-3.5 h-3.5 text-amber" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-amber flex-1">
+                  History
+                </span>
+                <span className="text-[10px] text-amber/70 font-medium">Medical, family, personal, and social background</span>
+              </div>
+              {/* Card Body */}
+              <div className="divide-y divide-border bg-surface">
+                <CollapsibleSection 
+                  title="Past Medical History (PMH)" 
+                  variant="row" 
+                  defaultOpen
+                  theme="amber"
+                  icon={<ClipboardList className="w-3.5 h-3.5" />}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
+                        Comorbidities
+                      </label>
+                      <input
+                        {...form.register('pmhComorbidities')}
+                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        placeholder="e.g. Diabetes Mellitus (2018), Asthma"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
+                        Previous Surgeries
+                      </label>
+                      <input
+                        {...form.register('pmhSurgeries')}
+                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        placeholder="e.g. Appendectomy (2015)"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
+                        Previous Hospitalizations
+                      </label>
+                      <input
+                        {...form.register('pmhHospitalizations')}
+                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        placeholder="e.g. Dengue (2022)"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
+                        Allergies
+                      </label>
+                      <input
+                        {...form.register('allergies')}
+                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        placeholder="e.g. Penicillin (rash), Sulfa"
+                      />
+                    </div>
+                  </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection 
+                  title="Family Medical History" 
+                  variant="row"
+                  theme="amber"
+                  icon={<Users className="w-3.5 h-3.5" />}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <textarea
+                      {...form.register('familyHistory')}
+                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      placeholder="e.g. Father: Hypertension, CVA. Mother: DM."
+                    />
+                  </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection 
+                  title="Personal & Social History" 
+                  variant="row"
+                  theme="amber"
+                  icon={<User className="w-3.5 h-3.5" />}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <textarea
+                      {...form.register('socialHistory')}
+                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      placeholder="e.g. Non-smoker, occasional alcohol. Sedentary lifestyle."
+                    />
+                  </div>
+                </CollapsibleSection>
+
+                {isFemale && (
+                  <CollapsibleSection 
+                    title="OB / Menstrual History" 
+                    variant="row"
+                    theme="amber"
+                    icon={<Calendar className="w-3.5 h-3.5" />}
+                  >
                     <div className="flex flex-col gap-1.5">
                       <textarea
-                        {...form.register('psychosocialHistory')}
-                        className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                        placeholder="e.g. Works as accountant, high stress lately. Good family support system."
+                        {...form.register('obHistory')}
+                        className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                        placeholder="e.g. G0P0. Regular menses. LMP: May 12, 2026."
                       />
                     </div>
                   </CollapsibleSection>
-                </div>
-              </div>
+                )}
 
-              {/* Objective Card */}
-              <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0">
-                    <Microscope className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
-                    Objective Entry
-                  </span>
-                </div>
-                <div className="p-4 flex flex-col gap-4">
-                  {/* Physical Examination */}
+                <CollapsibleSection 
+                  title="Psychosocial History" 
+                  variant="row"
+                  theme="amber"
+                  icon={<Brain className="w-3.5 h-3.5" />}
+                >
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      Physical Examination <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
-                    </label>
                     <textarea
-                      {...form.register('physicalExam')}
-                      className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[90px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                      placeholder="Describe physical exam findings... e.g. General: Conscious, coherent, not in acute distress..."
+                      {...form.register('psychosocialHistory')}
+                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      placeholder="e.g. Works as accountant, high stress lately. Good family support system."
                     />
                   </div>
-
-                  {/* Labs & Imaging Results */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      Labs and Imaging Results
-                    </label>
-                    <Controller
-                      control={form.control}
-                      name="diagnostics"
-                      render={({ field }) => (
-                        <TagInputField
-                          value={field.value || []}
-                          onChange={field.onChange}
-                          placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
-                          isObjectFormat={false}
-                        />
-                      )}
-                    />
-                    <div className="mt-2">
-                      <AttachmentUploader />
-                    </div>
-                  </div>
-                </div>
+                </CollapsibleSection>
               </div>
+            </div>
 
-              {/* Assessment (Active Problems) Card */}
-              <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0">
-                    <ClipboardList className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
-                    Assessment (Active Problems)
-                  </span>
+            {/* 3. Objective Card */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden">
+              {/* Card Header */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-purple-bg/40 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <Microscope className="w-3.5 h-3.5 text-purple" />
                 </div>
-                <div className="p-4 flex flex-col gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[10px] text-[var(--text-muted)]">Add the active problems for this patient.</p>
-                    <Controller
-                      control={form.control}
-                      name="assessment"
-                      render={({ field }) => (
-                        <TagInputField
-                          value={field.value || []}
-                          onChange={field.onChange}
-                          placeholder="Type problem name and press Enter"
-                          isObjectFormat={true}
-                        />
-                      )}
-                    />
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
+                  Objective
+                </span>
+                <span className="text-[10px] text-purple/70 font-medium">Physical exam and diagnostic results</span>
+              </div>
+              <div className="p-4 flex flex-col gap-4 bg-surface">
+                {/* Physical Examination textarea */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    Physical Examination {!formValues.physicalExam && <span className="text-red font-bold ml-[2px] align-top">*</span>}
+                  </label>
+                  <textarea
+                    {...form.register('physicalExam')}
+                    className={cn(
+                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      form.formState.errors.physicalExam
+                        ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
+                        : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
+                    )}
+                    placeholder="General: Conscious, coherent, not in acute distress…&#10;HEENT: Anicteric sclerae, pink conjunctivae…&#10;Lungs: Clear to auscultation bilaterally…"
+                  />
+                  {form.formState.errors.physicalExam && (
+                    <p className="text-[10px] text-red font-medium">{form.formState.errors.physicalExam.message}</p>
+                  )}
+                </div>
+
+                {/* Labs and Imaging */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    Labs and Imaging Results
+                  </label>
+                  <Controller
+                    control={form.control}
+                    name="diagnostics"
+                    render={({ field }) => (
+                      <TagInputField
+                        value={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
+                        isObjectFormat={false}
+                      />
+                    )}
+                  />
+                  <div className="mt-2">
+                    <AttachmentUploader />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Vitals, Management Plan */}
-            <div className="flex flex-col gap-4">
-              {/* Latest Vitals Snapshot Card */}
-              <div className="bg-surface border border-accent-mid/30 rounded-card shadow-card overflow-hidden border-l-[3px] border-l-accent-mid">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light border-b border-accent-mid">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface flex items-center justify-center flex-shrink-0">
-                    <Heart className="w-3.5 h-3.5 text-accent" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">Latest Vitals</span>
-                  <button 
-                    type="button" 
-                    onClick={() => router.push(`/dashboard/${patientId}/vitals`)} 
-                    className="sec-btn primary !h-6 !text-[10px] !px-2.5"
-                  >
-                    Update ↗
-                  </button>
+            {/* 4. Assessment Card */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="w-3.5 h-3.5 text-accent-hover" />
                 </div>
-                <div className="p-3 grid grid-cols-2 gap-2">
-                  <VitalMiniCell 
-                    label="BP" 
-                    value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'} 
-                    unit="mmHg" 
-                    status={bpStatus} 
-                  />
-                  <VitalMiniCell 
-                    label="HR" 
-                    value={latestVitals?.heartRate ?? '—'} 
-                    unit="bpm" 
-                    status={hrStatus} 
-                  />
-                  <VitalMiniCell 
-                    label="Temp" 
-                    value={latestVitals?.temperature ? formatTemperature(latestVitals.temperature) : '—'} 
-                    unit="°C" 
-                    status={tempStatus} 
-                  />
-                  <VitalMiniCell 
-                    label="SpO2" 
-                    value={latestVitals?.oxygenSaturation ?? '—'} 
-                    unit="%" 
-                    status={o2Status} 
-                  />
-                  <div className="col-span-2 font-mono text-[10px] text-[var(--text-muted)] pt-1 border-t border-border mt-1 text-center">
-                    {measuredAt ? `${measuredAt} · by ${measuredBy}` : 'No vitals recorded'}
-                  </div>
-                </div>
-                {!latestVitals && (
-                  <div className="px-3 pb-3 text-[11px] text-[var(--text-secondary)] bg-surface-2 mx-3 mb-3 rounded-btn p-1.5 text-center">
-                    No vitals recorded. Please update vitals first.
-                  </div>
-                )}
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
+                  Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
+                </span>
+                <span className="text-[10px] text-accent-hover/70 font-medium">Required to publish</span>
               </div>
+              <div className="p-4 flex flex-col gap-3 bg-surface">
+                <p className="text-[11px] text-text-secondary leading-relaxed">
+                  Add the active problems or diagnoses for this visit. Press <kbd className="px-1 py-0.5 bg-surface-2 border border-border rounded text-[10px] font-mono">Enter</kbd> after each entry.
+                </p>
+                <Controller
+                  control={form.control}
+                  name="assessment"
+                  render={({ field }) => (
+                    <div className="flex flex-col gap-1.5">
+                      <TagInputField
+                        value={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Type problem name and press Enter"
+                        isObjectFormat={true}
+                      />
+                      {form.formState.errors.assessment && (
+                        <p className="text-[10px] text-red font-medium">
+                          {form.formState.errors.assessment.message || "At least one assessment is required"}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                />
+              </div>
+            </div>
 
-              {/* Management Plan Card */}
-              <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                  <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0">
-                    <Stethoscope className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
-                    Management Plan
-                  </span>
+            {/* 5. Management Plan Card */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+                  <Stethoscope className="w-3.5 h-3.5 text-green" />
                 </div>
-                <div className="p-4 flex flex-col gap-4">
-                  {/* Non-Pharmacologic Management */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      Non-Pharmacologic Management
-                    </label>
-                    <textarea
-                      {...form.register('mgmtNonpharm')}
-                      className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[60px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-accent-focus"
-                      placeholder="e.g. Low-sodium DASH diet. Daily BP monitoring."
-                    />
-                  </div>
-
-                  {/* Prescribed Medications */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
-                      Prescribed Medications
-                    </label>
-                    <p className="text-[10px] text-[var(--text-muted)]">Add medications prescribed during this initial consultation.</p>
-                    <MedicationListEditor patientId={patientId} />
-                  </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
+                  Plan / Management
+                </span>
+                <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
+              </div>
+              <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-surface">
+                {/* Left: Non-Pharmacologic */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    Non-Pharmacologic Management
+                  </label>
+                  <textarea
+                    {...form.register('mgmtNonpharm')}
+                    className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5]"
+                    placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
+                  />
+                </div>
+                {/* Right: Prescribed Medications */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                    Prescribed Medications
+                  </label>
+                  <p className="text-[11px] text-text-muted -mt-0.5">
+                    Medications added here are saved to the patient's cumulative medication list.
+                  </p>
+                  <MedicationListEditor patientId={patientId} />
                 </div>
               </div>
             </div>
           </form>
+
+          <div className="mt-2">
+            <NoteActionBar 
+              isSaving={isSaving}
+              isPublishing={publishMutation.isPending}
+              onPublish={handlePublish}
+              showSaveAndClear={false}
+            />
+          </div>
         </>
       )}
     </div>

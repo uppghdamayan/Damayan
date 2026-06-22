@@ -269,6 +269,41 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-text-muted;
   }
+
+  /* Ensures input/textarea bg-white is respected inside surface-2 wrappers */
+  .field-input {
+    background-color: #FFFFFF;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-btn);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field-input:focus {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-accent-focus);
+    background-color: #FFFFFF;
+  }
+  .field-input::placeholder {
+    color: var(--border-strong);
+  }
+
+  /* Collapsible Section height transitions */
+  .collapsible-content-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-in-out;
+    opacity: 0;
+  }
+  .collapsible-content-wrapper.is-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .collapsible-content-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
 }
 
 @keyframes startup-progress {

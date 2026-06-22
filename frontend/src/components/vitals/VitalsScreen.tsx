@@ -103,7 +103,24 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
       />
 
       {isLoading ? (
-        <div className="animate-pulse bg-surface border border-border rounded-lg h-64"></div>
+        <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden animate-pulse">
+          <div className="px-4 py-3 border-b border-border bg-surface-2 flex items-center gap-4">
+             <div className="w-1/4 h-4 bg-border/50 rounded" />
+             <div className="w-1/4 h-4 bg-border/50 rounded" />
+             <div className="w-1/4 h-4 bg-border/50 rounded" />
+             <div className="w-1/4 h-4 bg-border/50 rounded" />
+          </div>
+          <div className="flex flex-col divide-y divide-border bg-surface">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="px-4 py-4 flex items-center gap-4">
+                <div className="w-1/4 h-4 bg-border/30 rounded" />
+                <div className="w-1/4 h-4 bg-border/30 rounded" />
+                <div className="w-1/4 h-4 bg-border/30 rounded" />
+                <div className="w-1/4 h-4 bg-border/30 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <VitalsHistoryTable
           vitals={vitals}
