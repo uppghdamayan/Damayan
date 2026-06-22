@@ -6,17 +6,29 @@ interface CollapsibleSectionProps {
   title: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  variant?: 'default' | 'row';
 }
 
-export function CollapsibleSection({ title, children, defaultOpen = false }: CollapsibleSectionProps) {
+export function CollapsibleSection({ 
+  title, 
+  children, 
+  defaultOpen = false, 
+  variant = 'default' 
+}: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const isRow = variant === 'row';
 
   return (
-    <div className="border border-border rounded-card overflow-hidden bg-surface mb-4">
+    <div className={cn(
+      isRow ? "" : "border border-border rounded-card overflow-hidden bg-surface mb-4"
+    )}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-surface-2 hover:bg-surface-3 transition-colors border-b border-border"
+        className={cn(
+          "w-full flex items-center justify-between px-3.5 py-2.5 transition-colors",
+          isRow ? "hover:bg-surface-2" : "bg-surface-2 hover:bg-surface-3 border-b border-border"
+        )}
       >
         <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">
           {title}
@@ -28,7 +40,7 @@ export function CollapsibleSection({ title, children, defaultOpen = false }: Col
         )}
       </button>
       {isOpen && (
-        <div className="p-3">
+        <div className="p-3.5 pt-0">
           {children}
         </div>
       )}

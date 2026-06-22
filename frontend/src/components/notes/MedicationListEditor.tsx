@@ -62,32 +62,32 @@ export function MedicationListEditor({ patientId }: MedicationListEditorProps) {
         </div>
       )}
 
-      <div className="flex items-end gap-2 p-3 bg-surface-2 border border-border rounded-card mt-2">
-        <div className="flex-1 flex flex-col gap-1">
+      <div className="grid grid-cols-12 gap-2.5 p-3 bg-surface-2 border border-border rounded-card mt-2">
+        <div className="col-span-12 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Medication Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent"
+            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
             placeholder="e.g. Lisinopril"
           />
         </div>
-        <div className="w-[80px] flex flex-col gap-1">
+        <div className="col-span-6 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Dose</label>
           <input
             type="number"
             value={dose}
             onChange={(e) => setDose(e.target.value)}
-            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent"
+            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
             placeholder="e.g. 10"
           />
         </div>
-        <div className="w-[70px] flex flex-col gap-1">
+        <div className="col-span-6 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Unit</label>
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value as MedUnitValue)}
-            className="h-[28px] px-1 text-[12px] rounded border border-border outline-none focus:border-accent"
+            className="h-[28px] px-1 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
           >
             <option value="MG">MG</option>
             <option value="G">G</option>
@@ -96,23 +96,25 @@ export function MedicationListEditor({ patientId }: MedicationListEditorProps) {
             <option value="UNITS">UNITS</option>
           </select>
         </div>
-        <div className="flex-[1.5] flex flex-col gap-1">
+        <div className="col-span-12 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Sig / Instructions</label>
           <input
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent"
+            className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
             placeholder="e.g. Take 1 tab daily"
           />
         </div>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={!name || !dose || createMutation.isPending}
-          className="h-[28px] px-3 bg-accent text-white rounded font-medium text-[11px] disabled:opacity-50 inline-flex items-center gap-1"
-        >
-          <PlusIcon className="w-3 h-3" /> Add
-        </button>
+        <div className="col-span-12 flex justify-end">
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!name || !dose || createMutation.isPending}
+            className="h-[28px] px-3.5 bg-accent hover:bg-accent-hover text-white rounded font-medium text-[11px] disabled:opacity-50 inline-flex items-center gap-1 shadow-btn-primary"
+          >
+            <PlusIcon className="w-3.5 h-3.5" /> Add Medication
+          </button>
+        </div>
       </div>
     </div>
   );
