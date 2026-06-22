@@ -4,9 +4,10 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useUiStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { Pen, Edit } from 'lucide-react';
+import { ProgressNoteForm } from '@/components/notes/ProgressNoteForm';
 
 export function DocumentationPanel() {
-  const { documentationPanelOpen } = useUiStore();
+  const { documentationPanelOpen, activeNoteEditor, closeNoteEditor } = useUiStore();
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -64,46 +65,43 @@ export function DocumentationPanel() {
         )}
       />
 
-      {/* Inner content wrapper with static width to prevent reflow */}
-      <div className="w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)] flex flex-col h-full overflow-hidden">
-        {/* Panel header (Section 7.5) */}
-        <div className="flex items-center gap-2 px-4 py-3 bg-accent-light border-b border-accent-mid flex-shrink-0">
-          <Pen className="w-3.5 h-3.5 text-accent-hover" strokeWidth={2.5} />
-          <span className="font-bold text-accent-hover flex-1 text-[13px]">
-            Progress Note
-          </span>
-
-          {/* Autosave indicator */}
-          <span className="text-[9px] font-bold uppercase tracking-[0.5px] bg-green-bg text-green border border-green-border px-1.5 py-[2px] rounded-[4px]">
-            Saved
-          </span>
-
-          {/* Status badge */}
-          <span className="text-[9px] font-bold uppercase tracking-[0.5px] bg-amber-bg text-amber border border-amber-border px-1.5 py-[2px] rounded-[4px]">
-            Draft
-          </span>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-hidden bg-surface-2 flex flex-col relative">
-          <div className="absolute inset-0 overflow-y-auto">
-            {/* Real implementation would read active patient and selected note from a store. 
-                For now, if this is used globally, it needs context. 
-                We'll render a placeholder if no context, or the form if we can hook it up. */}
-            <div className="flex flex-col items-center justify-center h-full gap-3 py-10">
-              <div className="w-10 h-10 bg-accent-light rounded-lg flex items-center justify-center text-lg text-accent">
-                📝
+        {/* Inner content wrapper with static width to prevent reflow */}
+        <div className="w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)] flex flex-col h-full overflow-hidden">
+          {activeNoteEditor.mode === null ? (
+            <>
+              {/* Panel header (Section 7.5) */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-accent-light border-b border-accent-mid flex-shrink-0">
+                <Pen className="w-3.5 h-3.5 text-accent-hover" strokeWidth={2.5} />
+                <span className="font-bold text-accent-hover flex-1 text-[13px]">
+                  Progress Note
+                </span>
               </div>
-              <p className="text-[13px] font-semibold text-[var(--text-primary)] m-0">
-                Progress Note Workspace
-              </p>
-              <p className="text-xs text-[var(--text-muted)] text-center max-w-[280px] m-0 leading-relaxed">
-                Form is rendered in the Notes tab. (Global panel integration pending context provider)
-              </p>
-            </div>
-          </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-hidden bg-surface-2 flex flex-col relative">
+                <div className="absolute inset-0 overflow-y-auto">
+                  <div className="flex flex-col items-center justify-center h-full gap-3 py-10">
+                    <div className="w-10 h-10 bg-accent-light rounded-lg flex items-center justify-center text-lg text-accent">
+                      📝
+                    </div>
+                    <p className="text-[13px] font-semibold text-[var(--text-primary)] m-0">
+                      Progress Note Workspace
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] text-center max-w-[280px] m-0 leading-relaxed">
+                      Select a note from the timeline, or start a new note, to begin documenting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <ProgressNoteForm 
+              patientId={activeNoteEditor.patientId!} 
+              noteId={activeNoteEditor.noteId ?? undefined} 
+              onClose={() => closeNoteEditor()} 
+            />
+          )}
         </div>
-      </div>
     </aside>
   );
 }

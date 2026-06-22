@@ -6,6 +6,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { usePatientStore } from '@/stores/patientStore';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { initials } from '@/lib/patient-utils';
+import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { PanelRightOpen, PanelRightClose, Menu, PlusCircle } from 'lucide-react';
 
 export function Topbar() {
@@ -13,6 +14,7 @@ export function Topbar() {
   const { toggleSidebar, sidebarCollapsed, documentationPanelOpen, setDocumentationPanelOpen } = useUiStore();
   const { activePatient } = usePatientStore();
   const router = useRouter();
+  const { triggerNewNote } = useNewProgressNoteAction(activePatient?.id || null);
 
   const handleSignOut = async () => {
     const supabase = createSupabaseClient();
@@ -69,11 +71,7 @@ export function Topbar() {
       <div className="flex items-center gap-2 shrink-0">
         {/* + New Note button */}
         <button
-          onClick={() => {
-            if (activePatient) {
-              router.push(`/dashboard/${activePatient.id}/notes`);
-            }
-          }}
+          onClick={() => triggerNewNote()}
           disabled={!activePatient}
           className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50"
         >

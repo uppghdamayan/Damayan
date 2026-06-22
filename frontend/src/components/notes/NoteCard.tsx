@@ -6,14 +6,15 @@ import { cn } from '@/lib/utils';
 interface NoteCardProps {
   note: any;
   onClickEdit: () => void;
+  isActive?: boolean;
 }
 
-export function NoteCard({ note, onClickEdit }: NoteCardProps) {
+export function NoteCard({ note, onClickEdit, isActive }: NoteCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isInitial = note.visit?.visitType === 'INITIAL' || note.chiefComplaint !== undefined;
 
   return (
-    <div className="bg-surface border border-border rounded-card overflow-hidden shadow-sm hover:shadow-card transition-shadow">
+    <div className={cn("bg-surface border rounded-card overflow-hidden shadow-sm hover:shadow-card transition-shadow", isActive ? "border-accent ring-1 ring-accent" : "border-border")}>
       <div 
         className="flex flex-col p-4 cursor-pointer"
         onClick={() => setExpanded(!expanded)}

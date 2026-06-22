@@ -11,6 +11,12 @@ type ActiveScreen =
   | 'documents'
   | 'logs';
 
+interface ActiveNoteEditorState {
+  patientId: string | null;
+  noteId: string | null;       // null = new note, set = editing existing draft
+  mode: 'new' | 'edit' | null; // null = panel idle / nothing being edited
+}
+
 interface UiState {
   sidebarCollapsed: boolean;
   documentationPanelOpen: boolean;
@@ -19,6 +25,10 @@ interface UiState {
   toggleSidebar: () => void;
   setDocumentationPanelOpen: (v: boolean) => void;
   setActiveScreen: (s: ActiveScreen) => void;
+  activeNoteEditor: ActiveNoteEditorState;
+  openNewProgressNote: (patientId: string) => void;
+  openExistingProgressNote: (patientId: string, noteId: string) => void;
+  closeNoteEditor: () => void;
 }
 
 // Viewport-aware default: collapse on screens < 1440px
@@ -33,10 +43,22 @@ export const useUiStore = create<UiState>()(
       sidebarCollapsed: getDefaultSidebarCollapsed(),
       documentationPanelOpen: false,
       activeScreen: 'dashboard',
+      activeNoteEditor: { patientId: null, noteId: null, mode: null },
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setDocumentationPanelOpen: (v) => set({ documentationPanelOpen: v }),
       setActiveScreen: (s) => set({ activeScreen: s }),
+      openNewProgressNote: (patientId) => set({
+        activeNoteEditor: { patientId, noteId: null, mode: 'new' },
+        documentationPanelOpen: true,
+      }),
+      openExistingProgressNote: (patientId, noteId) => set({
+        activeNoteEditor: { patientId, noteId, mode: 'edit' },
+        documentationPanelOpen: true,
+      }),
+      closeNoteEditor: () => set({
+        activeNoteEditor: { patientId: null, noteId: null, mode: null },
+      }),
     }),
     {
       name: 'damayan-ui-sidebar',

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
 import { useMedications } from './useMedications';
@@ -41,11 +42,14 @@ export function useCopyForwardData(patientId: string | null) {
   const { data: problemsData, isLoading: problemsLoading } = useProblems(patientId);
   const { data: medicationsData, isLoading: medicationsLoading } = useMedications(patientId);
 
-  const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
-  const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
+  const data = useMemo(() => {
+    const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
+    const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
+    return { activeProblems, activeMedications };
+  }, [problemsData, medicationsData]);
 
   return {
-    data: { activeProblems, activeMedications },
+    data,
     isLoading: problemsLoading || medicationsLoading,
   };
 }

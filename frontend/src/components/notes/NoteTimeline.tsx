@@ -1,19 +1,22 @@
 import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { NoteCard } from './NoteCard';
 import { useRouter } from 'next/navigation';
+import { useUiStore } from '@/stores/uiStore';
 
 interface NoteTimelineProps {
   patientId: string;
-  onSelectNote: (id: string) => void;
 }
 
-export function NoteTimeline({ patientId, onSelectNote }: NoteTimelineProps) {
+export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const router = useRouter();
   const { data: initialNote, isLoading: initialLoading } = useInitialNote(patientId);
   const { data: progressNotesResponse, isLoading: progressLoading } = useProgressNotes(patientId);
+  const { openExistingProgressNote, activeNoteEditor } = useUiStore();
+  const { triggerNewNote, isLoading: actionLoading } = useNewProgressNoteAction(patientId);
 
-  if (initialLoading || progressLoading) {
+  if (initialLoading || progressLoading || actionLoading) {
     return <div className="animate-pulse flex flex-col gap-4 p-4">
       <div className="h-24 bg-surface-2 rounded-card" />
       <div className="h-24 bg-surface-2 rounded-card" />
@@ -31,15 +34,11 @@ export function NoteTimeline({ patientId, onSelectNote }: NoteTimelineProps) {
   allNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleNewNote = () => {
-    if (initialNote && initialNote.status === 'PUBLISHED') {
-      onSelectNote('new');
-    } else {
-      router.push(`/dashboard/${patientId}/initial-note`);
-    }
+    triggerNewNote();
   };
 
   return (
-    <div className="flex flex-col gap-4 w-[var(--timeline-w)] flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
+    <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Timeline</h2>
         <button 
@@ -64,11 +63,12 @@ export function NoteTimeline({ patientId, onSelectNote }: NoteTimelineProps) {
               <div className="absolute left-1.5 top-5 w-3.5 h-3.5 rounded-full bg-surface border-2 border-accent" />
               <NoteCard 
                 note={note} 
+                isActive={activeNoteEditor.patientId === patientId && activeNoteEditor.noteId === note.id}
                 onClickEdit={() => {
                   if (note.visitId && (!note.visit || note.visit.visitType === 'INITIAL') && 'chiefComplaint' in note) {
                     router.push(`/dashboard/${patientId}/initial-note`);
                   } else {
-                    onSelectNote(note.id);
+                    openExistingProgressNote(patientId, note.id);
                   }
                 }} 
               />
