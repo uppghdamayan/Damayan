@@ -12,6 +12,8 @@ interface DeleteConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   isDeleting?: boolean;
+  intent?: 'destructive' | 'primary';
+  loadingLabel?: string;
 }
 
 export function DeleteConfirmModal({
@@ -23,6 +25,8 @@ export function DeleteConfirmModal({
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   isDeleting = false,
+  intent = 'destructive',
+  loadingLabel = 'Deleting...',
 }: DeleteConfirmModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,17 +81,17 @@ export function DeleteConfirmModal({
             disabled={isDeleting}
             className={`h-[28px] px-3 rounded-btn text-[11px] font-semibold border transition-all duration-150 flex items-center justify-center gap-1.5 ${
               isDeleting
-                ? 'bg-red-bg/50 text-red/50 border-red-border/30 cursor-not-allowed'
-                : 'bg-red-bg text-red border border-red-border hover:bg-red/15 hover:border-red/80 cursor-pointer shadow-sm'
+                ? (intent === 'destructive' ? 'bg-red-bg/50 text-red/50 border-red-border/30 cursor-not-allowed' : 'bg-accent/50 text-white/50 border-accent/30 cursor-not-allowed')
+                : (intent === 'destructive' ? 'bg-red-bg text-red border border-red-border hover:bg-red/15 hover:border-red/80 cursor-pointer shadow-sm' : 'bg-accent text-white border border-accent hover:bg-accent-hover cursor-pointer shadow-sm')
             }`}
           >
             {isDeleting ? (
               <>
-                <svg className="animate-spin h-3.5 w-3.5 text-red/60 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className={`animate-spin h-3.5 w-3.5 mr-1 ${intent === 'destructive' ? 'text-red/60' : 'text-white/60'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Deleting...
+                {loadingLabel}
               </>
             ) : (
               confirmLabel

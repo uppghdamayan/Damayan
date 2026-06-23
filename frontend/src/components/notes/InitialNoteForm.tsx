@@ -22,7 +22,7 @@ import { TagInputField } from './TagInputField';
 import { MedicationListEditor } from './MedicationListEditor';
 import { AttachmentUploader } from './AttachmentUploader';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
@@ -67,12 +67,14 @@ function NoteActionBar({
         )}
         {showSaveAndClear && onSaveDraft && (
           <button type="button" onClick={onSaveDraft} disabled={isSaving} className="sec-btn">
-            <SaveIcon className="w-3.5 h-3.5" /> Save Draft
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SaveIcon className="w-3.5 h-3.5" />}
+            {isSaving ? 'Saving...' : 'Save Draft'}
           </button>
         )}
         {showPublish && onPublish && (
-          <button type="button" onClick={onPublish} disabled={isPublishing} className="sec-btn primary">
-            <SendIcon className="w-3.5 h-3.5" /> Publish Note
+          <button type="button" onClick={onPublish} disabled={isPublishing || isSaving} className="sec-btn primary">
+            {isPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SendIcon className="w-3.5 h-3.5" />}
+            {isPublishing ? 'Publishing...' : 'Publish Note'}
           </button>
         )}
       </div>
@@ -164,6 +166,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
   const isFemale = patient?.sex?.toLowerCase() === 'female';
 
@@ -223,9 +226,17 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const handleSave = (data: InitialNoteDraftValues) => {
     if (note) {
-      updateMutation.mutate({ id: note.id, data });
+      updateMutation.mutate({ id: note.id, data }, {
+        onSuccess: () => {
+          router.push(`/dashboard/${patientId}/notes`);
+        }
+      });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(data, {
+        onSuccess: () => {
+          router.push(`/dashboard/${patientId}/notes`);
+        }
+      });
     }
   };
 
@@ -238,15 +249,35 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     const isValid = await form.trigger();
     if (!isValid) {
       setPublishError("Please fill out all required fields: Chief Complaint, HPI, Physical Exam, and at least one Assessment.");
+      
+      const errors = form.formState.errors;
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        setTimeout(() => {
+          const element = 
+            document.getElementsByName(firstErrorField)[0] || 
+            document.getElementById(`field-${firstErrorField}`) ||
+            document.getElementById(firstErrorField);
+          
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            (element as HTMLElement).focus?.();
+          }
+        }, 50);
+      }
       return;
     }
+    setShowPublishModal(true);
+  };
 
+  const executePublish = () => {
     if (note) {
       // Save latest state first
       updateMutation.mutate({ id: note.id, data: formValues }, {
         onSuccess: () => {
           publishMutation.mutate(note.id, {
             onSuccess: () => {
+              setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
             }
@@ -258,6 +289,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         onSuccess: (newNote) => {
           publishMutation.mutate(newNote.id, {
             onSuccess: () => {
+              setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
             }
@@ -280,7 +312,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     );
   }
 
-  const isSaving = updateMutation.isPending || createMutation.isPending;
+  const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending;
 
   const hrStatus = latestVitals ? classifyHeartRate(latestVitals.heartRate) : 'unknown';
   const rrStatus = latestVitals ? classifyRespiratoryRate(latestVitals.respiratoryRate) : 'unknown';
@@ -592,6 +624,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           />
 
           <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
+            <fieldset disabled={isSaving} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
             {/* Latest Vitals Snapshot Strip */}
             <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">
@@ -916,7 +949,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   control={form.control}
                   name="assessment"
                   render={({ field }) => (
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5" id="field-assessment">
                       <TagInputField
                         value={field.value || []}
                         onChange={field.onChange}
@@ -969,6 +1002,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 </div>
               </div>
             </div>
+            </fieldset>
           </form>
 
           <div className="mt-2">
@@ -1012,6 +1046,18 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         title="Unsave Draft"
         message="Are you sure you want to unsave this draft? This will delete the draft from the system."
         confirmLabel="Unsave"
+      />
+
+      <DeleteConfirmModal
+        open={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onConfirm={executePublish}
+        isDeleting={publishMutation.isPending || updateMutation.isPending || createMutation.isPending}
+        title="Publish Note"
+        message="Are you sure you want to publish this Initial Consultation Note? Once published, it will be finalized and become part of the patient's permanent record."
+        confirmLabel="Publish"
+        intent="primary"
+        loadingLabel="Publishing..."
       />
     </div>
   );
