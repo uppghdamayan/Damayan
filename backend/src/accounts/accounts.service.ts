@@ -72,7 +72,9 @@ export class AccountsService implements OnModuleInit {
       });
 
       if (existing) {
-        this.logger.log(`Admin account ${adminEmail} already exists. Seed skipped.`);
+        this.logger.log(
+          `Admin account ${adminEmail} already exists. Seed skipped.`,
+        );
         continue;
       }
 
@@ -233,9 +235,7 @@ export class AccountsService implements OnModuleInit {
         where: { role: Role.ADMIN },
       });
       if (adminCount <= 1) {
-        throw new ConflictException(
-          'Cannot delete the last Admin account.',
-        );
+        throw new ConflictException('Cannot delete the last Admin account.');
       }
     }
 
@@ -243,16 +243,23 @@ export class AccountsService implements OnModuleInit {
       const deletedUser = await this.prisma.user.delete({
         where: { id },
       });
-      
+
       const { error } = await this.supabase.auth.admin.deleteUser(id);
       if (error) {
-        this.logger.error(`Failed to delete Supabase user ${id}: ${error.message}`);
+        this.logger.error(
+          `Failed to delete Supabase user ${id}: ${error.message}`,
+        );
       }
 
       return deletedUser;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        throw new ConflictException('Cannot delete account because it is referenced by existing medical records.');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Cannot delete account because it is referenced by existing medical records.',
+        );
       }
       throw error;
     }
@@ -276,7 +283,7 @@ export class AccountsService implements OnModuleInit {
     // Flag user for mandatory password change on next login
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { 
+      data: {
         requiresPasswordChange: true,
         temporaryPassword: tempPassword,
       },

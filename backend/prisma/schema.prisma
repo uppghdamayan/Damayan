@@ -188,6 +188,7 @@ model InitialNote {
   psychosocialHistory  String?    @map("psychosocial_history")
   physicalExam         String     @map("physical_exam")
   assessment           Json
+  medicationSnapshot   Json?      @map("medication_snapshot")
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
   diagnostics          Json?
   status               NoteStatus @default(DRAFT)

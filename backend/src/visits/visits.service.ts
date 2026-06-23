@@ -19,7 +19,7 @@ export class VisitsService {
           physician: {
             select: { firstName: true, lastName: true, middleName: true },
           },
-          initialNote:  { select: { status: true, chiefComplaint: true } },
+          initialNote: { select: { status: true, chiefComplaint: true } },
           progressNote: { select: { status: true, subjective: true } },
         },
       }),
@@ -38,7 +38,7 @@ export class VisitsService {
         physician: {
           select: { firstName: true, lastName: true, middleName: true },
         },
-        initialNote:  true,
+        initialNote: true,
         progressNote: true,
       },
     });
@@ -76,7 +76,7 @@ export class VisitsService {
     return client.visit.update({
       where: { id: visitId },
       data: {
-        ...(problemChanges    && { problemChanges }),
+        ...(problemChanges && { problemChanges }),
         ...(medicationChanges && { medicationChanges }),
       },
     });

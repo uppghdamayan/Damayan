@@ -33,19 +33,15 @@ export class PatientsService {
 
   // ── List / search ──────────────────────────────────────────────────────────
 
-  async findAll(filters: {
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async findAll(filters: { search?: string; page?: number; limit?: number }) {
     const { search, page = 1, limit = 50 } = filters;
     const skip = (page - 1) * limit;
 
     const where: Prisma.PatientWhereInput = { isActive: true };
     if (search) {
       where.OR = [
-        { lastName:    { contains: search, mode: 'insensitive' } },
-        { firstName:   { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
         { patientCode: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -111,17 +107,17 @@ export class PatientsService {
     return this.prisma.patient.create({
       data: {
         patientCode,
-        lastName:        dto.lastName,
-        firstName:       dto.firstName,
-        middleName:      dto.middleName,
-        extension:       dto.extension,
-        dateOfBirth:     new Date(dto.dateOfBirth),
-        sex:             dto.sex,
-        addressStreet:   dto.addressStreet,
+        lastName: dto.lastName,
+        firstName: dto.firstName,
+        middleName: dto.middleName,
+        extension: dto.extension,
+        dateOfBirth: new Date(dto.dateOfBirth),
+        sex: dto.sex,
+        addressStreet: dto.addressStreet,
         addressBarangay: dto.addressBarangay,
-        addressCity:     dto.addressCity,
-        addressRegion:   dto.addressRegion,
-        createdBy:       userId,
+        addressCity: dto.addressCity,
+        addressRegion: dto.addressRegion,
+        createdBy: userId,
       },
     });
   }
@@ -133,16 +129,24 @@ export class PatientsService {
     return this.prisma.patient.update({
       where: { id },
       data: {
-        ...(dto.lastName        !== undefined && { lastName:        dto.lastName }),
-        ...(dto.firstName       !== undefined && { firstName:       dto.firstName }),
-        ...(dto.middleName      !== undefined && { middleName:      dto.middleName }),
-        ...(dto.extension       !== undefined && { extension:       dto.extension }),
-        ...(dto.dateOfBirth     !== undefined && { dateOfBirth:     new Date(dto.dateOfBirth) }),
-        ...(dto.sex             !== undefined && { sex:             dto.sex }),
-        ...(dto.addressStreet   !== undefined && { addressStreet:   dto.addressStreet }),
-        ...(dto.addressBarangay !== undefined && { addressBarangay: dto.addressBarangay }),
-        ...(dto.addressCity     !== undefined && { addressCity:     dto.addressCity }),
-        ...(dto.addressRegion   !== undefined && { addressRegion:   dto.addressRegion }),
+        ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+        ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+        ...(dto.middleName !== undefined && { middleName: dto.middleName }),
+        ...(dto.extension !== undefined && { extension: dto.extension }),
+        ...(dto.dateOfBirth !== undefined && {
+          dateOfBirth: new Date(dto.dateOfBirth),
+        }),
+        ...(dto.sex !== undefined && { sex: dto.sex }),
+        ...(dto.addressStreet !== undefined && {
+          addressStreet: dto.addressStreet,
+        }),
+        ...(dto.addressBarangay !== undefined && {
+          addressBarangay: dto.addressBarangay,
+        }),
+        ...(dto.addressCity !== undefined && { addressCity: dto.addressCity }),
+        ...(dto.addressRegion !== undefined && {
+          addressRegion: dto.addressRegion,
+        }),
       },
     });
   }

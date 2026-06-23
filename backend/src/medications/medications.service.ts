@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { Prisma, Medication } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
@@ -14,7 +18,10 @@ export class MedicationsService {
   // LIST — active by default; ?includeInactive=true returns the full history
   // (used by the frontend autocomplete merge and by Visit History detail views).
   // ─────────────────────────────────────────────
-  async findAll(patientId: string, includeInactive = false): Promise<Medication[]> {
+  async findAll(
+    patientId: string,
+    includeInactive = false,
+  ): Promise<Medication[]> {
     return this.prisma.medication.findMany({
       where: { patientId, ...(includeInactive ? {} : { isActive: true }) },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
@@ -38,15 +45,24 @@ export class MedicationsService {
   }
 
   async findOne(patientId: string, id: string): Promise<Medication> {
-    const med = await this.prisma.medication.findFirst({ where: { id, patientId } });
-    if (!med) throw new NotFoundException(`Medication ${id} not found for this patient.`);
+    const med = await this.prisma.medication.findFirst({
+      where: { id, patientId },
+    });
+    if (!med)
+      throw new NotFoundException(
+        `Medication ${id} not found for this patient.`,
+      );
     return med;
   }
 
   // ─────────────────────────────────────────────
   // CREATE
   // ─────────────────────────────────────────────
-  async create(patientId: string, dto: CreateMedicationDto, userId: string): Promise<Medication> {
+  async create(
+    patientId: string,
+    dto: CreateMedicationDto,
+    userId: string,
+  ): Promise<Medication> {
     return this.prisma.medication.create({
       data: {
         patientId,
@@ -65,15 +81,21 @@ export class MedicationsService {
   // ─────────────────────────────────────────────
   // UPDATE
   // ─────────────────────────────────────────────
-  async update(patientId: string, id: string, dto: UpdateMedicationDto): Promise<Medication> {
+  async update(
+    patientId: string,
+    id: string,
+    dto: UpdateMedicationDto,
+  ): Promise<Medication> {
     await this.findOne(patientId, id); // throws if not found / not owned by patient
 
     const data: Prisma.MedicationUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.dose !== undefined) data.dose = dto.dose;
     if (dto.unit !== undefined) data.unit = dto.unit;
-    if (dto.formulation !== undefined) data.formulation = dto.formulation?.trim() || null;
-    if (dto.instructions !== undefined) data.instructions = dto.instructions?.trim() || null;
+    if (dto.formulation !== undefined)
+      data.formulation = dto.formulation?.trim() || null;
+    if (dto.instructions !== undefined)
+      data.instructions = dto.instructions?.trim() || null;
     if (dto.quantity !== undefined) data.quantity = dto.quantity ?? null;
 
     return this.prisma.medication.update({ where: { id }, data });
@@ -107,7 +129,14 @@ export class MedicationsService {
   // ─────────────────────────────────────────────
   async upsertFromNoteMedications(
     patientId: string,
-    items: { name: string; dose: number; unit: string; formulation?: string; instructions?: string; quantity?: number }[],
+    items: {
+      name: string;
+      dose: number;
+      unit: string;
+      formulation?: string;
+      instructions?: string;
+      quantity?: number;
+    }[],
     userId: string,
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {

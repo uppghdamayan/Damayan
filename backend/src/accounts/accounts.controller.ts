@@ -49,7 +49,9 @@ export class AccountsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create user account (Admin only)' })
-  @ApiCreatedResponse({ description: 'Account created; temp password returned once.' })
+  @ApiCreatedResponse({
+    description: 'Account created; temp password returned once.',
+  })
   async create(@Body() dto: CreateAccountDto) {
     return this.accountsService.create(dto);
   }
@@ -76,7 +78,10 @@ export class AccountsController {
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset user password (Admin only)' })
-  @ApiOkResponse({ description: 'Password reset successfully; new temp password returned once.' })
+  @ApiOkResponse({
+    description:
+      'Password reset successfully; new temp password returned once.',
+  })
   async resetPassword(@Param('id') id: string) {
     return this.accountsService.resetPassword(id);
   }

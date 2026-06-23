@@ -36,12 +36,18 @@ export class MedicationsController {
 
   @Get()
   @ApiOperation({ summary: 'List medications for a patient — All roles' })
-  @ApiOkResponse({ description: 'Active medications by default; pass includeInactive=true for full history.' })
+  @ApiOkResponse({
+    description:
+      'Active medications by default; pass includeInactive=true for full history.',
+  })
   async findAll(
     @Param('patientId') patientId: string,
     @Query('includeInactive') includeInactive?: boolean,
   ) {
-    const data = await this.medicationsService.findAll(patientId, !!includeInactive);
+    const data = await this.medicationsService.findAll(
+      patientId,
+      !!includeInactive,
+    );
     return { data };
   }
 
@@ -75,7 +81,9 @@ export class MedicationsController {
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft-delete medication — sets is_active false (Doctor, Admin)' })
+  @ApiOperation({
+    summary: 'Soft-delete medication — sets is_active false (Doctor, Admin)',
+  })
   async remove(@Param('patientId') patientId: string, @Param('id') id: string) {
     return this.medicationsService.remove(patientId, id);
   }

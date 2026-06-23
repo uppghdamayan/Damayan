@@ -18,10 +18,9 @@ export class AuthorGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const noteModel = this.reflector.getAllAndOverride<'initialNote' | 'progressNote'>(
-      NOTE_MODEL_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const noteModel = this.reflector.getAllAndOverride<
+      'initialNote' | 'progressNote'
+    >(NOTE_MODEL_KEY, [context.getHandler(), context.getClass()]);
 
     if (!noteModel) {
       return true;
@@ -53,7 +52,9 @@ export class AuthorGuard implements CanActivate {
     }
 
     if (note.authorId !== user.id) {
-      throw new ForbiddenException('Only the author or an admin can modify this note');
+      throw new ForbiddenException(
+        'Only the author or an admin can modify this note',
+      );
     }
 
     return true;

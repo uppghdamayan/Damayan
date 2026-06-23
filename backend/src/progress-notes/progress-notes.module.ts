@@ -8,7 +8,13 @@ import { VisitsModule } from '../visits/visits.module';
 import { InitialNotesModule } from '../initial-notes/initial-notes.module';
 
 @Module({
-  imports: [ProblemsModule, MedicationsModule, VitalsModule, VisitsModule, InitialNotesModule],
+  imports: [
+    ProblemsModule,
+    MedicationsModule,
+    VitalsModule,
+    VisitsModule,
+    InitialNotesModule,
+  ],
   controllers: [ProgressNotesController],
   providers: [ProgressNotesService],
 })

@@ -47,7 +47,11 @@ export class ProblemsService {
   // CREATE
   // ─────────────────────────────────────────────
 
-  async create(patientId: string, dto: CreateProblemDto, userId: string): Promise<Problem> {
+  async create(
+    patientId: string,
+    dto: CreateProblemDto,
+    userId: string,
+  ): Promise<Problem> {
     if (dto.parentId) {
       await this.assertValidParent(patientId, dto.parentId);
     }
@@ -69,14 +73,24 @@ export class ProblemsService {
   // UPDATE — title, status, parentId (all optional, independently settable)
   // ─────────────────────────────────────────────
 
-  async update(patientId: string, id: string, dto: UpdateProblemDto): Promise<Problem> {
+  async update(
+    patientId: string,
+    id: string,
+    dto: UpdateProblemDto,
+  ): Promise<Problem> {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.problem.findFirst({ where: { id, patientId } });
       if (!existing) {
-        throw new NotFoundException(`Problem ${id} not found for this patient.`);
+        throw new NotFoundException(
+          `Problem ${id} not found for this patient.`,
+        );
       }
 
-      if (dto.parentId !== undefined && dto.parentId !== existing.parentId && dto.parentId !== null) {
+      if (
+        dto.parentId !== undefined &&
+        dto.parentId !== existing.parentId &&
+        dto.parentId !== null
+      ) {
         if (dto.parentId === id) {
           throw new BadRequestException('A problem cannot be its own parent.');
         }
@@ -85,23 +99,33 @@ export class ProblemsService {
 
       const data: Prisma.ProblemUpdateInput = {};
       if (dto.title !== undefined) data.title = dto.title.trim();
-      if (dto.icdCode !== undefined) data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
+      if (dto.icdCode !== undefined)
+        data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
       if (dto.parentId !== undefined) {
-        data.parent = dto.parentId ? { connect: { id: dto.parentId } } : { disconnect: true };
+        data.parent = dto.parentId
+          ? { connect: { id: dto.parentId } }
+          : { disconnect: true };
       }
 
       if (dto.status !== undefined && dto.status !== existing.status) {
         data.status = dto.status;
 
         // Business rule 3: Resolved/Removed always bump to the end of the list.
-        if (dto.status === ProblemStatus.RESOLVED || dto.status === ProblemStatus.REMOVED) {
+        if (
+          dto.status === ProblemStatus.RESOLVED ||
+          dto.status === ProblemStatus.REMOVED
+        ) {
           data.sortOrder = await this.getNextSortOrder(patientId, tx);
         }
 
         // Business rule 5: removing a parent cascades to its direct children.
         if (dto.status === ProblemStatus.REMOVED) {
           await tx.problem.updateMany({
-            where: { patientId, parentId: id, status: { not: ProblemStatus.REMOVED } },
+            where: {
+              patientId,
+              parentId: id,
+              status: { not: ProblemStatus.REMOVED },
+            },
             data: { status: ProblemStatus.REMOVED },
           });
         }
@@ -123,15 +147,25 @@ export class ProblemsService {
   // REORDER (batch)
   // ─────────────────────────────────────────────
 
-  async reorder(patientId: string, dto: ReorderProblemsDto): Promise<{ updated: number }> {
+  async reorder(
+    patientId: string,
+    dto: ReorderProblemsDto,
+  ): Promise<{ updated: number }> {
     const ids = dto.items.map((i) => i.id);
-    const owned = await this.prisma.problem.count({ where: { id: { in: ids }, patientId } });
+    const owned = await this.prisma.problem.count({
+      where: { id: { in: ids }, patientId },
+    });
     if (owned !== ids.length) {
-      throw new ForbiddenException('One or more problems do not belong to this patient.');
+      throw new ForbiddenException(
+        'One or more problems do not belong to this patient.',
+      );
     }
     await this.prisma.$transaction(
       dto.items.map((item) =>
-        this.prisma.problem.update({ where: { id: item.id }, data: { sortOrder: item.sortOrder } }),
+        this.prisma.problem.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder },
+        }),
       ),
     );
     return { updated: dto.items.length };
@@ -154,19 +188,34 @@ export class ProblemsService {
 
   async upsertFromAssessment(
     patientId: string,
-    assessmentTitles: string[],
+    assessmentItems: { title: string; icdCode?: string }[],
     userId: string,
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
-    const titles = [...new Set(assessmentTitles.map((t) => t.trim()).filter(Boolean))];
-    if (titles.length === 0) return;
+    const validItems = assessmentItems.filter((i) => i.title?.trim());
+    if (validItems.length === 0) return;
 
     const existing = await client.problem.findMany({
-      where: { patientId, status: { in: [ProblemStatus.ACTIVE, ProblemStatus.RESOLVED] } },
+      where: {
+        patientId,
+        status: { in: [ProblemStatus.ACTIVE, ProblemStatus.RESOLVED] },
+      },
     });
 
-    for (const title of titles) {
-      const match = existing.find((p) => p.title.toLowerCase() === title.toLowerCase());
+    // Map by title to avoid duplicates and keep first occurrence
+    const uniqueItems = new Map<string, { title: string; icdCode?: string }>();
+    for (const item of validItems) {
+      const key = item.title.trim().toLowerCase();
+      if (!uniqueItems.has(key)) {
+        uniqueItems.set(key, {
+          title: item.title.trim(),
+          icdCode: item.icdCode,
+        });
+      }
+    }
+
+    for (const [key, item] of uniqueItems.entries()) {
+      const match = existing.find((p) => p.title.toLowerCase() === key);
 
       if (match && match.status === ProblemStatus.ACTIVE) {
         continue;
@@ -183,7 +232,14 @@ export class ProblemsService {
 
       const sortOrder = await this.getNextSortOrder(patientId, client);
       await client.problem.create({
-        data: { patientId, title, status: ProblemStatus.ACTIVE, sortOrder, addedBy: userId },
+        data: {
+          patientId,
+          title: item.title,
+          icdCode: item.icdCode,
+          status: ProblemStatus.ACTIVE,
+          sortOrder,
+          addedBy: userId,
+        },
       });
     }
   }
@@ -213,11 +269,18 @@ export class ProblemsService {
     let curr: string | null = parentId;
     while (curr) {
       if (curr === currentProblemId) {
-        throw new BadRequestException('Cannot nest a problem under its own descendant.');
+        throw new BadRequestException(
+          'Cannot nest a problem under its own descendant.',
+        );
       }
-      const node = await client.problem.findFirst({ where: { id: curr, patientId } });
+      const node = await client.problem.findFirst({
+        where: { id: curr, patientId },
+      });
       if (!node) {
-        if (curr === parentId) throw new NotFoundException('Parent problem not found for this patient.');
+        if (curr === parentId)
+          throw new NotFoundException(
+            'Parent problem not found for this patient.',
+          );
         break;
       }
       curr = node.parentId;

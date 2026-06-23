@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsArray, MaxLength, ValidateNested, IsNotEmpty, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  MaxLength,
+  ValidateNested,
+  IsNotEmpty,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AssessmentItemDto {
@@ -11,15 +19,41 @@ class AssessmentItemDto {
   icdCode?: string;
 }
 
-export class CreateInitialNoteDto {
+class MedicationItemDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
-  chiefComplaint: string;
+  name: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  dose?: number;
 
   @IsString()
-  @IsNotEmpty()
-  hpi: string;
+  @IsOptional()
+  unit?: string;
+
+  @IsString()
+  @IsOptional()
+  formulation?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  quantity?: number;
+
+  @IsString()
+  @IsOptional()
+  instructions?: string;
+}
+
+export class CreateInitialNoteDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  chiefComplaint?: string;
+
+  @IsString()
+  @IsOptional()
+  hpi?: string;
 
   @IsString()
   @IsOptional()
@@ -54,13 +88,14 @@ export class CreateInitialNoteDto {
   psychosocialHistory?: string;
 
   @IsString()
-  @IsNotEmpty()
-  physicalExam: string;
+  @IsOptional()
+  physicalExam?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AssessmentItemDto)
-  assessment: AssessmentItemDto[];
+  @IsOptional()
+  assessment?: AssessmentItemDto[];
 
   @IsString()
   @IsOptional()
@@ -70,6 +105,12 @@ export class CreateInitialNoteDto {
   @IsString({ each: true })
   @IsOptional()
   diagnostics?: string[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicationItemDto)
+  @IsOptional()
+  medicationSnapshot?: MedicationItemDto[];
 
   @IsDateString()
   visitDatetime: string;

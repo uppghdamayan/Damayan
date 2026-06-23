@@ -78,7 +78,13 @@ export function DocumentationPanel() {
 
         {/* Inner content wrapper with static width to prevent reflow */}
         <div className="w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)] flex flex-col h-full overflow-hidden">
-          {activeNoteEditor.mode === null ? (
+          {activeNoteEditor.mode !== null ? (
+            <ProgressNoteForm 
+              patientId={activeNoteEditor.patientId!} 
+              noteId={activeNoteEditor.noteId ?? undefined} 
+              onClose={() => closeNoteEditor()} 
+            />
+          ) : initialNoteLoading ? (
             <>
               {/* Panel header (Section 7.5) */}
               <div className="flex items-center gap-2 px-4 py-3 bg-accent-light border-b border-accent-mid flex-shrink-0">
@@ -87,56 +93,52 @@ export function DocumentationPanel() {
                   Progress Note
                 </span>
               </div>
-
-              {/* Scrollable body */}
               <div className="flex-1 overflow-hidden bg-surface-2 flex flex-col relative">
                 <div className="absolute inset-0 overflow-y-auto">
-                  {initialNoteLoading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center justify-center h-full">
+                    <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : hasNoInitialNote ? (
+            <>
+              {/* Panel header (Section 7.5) */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-accent-light border-b border-accent-mid flex-shrink-0">
+                <Pen className="w-3.5 h-3.5 text-accent-hover" strokeWidth={2.5} />
+                <span className="font-bold text-accent-hover flex-1 text-[13px]">
+                  Progress Note
+                </span>
+              </div>
+              <div className="flex-1 overflow-hidden bg-surface-2 flex flex-col relative">
+                <div className="absolute inset-0 overflow-y-auto">
+                  <div className="flex flex-col items-center justify-center h-full px-6 py-10 text-center">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-4 transition-transform hover:scale-110 duration-300">
+                      <ClipboardList className="w-6 h-6 text-accent" />
                     </div>
-                  ) : hasNoInitialNote ? (
-                    <div className="flex flex-col items-center justify-center h-full px-6 py-10 text-center">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-4 transition-transform hover:scale-110 duration-300">
-                        <ClipboardList className="w-6 h-6 text-accent" />
-                      </div>
-                      <h3 className="text-[14px] font-semibold text-text-primary mb-1.5">
-                        Initial Note Required
-                      </h3>
-                      <p className="text-[12px] text-text-muted max-w-[260px] mb-5 leading-relaxed">
-                        Before documenting progress notes, you must first create and publish an Initial Consultation Note for this patient.
-                      </p>
-                      <Button
-                        onClick={() => {
-                          setDocumentationPanelOpen(false);
-                          router.push(`/dashboard/${patientId}/initial-note`);
-                        }}
-                        className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
-                      >
-                        Create Initial Note
-                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full gap-3 py-10">
-                      <div className="w-10 h-10 bg-accent-light rounded-lg flex items-center justify-center text-lg text-accent">
-                        📝
-                      </div>
-                      <p className="text-[13px] font-semibold text-[var(--text-primary)] m-0">
-                        Progress Note Workspace
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)] text-center max-w-[280px] m-0 leading-relaxed">
-                        Select a note from the timeline, or start a new note, to begin documenting.
-                      </p>
-                    </div>
-                  )}
+                    <h3 className="text-[14px] font-semibold text-text-primary mb-1.5">
+                      Initial Note Required
+                    </h3>
+                    <p className="text-[12px] text-text-muted max-w-[260px] mb-5 leading-relaxed">
+                      Before documenting progress notes, you must first create and publish an Initial Consultation Note for this patient.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setDocumentationPanelOpen(false);
+                        router.push(`/dashboard/${patientId}/initial-note`);
+                      }}
+                      className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
+                    >
+                      Create Initial Note
+                      <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
           ) : (
             <ProgressNoteForm 
-              patientId={activeNoteEditor.patientId!} 
-              noteId={activeNoteEditor.noteId ?? undefined} 
+              patientId={patientId!} 
               onClose={() => closeNoteEditor()} 
             />
           )}

@@ -32,7 +32,10 @@ export class CreateVitalsDto {
   @Max(300)
   heartRate?: number;
 
-  @ApiPropertyOptional({ example: 16, description: 'Respiratory rate, breaths/min' })
+  @ApiPropertyOptional({
+    example: 16,
+    description: 'Respiratory rate, breaths/min',
+  })
   @IsOptional()
   @IsInt()
   @Min(5)
@@ -47,7 +50,10 @@ export class CreateVitalsDto {
   @Type(() => Number)
   temperature?: number;
 
-  @ApiPropertyOptional({ example: 98, description: 'Oxygen saturation, SpO2 %' })
+  @ApiPropertyOptional({
+    example: 98,
+    description: 'Oxygen saturation, SpO2 %',
+  })
   @IsOptional()
   @IsInt()
   @Min(50)

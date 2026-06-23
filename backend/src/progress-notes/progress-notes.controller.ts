@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, NotFoundException, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  Request,
+  NotFoundException,
+  Query,
+  Delete,
+} from '@nestjs/common';
 import { ProgressNotesService } from './progress-notes.service';
 import { CreateProgressNoteDto } from './dto/create-progress-note.dto';
 import { UpdateProgressNoteDto } from './dto/update-progress-note.dto';
@@ -21,15 +33,20 @@ export class ProgressNotesController {
     @Param('patientId') patientId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
-    @Request() req
+    @Request() req,
   ) {
-    const result = await this.progressNotesService.findAllByPatient(patientId, +page, +limit);
-    
+    const result = await this.progressNotesService.findAllByPatient(
+      patientId,
+      +page,
+      +limit,
+    );
+
     // Filter out drafts that the user shouldn't see
     const filteredData = result.data.filter((note) => {
       if (note.status === NoteStatus.PUBLISHED) return true;
       if (req.user.role === Role.ADMIN) return true;
-      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId) return true;
+      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId)
+        return true;
       return false; // Nurses shouldn't see drafts, or other doctors
     });
 
@@ -42,19 +59,27 @@ export class ProgressNotesController {
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
     const note = await this.progressNotesService.findOne(id);
-    
+
     if (note.status === NoteStatus.DRAFT) {
-      if (req.user.role === Role.DOCTOR && req.user.id !== note.authorId && req.user.role !== Role.ADMIN) {
+      if (
+        req.user.role === Role.DOCTOR &&
+        req.user.id !== note.authorId &&
+        req.user.role !== Role.ADMIN
+      ) {
         throw new NotFoundException('Progress Note not found');
       }
     }
-    
+
     return note;
   }
 
   @Post()
   @Roles(Role.DOCTOR, Role.ADMIN)
-  create(@Param('patientId') patientId: string, @Body() dto: CreateProgressNoteDto, @Request() req) {
+  create(
+    @Param('patientId') patientId: string,
+    @Body() dto: CreateProgressNoteDto,
+    @Request() req,
+  ) {
     return this.progressNotesService.create(patientId, dto, req.user.id);
   }
 
@@ -64,7 +89,7 @@ export class ProgressNotesController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProgressNoteDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.progressNotesService.update(id, dto, req.user.id);
   }
@@ -75,8 +100,28 @@ export class ProgressNotesController {
   publish(
     @Param('patientId') patientId: string,
     @Param('id') id: string,
-    @Request() req
+    @Request() req,
   ) {
     return this.progressNotesService.publish(patientId, id, req.user.id);
+  }
+
+  @Delete('drafts')
+  @Roles(Role.DOCTOR, Role.ADMIN)
+  removeAllDrafts(
+    @Param('patientId') patientId: string,
+    @Request() req,
+  ) {
+    return this.progressNotesService.deleteAllDrafts(patientId, req.user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthorGuard)
+  @NoteModel('progressNote')
+  remove(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @Request() req,
+  ) {
+    return this.progressNotesService.deleteDraft(patientId, id, req.user.id);
   }
 }

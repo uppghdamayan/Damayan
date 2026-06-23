@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, MaxLength, IsEnum, IsNumber, IsOptional, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MedUnit } from '@prisma/client';
 

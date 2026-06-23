@@ -16,12 +16,17 @@ import {
 import { usePatient } from '@/hooks/usePatients';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useMedications } from '@/hooks/useMedications';
+import { buildMedicationSuggestions } from '@/lib/medication-utils';
+import type { MedUnitValue } from '@/types/medication';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
 import { TrashIcon } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
+import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { Button } from '@/components/ui/button';
+import { useUiStore } from '@/stores/uiStore';
 
 interface ProgressNoteFormProps {
   patientId: string;
@@ -76,8 +81,20 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const createMutation = useCreateProgressNote(patientId);
   const updateMutation = useUpdateProgressNote(patientId);
   const publishMutation = usePublishProgressNote(patientId);
+  const { openExistingProgressNote } = useUiStore();
 
   const [publishError, setPublishError] = useState<string | null>(null);
+
+  const [newMedName, setNewMedName] = useState('');
+  const [newMedDose, setNewMedDose] = useState('');
+  const [newMedUnit, setNewMedUnit] = useState<MedUnitValue>('MG');
+  const [newMedFormulation, setNewMedFormulation] = useState('');
+  const [newMedInstructions, setNewMedInstructions] = useState('');
+  const [newMedQuantity, setNewMedQuantity] = useState('');
+
+  const { data: patientMedicationsResponse } = useMedications(patientId);
+  const patientMedications = patientMedicationsResponse?.data || [];
+  const nameOptions = buildMedicationSuggestions(patientMedications);
 
   const form = useForm<ProgressNoteDraftValues>({
     resolver: zodResolver(progressNoteDraftSchema),
@@ -95,21 +112,71 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   useEffect(() => {
     if (noteId && note) {
+      const draftProblems = (note.problemListSnapshot as any[]) || [];
+      const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
+
+      const draftMeds = (note.medicationSnapshot as any[]) || [];
+      const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : m);
+
       form.reset({
         subjective: note.subjective,
         objective: note.objective,
         labs: (note as any).labs || '',
         mgmtNonpharm: note.mgmtNonpharm || '',
         diagnostics: note.diagnostics || [],
-        problemListSnapshot: note.problemListSnapshot || [],
-        medicationSnapshot: note.medicationSnapshot || [],
+        problemListSnapshot: validProblems.length > 0
+          ? validProblems
+          : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+        medicationSnapshot: validMeds.length > 0
+          ? validMeds
+          : (copyForward?.activeMedications || []).map((m: any) => ({
+              name: m.name,
+              dose: m.dose ? Number(m.dose) : undefined,
+              unit: m.unit,
+              formulation: m.formulation || undefined,
+              quantity: m.quantity || undefined,
+              instructions: m.instructions || undefined,
+            })),
         visitDatetime: note.createdAt,
       });
     } else if (!noteId && !copyLoading) {
       const draft = localStorage.getItem(`damayan:draft:${patientId}:progress`);
       if (draft) {
         try {
-          form.reset(JSON.parse(draft));
+          const parsed = JSON.parse(draft);
+          const draftProblems = parsed.problemListSnapshot as any[] || [];
+          const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
+          
+          const draftMeds = parsed.medicationSnapshot as any[] || [];
+          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : {
+            name: m.name,
+            dose: m.dose ? Number(m.dose) : undefined,
+            unit: m.unit,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+          });
+
+          if (validProblems.length === 0) {
+            parsed.problemListSnapshot = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
+          } else {
+            parsed.problemListSnapshot = validProblems;
+          }
+
+          if (validMeds.length === 0) {
+            parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
+              name: m.name,
+              dose: m.dose ? Number(m.dose) : undefined,
+              unit: m.unit,
+              formulation: m.formulation || undefined,
+              quantity: m.quantity || undefined,
+              instructions: m.instructions || undefined,
+            }));
+          } else {
+            parsed.medicationSnapshot = validMeds;
+          }
+          
+          form.reset(parsed);
           return;
         } catch (e) {}
       }
@@ -123,7 +190,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           icdCode: p.icdCode || undefined
         })),
-        medicationSnapshot: copyForward?.activeMedications || [],
+        medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
+          name: m.name,
+          dose: m.dose ? Number(m.dose) : undefined,
+          unit: m.unit,
+          formulation: m.formulation || undefined,
+          quantity: m.quantity || undefined,
+          instructions: m.instructions || undefined,
+        })),
         visitDatetime: new Date().toISOString(),
       });
     }
@@ -136,14 +210,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       updateMutation.mutate({ id: noteId, data });
     } else {
       createMutation.mutate(data, {
-        onSuccess: () => {
-          onClose(); 
+        onSuccess: (newNote) => {
+          openExistingProgressNote(patientId, newNote.id);
         }
       });
     }
   };
 
-  useAutoSave(formValues, handleSave, `damayan:draft:${patientId}:progress`, 30000);
+  useAutoSave(formValues, (data) => {
+    localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(data));
+  }, `damayan:draft:${patientId}:progress`, 5000);
 
   const handlePublish = async () => {
     setPublishError(null);
@@ -313,7 +389,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       {field.value?.map((prob: any, idx: number) => (
                         <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
                           <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
-                          <div className="flex-1 min-w-0 truncate">{prob.title}</div>
+                          <div className="flex-1 min-w-0 truncate">
+                            {typeof prob === 'string' ? prob : prob.title}
+                            {typeof prob !== 'string' && prob.icdCode && (
+                              <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
+                                {prob.icdCode}
+                              </span>
+                            )}
+                          </div>
                           {!isPublished && (
                             <Button
                               type="button"
@@ -332,13 +415,35 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                         </div>
                       ))}
                       {!isPublished && (
-                        <div className="mt-2.5">
-                          <TagInputField
-                            value={field.value || []}
-                            onChange={field.onChange}
-                            placeholder="+ Add new problem and press Enter"
-                            isObjectFormat={true}
-                          />
+                        <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-card">
+                          <div className="col-span-12 md:col-span-8 flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
+                            <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
+                          </div>
+                          <div className="col-span-12 md:col-span-4 flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
+                            <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
+                          </div>
+                          <div className="col-span-12 flex justify-end mt-1">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => {
+                                const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
+                                const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
+                                if (titleEl.value.trim()) {
+                                  const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined }];
+                                  field.onChange(newProbs);
+                                  titleEl.value = '';
+                                  icdEl.value = '';
+                                }
+                              }}
+                              className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+                            >
+                              + Add Problem
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -386,7 +491,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* MEDICATIONS */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Current Medication List</span>
@@ -402,7 +507,19 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                         {meds.map((med: any, idx: number) => (
                           <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
                             <div className="flex-1 min-w-0 truncate">
-                              <strong>{med.name}</strong> <span className="font-mono text-accent font-semibold ml-1.5">{med.dose}{med.unit}</span>
+                              <strong>{typeof med === 'string' ? med : med.name}</strong> 
+                              {typeof med !== 'string' && med.dose && (
+                                <span className="font-mono text-accent font-semibold ml-1.5">{med.dose}{med.unit}</span>
+                              )}
+                              {typeof med !== 'string' && med.formulation && (
+                                <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                              )}
+                              {typeof med !== 'string' && med.quantity && (
+                                <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                              )}
+                              {typeof med !== 'string' && med.instructions && (
+                                <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                              )}
                             </div>
                             {!isPublished && (
                               <Button
@@ -422,45 +539,97 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                           </div>
                         ))}
                         {!isPublished && (
-                          <div className="flex flex-wrap items-center gap-2 mt-3">
-                            <input 
-                              id="newMedName" 
-                              placeholder="Name" 
-                              className="w-[120px] h-7 px-2 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[12px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70" 
-                            />
-                            <input 
-                              id="newMedDose" 
-                              type="number" 
-                              placeholder="Dose" 
-                              className="w-[60px] h-7 px-2 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[12px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70" 
-                            />
-                            <select 
-                              id="newMedUnit" 
-                              className="w-[70px] h-7 px-1 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[12px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] cursor-pointer"
-                            >
-                              <option value="MG">MG</option>
-                              <option value="G">G</option>
-                              <option value="MCG">MCG</option>
-                              <option value="ML">ML</option>
-                            </select>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="xs"
-                              onClick={() => {
-                                const nameEl = document.getElementById('newMedName') as HTMLInputElement;
-                                const doseEl = document.getElementById('newMedDose') as HTMLInputElement;
-                                const unitEl = document.getElementById('newMedUnit') as HTMLSelectElement;
-                                if (nameEl.value && doseEl.value) {
-                                  field.onChange([...meds, { name: nameEl.value, dose: parseFloat(doseEl.value), unit: unitEl.value }]);
-                                  nameEl.value = '';
-                                  doseEl.value = '';
-                                }
-                              }}
-                              className="h-7 text-[11px] font-semibold"
-                            >
-                              + Add Medication
-                            </Button>
+                          <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-card">
+                            <div className="col-span-12 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
+                              <ComboboxInput
+                                value={newMedName}
+                                onChange={setNewMedName}
+                                options={nameOptions}
+                                placeholder="e.g. Lisinopril"
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+                              />
+                            </div>
+                            <div className="col-span-6 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+                              <input 
+                                type="number" 
+                                value={newMedDose}
+                                onChange={(e) => setNewMedDose(e.target.value)}
+                                placeholder="e.g. 10" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                              />
+                            </div>
+                            <div className="col-span-6 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Unit</label>
+                              <select 
+                                value={newMedUnit}
+                                onChange={(e) => setNewMedUnit(e.target.value as MedUnitValue)}
+                                className="h-[28px] px-1 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all cursor-pointer focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+                              >
+                                <option value="MG">MG</option>
+                                <option value="G">G</option>
+                                <option value="MCG">MCG</option>
+                                <option value="ML">ML</option>
+                                <option value="UNITS">UNITS</option>
+                              </select>
+                            </div>
+                            <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
+                              <input 
+                                value={newMedFormulation}
+                                onChange={(e) => setNewMedFormulation(e.target.value)}
+                                placeholder="e.g. Tablet, Syrup" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
+                              <input 
+                                type="number"
+                                value={newMedQuantity}
+                                onChange={(e) => setNewMedQuantity(e.target.value)}
+                                placeholder="e.g. 30" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                              />
+                            </div>
+                            <div className="col-span-12 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
+                              <input 
+                                value={newMedInstructions}
+                                onChange={(e) => setNewMedInstructions(e.target.value)}
+                                placeholder="e.g. Take 1 tab daily" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                              />
+                            </div>
+                            <div className="col-span-12 flex justify-end mt-1">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => {
+                                  if (newMedName.trim() && newMedDose.trim()) {
+                                    field.onChange([...meds, { 
+                                      name: newMedName.trim(), 
+                                      dose: parseFloat(newMedDose), 
+                                      unit: newMedUnit, 
+                                      formulation: newMedFormulation.trim() || undefined,
+                                      quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
+                                      instructions: newMedInstructions.trim() 
+                                    }]);
+                                    setNewMedName('');
+                                    setNewMedDose('');
+                                    setNewMedUnit('MG');
+                                    setNewMedFormulation('');
+                                    setNewMedQuantity('');
+                                    setNewMedInstructions('');
+                                  }
+                                }}
+                                className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+                              >
+                                + Add Medication
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>

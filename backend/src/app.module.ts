@@ -19,7 +19,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     ConfigModule.forRoot({
       isGlobal: true, // Makes process.env available everywhere without re-importing
     }),
-    PrismaModule,           // ← must be first after ConfigModule
+    PrismaModule, // ← must be first after ConfigModule
     AuthModule,
     AccountsModule,
     PatientsModule,

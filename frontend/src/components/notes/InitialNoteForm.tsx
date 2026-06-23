@@ -13,16 +13,20 @@ import {
   usePublishInitialNote,
   useDeleteInitialNote
 } from '@/hooks/useInitialNote';
+import { useCopyForwardData } from '@/hooks/useProgressNotes';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { usePatient } from '@/hooks/usePatients';
 import { useMedications } from '@/hooks/useMedications';
+import { buildMedicationSuggestions } from '@/lib/medication-utils';
+import type { MedUnitValue } from '@/types/medication';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
-import { MedicationListEditor } from './MedicationListEditor';
 import { AttachmentUploader } from './AttachmentUploader';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2 } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
@@ -158,15 +162,32 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const { data: note, isLoading } = useInitialNote(patientId);
   const { data: latestVitals } = useLatestVitals(patientId);
   const { data: patient } = usePatient(patientId);
+  const { data: patientMedicationsResponse } = useMedications(patientId);
   const createMutation = useCreateInitialNote(patientId);
   const updateMutation = useUpdateInitialNote(patientId);
   const publishMutation = usePublishInitialNote(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
+  const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
 
   const [publishError, setPublishError] = useState<string | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+
+  const [newMedName, setNewMedName] = useState('');
+  const [newMedDose, setNewMedDose] = useState('');
+  const [newMedUnit, setNewMedUnit] = useState<MedUnitValue>('MG');
+  const [newMedFormulation, setNewMedFormulation] = useState('');
+  const [newMedInstructions, setNewMedInstructions] = useState('');
+  const [newMedQuantity, setNewMedQuantity] = useState('');
+
+  const [medError, setMedError] = useState('');
+  const [addingMed, setAddingMed] = useState(false);
+  const [probError, setProbError] = useState('');
+  const [addingProb, setAddingProb] = useState(false);
+
+  const patientMedications = patientMedicationsResponse?.data || [];
+  const nameOptions = buildMedicationSuggestions(patientMedications);
 
   const isFemale = patient?.sex?.toLowerCase() === 'female';
 
@@ -186,6 +207,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       psychosocialHistory: '',
       physicalExam: '',
       assessment: [],
+      medicationSnapshot: [],
       mgmtNonpharm: '',
       diagnostics: [],
       visitDatetime: new Date().toISOString(),
@@ -194,33 +216,109 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   useEffect(() => {
     if (note) {
-      form.reset({
-        chiefComplaint: note.chiefComplaint || '',
-        hpi: note.hpi || '',
-        pmhComorbidities: note.pmhComorbidities || '',
-        pmhSurgeries: note.pmhSurgeries || '',
-        pmhHospitalizations: note.pmhHospitalizations || '',
-        allergies: note.allergies || '',
-        familyHistory: note.familyHistory || '',
-        socialHistory: note.socialHistory || '',
-        obHistory: note.obHistory || '',
-        psychosocialHistory: note.psychosocialHistory || '',
-        physicalExam: note.physicalExam || '',
-        assessment: note.assessment || [],
-        mgmtNonpharm: note.mgmtNonpharm || '',
+        const draftProblems = note.assessment as any[] || [];
+        const validProblems = draftProblems.filter((p: any) => p && p.title);
+        
+        const draftMeds = note.medicationSnapshot as any[] || [];
+        const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name));
+
+        form.reset({
+          chiefComplaint: note.chiefComplaint || '',
+          hpi: note.hpi || '',
+          pmhComorbidities: note.pmhComorbidities || '',
+          pmhSurgeries: note.pmhSurgeries || '',
+          pmhHospitalizations: note.pmhHospitalizations || '',
+          allergies: note.allergies || '',
+          familyHistory: note.familyHistory || '',
+          socialHistory: note.socialHistory || '',
+          obHistory: note.obHistory || '',
+          psychosocialHistory: note.psychosocialHistory || '',
+          physicalExam: note.physicalExam || '',
+          assessment: validProblems.length > 0
+            ? validProblems
+            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+          medicationSnapshot: validMeds.length > 0
+            ? validMeds
+            : (copyForward?.activeMedications || []).map((m: any) => ({
+                name: m.name,
+                dose: m.dose ? Number(m.dose) : undefined,
+                unit: m.unit,
+                formulation: m.formulation || undefined,
+                quantity: m.quantity || undefined,
+                instructions: m.instructions || undefined,
+              })),
+          mgmtNonpharm: note.mgmtNonpharm || '',
         diagnostics: note.diagnostics || [],
         visitDatetime: note.createdAt,
       });
-    } else {
+    } else if (!copyLoading) {
       // Check local storage
       const draft = localStorage.getItem(`damayan:draft:${patientId}:initial`);
       if (draft) {
         try {
-          form.reset(JSON.parse(draft));
+          const parsed = JSON.parse(draft);
+          const draftProblems = parsed.assessment as any[] || [];
+          const validProblems = draftProblems.filter((p: any) => p && p.title);
+          const draftMeds = parsed.medicationSnapshot as any[] || [];
+          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : {
+            name: m.name,
+            dose: m.dose ? Number(m.dose) : undefined,
+            unit: m.unit,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+          });
+
+          if (validProblems.length === 0) {
+            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
+          } else {
+            parsed.assessment = validProblems;
+          }
+
+          if (validMeds.length === 0) {
+            parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
+              name: m.name,
+              dose: m.dose ? Number(m.dose) : undefined,
+              unit: m.unit,
+              formulation: m.formulation || undefined,
+              quantity: m.quantity || undefined,
+              instructions: m.instructions || undefined,
+            }));
+          } else {
+            parsed.medicationSnapshot = validMeds;
+          }
+          
+          form.reset(parsed);
+          return;
         } catch (e) {}
       }
+      form.reset({
+        chiefComplaint: '',
+        hpi: '',
+        pmhComorbidities: '',
+        pmhSurgeries: '',
+        pmhHospitalizations: '',
+        allergies: '',
+        familyHistory: '',
+        socialHistory: '',
+        obHistory: '',
+        psychosocialHistory: '',
+        physicalExam: '',
+        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+        medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
+          name: m.name,
+          dose: m.dose ? Number(m.dose) : undefined,
+          unit: m.unit,
+          formulation: m.formulation || undefined,
+          quantity: m.quantity || undefined,
+          instructions: m.instructions || undefined,
+        })),
+        mgmtNonpharm: '',
+        diagnostics: [],
+        visitDatetime: new Date().toISOString(),
+      });
     }
-  }, [note, form, patientId]);
+  }, [note, copyLoading, form, patientId, copyForward]);
 
   const formValues = form.watch();
 
@@ -280,8 +378,18 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
+            },
+            onError: (err: any) => {
+              setShowPublishModal(false);
+              setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }
           });
+        },
+        onError: (err: any) => {
+          setShowPublishModal(false);
+          setPublishError(err?.response?.data?.message || err.message || 'Failed to save draft before publishing');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
     } else {
@@ -292,8 +400,17 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
+            },
+            onError: (err: any) => {
+              setShowPublishModal(false);
+              setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
             }
           });
+        },
+        onError: (err: any) => {
+          setShowPublishModal(false);
+          setPublishError(err?.response?.data?.message || err.message || 'Failed to create draft before publishing');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
     }
@@ -600,7 +717,25 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <span>💊</span> Medications Prescribed
                 </div>
                 <div className="flex flex-col gap-1.5 border border-border rounded-btn bg-surface-2 p-3">
-                  <MedicationListReadOnly patientId={patientId} />
+                  {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
+                    note.medicationSnapshot.map((med: any, idx: number) => (
+                      <div key={idx} className="flex flex-col text-[12px] pb-1.5 border-b border-border/50 last:border-b-0 last:pb-0">
+                        <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green" />
+                          <span>
+                            {typeof med === 'string' ? med : med.name} {typeof med !== 'string' && med.dose ? med.dose : ''}{typeof med !== 'string' && med.unit ? med.unit : ''}
+                            {typeof med !== 'string' && med.formulation && ` ${med.formulation}`}
+                            {typeof med !== 'string' && med.quantity && ` (Qty: ${med.quantity})`}
+                          </span>
+                        </div>
+                        {typeof med !== 'string' && med.instructions && (
+                          <span className="text-[10px] text-[var(--text-muted)] pl-3.5">{med.instructions}</span>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[12px] text-[var(--text-muted)]">No medications prescribed.</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -624,7 +759,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           />
 
           <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
-            <fieldset disabled={isSaving} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
+            <fieldset disabled={isSaving || publishMutation.isPending || addingMed || addingProb} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
             {/* Latest Vitals Snapshot Strip */}
             <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">
@@ -931,11 +1066,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 4. Assessment Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-card shadow-card overflow-hidden">
+            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
-                  <ClipboardList className="w-3.5 h-3.5 text-accent-hover" />
-                </div>
+                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">📊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
@@ -943,22 +1076,89 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               </div>
               <div className="p-4 flex flex-col gap-3 bg-surface">
                 <p className="text-[11px] text-text-secondary leading-relaxed">
-                  Add the active problems or diagnoses for this visit. Press <kbd className="px-1 py-0.5 bg-surface-2 border border-border rounded text-[10px] font-mono">Enter</kbd> after each entry.
+                  Add the active problems or diagnoses for this visit. These will be automatically synced with the patient's global Problem List.
                 </p>
                 <Controller
                   control={form.control}
                   name="assessment"
                   render={({ field }) => (
                     <div className="flex flex-col gap-1.5" id="field-assessment">
-                      <TagInputField
-                        value={field.value || []}
-                        onChange={field.onChange}
-                        placeholder="Type problem name and press Enter"
-                        isObjectFormat={true}
-                      />
+                      <div className="flex flex-col gap-1">
+                        {field.value?.map((prob: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
+                            <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
+                            <div className="flex-1 min-w-0 truncate">
+                              {typeof prob === 'string' ? prob : prob.title}
+                              {typeof prob !== 'string' && prob.icdCode && (
+                                <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
+                                  {prob.icdCode}
+                                </span>
+                              )}
+                            </div>
+                            {note?.status !== 'PUBLISHED' && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => {
+                                  const newProbs = [...(field.value || [])];
+                                  newProbs.splice(idx, 1);
+                                  field.onChange(newProbs);
+                                }}
+                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        {note?.status !== 'PUBLISHED' && (
+                          <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
+                            <div className="col-span-12 md:col-span-8 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
+                              <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
+                            </div>
+                            <div className="col-span-12 md:col-span-4 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
+                              <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
+                            </div>
+                            <div className="col-span-12 flex justify-between items-center mt-1">
+                              {probError ? (
+                                <span className="text-red font-medium text-[10px]">{probError}</span>
+                              ) : <span />}
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="xs"
+                                disabled={addingProb}
+                                onClick={() => {
+                                  const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
+                                  const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
+                                  if (!titleEl.value.trim()) {
+                                    setProbError('Problem title is required');
+                                    return;
+                                  }
+                                  setProbError('');
+                                  setAddingProb(true);
+                                  setTimeout(() => {
+                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined }];
+                                    field.onChange(newProbs);
+                                    titleEl.value = '';
+                                    icdEl.value = '';
+                                    setAddingProb(false);
+                                  }, 400);
+                                }}
+                                className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+                              >
+                                {addingProb ? 'Adding...' : '+ Add Problem'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       {form.formState.errors.assessment && (
                         <p className="text-[10px] text-red font-medium">
-                          {form.formState.errors.assessment.message || "At least one assessment is required"}
+                          {form.formState.errors.assessment.message}
                         </p>
                       )}
                     </div>
@@ -968,7 +1168,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 5. Management Plan Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card overflow-hidden">
+            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <Stethoscope className="w-3.5 h-3.5 text-green" />
@@ -996,9 +1196,159 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     Prescribed Medications
                   </label>
                   <p className="text-[11px] text-text-muted -mt-0.5">
-                    Medications added here are saved to the patient's cumulative medication list.
+                    Medications added here are saved to the patient's cumulative medication list when this note is published.
                   </p>
-                  <MedicationListEditor patientId={patientId} />
+                  <Controller
+                    control={form.control}
+                    name="medicationSnapshot"
+                    render={({ field }) => {
+                      const meds = field.value || [];
+                      return (
+                        <div className="flex flex-col gap-1.5" id="field-medications">
+                          {meds.map((med: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green shrink-0"></div>
+                              <div className="flex-1 min-w-0 truncate">
+                                <span className="font-semibold">{typeof med === 'string' ? med : med.name}</span>
+                                {typeof med !== 'string' && med.dose && (
+                                  <span className="font-mono text-green font-semibold ml-1.5">{med.dose}{med.unit}</span>
+                                )}
+                                {typeof med !== 'string' && med.formulation && (
+                                  <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                                )}
+                                {typeof med !== 'string' && med.quantity && (
+                                  <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                                )}
+                                {typeof med !== 'string' && med.instructions && (
+                                  <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                                )}
+                              </div>
+                              {note?.status !== 'PUBLISHED' && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => {
+                                    const newMeds = [...meds];
+                                    newMeds.splice(idx, 1);
+                                    field.onChange(newMeds);
+                                  }}
+                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          {note?.status !== 'PUBLISHED' && (
+                            <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
+                              <div className="col-span-12 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
+                                <ComboboxInput
+                                  value={newMedName}
+                                  onChange={setNewMedName}
+                                  options={nameOptions}
+                                  placeholder="e.g. Lisinopril"
+                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+                                />
+                              </div>
+                              <div className="col-span-6 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+                                <input 
+                                  type="number" 
+                                  value={newMedDose}
+                                  onChange={(e) => setNewMedDose(e.target.value)}
+                                  placeholder="e.g. 10" 
+                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                />
+                              </div>
+                              <div className="col-span-6 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Unit</label>
+                                <select 
+                                  value={newMedUnit}
+                                  onChange={(e) => setNewMedUnit(e.target.value as MedUnitValue)}
+                                  className="h-[28px] px-1 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all cursor-pointer focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+                                >
+                                  <option value="MG">MG</option>
+                                  <option value="G">G</option>
+                                  <option value="MCG">MCG</option>
+                                  <option value="ML">ML</option>
+                                  <option value="UNITS">UNITS</option>
+                                </select>
+                              </div>
+                              <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
+                                <input 
+                                  value={newMedFormulation}
+                                  onChange={(e) => setNewMedFormulation(e.target.value)}
+                                  placeholder="e.g. Tablet, Syrup" 
+                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                />
+                              </div>
+                              <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
+                                <input 
+                                  type="number"
+                                  value={newMedQuantity}
+                                  onChange={(e) => setNewMedQuantity(e.target.value)}
+                                  placeholder="e.g. 30" 
+                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                />
+                              </div>
+                              <div className="col-span-12 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
+                                <input 
+                                  value={newMedInstructions}
+                                  onChange={(e) => setNewMedInstructions(e.target.value)}
+                                  placeholder="e.g. Take 1 tab daily" 
+                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                />
+                              </div>
+                              <div className="col-span-12 flex justify-between items-center mt-1">
+                                {medError ? (
+                                  <span className="text-red font-medium text-[10px]">{medError}</span>
+                                ) : <span />}
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="xs"
+                                  disabled={addingMed}
+                                  onClick={() => {
+                                    if (!newMedName.trim() || !newMedDose.trim()) {
+                                      setMedError('Medication name and dose are required');
+                                      return;
+                                    }
+                                    setMedError('');
+                                    setAddingMed(true);
+                                    setTimeout(() => {
+                                      field.onChange([...meds, { 
+                                        name: newMedName.trim(), 
+                                        dose: parseFloat(newMedDose), 
+                                        unit: newMedUnit, 
+                                        formulation: newMedFormulation.trim() || undefined,
+                                        quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
+                                        instructions: newMedInstructions.trim() 
+                                      }]);
+                                      setNewMedName('');
+                                      setNewMedDose('');
+                                      setNewMedUnit('MG');
+                                      setNewMedFormulation('');
+                                      setNewMedQuantity('');
+                                      setNewMedInstructions('');
+                                      setAddingMed(false);
+                                    }, 400);
+                                  }}
+                                  className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+                                >
+                                  {addingMed ? 'Adding...' : '+ Add Medication'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -1020,7 +1370,31 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         open={showClearModal}
         onClose={() => setShowClearModal(false)}
         onConfirm={() => {
-          form.reset();
+          form.reset({
+            chiefComplaint: '',
+            hpi: '',
+            pmhComorbidities: '',
+            pmhSurgeries: '',
+            pmhHospitalizations: '',
+            allergies: '',
+            familyHistory: '',
+            socialHistory: '',
+            obHistory: '',
+            psychosocialHistory: '',
+            physicalExam: '',
+            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+            medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
+              name: m.name,
+              dose: m.dose ? Number(m.dose) : undefined,
+              unit: m.unit,
+              formulation: m.formulation || undefined,
+              quantity: m.quantity || undefined,
+              instructions: m.instructions || undefined,
+            })),
+            mgmtNonpharm: '',
+            diagnostics: [],
+            visitDatetime: new Date().toISOString(),
+          });
           localStorage.removeItem(`damayan:draft:${patientId}:initial`);
           setShowClearModal(false);
         }}

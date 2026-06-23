@@ -14,8 +14,8 @@ export class VisitsController {
   @ApiOperation({ summary: 'List visits for a patient (newest first)' })
   async findAll(
     @Param('patientId') patientId: string,
-    @Query('page')      page?:      number,
-    @Query('limit')     limit?:     number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.visitsService.findAllByPatient(patientId, page, limit);
   }

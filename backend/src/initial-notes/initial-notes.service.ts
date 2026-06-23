@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInitialNoteDto } from './dto/create-initial-note.dto';
 import { UpdateInitialNoteDto } from './dto/update-initial-note.dto';
@@ -61,35 +66,75 @@ export class InitialNotesService {
           psychosocialHistory: dto.psychosocialHistory,
           mgmtNonpharm: dto.mgmtNonpharm,
           diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
+          medicationSnapshot: dto.medicationSnapshot ? (dto.medicationSnapshot as any) : [],
           status: NoteStatus.DRAFT,
         },
       });
     });
   }
 
-  async update(patientId: string, id: string, dto: UpdateInitialNoteDto, userId: string) {
+  async update(
+    patientId: string,
+    id: string,
+    dto: UpdateInitialNoteDto,
+    userId: string,
+  ) {
     const note = await this.prisma.initialNote.findUnique({ where: { id } });
     if (!note) throw new NotFoundException('Note not found');
-    if (note.visitId && !(await this.prisma.visit.findFirst({ where: { id: note.visitId, patientId } }))) {
-       throw new NotFoundException('Note not found for this patient');
+    if (
+      note.visitId &&
+      !(await this.prisma.visit.findFirst({
+        where: { id: note.visitId, patientId },
+      }))
+    ) {
+      throw new NotFoundException('Note not found for this patient');
     }
 
     const { visitDatetime, ...updateData } = dto;
     const data: Prisma.InitialNoteUpdateInput = {
-      ...(updateData.chiefComplaint !== undefined && { chiefComplaint: updateData.chiefComplaint }),
+      ...(updateData.chiefComplaint !== undefined && {
+        chiefComplaint: updateData.chiefComplaint,
+      }),
       ...(updateData.hpi !== undefined && { hpi: updateData.hpi }),
-      ...(updateData.pmhComorbidities !== undefined && { pmhComorbidities: updateData.pmhComorbidities }),
-      ...(updateData.pmhSurgeries !== undefined && { pmhSurgeries: updateData.pmhSurgeries }),
-      ...(updateData.pmhHospitalizations !== undefined && { pmhHospitalizations: updateData.pmhHospitalizations }),
-      ...(updateData.allergies !== undefined && { allergies: updateData.allergies }),
-      ...(updateData.familyHistory !== undefined && { familyHistory: updateData.familyHistory }),
-      ...(updateData.socialHistory !== undefined && { socialHistory: updateData.socialHistory }),
-      ...(updateData.obHistory !== undefined && { obHistory: updateData.obHistory }),
-      ...(updateData.psychosocialHistory !== undefined && { psychosocialHistory: updateData.psychosocialHistory }),
-      ...(updateData.physicalExam !== undefined && { physicalExam: updateData.physicalExam }),
-      ...(updateData.assessment !== undefined && { assessment: updateData.assessment as any }),
-      ...(updateData.mgmtNonpharm !== undefined && { mgmtNonpharm: updateData.mgmtNonpharm }),
-      ...(updateData.diagnostics !== undefined && { diagnostics: updateData.diagnostics as any }),
+      ...(updateData.pmhComorbidities !== undefined && {
+        pmhComorbidities: updateData.pmhComorbidities,
+      }),
+      ...(updateData.pmhSurgeries !== undefined && {
+        pmhSurgeries: updateData.pmhSurgeries,
+      }),
+      ...(updateData.pmhHospitalizations !== undefined && {
+        pmhHospitalizations: updateData.pmhHospitalizations,
+      }),
+      ...(updateData.allergies !== undefined && {
+        allergies: updateData.allergies,
+      }),
+      ...(updateData.familyHistory !== undefined && {
+        familyHistory: updateData.familyHistory,
+      }),
+      ...(updateData.socialHistory !== undefined && {
+        socialHistory: updateData.socialHistory,
+      }),
+      ...(updateData.obHistory !== undefined && {
+        obHistory: updateData.obHistory,
+      }),
+      ...(updateData.psychosocialHistory !== undefined && {
+        psychosocialHistory: updateData.psychosocialHistory,
+      }),
+      ...(updateData.physicalExam !== undefined && {
+        physicalExam: updateData.physicalExam,
+      }),
+      ...(updateData.assessment !== undefined && {
+        assessment: updateData.assessment as any,
+      }),
+      ...(updateData.mgmtNonpharm !== undefined && {
+        mgmtNonpharm: updateData.mgmtNonpharm,
+      }),
+      ...(updateData.diagnostics !== undefined && {
+        diagnostics: updateData.diagnostics,
+      }),
+      ...(updateData.medicationSnapshot !== undefined && {
+        medicationSnapshot: updateData.medicationSnapshot as any,
+      }),
     };
 
     if (note.status === NoteStatus.PUBLISHED) {
@@ -103,16 +148,19 @@ export class InitialNotesService {
   async publish(patientId: string, id: string, userId: string) {
     const note = await this.prisma.initialNote.findUnique({ where: { id } });
     if (!note) throw new NotFoundException('Note not found');
-    
+
     // Assert publishable
     const missingFields: string[] = [];
     if (!note.chiefComplaint) missingFields.push('chiefComplaint');
     if (!note.hpi) missingFields.push('hpi');
     if (!note.physicalExam) missingFields.push('physicalExam');
-    if (!note.assessment || (note.assessment as any[]).length === 0) missingFields.push('assessment');
-    
+    if (!note.assessment || (note.assessment as any[]).length === 0)
+      missingFields.push('assessment');
+
     if (missingFields.length > 0) {
-      throw new BadRequestException(`Missing required fields for publishing: ${missingFields.join(', ')}`);
+      throw new BadRequestException(
+        `Missing required fields for publishing: ${missingFields.join(', ')}`,
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -121,19 +169,36 @@ export class InitialNotesService {
         data: { status: NoteStatus.PUBLISHED },
       });
 
-      const assessmentTitles = (note.assessment as { title: string }[]).map(a => a.title);
-      await this.problemsService.upsertFromAssessment(patientId, assessmentTitles, userId, tx);
+      const assessmentItems = (note.assessment as any[] || [])
+        .filter(a => a && a.title && String(a.title).trim() !== '')
+        .map((a) => ({
+          title: String(a.title).trim(),
+          icdCode: a.icdCode,
+        }));
+      
+      await this.problemsService.upsertFromAssessment(
+        patientId,
+        assessmentItems,
+        userId,
+        tx,
+      );
 
-      // Medications are created directly, so we just query active meds during Initial Note publish?
-      // Wait, initial&progress.md says: "Initial Note publish does not need deactivation logic at all... 
-      // see comment block in the service". Actually, "note.medicationList" is mentioned in 3.1.4 but then:
-      // "Important schema note: InitialNote has no dedicated medicationList column in schema.prisma...
-      // The frontend MedicationListEditor uses useCreateMedication... while Initial Note is open.
-      // This keeps a single source of truth in the medications table and avoids the upsert collision."
-      // So I don't need to call upsertFromNoteMedications in publish for Initial Note if they are added live.
-      // Let's re-read 3.1.4 Important schema note: "Do not add a new JSONB column... wire the frontend 
-      // MedicationListEditor to call the Medications API directly". 
-      // So no medication upserts during Initial Note publish.
+      const medicationItems = (note.medicationSnapshot as any[] || [])
+        .filter(m => m && m.name && String(m.name).trim() !== '')
+        .map((m) => ({
+          name: String(m.name).trim(),
+          dose: m.dose !== undefined && m.dose !== null ? Number(m.dose) : 0,
+          unit: m.unit || 'MG',
+          formulation: m.formulation,
+          quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
+          instructions: m.instructions,
+        }));
+      await this.medicationsService.upsertFromNoteMedications(
+        patientId,
+        medicationItems,
+        userId,
+        tx,
+      );
 
       await tx.visit.update({
         where: { id: note.visitId },
@@ -145,32 +210,37 @@ export class InitialNotesService {
   }
 
   async remove(patientId: string, id: string, userId: string) {
-    const note = await this.prisma.initialNote.findUnique({ where: { id }, include: { visit: true } });
+    const note = await this.prisma.initialNote.findUnique({
+      where: { id },
+      include: { visit: true },
+    });
     if (!note) throw new NotFoundException('Note not found');
-    
+
     if (note.visit.patientId !== patientId) {
       throw new NotFoundException('Note not found for this patient');
     }
 
     const progressNotesCount = await this.prisma.progressNote.count({
-      where: { visit: { patientId } }
+      where: { visit: { patientId } },
     });
 
     if (progressNotesCount > 0) {
-      throw new BadRequestException('Cannot delete initial note because progress notes already exist for this patient.');
+      throw new BadRequestException(
+        'Cannot delete initial note because progress notes already exist for this patient.',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
       // Delete attachments first if there are any
       await tx.attachment.deleteMany({
-        where: { noteId: id }
+        where: { noteId: id },
       });
-      
+
       await tx.initialNote.delete({ where: { id } });
-      
+
       // Delete the visit since an Initial Note is 1:1 with its visit
       await tx.visit.delete({ where: { id: note.visitId } });
-      
+
       return { success: true };
     });
   }

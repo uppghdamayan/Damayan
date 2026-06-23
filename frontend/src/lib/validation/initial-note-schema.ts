@@ -18,6 +18,7 @@ export const initialNoteDraftSchema = z.object({
   psychosocialHistory: z.string().optional().or(z.literal('')),
   physicalExam: z.string().optional().or(z.literal('')),
   assessment: z.array(assessmentItemSchema).optional(),
+  medicationSnapshot: z.array(z.any()).optional(),
   mgmtNonpharm: z.string().optional().or(z.literal('')),
   diagnostics: z.array(z.string()).optional(),
   visitDatetime: z.string().optional(),
@@ -28,6 +29,7 @@ export const initialNotePublishSchema = initialNoteDraftSchema.extend({
   hpi: z.string().min(1, 'HPI is required'),
   physicalExam: z.string().min(1, 'Physical Exam is required'),
   assessment: z.array(assessmentItemSchema).min(1, 'At least one assessment is required'),
+  medicationSnapshot: z.array(z.any()),
   visitDatetime: z.string().min(1, 'Visit Datetime is required'),
 });
 

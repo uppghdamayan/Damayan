@@ -7,9 +7,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { passportJwtSecret } from 'jwks-rsa';
 
 export interface JwtPayload {
-  sub: string;          // Supabase Auth user UUID
+  sub: string; // Supabase Auth user UUID
   email: string;
-  user_role: string;    // Injected by custom_access_token_hook
+  user_role: string; // Injected by custom_access_token_hook
   iat: number;
   exp: number;
 }

@@ -17,6 +17,7 @@ export interface InitialNote {
   psychosocialHistory?: string;
   physicalExam: string;
   assessment: any[];
+  medicationSnapshot?: any[];
   mgmtNonpharm?: string;
   diagnostics?: string[];
   status: 'DRAFT' | 'PUBLISHED';

@@ -8,7 +8,8 @@ import { useState, useMemo } from 'react';
 import { mapNoteToTimelineView } from '@/lib/notes-utils';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { ClipboardList, ArrowRight } from 'lucide-react';
+import { ClipboardList, ArrowRight, Trash2 } from 'lucide-react';
+import { useDeleteAllDraftProgressNotes, useDeleteProgressNote } from '@/hooks/useProgressNotes';
 
 
 interface NoteTimelineProps {
@@ -27,6 +28,11 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   // Decided per fix.md §6.4.
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+  const [deleteDraftNoteId, setDeleteDraftNoteId] = useState<string | null>(null);
+  const [showClearDraftsModal, setShowClearDraftsModal] = useState(false);
+
+  const deleteAllDraftsMutation = useDeleteAllDraftProgressNotes(patientId);
+  const deleteProgressNoteMutation = useDeleteProgressNote(patientId);
 
   const handleToggleNote = (id: string) => {
     setExpandedNotes((prev) => {
@@ -51,6 +57,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   if (initialNote) {
     allNotesRaw.push(initialNote as any);
   }
+
+  const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
 
   // Sort chronologically (newest first)
   allNotesRaw.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -93,14 +101,24 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             </Button>
           )}
         </div>
-        {initialNote?.status === 'PUBLISHED' && (
-          <button 
-            onClick={handleNewNote}
-            className="h-[24px] px-3 bg-accent hover:bg-accent-hover text-white rounded text-[10px] font-bold cursor-pointer transition-all"
-          >
-            + New Note
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasDrafts && (
+            <button 
+              onClick={() => setShowClearDraftsModal(true)}
+              className="h-[24px] px-3 bg-red hover:bg-red-hover text-white rounded text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Clear Drafts
+            </button>
+          )}
+          {initialNote?.status === 'PUBLISHED' && !hasDrafts && (
+            <button 
+              onClick={handleNewNote}
+              className="h-[24px] px-3 bg-accent hover:bg-accent-hover text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+            >
+              + New Note
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 relative">
@@ -151,9 +169,11 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                     }
                   }} 
                   onDelete={
-                    note.kind === 'initial' && mappedNotes.length === 1 && note.status !== 'DRAFT'
+                    (note.kind === 'initial' && mappedNotes.length === 1 && note.status !== 'DRAFT')
                       ? () => setDeleteNoteId(note.id)
-                      : undefined
+                      : (note.kind === 'progress' && note.status === 'DRAFT')
+                        ? () => setDeleteDraftNoteId(note.id)
+                        : undefined
                   }
                 />
               </div>
@@ -175,6 +195,34 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         isDeleting={deleteMutation.isPending}
         title="Delete Initial Note"
         message="Are you sure you want to delete this Initial Note? This action cannot be undone."
+      />
+
+      <DeleteConfirmModal
+        open={showClearDraftsModal}
+        onClose={() => setShowClearDraftsModal(false)}
+        onConfirm={() => {
+          deleteAllDraftsMutation.mutate(undefined, {
+            onSuccess: () => setShowClearDraftsModal(false),
+          });
+        }}
+        isDeleting={deleteAllDraftsMutation.isPending}
+        title="Clear Draft Progress Notes"
+        message="Are you sure you want to delete all draft progress notes for this patient? This action cannot be undone."
+      />
+
+      <DeleteConfirmModal
+        open={!!deleteDraftNoteId}
+        onClose={() => setDeleteDraftNoteId(null)}
+        onConfirm={() => {
+          if (deleteDraftNoteId) {
+            deleteProgressNoteMutation.mutate(deleteDraftNoteId, {
+              onSuccess: () => setDeleteDraftNoteId(null),
+            });
+          }
+        }}
+        isDeleting={deleteProgressNoteMutation.isPending}
+        title="Delete Progress Note Draft"
+        message="Are you sure you want to delete this draft? This action cannot be undone."
       />
     </div>
   );

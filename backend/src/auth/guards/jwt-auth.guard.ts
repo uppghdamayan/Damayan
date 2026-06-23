@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -13,7 +19,7 @@ export class JwtAuthGuard implements CanActivate {
   ) {
     this.supabase = createClient(
       this.configService.get<string>('SUPABASE_URL')!,
-      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')!
+      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')!,
     );
   }
 
@@ -22,13 +28,18 @@ export class JwtAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid authorization header');
+      throw new UnauthorizedException(
+        'Missing or invalid authorization header',
+      );
     }
 
     const token = authHeader.split(' ')[1];
 
     // Securely verify token by fetching the user profile from Supabase Auth
-    const { data: { user: supabaseUser }, error } = await this.supabase.auth.getUser(token);
+    const {
+      data: { user: supabaseUser },
+      error,
+    } = await this.supabase.auth.getUser(token);
 
     if (error || !supabaseUser) {
       throw new UnauthorizedException('Invalid token');
@@ -57,7 +68,7 @@ export class JwtAuthGuard implements CanActivate {
         return true;
       }
       throw new ForbiddenException(
-        'Your account requires a password change before you can continue.'
+        'Your account requires a password change before you can continue.',
       );
     }
 

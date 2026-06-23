@@ -5,6 +5,8 @@ import {
   formatBloodPressure, formatTemperature
 } from '@/lib/vitals-utils';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 
 interface VitalsSummaryRowProps {
   patientId: string;
@@ -32,9 +34,18 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
 
   return (
     <div className="bg-surface border border-accent-mid rounded-[8px] shadow-[0_4px_12px_rgba(10,110,95,0.08)] mb-4 overflow-hidden">
-      <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-accent-light border-b border-accent-mid rounded-t-[7px]">
-        <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface text-accent shrink-0">🫀</div>
-        <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">Latest Vital Signs</span>
+      <div className="flex items-center justify-between px-[14px] py-[10px] bg-accent-light border-b border-accent-mid rounded-t-[7px]">
+        <div className="flex items-center gap-[9px]">
+          <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface text-accent shrink-0">🫀</div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">Latest Vital Signs</span>
+        </div>
+        <Link 
+          href={`/dashboard/${patientId}/vitals`}
+          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.6px] text-accent hover:text-accent-hover transition-colors"
+          title="Go to Vitals"
+        >
+          View All <ExternalLink className="w-3 h-3" />
+        </Link>
       </div>
       <div className="p-4">
         <div className="border border-border rounded-[8px] overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.03)]">
@@ -73,7 +84,12 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
           <svg width="12" height="12" fill="none" viewBox="0 0 16 16">
             <path d="M8 15A7 7 0 108 1a7 7 0 000 14zm0-3.5v-4M8 5.5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Vitals are automatically synced from the patient's record. To record new vitals, please use the Vital Signs tab.
+          <span>
+            Vitals are automatically synced from the patient&apos;s record. To record new vitals, please use the{' '}
+            <Link href={`/dashboard/${patientId}/vitals`} className="text-accent hover:text-accent-hover underline underline-offset-2 font-medium">
+              Vital Signs tab
+            </Link>.
+          </span>
         </div>
       </div>
     </div>

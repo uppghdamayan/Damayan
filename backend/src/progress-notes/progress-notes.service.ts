@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProgressNoteDto } from './dto/create-progress-note.dto';
 import { UpdateProgressNoteDto } from './dto/update-progress-note.dto';
@@ -31,7 +37,7 @@ export class ProgressNotesService {
         orderBy: { visit: { visitDatetime: 'desc' } },
         include: {
           visit: true,
-        }
+        },
       }),
       this.prisma.progressNote.count({ where: { visit: { patientId } } }),
     ]);
@@ -42,7 +48,10 @@ export class ProgressNotesService {
   }
 
   async findOne(id: string) {
-    const note = await this.prisma.progressNote.findUnique({ where: { id }, include: { visit: true } });
+    const note = await this.prisma.progressNote.findUnique({
+      where: { id },
+      include: { visit: true },
+    });
     if (!note) throw new NotFoundException('Progress Note not found');
     return note;
   }
@@ -51,26 +60,39 @@ export class ProgressNotesService {
     try {
       const initialNote = await this.initialNotesService.findOne(patientId);
       if (initialNote.status !== NoteStatus.PUBLISHED) {
-        throw new BadRequestException('Initial Note must be published before a Progress Note can be created.');
+        throw new BadRequestException(
+          'Initial Note must be published before a Progress Note can be created.',
+        );
       }
     } catch (e) {
       if (e instanceof NotFoundException) {
-        throw new BadRequestException('An Initial Note must be published before a Progress Note can be created.');
+        throw new BadRequestException(
+          'An Initial Note must be published before a Progress Note can be created.',
+        );
       }
       throw e;
     }
   }
 
-  private async getLatestNonpharmMgmt(patientId: string, tx: Prisma.TransactionClient): Promise<string | null> {
+  private async getLatestNonpharmMgmt(
+    patientId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<string | null> {
     const latestProgress = await tx.progressNote.findFirst({
       where: { visit: { patientId }, status: NoteStatus.PUBLISHED },
       orderBy: { visit: { visitDatetime: 'desc' } },
-      select: { mgmtNonpharm: true, visit: { select: { visitDatetime: true } } }
+      select: {
+        mgmtNonpharm: true,
+        visit: { select: { visitDatetime: true } },
+      },
     });
 
     const initial = await tx.initialNote.findFirst({
       where: { visit: { patientId }, status: NoteStatus.PUBLISHED },
-      select: { mgmtNonpharm: true, visit: { select: { visitDatetime: true } } }
+      select: {
+        mgmtNonpharm: true,
+        visit: { select: { visitDatetime: true } },
+      },
     });
 
     if (latestProgress && initial) {
@@ -87,12 +109,27 @@ export class ProgressNotesService {
   async create(patientId: string, dto: CreateProgressNoteDto, userId: string) {
     await this.assertInitialNotePublished(patientId);
 
+    const existingDraft = await this.prisma.progressNote.findFirst({
+      where: {
+        authorId: userId,
+        status: NoteStatus.DRAFT,
+        visit: {
+          patientId,
+        },
+      },
+    });
+
+    if (existingDraft) {
+      throw new ConflictException('You already have an active progress note draft for this patient.');
+    }
+
     return this.prisma.$transaction(async (tx) => {
-      const [activeProblems, activeMedications, latestVitals] = await Promise.all([
-        this.problemsService.findActiveForPatient(patientId, tx),
-        this.medicationsService.findActiveForPatient(patientId, tx),
-        this.vitalsService.findLatestForPatient(patientId, tx),
-      ]);
+      const [activeProblems, activeMedications, latestVitals] =
+        await Promise.all([
+          this.problemsService.findActiveForPatient(patientId, tx),
+          this.medicationsService.findActiveForPatient(patientId, tx),
+          this.vitalsService.findLatestForPatient(patientId, tx),
+        ]);
 
       const priorMgmtNonpharm = await this.getLatestNonpharmMgmt(patientId, tx);
 
@@ -112,8 +149,12 @@ export class ProgressNotesService {
           objective: dto.objective ?? '',
           mgmtNonpharm: dto.mgmtNonpharm ?? priorMgmtNonpharm ?? '',
           diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
-          problemListSnapshot: activeProblems as any,
-          medicationSnapshot: activeMedications as any,
+          problemListSnapshot: dto.problemListSnapshot
+            ? (dto.problemListSnapshot as any)
+            : (activeProblems as any),
+          medicationSnapshot: dto.medicationSnapshot
+            ? (dto.medicationSnapshot as any)
+            : (activeMedications as any),
           status: NoteStatus.DRAFT,
         },
       });
@@ -126,12 +167,24 @@ export class ProgressNotesService {
 
     const { visitDatetime, ...updateData } = dto;
     const data: Prisma.ProgressNoteUpdateInput = {
-      ...(updateData.subjective !== undefined && { subjective: updateData.subjective }),
-      ...(updateData.objective !== undefined && { objective: updateData.objective }),
-      ...(updateData.mgmtNonpharm !== undefined && { mgmtNonpharm: updateData.mgmtNonpharm }),
-      ...(updateData.diagnostics !== undefined && { diagnostics: updateData.diagnostics as any }),
-      ...(updateData.problemListSnapshot !== undefined && { problemListSnapshot: updateData.problemListSnapshot as any }),
-      ...(updateData.medicationSnapshot !== undefined && { medicationSnapshot: updateData.medicationSnapshot as any }),
+      ...(updateData.subjective !== undefined && {
+        subjective: updateData.subjective,
+      }),
+      ...(updateData.objective !== undefined && {
+        objective: updateData.objective,
+      }),
+      ...(updateData.mgmtNonpharm !== undefined && {
+        mgmtNonpharm: updateData.mgmtNonpharm,
+      }),
+      ...(updateData.diagnostics !== undefined && {
+        diagnostics: updateData.diagnostics,
+      }),
+      ...(updateData.problemListSnapshot !== undefined && {
+        problemListSnapshot: updateData.problemListSnapshot as any,
+      }),
+      ...(updateData.medicationSnapshot !== undefined && {
+        medicationSnapshot: updateData.medicationSnapshot as any,
+      }),
     };
 
     if (note.status === NoteStatus.PUBLISHED) {
@@ -147,26 +200,67 @@ export class ProgressNotesService {
     if (!note) throw new NotFoundException('Note not found');
 
     if (!note.subjective || !note.objective) {
-      throw new BadRequestException('Subjective and Objective are required to publish a progress note.');
+      throw new BadRequestException(
+        'Subjective and Objective are required to publish a progress note.',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const beforeProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-      const beforeMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+      const beforeProblems = await this.problemsService.findActiveForPatient(
+        patientId,
+        tx,
+      );
+      const beforeMeds = await this.medicationsService.findActiveForPatient(
+        patientId,
+        tx,
+      );
 
-      const snapshotTitles = ((note.problemListSnapshot as any[]) || []).map((p: any) => p.title);
-      await this.problemsService.upsertFromAssessment(patientId, snapshotTitles, userId, tx);
+      const snapshotItems = (note.problemListSnapshot as any[] || [])
+        .filter(p => p && p.title && String(p.title).trim() !== '')
+        .map(p => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
 
-      const snapshotMeds = (note.medicationSnapshot as any[]) || [];
-      await this.medicationsService.upsertFromNoteMedications(patientId, snapshotMeds, userId, tx);
+      await this.problemsService.upsertFromAssessment(
+        patientId,
+        snapshotItems,
+        userId,
+        tx,
+      );
 
-      const afterProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-      const afterMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+      const snapshotMeds = (note.medicationSnapshot as any[] || [])
+        .filter(m => m && m.name && String(m.name).trim() !== '')
+        .map((m) => ({
+          name: String(m.name).trim(),
+          dose: m.dose !== undefined && m.dose !== null ? Number(m.dose) : 0,
+          unit: m.unit || 'MG',
+          formulation: m.formulation,
+          quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
+          instructions: m.instructions,
+        }));
+      await this.medicationsService.upsertFromNoteMedications(
+        patientId,
+        snapshotMeds,
+        userId,
+        tx,
+      );
+
+      const afterProblems = await this.problemsService.findActiveForPatient(
+        patientId,
+        tx,
+      );
+      const afterMeds = await this.medicationsService.findActiveForPatient(
+        patientId,
+        tx,
+      );
 
       const problemChanges = diffByTitle(beforeProblems, afterProblems);
       const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
 
-      await this.visitsService.updateChangeSummary(note.visitId, problemChanges, medicationChanges, tx);
+      await this.visitsService.updateChangeSummary(
+        note.visitId,
+        problemChanges,
+        medicationChanges,
+        tx,
+      );
 
       const published = await tx.progressNote.update({
         where: { id },
@@ -179,6 +273,55 @@ export class ProgressNotesService {
       });
 
       return published;
+    });
+  }
+
+  async deleteDraft(patientId: string, id: string, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const note = await tx.progressNote.findUnique({
+        where: { id },
+        include: { visit: true },
+      });
+
+      if (!note) throw new NotFoundException('Note not found');
+      if (note.authorId !== userId && userId !== 'admin') throw new ForbiddenException('Not authorized to delete this note');
+      if (note.status !== NoteStatus.DRAFT) throw new BadRequestException('Only draft notes can be deleted');
+      if (note.visit.patientId !== patientId) throw new BadRequestException('Note does not belong to this patient');
+
+      await tx.progressNote.delete({ where: { id } });
+      await tx.visit.delete({ where: { id: note.visitId } });
+
+      return { success: true };
+    });
+  }
+
+  async deleteAllDrafts(patientId: string, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const drafts = await tx.progressNote.findMany({
+        where: {
+          authorId: userId,
+          status: NoteStatus.DRAFT,
+          visit: {
+            patientId,
+          },
+        },
+        select: { id: true, visitId: true },
+      });
+
+      if (drafts.length === 0) return { count: 0 };
+
+      const noteIds = drafts.map(d => d.id);
+      const visitIds = drafts.map(d => d.visitId);
+
+      const count = await tx.progressNote.deleteMany({
+        where: { id: { in: noteIds } },
+      });
+
+      await tx.visit.deleteMany({
+        where: { id: { in: visitIds } },
+      });
+
+      return { count: count.count };
     });
   }
 }

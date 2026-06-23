@@ -1,10 +1,21 @@
 import {
-  Controller, Get, Post, Patch, Body, Param, Query,
-  HttpCode, HttpStatus, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags, ApiOperation, ApiBearerAuth,
-  ApiCreatedResponse, ApiOkResponse,
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
@@ -27,8 +38,8 @@ export class PatientsController {
   @ApiOkResponse({ description: 'Paginated patient list.' })
   async findAll(
     @Query('search') search?: string,
-    @Query('page')   page?:   number,
-    @Query('limit')  limit?:  number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.patientsService.findAll({ search, page, limit });
   }
@@ -39,10 +50,7 @@ export class PatientsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new patient (Doctor, Admin)' })
   @ApiCreatedResponse({ description: 'Patient created.' })
-  async create(
-    @Body() dto: CreatePatientDto,
-    @CurrentUser() user: User,
-  ) {
+  async create(@Body() dto: CreatePatientDto, @CurrentUser() user: User) {
     return this.patientsService.create(dto, user.id);
   }
 
@@ -56,10 +64,7 @@ export class PatientsController {
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
   @ApiOperation({ summary: 'Update patient demographics (Doctor, Admin)' })
-  async update(
-    @Param('id') id: string,
-    @Body() dto: UpdatePatientDto,
-  ) {
+  async update(@Param('id') id: string, @Body() dto: UpdatePatientDto) {
     return this.patientsService.update(id, dto);
   }
   @Patch(':id/deactivate')

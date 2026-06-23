@@ -2,8 +2,12 @@ export function diffByTitle(before: any[], after: any[]) {
   const beforeTitles = before.map((p) => p.title.toLowerCase());
   const afterTitles = after.map((p) => p.title.toLowerCase());
 
-  const added = after.filter((p) => !beforeTitles.includes(p.title.toLowerCase()));
-  const removed = before.filter((p) => !afterTitles.includes(p.title.toLowerCase()));
+  const added = after.filter(
+    (p) => !beforeTitles.includes(p.title.toLowerCase()),
+  );
+  const removed = before.filter(
+    (p) => !afterTitles.includes(p.title.toLowerCase()),
+  );
 
   return { added, removed };
 }

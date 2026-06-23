@@ -35,19 +35,29 @@ export class VitalsController {
   constructor(private readonly vitalsService: VitalsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List vital signs history for a patient, newest first — All roles' })
+  @ApiOperation({
+    summary: 'List vital signs history for a patient, newest first — All roles',
+  })
   @ApiOkResponse({ description: 'Paginated vitals history.' })
   async findAll(
     @Param('patientId') patientId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.vitalsService.findAll(patientId, Number(page) || 1, Number(limit) || 10);
+    return this.vitalsService.findAll(
+      patientId,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
   }
 
   @Get('latest')
-  @ApiOperation({ summary: 'Get the single most recent vital signs record — All roles' })
-  @ApiOkResponse({ description: 'Latest vitals record, or null if none recorded.' })
+  @ApiOperation({
+    summary: 'Get the single most recent vital signs record — All roles',
+  })
+  @ApiOkResponse({
+    description: 'Latest vitals record, or null if none recorded.',
+  })
   async findLatest(@Param('patientId') patientId: string) {
     return this.vitalsService.findLatest(patientId);
   }
@@ -82,7 +92,10 @@ export class VitalsController {
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a vital signs record (Doctor, Admin — Nurse cannot delete)' })
+  @ApiOperation({
+    summary:
+      'Delete a vital signs record (Doctor, Admin — Nurse cannot delete)',
+  })
   async remove(@Param('patientId') patientId: string, @Param('id') id: string) {
     return this.vitalsService.remove(patientId, id);
   }

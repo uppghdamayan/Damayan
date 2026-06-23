@@ -8,4 +8,3 @@ import { VitalsService } from './vitals.service';
   exports: [VitalsService],
 })
 export class VitalsModule {}
-

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -47,21 +47,32 @@ export function CollapsibleSection({
   theme = 'amber'
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isFullyOpen, setIsFullyOpen] = useState(defaultOpen);
   const isRow = variant === 'row';
   const activeTheme = themeClasses[theme];
+
+  const handleToggle = () => {
+    if (isOpen) {
+      setIsFullyOpen(false);
+      setIsOpen(false);
+    } else {
+      setIsOpen(true);
+      setTimeout(() => setIsFullyOpen(true), 250);
+    }
+  };
 
   return (
     <div className={cn(
       isRow 
         ? "transition-all duration-250 ease-in-out" 
-        : "border border-border rounded-card overflow-hidden bg-surface mb-4",
+        : cn("border border-border rounded-card bg-surface mb-4 transition-all", isFullyOpen ? "overflow-visible" : "overflow-hidden"),
       isRow && isOpen 
         ? activeTheme.bgContainerOpen 
         : ""
     )}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={cn(
           "w-full flex items-center justify-between px-3.5 py-2.5 transition-all duration-200 rounded-[4px] cursor-pointer outline-none",
           isRow 
@@ -98,7 +109,10 @@ export function CollapsibleSection({
         "collapsible-content-wrapper",
         isOpen && "is-open"
       )}>
-        <div className="collapsible-content-inner">
+        <div className={cn(
+          "collapsible-content-inner",
+          isFullyOpen ? "!overflow-visible" : ""
+        )}>
           <div className="p-3.5 pt-3">
             {children}
           </div>

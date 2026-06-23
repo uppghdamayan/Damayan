@@ -25,9 +25,9 @@ async function bootstrap() {
   // ─────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,              // Strip properties not declared in DTO
-      forbidNonWhitelisted: true,   // Throw 400 if unknown properties are sent
-      transform: true,              // Auto-transform payload to DTO class instance
+      whitelist: true, // Strip properties not declared in DTO
+      forbidNonWhitelisted: true, // Throw 400 if unknown properties are sent
+      transform: true, // Auto-transform payload to DTO class instance
       transformOptions: {
         enableImplicitConversion: true, // Convert query string types automatically
       },
@@ -39,7 +39,9 @@ async function bootstrap() {
   // ─────────────────────────────────────────────
   const config = new DocumentBuilder()
     .setTitle('DAMAYAN EMR API')
-    .setDescription('Problem-Oriented EMR System for Philippine Clinical Settings')
+    .setDescription(
+      'Problem-Oriented EMR System for Philippine Clinical Settings',
+    )
     .setVersion('1.0.0')
     .addBearerAuth(
       {

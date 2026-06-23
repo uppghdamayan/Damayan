@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, NotFoundException, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  Request,
+  NotFoundException,
+  Delete,
+} from '@nestjs/common';
 import { InitialNotesService } from './initial-notes.service';
 import { CreateInitialNoteDto } from './dto/create-initial-note.dto';
 import { UpdateInitialNoteDto } from './dto/update-initial-note.dto';
@@ -19,21 +30,33 @@ export class InitialNotesController {
   @Get()
   async findOne(@Param('patientId') patientId: string, @Request() req) {
     const note = await this.initialNotesService.findOne(patientId);
-    
+
     // Draft visibility rule
     if (note.status === NoteStatus.DRAFT) {
-      if (req.user.role === Role.DOCTOR && req.user.id !== note.authorId && req.user.role !== Role.ADMIN) {
+      if (
+        req.user.role === Role.DOCTOR &&
+        req.user.id !== note.authorId &&
+        req.user.role !== Role.ADMIN
+      ) {
         throw new NotFoundException('Initial note not found for this patient.');
       }
     }
-    
+
     return note;
   }
 
   @Post()
   @Roles(Role.DOCTOR, Role.ADMIN)
-  create(@Param('patientId') patientId: string, @Body() createInitialNoteDto: CreateInitialNoteDto, @Request() req) {
-    return this.initialNotesService.create(patientId, createInitialNoteDto, req.user.id);
+  create(
+    @Param('patientId') patientId: string,
+    @Body() createInitialNoteDto: CreateInitialNoteDto,
+    @Request() req,
+  ) {
+    return this.initialNotesService.create(
+      patientId,
+      createInitialNoteDto,
+      req.user.id,
+    );
   }
 
   @Patch(':id')
@@ -43,9 +66,14 @@ export class InitialNotesController {
     @Param('patientId') patientId: string,
     @Param('id') id: string,
     @Body() updateInitialNoteDto: UpdateInitialNoteDto,
-    @Request() req
+    @Request() req,
   ) {
-    return this.initialNotesService.update(patientId, id, updateInitialNoteDto, req.user.id);
+    return this.initialNotesService.update(
+      patientId,
+      id,
+      updateInitialNoteDto,
+      req.user.id,
+    );
   }
 
   @Post(':id/publish')
@@ -54,7 +82,7 @@ export class InitialNotesController {
   publish(
     @Param('patientId') patientId: string,
     @Param('id') id: string,
-    @Request() req
+    @Request() req,
   ) {
     return this.initialNotesService.publish(patientId, id, req.user.id);
   }
@@ -65,7 +93,7 @@ export class InitialNotesController {
   remove(
     @Param('patientId') patientId: string,
     @Param('id') id: string,
-    @Request() req
+    @Request() req,
   ) {
     return this.initialNotesService.remove(patientId, id, req.user.id);
   }

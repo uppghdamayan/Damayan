@@ -107,3 +107,33 @@ export function usePublishProgressNote(patientId: string) {
     },
   });
 }
+
+export function useDeleteAllDraftProgressNotes(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => 
+      apiRequest<{ count: number }>(`/patients/${patientId}/progress-notes/drafts`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+    },
+  });
+}
+
+export function useDeleteProgressNote(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => 
+      apiRequest<{ success: boolean }>(`/patients/${patientId}/progress-notes/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
+    },
+  });
+}

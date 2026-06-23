@@ -35,8 +35,12 @@ export class ProblemsController {
   constructor(private readonly problemsService: ProblemsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List problem list for a patient, flat & sort-ordered — All roles' })
-  @ApiOkResponse({ description: 'Flat list; build the parent/child tree client-side.' })
+  @ApiOperation({
+    summary: 'List problem list for a patient, flat & sort-ordered — All roles',
+  })
+  @ApiOkResponse({
+    description: 'Flat list; build the parent/child tree client-side.',
+  })
   async findAll(@Param('patientId') patientId: string) {
     const data = await this.problemsService.findAll(patientId);
     return { data };
@@ -46,8 +50,13 @@ export class ProblemsController {
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Batch update sort_order after drag-and-drop (Doctor, Admin)' })
-  async reorder(@Param('patientId') patientId: string, @Body() dto: ReorderProblemsDto) {
+  @ApiOperation({
+    summary: 'Batch update sort_order after drag-and-drop (Doctor, Admin)',
+  })
+  async reorder(
+    @Param('patientId') patientId: string,
+    @Body() dto: ReorderProblemsDto,
+  ) {
     return this.problemsService.reorder(patientId, dto);
   }
 
@@ -68,7 +77,9 @@ export class ProblemsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
-  @ApiOperation({ summary: 'Edit problem title, status, or parent (Doctor, Admin)' })
+  @ApiOperation({
+    summary: 'Edit problem title, status, or parent (Doctor, Admin)',
+  })
   async update(
     @Param('patientId') patientId: string,
     @Param('id') id: string,
@@ -81,7 +92,9 @@ export class ProblemsController {
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft-delete a problem — sets status to REMOVED (Doctor, Admin)' })
+  @ApiOperation({
+    summary: 'Soft-delete a problem — sets status to REMOVED (Doctor, Admin)',
+  })
   async remove(@Param('patientId') patientId: string, @Param('id') id: string) {
     return this.problemsService.remove(patientId, id);
   }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Prisma, VitalSign } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVitalsDto } from './dto/create-vitals.dto';
@@ -6,7 +10,14 @@ import { UpdateVitalsDto } from './dto/update-vitals.dto';
 
 type PrismaTx = Prisma.TransactionClient;
 
-const MEASURE_FIELDS = ['sbp', 'dbp', 'heartRate', 'respiratoryRate', 'temperature', 'oxygenSaturation'] as const;
+const MEASURE_FIELDS = [
+  'sbp',
+  'dbp',
+  'heartRate',
+  'respiratoryRate',
+  'temperature',
+  'oxygenSaturation',
+] as const;
 
 @Injectable()
 export class VitalsService {
@@ -24,7 +35,9 @@ export class VitalsService {
         take: limit,
         orderBy: { measuredAt: 'desc' },
         include: {
-          measuredByUser: { select: { firstName: true, lastName: true, role: true } },
+          measuredByUser: {
+            select: { firstName: true, lastName: true, role: true },
+          },
         },
       }),
       this.prisma.vitalSign.count({ where: { patientId } }),
@@ -44,7 +57,9 @@ export class VitalsService {
       where: { patientId },
       orderBy: { measuredAt: 'desc' },
       include: {
-        measuredByUser: { select: { firstName: true, lastName: true, role: true } },
+        measuredByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
       },
     });
   }
@@ -68,15 +83,24 @@ export class VitalsService {
   }
 
   async findOne(patientId: string, id: string): Promise<VitalSign> {
-    const record = await this.prisma.vitalSign.findFirst({ where: { id, patientId } });
-    if (!record) throw new NotFoundException(`Vital signs record ${id} not found for this patient.`);
+    const record = await this.prisma.vitalSign.findFirst({
+      where: { id, patientId },
+    });
+    if (!record)
+      throw new NotFoundException(
+        `Vital signs record ${id} not found for this patient.`,
+      );
     return record;
   }
 
   // ─────────────────────────────────────────────
   // CREATE — standalone vitals (visitId always null in Phase 7)
   // ─────────────────────────────────────────────
-  async create(patientId: string, dto: CreateVitalsDto, userId: string): Promise<VitalSign> {
+  async create(
+    patientId: string,
+    dto: CreateVitalsDto,
+    userId: string,
+  ): Promise<VitalSign> {
     this.assertAtLeastOneMeasure(dto);
     return this.prisma.vitalSign.create({
       data: {
@@ -97,19 +121,34 @@ export class VitalsService {
   // ─────────────────────────────────────────────
   // UPDATE
   // ─────────────────────────────────────────────
-  async update(patientId: string, id: string, dto: UpdateVitalsDto): Promise<VitalSign> {
+  async update(
+    patientId: string,
+    id: string,
+    dto: UpdateVitalsDto,
+  ): Promise<VitalSign> {
     const existing = await this.findOne(patientId, id);
 
     const merged: CreateVitalsDto = {
-      sbp: dto.sbp !== undefined ? dto.sbp : existing.sbp ?? undefined,
-      dbp: dto.dbp !== undefined ? dto.dbp : existing.dbp ?? undefined,
-      heartRate: dto.heartRate !== undefined ? dto.heartRate : existing.heartRate ?? undefined,
+      sbp: dto.sbp !== undefined ? dto.sbp : (existing.sbp ?? undefined),
+      dbp: dto.dbp !== undefined ? dto.dbp : (existing.dbp ?? undefined),
+      heartRate:
+        dto.heartRate !== undefined
+          ? dto.heartRate
+          : (existing.heartRate ?? undefined),
       respiratoryRate:
-        dto.respiratoryRate !== undefined ? dto.respiratoryRate : existing.respiratoryRate ?? undefined,
+        dto.respiratoryRate !== undefined
+          ? dto.respiratoryRate
+          : (existing.respiratoryRate ?? undefined),
       temperature:
-        dto.temperature !== undefined ? dto.temperature : existing.temperature ? Number(existing.temperature) : undefined,
+        dto.temperature !== undefined
+          ? dto.temperature
+          : existing.temperature
+            ? Number(existing.temperature)
+            : undefined,
       oxygenSaturation:
-        dto.oxygenSaturation !== undefined ? dto.oxygenSaturation : existing.oxygenSaturation ?? undefined,
+        dto.oxygenSaturation !== undefined
+          ? dto.oxygenSaturation
+          : (existing.oxygenSaturation ?? undefined),
       measuredAt: dto.measuredAt ?? existing.measuredAt.toISOString(),
     };
     this.assertAtLeastOneMeasure(merged);
@@ -118,10 +157,13 @@ export class VitalsService {
     if (dto.sbp !== undefined) data.sbp = dto.sbp;
     if (dto.dbp !== undefined) data.dbp = dto.dbp;
     if (dto.heartRate !== undefined) data.heartRate = dto.heartRate;
-    if (dto.respiratoryRate !== undefined) data.respiratoryRate = dto.respiratoryRate;
+    if (dto.respiratoryRate !== undefined)
+      data.respiratoryRate = dto.respiratoryRate;
     if (dto.temperature !== undefined) data.temperature = dto.temperature;
-    if (dto.oxygenSaturation !== undefined) data.oxygenSaturation = dto.oxygenSaturation;
-    if (dto.measuredAt !== undefined) data.measuredAt = new Date(dto.measuredAt);
+    if (dto.oxygenSaturation !== undefined)
+      data.oxygenSaturation = dto.oxygenSaturation;
+    if (dto.measuredAt !== undefined)
+      data.measuredAt = new Date(dto.measuredAt);
 
     return this.prisma.vitalSign.update({ where: { id }, data });
   }
@@ -138,7 +180,9 @@ export class VitalsService {
   // Helpers
   // ─────────────────────────────────────────────
   private assertAtLeastOneMeasure(dto: Partial<CreateVitalsDto>): void {
-    const hasAny = MEASURE_FIELDS.some((field) => dto[field] !== undefined && dto[field] !== null);
+    const hasAny = MEASURE_FIELDS.some(
+      (field) => dto[field] !== undefined && dto[field] !== null,
+    );
     if (!hasAny) {
       throw new BadRequestException(
         'At least one vital sign measurement (SBP, DBP, heart rate, respiratory rate, temperature, or oxygen saturation) is required.',
