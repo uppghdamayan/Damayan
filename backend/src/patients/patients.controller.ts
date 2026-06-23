@@ -40,8 +40,16 @@ export class PatientsController {
     @Query('search') search?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('includeInactive') includeInactive?: string,
+    @CurrentUser() user?: User,
   ) {
-    return this.patientsService.findAll({ search, page, limit });
+    const isAdmin = user?.role === Role.ADMIN;
+    return this.patientsService.findAll({ 
+      search, 
+      page, 
+      limit, 
+      includeInactive: includeInactive === 'true' && isAdmin 
+    });
   }
 
   @Post()
@@ -73,5 +81,13 @@ export class PatientsController {
   @ApiOperation({ summary: 'Deactivate patient record (Admin only)' })
   async deactivate(@Param('id') id: string) {
     return this.patientsService.deactivate(id);
+  }
+
+  @Patch(':id/reactivate')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Reactivate patient record (Admin only)' })
+  async reactivate(@Param('id') id: string) {
+    return this.patientsService.reactivate(id);
   }
 }

@@ -111,7 +111,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 function AdminTabsNav() {
   const pathname = require('next/navigation').usePathname();
   const router = require('next/navigation').useRouter();
-  const activeTab = pathname.includes('/admin/dashboard') ? 'dashboard' : 'accounts';
+  const activeTab = pathname.includes('/admin/dashboard') 
+    ? 'dashboard' 
+    : pathname.includes('/admin/patients')
+      ? 'patients'
+      : 'accounts';
 
   return (
     <div className="border-b border-border">
@@ -124,8 +128,21 @@ function AdminTabsNav() {
               : 'text-text-muted hover:text-text-secondary'
           }`}
         >
-          Accounts
+          Staff Accounts
           {activeTab === 'accounts' && (
+            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+          )}
+        </button>
+        <button
+          onClick={() => router.push('/admin/patients')}
+          className={`pb-3 text-[13px] font-semibold transition-colors relative ${
+            activeTab === 'patients'
+              ? 'text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          Patient Accounts
+          {activeTab === 'patients' && (
             <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
           )}
         </button>

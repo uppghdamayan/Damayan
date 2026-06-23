@@ -33,11 +33,14 @@ export class PatientsService {
 
   // ── List / search ──────────────────────────────────────────────────────────
 
-  async findAll(filters: { search?: string; page?: number; limit?: number }) {
-    const { search, page = 1, limit = 50 } = filters;
+  async findAll(filters: { search?: string; page?: number; limit?: number; includeInactive?: boolean }) {
+    const { search, page = 1, limit = 50, includeInactive = false } = filters;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.PatientWhereInput = { isActive: true };
+    const where: Prisma.PatientWhereInput = {};
+    if (!includeInactive) {
+      where.isActive = true;
+    }
     if (search) {
       where.OR = [
         { lastName: { contains: search, mode: 'insensitive' } },
@@ -157,6 +160,18 @@ export class PatientsService {
     return this.prisma.patient.update({
       where: { id },
       data: { isActive: false },
+    });
+  }
+
+  // ── Reactivate ─────────────────────────────────────────────────────────────
+
+  async reactivate(id: string) {
+    // we use prisma directly because findOne might check isActive if we modify it in the future
+    const patient = await this.prisma.patient.findUnique({ where: { id } });
+    if (!patient) throw new NotFoundException(`Patient ${id} not found.`);
+    return this.prisma.patient.update({
+      where: { id },
+      data: { isActive: true },
     });
   }
 }
