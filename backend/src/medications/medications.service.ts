@@ -140,7 +140,7 @@ export class MedicationsService {
     userId: string,
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
-    if (!items?.length) return;
+    const keptIds = new Set<string>();
 
     const existing = await client.medication.findMany({
       where: { patientId, isActive: true },
@@ -153,7 +153,10 @@ export class MedicationsService {
           Number(m.dose) === Number(item.dose) &&
           m.unit === item.unit,
       );
-      if (match) continue;
+      if (match) {
+        keptIds.add(match.id);
+        continue;
+      }
 
       await client.medication.create({
         data: {
@@ -168,6 +171,16 @@ export class MedicationsService {
           addedBy: userId,
         },
       });
+    }
+
+    // Deactivate missing items
+    for (const ext of existing) {
+      if (!keptIds.has(ext.id)) {
+        await client.medication.update({
+          where: { id: ext.id },
+          data: { isActive: false },
+        });
+      }
     }
   }
 }

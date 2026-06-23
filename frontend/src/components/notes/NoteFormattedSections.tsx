@@ -27,6 +27,11 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const prevMeds = previousNote?.sections.medications || null;
   const medDiff = diffListItems(currentMeds, prevMeds);
 
+  // Diff assessment
+  const currentAssessment = note.sections.assessment || [];
+  const prevAssessment = previousNote?.sections.assessment || null;
+  const assessmentDiff = diffListItems(currentAssessment, prevAssessment);
+
   return (
     <div className="flex flex-col gap-4 text-[13px] text-[var(--text-secondary)] leading-relaxed">
       {/* Subjective (Chief Complaint + HPI, or Subjective for progress notes) */}
@@ -79,10 +84,24 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Assessment</span>
           </div>
           <div className="flex flex-col gap-1.5 mt-1 pl-2">
-            {note.sections.assessment.map((title, idx) => (
+            {assessmentDiff.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--red)] shrink-0" />
-                <span className="text-[12px] font-medium text-[var(--text-primary)]">{title}</span>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  item.status === 'removed' ? 'bg-[var(--text-muted)]' : 'bg-[var(--red)]'
+                }`} />
+                <div className="flex items-center flex-wrap gap-1.5">
+                  <span className={`text-[12px] font-medium ${
+                    item.status === 'removed' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'
+                  }`}>
+                    {item.text}
+                  </span>
+                  {item.status === 'removed' && (
+                    <Badge variant="removed" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
+                  )}
+                  {item.status === 'added' && (
+                    <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
+                  )}
+                </div>
               </div>
             ))}
           </div>

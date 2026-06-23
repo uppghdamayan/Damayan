@@ -118,6 +118,16 @@ export function mapNoteToTimelineView(
         }).filter(Boolean)
       : [];
 
+    const medicationList = Array.isArray(initialNote.medicationSnapshot)
+      ? initialNote.medicationSnapshot.map((med: any) => {
+          if (typeof med === 'string') return med;
+          if (med && typeof med === 'object') {
+            return `${med.name} ${med.dose}${med.unit}`;
+          }
+          return '';
+        }).filter(Boolean)
+      : [];
+
     return {
       id: initialNote.id,
       kind: 'initial',
@@ -133,7 +143,7 @@ export function mapNoteToTimelineView(
         assessment: assessmentTitles,
         nonPharm: initialNote.mgmtNonpharm || undefined,
         diagnostics: Array.isArray(initialNote.diagnostics) ? initialNote.diagnostics : undefined,
-        medications: undefined,
+        medications: medicationList.length > 0 ? medicationList : undefined,
       }
     };
   } else {

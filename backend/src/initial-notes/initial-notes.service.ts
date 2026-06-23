@@ -11,6 +11,7 @@ import { NoteStatus, VisitType, Prisma } from '@prisma/client';
 import { VisitsService } from '../visits/visits.service';
 import { ProblemsService } from '../problems/problems.service';
 import { MedicationsService } from '../medications/medications.service';
+import { diffByTitle, diffByNameDoseUnit } from '../progress-notes/progress-notes.utils';
 
 @Injectable()
 export class InitialNotesService {
@@ -169,6 +170,9 @@ export class InitialNotesService {
         data: { status: NoteStatus.PUBLISHED },
       });
 
+      const beforeProblems = await this.problemsService.findActiveForPatient(patientId, tx);
+      const beforeMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+
       const assessmentItems = (note.assessment as any[] || [])
         .filter(a => a && a.title && String(a.title).trim() !== '')
         .map((a) => ({
@@ -197,6 +201,19 @@ export class InitialNotesService {
         patientId,
         medicationItems,
         userId,
+        tx,
+      );
+
+      const afterProblems = await this.problemsService.findActiveForPatient(patientId, tx);
+      const afterMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+
+      const problemChanges = diffByTitle(beforeProblems, afterProblems);
+      const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+
+      await this.visitsService.updateChangeSummary(
+        note.visitId,
+        problemChanges,
+        medicationChanges,
         tx,
       );
 

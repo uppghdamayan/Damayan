@@ -174,6 +174,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
 
+  const [deleteProblemIndex, setDeleteProblemIndex] = useState<number | null>(null);
+  const [deleteMedIndex, setDeleteMedIndex] = useState<number | null>(null);
+
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedUnit, setNewMedUnit] = useState<MedUnitValue>('MG');
@@ -1100,11 +1103,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 type="button"
                                 variant="ghost"
                                 size="icon-xs"
-                                onClick={() => {
-                                  const newProbs = [...(field.value || [])];
-                                  newProbs.splice(idx, 1);
-                                  field.onChange(newProbs);
-                                }}
+                                onClick={() => setDeleteProblemIndex(idx)}
                                 className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
                               >
                                 <TrashIcon className="w-3.5 h-3.5" />
@@ -1228,11 +1227,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   type="button"
                                   variant="ghost"
                                   size="icon-xs"
-                                  onClick={() => {
-                                    const newMeds = [...meds];
-                                    newMeds.splice(idx, 1);
-                                    field.onChange(newMeds);
-                                  }}
+                                  onClick={() => setDeleteMedIndex(idx)}
                                   className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
                                 >
                                   <TrashIcon className="w-3.5 h-3.5" />
@@ -1432,6 +1427,40 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         confirmLabel="Publish"
         intent="primary"
         loadingLabel="Publishing..."
+      />
+
+      <DeleteConfirmModal
+        open={deleteProblemIndex !== null}
+        onClose={() => setDeleteProblemIndex(null)}
+        onConfirm={() => {
+          if (deleteProblemIndex !== null) {
+            const current = form.getValues('assessment') || [];
+            const updated = [...current];
+            updated.splice(deleteProblemIndex, 1);
+            form.setValue('assessment', updated, { shouldDirty: true, shouldTouch: true });
+            setDeleteProblemIndex(null);
+          }
+        }}
+        title="Remove Problem"
+        message="Are you sure you want to remove this problem from the active problem list?"
+        confirmLabel="Remove"
+      />
+
+      <DeleteConfirmModal
+        open={deleteMedIndex !== null}
+        onClose={() => setDeleteMedIndex(null)}
+        onConfirm={() => {
+          if (deleteMedIndex !== null) {
+            const current = form.getValues('medicationSnapshot') || [];
+            const updated = [...current];
+            updated.splice(deleteMedIndex, 1);
+            form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
+            setDeleteMedIndex(null);
+          }
+        }}
+        title="Remove Medication"
+        message="Are you sure you want to remove this medication from the prescribed list?"
+        confirmLabel="Remove"
       />
     </div>
   );

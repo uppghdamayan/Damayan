@@ -193,7 +193,7 @@ export class ProblemsService {
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
     const validItems = assessmentItems.filter((i) => i.title?.trim());
-    if (validItems.length === 0) return;
+    const keptIds = new Set<string>();
 
     const existing = await client.problem.findMany({
       where: {
@@ -218,10 +218,12 @@ export class ProblemsService {
       const match = existing.find((p) => p.title.toLowerCase() === key);
 
       if (match && match.status === ProblemStatus.ACTIVE) {
+        keptIds.add(match.id);
         continue;
       }
 
       if (match && match.status === ProblemStatus.RESOLVED) {
+        keptIds.add(match.id);
         const sortOrder = await this.getNextSortOrder(patientId, client);
         await client.problem.update({
           where: { id: match.id },
@@ -241,6 +243,19 @@ export class ProblemsService {
           addedBy: userId,
         },
       });
+    }
+
+    // Mark missing items as REMOVED
+    for (const ext of existing) {
+      // We only auto-remove ACTIVE problems that were dropped from the snapshot.
+      // We don't touch already RESOLVED problems that are not mentioned.
+      if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
+        const sortOrder = await this.getNextSortOrder(patientId, client);
+        await client.problem.update({
+          where: { id: ext.id },
+          data: { status: ProblemStatus.REMOVED, sortOrder },
+        });
+      }
     }
   }
 
