@@ -1,246 +1,182 @@
-# FIX: Note Timeline must use the persistent right-hand Documentation Panel (per wireframe3.html)
+# DAMAYAN — Note Timeline Module Revamp (Wireframe Parity Pass)
 
-## Audience
-This file is written for a coding agent (e.g. Claude Code) to execute directly. Do not ask the human
-for clarification on anything covered below — the spec is complete. If you discover a contradiction
-with the live codebase that this document does not address, stop and report it instead of guessing.
+**Phase type:** Frontend refactor (parity pass, not a new backend phase)
+**Target:** `frontend/src/components/notes/NoteTimeline.tsx` and its supporting pieces
+**Source of truth for behavior/look:** `wireframe/wireframe3.html` → `#screen-note-timeline`, `.note-timeline`, `.nt-entry`, `formatNoteForTimeline()`, `toggleTimelineNote()`, `closeAllTimelineNotes()`
+**Source of truth for code conventions:** existing `frontend/src/components/notes/*.tsx` and `frontend/src/hooks/useInitialNote.ts`
 
-## Context — what's broken right now
+> **Agent note before starting:** This repo is expected to have a `design-standards` doc (Tailwind tokens, shadcn/ui conventions, spacing scale, etc.). Locate it — likely `frontend/DESIGN_STANDARDS.md`, `frontend/src/styles/design-standards.md`, or similar — and read it in full before writing any component. If genuinely absent, fall back to the conventions explicitly demonstrated in `InitialNoteForm.tsx` / `NoteTimeline.tsx` / `NoteTimelineSkeleton.tsx` (CSS custom-property color tokens like `var(--text-muted)`, `cn()` from `@/lib/utils`, `lucide-react` icons, `rounded-card` / `rounded-btn` radius classes, `sec-btn` / `sec-btn primary` button classes). Do not invent a new visual language — match what's already there.
 
-Open `/dashboard/[patientId]/notes`. Today the page looks like this:
+---
+
+## 1. Goal
+
+The current `NoteTimeline.tsx` is a bare-bones list: a column of `NoteCard`s with no expand/collapse, no inline SOAP-section formatting, and no diff-aware diagnostics/medications rendering. The wireframe's Note Timeline screen has a materially richer interaction model that the product is supposed to follow. Port that mechanic and visual treatment into the real TypeScript + shadcn/ui component, using real data from `useInitialNote` and `useProgressNotes` instead of the wireframe's hardcoded `noteData` object.
+
+This is **not** a new feature — it's bringing `NoteTimeline.tsx` up to parity with what the wireframe already specifies. Do not invent new behavior beyond what's in `wireframe3.html`'s timeline section unless a real-data constraint forces a decision (documented in §6).
+
+---
+
+## 2. What "parity" means, concretely
+
+Reproduce these wireframe mechanics, translated to React/TypeScript/shadcn idioms:
+
+### 2.1 Collapsed entry → expandable entry (`.nt-entry` / `toggleTimelineNote`)
+- Each timeline entry is a card showing, when collapsed: date/time, note type label, badges (Draft/Published, "Latest Note", "Inherited" for the initial note), author name, and a 1-line italic preview (first ~65 chars of the subjective/chief-complaint text).
+- Clicking the entry (anywhere except inside the expanded dropdown body) toggles an inline expanded panel below it. Only one entry needs to support being open at a time in spirit, but the wireframe in fact allows multiple entries open simultaneously — preserve that (it's `closeAllTimelineNotes()` that collapses everything, not auto-collapse-on-open-another).
+- A chevron/indicator rotates 180° when open (`.nt-indicator` → use a lucide `ChevronDown` rotated via `cn()`/Tailwind `rotate-180` state class, not the wireframe's raw `▼` glyph).
+- Selected/open entries get an accent left-border + tinted background (`.nt-entry.selected` → `border-l-[3px] border-l-accent bg-accent-light`), matching the same selected-state visual already used elsewhere (see `.visit-row.selected` and `NoteActionBar`'s active states in `InitialNoteForm.tsx` for the established accent/border-left pattern).
+
+### 2.2 "Close All" control
+- A small ghost button in the section header ("Close All") that collapses every currently-open entry at once. Implement via component state (`Set<string>` of open note IDs) rather than DOM queries.
+
+### 2.3 Formatted note body inside the expanded panel (`formatNoteForTimeline`)
+This is the most important piece of mechanic to port faithfully, **but it must be rewritten as a structured renderer, not a regex-over-freetext parser**, because real data is already structured (see `InitialNote` interface in `useInitialNote.ts` and whatever `ProgressNote` type backs `useProgressNotes`). The wireframe's regex-based section-splitter exists only because the wireframe stores notes as a single flat string. **Do not port the regex parsing logic itself** — port the *visual section model* it produces:
+
+For each expanded note, render a stack of labeled section blocks, each styled exactly like the wireframe's `.nf-section` / `.nf-label` / `.nf-content`:
+
+| Section | Icon | Label color token (wireframe var → use existing token names) |
+|---|---|---|
+| Latest Vital Signs | ❤️ / `Heart` | `--accent-mid` |
+| Subjective (Chief Complaint + HPI, or Interval for progress notes) | 💬 / `MessageSquare` | `--blue` |
+| Objective (Physical Exam) | 🔬 / `Microscope` | `--amber` |
+| Labs / Imaging | 🧪 / (lucide `FlaskConical` or similar) | `--purple` |
+| Assessment | 📊 / `ClipboardList` | `--red` |
+| Plan (Non-pharmacologic) | 🩺 / `Stethoscope` | `--green` |
+| Diagnostics | 🔍 / (lucide `Search`) | `--green` |
+| Medications | 💊 / (lucide `Pill`) | `--green` |
+
+Use real lucide-react icons (the codebase already imports `Heart, MessageSquare, Microscope, ClipboardList, Stethoscope` etc. in `InitialNoteForm.tsx` — reuse those imports, don't introduce emoji into the TSX). Each label row keeps the wireframe's bottom-border-as-underline treatment (`border-b-[1.5px] border-b-{color}` under the label, not under the whole block).
+
+If a structured field is empty/null, render nothing for that section (skip it), matching how `InitialNoteForm.tsx`'s read-only view already conditionally renders sections (`{note.familyHistory && (...)}` pattern — follow that exact convention here).
+
+### 2.4 Diagnostics / Medications diff badges (added / existing / removed)
+The wireframe's `formatNoteForTimeline` does a same-name fuzzy match between the current note's diagnostics/medications list and the *previous* note in the sorted timeline, tagging each item as:
+- **existing** — plain badge, no tag
+- **added** — badge + small green "New" sub-badge
+- **removed** — struck-through, muted, dashed border + small red "Removed" sub-badge (this only applies to medications carried over from a prior note that are absent in the current one — i.e. it's showing what changed between consecutive notes, not deletions from the master list)
+
+Port this as a small pure utility function, e.g. `diffListItems(current: string[], previous: string[] | null): { text: string; status: 'existing' | 'added' | 'removed' }[]`, using the wireframe's matching heuristic (case-insensitive, match on leading drug/diagnostic name token, substring-tolerant) — see `isMatch()` in the wireframe script for the exact heuristic to replicate. Put this in `frontend/src/lib/notes/diff-list-items.ts` (or alongside existing note utils if a `lib/notes/` dir doesn't exist, check `@/lib/vitals-utils` for the established "domain-utils-as-flat-file" pattern and mirror it, e.g. `@/lib/notes-utils.ts`).
+
+Render diff badges with shadcn `Badge` variants:
+- existing → `<Badge variant="secondary">`
+- added → `<Badge variant="secondary">{text}<Badge className="ml-1 ...">New</Badge></Badge>` (nested small badge) — or two adjacent inline-flex badges, whichever matches how badges are already composed elsewhere in the codebase (check for any existing nested-badge pattern in `NoteCard.tsx` before inventing one)
+- removed → `<Badge variant="outline" className="border-dashed line-through opacity-70">` + red "Removed" sub-badge
+
+### 2.5 "Inherited" badge on the Initial Note's timeline entry
+The wireframe tags the Initial Consultation Note entry with a small purple "📌 Inherited by today's note" badge (`.nt-inherited-badge`) to communicate that its PMH/allergies/etc. flow forward into every subsequent note. Port this as a `Badge` with a lucide `Pin` or `ArrowDownToLine` icon, purple variant, shown only on the entry whose note type is the Initial Note.
+
+### 2.6 Sort order
+Same as current `NoteTimeline.tsx` — newest first by `createdAt` — this part doesn't need to change. Just confirm the Initial Note still sorts correctly relative to progress notes (it already does via the existing `allNotes.sort(...)` call); don't reintroduce the wireframe's separate "always put initial note last" logic, since the real component's chronological sort is the more correct behavior and should be kept.
+
+### 2.7 Section header / empty state
+- Header row: "Timeline" label (already present) + "+ New Note" button (already present) + add a "Close All" ghost button per §2.2, right-aligned, `sec-btn ghost` sized small, only rendered when at least one entry is currently expanded (avoid showing a no-op button).
+- Empty state ("No notes yet. Create an Initial Note to begin.") — keep as-is, already correct.
+
+---
+
+## 3. Component structure to produce
+
+Do not cram all of this into `NoteTimeline.tsx`. Split it the same way the wireframe conceptually separates "the list" from "one row's formatted content":
 
 ```
-┌─────────────┬──────────────────────────────────────────┬───────────────────────┐
-│  Sidebar    │  TIMELINE  +  PROGRESS NOTE FORM          │  DocumentationPanel   │
-│             │  (both rendered inline in notes/page.tsx) │  (dead placeholder)   │
-└─────────────┴──────────────────────────────────────────┴───────────────────────┘
+frontend/src/components/notes/
+  NoteTimeline.tsx              (existing — orchestrates list, owns open/closed Set<string>, renders TimelineEntry per note)
+  TimelineEntry.tsx             (NEW — one collapsible row: header strip + expand/collapse + mounts NoteFormattedSections when open)
+  NoteFormattedSections.tsx     (NEW — pure render of the SOAP-style section stack for one note, used inside TimelineEntry)
+  NoteTimelineSkeleton.tsx      (existing — no change needed unless the new row height materially differs; check after building TimelineEntry)
+frontend/src/lib/
+  notes-utils.ts                (NEW or extend — diffListItems() and the section-extraction mapping table)
 ```
 
-Two things are wrong:
+Use shadcn/ui primitives:
+- Wrap each `TimelineEntry` in shadcn `Collapsible` / `CollapsibleTrigger` / `CollapsibleContent` (from `@/components/ui/collapsible`) instead of hand-rolled open/close div toggling — this replaces the wireframe's manual `style.display` flipping with the idiomatic React/shadcn equivalent.
+- Use shadcn `Badge` (`@/components/ui/badge`) for all status/diff/inherited badges instead of the wireframe's raw `<span class="ch-badge ...">`.
+- Use shadcn `Button` with `variant="ghost"` `size="sm"` for "Close All", replacing `sec-btn ghost`.
+- If a `ScrollArea` component exists in `@/components/ui/scroll-area`, use it for the timeline's scrollable column instead of the raw `overflow-y-auto` div — check first; if absent, keep the existing raw scroll container (`overflow-y-auto` is already on the wrapping div in `NoteTimeline.tsx`, so no regression either way).
 
-1. **`ProgressNoteForm` is rendered inline inside `notes/page.tsx`**, next to the timeline, in the
-   *middle column*. It is not using the app's global right-hand `DocumentationPanel`.
-2. **`DocumentationPanel.tsx` is a static, non-functional placeholder.** It always renders the same
-   hardcoded text — "Progress Note Workspace... Form is rendered in the Notes tab. (Global panel
-   integration pending context provider)" — regardless of what's selected. It has no knowledge of
-   `patientId` or the selected note.
+---
 
-The net effect (visible in the bug screenshot): the timeline card and the note-editing UI both end up
-crammed into the main content column, and the actual right-hand documentation panel sits empty/inert
-beside them. This does **not** match `wireframe3.html`, which has exactly ONE right-hand panel
-(`#documentation-panel`) that is global, persistent across screens, and is where ALL note editing
-(Initial Note workspace fields AND Progress Note fields) happens. The Note Timeline (`#screen-note-timeline`
-in the wireframe) is a **read-only list of past notes** — clicking an entry expands an inline
-read-only preview *within the timeline card itself* (see `.nt-dropdown` in wireframe3.html). The
-wireframe never puts an editable form next to or inside the timeline. New/active note editing always
-happens in `#documentation-panel` on the right.
+## 4. Data contract — what each note needs to expose
 
-## Target architecture (must match wireframe3.html intent)
-
-```
-┌─────────────┬──────────────────────────┬───────────────────────────────┐
-│  Sidebar    │  Note Timeline           │  Documentation Panel (global) │
-│             │  (read-only list;        │  - shows the ACTIVE note      │
-│             │   click entry = inline   │    (new draft OR an existing  │
-│             │   read-only preview,     │    draft being edited)        │
-│             │   NOT an editable form)  │  - Subjective / Objective /   │
-│             │                          │    Problem snapshot / Med     │
-│             │                          │    snapshot / Diagnostics /   │
-│             │                          │    Save / Publish             │
-└─────────────┴──────────────────────────┴───────────────────────────────┘
-```
-
-- The Note Timeline column only ever shows a list + (optionally) a read-only expanded preview of a
-  past note when a timeline row is clicked, matching `.nt-entry` / `.nt-dropdown` behavior in
-  `wireframe3.html`.
-- The "+ New Note" action (whether triggered from the Topbar's "+ New Note" button or from the
-  Timeline's own "+ New Note" button) opens the **same global `DocumentationPanel`** on the right,
-  pre-populated with copy-forward data for a brand-new Progress Note draft.
-- Clicking an existing **draft** note in the timeline also opens it for editing in the same
-  `DocumentationPanel` (not inline, not in a separate column).
-- Clicking an existing **published** note in the timeline shows its read-only content inline in the
-  timeline (current `NoteCard` expand behavior is fine for this — published notes are NOT edited in
-  the panel).
-
-## Root cause
-
-There is no shared state connecting "which note is being actively edited" between:
-- the Topbar's "+ New Note" button (`frontend/src/components/layout/Topbar.tsx`),
-- the Note Timeline's own "+ New Note" button and row clicks (`frontend/src/components/notes/NoteTimeline.tsx`),
-- and the global `DocumentationPanel` (`frontend/src/components/layout/DocumentationPanel.tsx`).
-
-`notes/page.tsx` currently owns this state locally (`selectedNoteId`) and renders `ProgressNoteForm`
-itself, completely bypassing `DocumentationPanel`. That's the bug.
-
-## Fix plan
-
-### Step 1 — Add active-note state to a store the DocumentationPanel can read
-
-Edit `frontend/src/stores/uiStore.ts`. Add state for which note is actively being edited in the panel:
+`TimelineEntry` needs a normalized shape regardless of whether the underlying note is an `InitialNote` or a progress note. Define (or confirm an existing) discriminated union, e.g.:
 
 ```ts
-interface ActiveNoteEditorState {
-  patientId: string | null;
-  noteId: string | null;       // null = new note, set = editing existing draft
-  mode: 'new' | 'edit' | null; // null = panel idle / nothing being edited
+interface TimelineNoteView {
+  id: string;
+  kind: 'initial' | 'progress';
+  status: 'DRAFT' | 'PUBLISHED';
+  createdAt: string;
+  authorName: string;
+  previewText: string;       // first ~65 chars of chief complaint (initial) or subjective (progress)
+  isLatest: boolean;
+  sections: {
+    vitals?: { bp: string; hr: number; temp: string; spo2: number; measuredAt: string; measuredBy: string };
+    subjective?: { label: string; body: string }[];   // e.g. [{label: 'Chief Complaint', body: ...}, {label: 'HPI', body: ...}] for initial; [{label: 'Subjective', body}] for progress
+    objective?: string;
+    labs?: string;
+    assessment?: string[];          // problem titles
+    nonPharm?: string;
+    diagnostics?: string[];
+    medications?: string[];
+  };
 }
 ```
 
-Add to the `UiState` interface and the store implementation:
+Write a small mapper (in `notes-utils.ts`) that converts an `InitialNote` (from `useInitialNote.ts`) or a progress-note record (from `useProgressNotes`) into this shape. **Inspect the actual `useProgressNotes` hook and its returned type before writing this mapper** — it is referenced in `NoteTimeline.tsx` but its shape isn't in the files provided to you; read `frontend/src/hooks/useProgressNotes.ts` directly rather than guessing its fields.
 
-```ts
-activeNoteEditor: ActiveNoteEditorState;
-openNewProgressNote: (patientId: string) => void;
-openExistingProgressNote: (patientId: string, noteId: string) => void;
-closeNoteEditor: () => void;
+For vitals: each entry's "Latest Vital Signs" section in the wireframe is static/global (it shows the patient's *current* latest vitals on every entry, which is a quirk of the wireframe's mock data, not real clinical correctness). For the real component, decide and document explicitly: either (a) show vitals as recorded *at the time of that note* if the data model supports per-note vitals snapshots, or (b) omit the vitals section from historical timeline entries entirely and only show it in the active note editor (which `InitialNoteForm.tsx` already does via `useLatestVitals`). **Default to (b)** unless you find a `vitalsSnapshotId` or similar field linking a note to a specific vitals record — don't fabricate per-note vitals data that doesn't exist in the backend.
+
+---
+
+## 5. Visual tokens to reuse exactly (no new colors)
+
+Pull these directly from the existing CSS variable set already in use across `InitialNoteForm.tsx` / the wireframe `:root` block — do not introduce new hex values:
+
+```
+--text-primary, --text-secondary, --text-muted
+--surface, --surface-2, --surface-3
+--border
+--accent, --accent-hover, --accent-light, --accent-mid
+--blue, --blue-bg, --blue-border
+--amber, --amber-bg, --amber-border
+--red, --red-bg, --red-border
+--green, --green-bg, --green-border
+--purple, --purple-bg, --purple-border
 ```
 
-Implementation notes:
-- `openNewProgressNote(patientId)` sets `activeNoteEditor = { patientId, noteId: null, mode: 'new' }`
-  AND sets `documentationPanelOpen = true`.
-- `openExistingProgressNote(patientId, noteId)` sets
-  `activeNoteEditor = { patientId, noteId, mode: 'edit' }` AND sets `documentationPanelOpen = true`.
-- `closeNoteEditor()` sets `activeNoteEditor = { patientId: null, noteId: null, mode: null }`. Do NOT
-  force `documentationPanelOpen` to false here — closing the editor and collapsing the panel are
-  separate concerns; let the existing panel-toggle button control visibility.
-- Do **not** persist `activeNoteEditor` to localStorage (don't add it to the existing `partialize`
-  for this store) — it's session/navigation state, not a UI preference.
+Tailwind usage should follow the same arbitrary-value-via-CSS-var convention already established, e.g. `text-[var(--text-muted)]`, `border-l-accent`, `bg-accent-light`, exactly as seen throughout `InitialNoteForm.tsx`. If the project's Tailwind config already maps these to named utilities (e.g. `text-text-muted`, `bg-accent-light` as first-class classes — both forms appear in the provided files, suggesting the config does define them), prefer the named utility form over the `var(--...)` bracket form, matching whichever the *majority* of surrounding code in that same file does.
 
-### Step 2 — Rewrite `DocumentationPanel.tsx` to be the real Progress Note workspace
+---
 
-Replace the placeholder body in `frontend/src/components/layout/DocumentationPanel.tsx` with the
-actual editing UI, reusing the existing `ProgressNoteForm` component
-(`frontend/src/components/notes/ProgressNoteForm.tsx`) rather than rewriting form logic from scratch.
+## 6. Explicit decisions the agent must make and document inline (as code comments)
 
-Required behavior:
+Because the wireframe runs on fabricated mock state and the real app runs on live API data, a few mechanics can't be ported 1:1. Where this happens, leave a one-line comment explaining the deviation:
 
-- Read `activeNoteEditor` from `useUiStore()`.
-- **If `activeNoteEditor.mode` is `null`:** render the current idle placeholder (the existing
-  "Progress Note Workspace" icon + copy), but make the copy generic and accurate — it should say
-  something like "Select a note from the timeline, or start a new note, to begin documenting." Do NOT
-  claim a context-provider limitation; once this fix lands there is no such limitation.
-- **If `activeNoteEditor.mode` is `'new'` or `'edit'`:** render
-  `<ProgressNoteForm patientId={activeNoteEditor.patientId!} noteId={activeNoteEditor.noteId ?? undefined} onClose={() => closeNoteEditor()} />`
-  inside the panel body, replacing the placeholder. Remove the hardcoded header badges ("Saved",
-  "Draft") from `DocumentationPanel`'s own header — `ProgressNoteForm` already renders its own header
-  with live status; don't duplicate or shadow it. Keep the panel's pen icon are fine to leave for the
-  idle state's header, but when a note is active just let `ProgressNoteForm`'s own internal header
-  render (you may need to pass a prop to `ProgressNoteForm` to suppress its sticky top header
-  duplication if it conflicts visually with the panel chrome — check render output and remove
-  whichever header is redundant so there is exactly one header row).
-- The panel must continue to support resize and collapse exactly as it does today — do not touch the
-  resize handle or width logic, only the body content.
+1. **Per-note vitals** — see §4. Default to omitting unless evidence of a data link exists.
+2. **"Inherited" badge condition** — wireframe hardcodes this onto the Initial Note. Keep that same condition (`kind === 'initial'`); do not extend it to progress notes.
+3. **Diff baseline for diagnostics/medications** — the wireframe diffs against "the next note older in sorted order." Replicate this same adjacency rule (diff each note against the one immediately preceding it chronologically), not against the master medication list. This means the diff is re-computed per pair as the list renders — fine to do in a `useMemo` over the sorted array.
+4. **Multiple notes open simultaneously** — confirmed intentional (§2.1). Don't "fix" this into an accordion-style single-open-at-a-time unless explicitly asked; that would be a behavior change beyond parity scope.
 
-### Step 3 — Make `ProgressNoteForm` callable standalone (already true — verify only)
+---
 
-`frontend/src/components/notes/ProgressNoteForm.tsx` already accepts `patientId`, optional `noteId`,
-and `onClose`. Confirm it has no dependency on being a sibling of `NoteTimeline` (e.g. no assumption
-about parent flex layout, no shared local state lifted from `notes/page.tsx`). If you find any, lift
-that state into the component itself or into `useProgressNotes.ts` hooks — it must be fully
-self-contained when rendered from `DocumentationPanel`.
+## 7. Acceptance checklist (the agent should self-verify before declaring done)
 
-### Step 4 — Strip the inline form out of the Notes page; Timeline becomes read-only-first
+- [ ] `NoteTimeline.tsx` still consumes `useInitialNote` + `useProgressNotes` exactly as before; no new fetch hooks invented.
+- [ ] Each timeline row collapses/expands independently using shadcn `Collapsible`, no manual DOM `style.display` mutation anywhere.
+- [ ] Expanded content renders labeled sections matching the table in §2.3, each visually distinct by left-icon + colored underline label, skipping empty sections.
+- [ ] Diagnostics and Medications sections show added/existing/removed diff badges per §2.4, computed via the new `diffListItems` utility (unit-testable, pure function, no DOM/React dependency).
+- [ ] Initial Note's timeline entry — and only that entry — shows the "Inherited" badge.
+- [ ] "Close All" button appears only when ≥1 entry is open, and clears the open-set on click.
+- [ ] No raw `<span class="ch-badge ...">`, `<button class="sec-btn ...">`, or emoji-as-icon remains in the new TSX — all replaced with shadcn `Badge`/`Button` and lucide-react icons respectively.
+- [ ] No new color hex values introduced; everything traces to the token list in §5.
+- [ ] `NoteTimelineSkeleton.tsx` reviewed and updated if the new row's collapsed-state height differs meaningfully from its current skeleton block height.
+- [ ] TypeScript: no `any` introduced for note shapes; the `TimelineNoteView` union (or equivalent) is fully typed and the mapper functions have explicit return types.
 
-Rewrite `frontend/src/app/dashboard/[patientId]/notes/page.tsx`:
+---
 
-```tsx
-'use client';
+## 8. Out of scope (do not touch)
 
-import { useParams } from 'next/navigation';
-import { NoteTimeline } from '@/components/notes/NoteTimeline';
-
-export default function NotesPage() {
-  const params = useParams();
-  const patientId = params.patientId as string;
-
-  return (
-    <div className="flex h-full bg-bg overflow-hidden">
-      <NoteTimeline patientId={patientId} />
-    </div>
-  );
-}
-```
-
-- Remove the `selectedNoteId` state and the `<ProgressNoteForm>` render entirely from this file.
-  The timeline no longer takes an `onSelectNote` callback prop for opening an editor in-column.
-- The timeline itself should now span the available width of the middle column (it can drop its fixed
-  `w-[var(--timeline-w)]` constraint here since it's no longer sharing the column with a form — but
-  see Step 5; the wireframe's `#screen-note-timeline` shows the timeline as a single full-width card,
-  so prefer `w-full` over a fixed narrow rail in this standalone context).
-
-### Step 5 — Rewire `NoteTimeline.tsx` to drive the global panel, not local state
-
-Edit `frontend/src/components/notes/NoteTimeline.tsx`:
-
-- Drop the `onSelectNote` prop entirely.
-- Import `useUiStore` and use `openNewProgressNote` / `openExistingProgressNote` / `closeNoteEditor`.
-- The "+ New Note" button's `onClick` (currently `handleNewNote`) keeps its existing guard logic
-  (if no published Initial Note exists, `router.push` to `/initial-note` instead) but for the
-  progress-note branch, call `openNewProgressNote(patientId)` instead of `onSelectNote('new')`.
-- Each `<NoteCard>`'s `onClickEdit` currently does one of:
-  - `router.push(.../initial-note)` for the Initial Note card — **keep this unchanged**.
-  - `onSelectNote(note.id)` for a Progress Note card — **change this to**
-    `openExistingProgressNote(patientId, note.id)`.
-- Add a lightweight visual indicator on whichever timeline row corresponds to
-  `activeNoteEditor.noteId` (when `activeNoteEditor.patientId === patientId`) so the person can see
-  which note is currently open in the right panel — reuse the existing `.selected` / `border-accent`
-  treatment pattern already used elsewhere in this codebase (see `.nt-entry.selected` in
-  `wireframe3.html` and the `isActive` styling pattern in `Sidebar.tsx` for reference), applied to the
-  matching `NoteCard`'s wrapper `div`.
-- Do not change `NoteCard.tsx` itself in this step unless the "open in panel" affordance requires a
-  prop you don't already have (e.g. an `isActive` boolean) — if so, add that one prop, nothing more.
-
-### Step 6 — Sanity-check the Topbar's "+ New Note" entrypoint
-
-`frontend/src/components/layout/Topbar.tsx` currently does:
-```ts
-router.push(`/dashboard/${activePatient.id}/notes`);
-```
-This is fine to leave as-is (it's reasonable for "+ New Note" to land you on the Notes/Timeline
-screen first), **but** after this fix the person still has to click the Timeline's own "+ New Note"
-button to actually open the panel — that's two clicks for one intent. Improve it minimally:
-
-- Add `openNewProgressNote` from `useUiStore` to `Topbar.tsx`.
-- In the click handler, after the route guard logic mirroring `NoteTimeline.handleNewNote` (you'll
-  need the patient's Initial Note status — reuse `useInitialNote(activePatient.id)` the same way
-  `NoteTimeline` does), either `router.push(.../initial-note)` (no published Initial Note yet) or
-  `router.push(.../notes)` **and** `openNewProgressNote(activePatient.id)` together (Initial Note is
-  published). This makes the Topbar button open the panel directly in one click, exactly like the
-  Timeline's own button, while still navigating to the Notes tab so the Timeline is visible alongside
-  the now-open panel.
-- If this introduces meaningful duplicated logic between `Topbar.tsx` and `NoteTimeline.tsx`, extract
-  a small shared hook, e.g. `useNewProgressNoteAction(patientId)` returning a single `trigger()`
-  function, and use it from both call sites. Use your judgment on whether the duplication is small
-  enough to leave inline — prefer the hook if the guard logic exceeds ~5 lines in either site.
-
-## Out of scope — do not touch
-
-- Do not modify `InitialNoteForm.tsx`, `initial-note/page.tsx`, or any Initial Note routing/behavior.
-  The Initial Note continues to live on its own full-page route, exactly as today. Only Progress
-  Notes move into the global panel.
-- Do not modify `ProgressNoteForm.tsx`'s internal field logic, validation, auto-save, or publish flow
-  — only verify/adjust its outer chrome per Step 2/3 if a duplicate header is found.
-- Do not change `DocumentationPanel`'s resize/collapse mechanics, width CSS variables, or its presence
-  in `dashboard/layout.tsx`.
-- Do not change any backend/NestJS code. This is a frontend-only state-wiring fix.
-
-## Acceptance criteria
-
-1. Navigate to a patient's Notes tab. The middle column shows ONLY the timeline (full width), no
-   inline form, no duplicate panel.
-2. Click "+ New Note" in the Timeline (with a published Initial Note already present for that
-   patient): the right-hand Documentation Panel switches from its idle placeholder to a live, editable
-   Progress Note form pre-filled with copy-forward problems/medications. The timeline itself does not
-   change.
-3. Click "+ New Note" in the Topbar: same result as #2, in one click, and you land on the Notes tab.
-4. Click an existing **draft** Progress Note card in the timeline: the right panel loads that draft
-   for editing. The corresponding timeline card shows an active/selected visual state.
-5. Click an existing **published** Progress Note card in the timeline: it expands inline within the
-   timeline as read-only (current behavior preserved) — the right panel is NOT triggered for
-   published notes.
-6. Click the Initial Note card in the timeline (any status): routes to `/initial-note` as today —
-   unaffected by this fix.
-7. Toggling the Documentation Panel closed/open via the existing panel-toggle button in `ScreenNav`
-   continues to work and does not clear `activeNoteEditor` state — reopening the panel while a note
-   is active shows that note again, not the idle placeholder.
-8. No console errors; no TypeScript errors; `npm run lint` and `npm run build` (frontend) both pass.
+- Backend/API changes — this is a frontend-only visual/interaction parity pass.
+- `InitialNoteForm.tsx`'s own published read-only view — already correct and already follows the right conventions; do not refactor it as part of this phase even though it shares visual DNA with what you're building.
+- Phase 8 (Initial Note) integration contracts already locked in prior phases — this phase must not alter `useInitialNote.ts`'s public hook signatures.

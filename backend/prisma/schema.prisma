@@ -215,6 +215,7 @@ model ProgressNote {
   authorId             String?    @map("author_id") @db.Uuid
   subjective           String
   objective            String
+  labs                 String?
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
   diagnostics          Json?
   problemListSnapshot  Json?      @map("problem_list_snapshot")

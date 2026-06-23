@@ -4,6 +4,7 @@ import { assessmentItemSchema } from './initial-note-schema';
 export const progressNoteDraftSchema = z.object({
   subjective: z.string().optional().or(z.literal('')),
   objective: z.string().optional().or(z.literal('')),
+  labs: z.string().optional().or(z.literal('')),
   mgmtNonpharm: z.string().optional().or(z.literal('')),
   diagnostics: z.array(z.string()).optional(),
   problemListSnapshot: z.array(assessmentItemSchema).optional(),

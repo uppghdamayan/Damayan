@@ -42,15 +42,15 @@ export function TagInputField({ value = [], onChange, placeholder = 'Type and pr
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         {value.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-1 px-2 py-1 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)]">
+          <div key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-surface-2 border border-border rounded-[6px] text-[12px] text-text-primary">
             <span>{isObjectFormat ? item.title : item}</span>
             {isObjectFormat && item.icdCode && (
-              <span className="text-[10px] text-[var(--text-muted)] ml-1">({item.icdCode})</span>
+              <span className="text-[10px] text-text-muted ml-1">({item.icdCode})</span>
             )}
             <button
               type="button"
               onClick={() => handleRemove(idx)}
-              className="text-[var(--text-muted)] hover:text-red transition-colors ml-1"
+              className="text-text-muted hover:text-red transition-colors ml-1"
             >
               <XIcon className="w-3 h-3" />
             </button>
@@ -59,7 +59,7 @@ export function TagInputField({ value = [], onChange, placeholder = 'Type and pr
       </div>
       <input
         type="text"
-        className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus placeholder:text-[var(--text-muted)]"
+        className="w-full h-[34px] px-2.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/70"
         placeholder={placeholder}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
@@ -68,3 +68,4 @@ export function TagInputField({ value = [], onChange, placeholder = 'Type and pr
     </div>
   );
 }
+

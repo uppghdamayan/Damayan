@@ -143,4 +143,35 @@ export class InitialNotesService {
       return published;
     });
   }
+
+  async remove(patientId: string, id: string, userId: string) {
+    const note = await this.prisma.initialNote.findUnique({ where: { id }, include: { visit: true } });
+    if (!note) throw new NotFoundException('Note not found');
+    
+    if (note.visit.patientId !== patientId) {
+      throw new NotFoundException('Note not found for this patient');
+    }
+
+    const progressNotesCount = await this.prisma.progressNote.count({
+      where: { visit: { patientId } }
+    });
+
+    if (progressNotesCount > 0) {
+      throw new BadRequestException('Cannot delete initial note because progress notes already exist for this patient.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Delete attachments first if there are any
+      await tx.attachment.deleteMany({
+        where: { noteId: id }
+      });
+      
+      await tx.initialNote.delete({ where: { id } });
+      
+      // Delete the visit since an Initial Note is 1:1 with its visit
+      await tx.visit.delete({ where: { id: note.visitId } });
+      
+      return { success: true };
+    });
+  }
 }

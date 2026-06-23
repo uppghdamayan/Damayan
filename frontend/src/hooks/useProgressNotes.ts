@@ -10,6 +10,7 @@ export interface ProgressNote {
   authorId: string | null;
   subjective: string;
   objective: string;
+  labs?: string;
   mgmtNonpharm?: string;
   diagnostics?: string[];
   problemListSnapshot?: any[];

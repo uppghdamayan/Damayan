@@ -10,7 +10,8 @@ import {
   useInitialNote, 
   useCreateInitialNote, 
   useUpdateInitialNote, 
-  usePublishInitialNote 
+  usePublishInitialNote,
+  useDeleteInitialNote
 } from '@/hooks/useInitialNote';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { usePatient } from '@/hooks/usePatients';
@@ -24,6 +25,7 @@ import { NoteStatusBadge } from './NoteStatusBadge';
 import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
   classifyTemperature, classifyRespiratoryRate,
@@ -36,6 +38,7 @@ interface NoteActionBarProps {
   onSaveDraft?: () => void;
   onPublish?: () => void;
   onClear?: () => void;
+  onUnsave?: () => void;
   showSaveAndClear?: boolean;
   showPublish?: boolean;
 }
@@ -46,17 +49,21 @@ function NoteActionBar({
   onSaveDraft, 
   onPublish, 
   onClear,
+  onUnsave,
   showSaveAndClear = true,
   showPublish = true
 }: NoteActionBarProps) {
   return (
     <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
       <span className="text-[11px] text-[var(--text-muted)]">
-        {showSaveAndClear ? (isSaving ? 'Saving…' : 'Draft auto-saves every 30s') : ''}
+        {showSaveAndClear ? (isSaving ? 'Saving…' : 'Draft auto-saves locally') : ''}
       </span>
       <div className="flex items-center gap-2">
         {showSaveAndClear && onClear && (
           <button type="button" onClick={onClear} className="sec-btn destructive">Clear Form</button>
+        )}
+        {showSaveAndClear && onUnsave && (
+          <button type="button" onClick={onUnsave} className="sec-btn">Unsave Draft</button>
         )}
         {showSaveAndClear && onSaveDraft && (
           <button type="button" onClick={onSaveDraft} disabled={isSaving} className="sec-btn">
@@ -152,8 +159,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const createMutation = useCreateInitialNote(patientId);
   const updateMutation = useUpdateInitialNote(patientId);
   const publishMutation = usePublishInitialNote(patientId);
+  const deleteMutation = useDeleteInitialNote(patientId);
 
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showUnsaveModal, setShowUnsaveModal] = useState(false);
 
   const isFemale = patient?.sex?.toLowerCase() === 'female';
 
@@ -219,7 +229,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     }
   };
 
-  useAutoSave(formValues, handleSave, `damayan:draft:${patientId}:initial`, 30000);
+  useAutoSave(formValues, (data) => {
+    localStorage.setItem(`damayan:draft:${patientId}:initial`, JSON.stringify(data));
+  }, `damayan:draft:${patientId}:initial`, 5000);
 
   const handlePublish = async () => {
     setPublishError(null);
@@ -574,7 +586,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           <NoteActionBar 
             isSaving={isSaving}
             onSaveDraft={() => handleSave(formValues)}
-            onClear={() => form.reset()}
+            onClear={() => setShowClearModal(true)}
+            onUnsave={note && note.status === 'DRAFT' ? () => setShowUnsaveModal(true) : undefined}
             showPublish={false}
           />
 
@@ -968,6 +981,38 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
         </>
       )}
+
+      <DeleteConfirmModal
+        open={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={() => {
+          form.reset();
+          localStorage.removeItem(`damayan:draft:${patientId}:initial`);
+          setShowClearModal(false);
+        }}
+        title="Clear Form"
+        message="Are you sure you want to clear the form? This will remove all your current input."
+        confirmLabel="Clear"
+      />
+
+      <DeleteConfirmModal
+        open={showUnsaveModal}
+        onClose={() => setShowUnsaveModal(false)}
+        onConfirm={() => {
+          if (note && note.status === 'DRAFT') {
+            deleteMutation.mutate(note.id, {
+              onSuccess: () => {
+                setShowUnsaveModal(false);
+                router.push(`/dashboard/${patientId}/notes`);
+              }
+            });
+          }
+        }}
+        isDeleting={deleteMutation.isPending}
+        title="Unsave Draft"
+        message="Are you sure you want to unsave this draft? This will delete the draft from the system."
+        confirmLabel="Unsave"
+      />
     </div>
   );
 }

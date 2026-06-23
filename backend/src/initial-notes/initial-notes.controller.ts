@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, NotFoundException, Delete } from '@nestjs/common';
 import { InitialNotesService } from './initial-notes.service';
 import { CreateInitialNoteDto } from './dto/create-initial-note.dto';
 import { UpdateInitialNoteDto } from './dto/update-initial-note.dto';
@@ -57,5 +57,16 @@ export class InitialNotesController {
     @Request() req
   ) {
     return this.initialNotesService.publish(patientId, id, req.user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthorGuard)
+  @NoteModel('initialNote')
+  remove(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @Request() req
+  ) {
+    return this.initialNotesService.remove(patientId, id, req.user.id);
   }
 }

@@ -85,3 +85,20 @@ export function usePublishInitialNote(patientId: string) {
     },
   });
 }
+
+export function useDeleteInitialNote(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => 
+      apiRequest<{ success: boolean }>(`/patients/${patientId}/initial-note/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.setQueryData(['initial-note', patientId], null);
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+    },
+  });
+}
