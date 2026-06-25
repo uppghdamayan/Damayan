@@ -1,23 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import {
-  DndContext,
-  DragOverlay,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragMoveEvent,
-} from '@dnd-kit/core';
+import { useMemo } from 'react';
+import { useDroppable, useDndContext } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  arrayMove,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -29,16 +16,19 @@ const COLUMN_LAYOUT = '22px 14px 3fr 1.5fr 1.2fr 2fr 120px 1.5fr';
 
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
+  flatProblems: { problem: ProblemNode; depth: number }[];
+  isTableDragging: boolean;
+  activeDragItem: { problem: ProblemNode; depth: number } | null;
+  dragOverState: { id: string; isMerge: boolean } | null;
   allOptions: Problem[];
   canManage: boolean;
   onEdit: (p: Problem) => void;
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
   onDelete: (p: Problem) => void;
-  onReorder: (items: { id: string; sortOrder: number }[]) => void;
   onParentChange: (p: Problem, newParentId: string | null) => void;
 }
 
-function ActiveProblemRow({
+export function ActiveProblemRow({
   problem,
   depth = 0,
   canManage,
@@ -237,202 +227,79 @@ function SortableRow({
 
 export function ActiveProblemTable({
   nodes,
+  flatProblems,
+  isTableDragging,
+  dragOverState,
   allOptions,
   canManage,
   onEdit,
   onStatusChange,
   onDelete,
-  onReorder,
   onParentChange,
 }: ActiveProblemTableProps) {
-  const [dragOverState, setDragOverState] = useState<{ id: string; isMerge: boolean } | null>(null);
-  const [isTableDragging, setIsTableDragging] = useState(false);
-  const [activeDragItem, setActiveDragItem] = useState<{ problem: ProblemNode; depth: number } | null>(null);
-
-  // Track global pointer coordinates to check relative x offset within elements
-  const pointerPosition = useRef({ x: 0, y: 0 });
-  useEffect(() => {
-    const handleMove = (e: PointerEvent) => {
-      pointerPosition.current = { x: e.clientX, y: e.clientY };
-    };
-    window.addEventListener('pointermove', handleMove);
-    return () => window.removeEventListener('pointermove', handleMove);
-  }, []);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  const flatProblems = useMemo(() => {
-    const list: { problem: ProblemNode; depth: number }[] = [];
-    const traverse = (nodesList: ProblemNode[], depth: number) => {
-      nodesList.forEach(node => {
-        list.push({ problem: node, depth });
-        traverse(node.children, depth + 1);
-      });
-    };
-    traverse(nodes, 0);
-    return list;
-  }, [nodes]);
-
   const ids = useMemo(() => flatProblems.map(item => item.problem.id), [flatProblems]);
 
-  const findProblemById = (id: string, currentNodes: ProblemNode[] = nodes): ProblemNode | undefined => {
-    for (const node of currentNodes) {
-      if (node.id === id) return node;
-      const child = findProblemById(id, node.children);
-      if (child) return child;
-    }
-    return undefined;
-  };
+  const { setNodeRef } = useDroppable({
+    id: 'active-table',
+  });
 
-  const handleDragMove = (event: DragMoveEvent) => {
-    const { over } = event;
-    if (!over) {
-      setDragOverState(null);
-      return;
-    }
-    const overElement = document.getElementById(`row-${over.id}`);
-    if (overElement) {
-      const rect = overElement.getBoundingClientRect();
-      const x = pointerPosition.current.x - rect.left;
-      const isMerge = x > 150;
-      setDragOverState({ id: over.id as string, isMerge });
-    } else {
-      setDragOverState(null);
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setIsTableDragging(false);
-    setActiveDragItem(null);
-    const { active, over } = event;
-    setDragOverState(null);
-    if (!over || active.id === over.id) return;
-
-    const activeProblem = findProblemById(active.id as string);
-    const targetProblem = findProblemById(over.id as string);
-    if (!activeProblem || !targetProblem) return;
-
-    const overElement = document.getElementById(`row-${over.id}`);
-    let isMerge = false;
-    if (overElement) {
-      const rect = overElement.getBoundingClientRect();
-      const x = pointerPosition.current.x - rect.left;
-      isMerge = x > 150;
-    }
-
-    if (isMerge) {
-      // Nesting (Merge) - target itself
-      const newParentId = targetProblem.id;
-
-      if (activeProblem.id === newParentId) return;
-      if (isDescendant(allOptions, newParentId, activeProblem.id)) {
-        toast.error('Cannot nest a problem under its own descendant.');
-        return;
-      }
-
-      try {
-        onParentChange(activeProblem, newParentId);
-      } catch (err) {
-        // Parent screen handles mutation errors
-      }
-    } else {
-      // Reordering - adopt target's parent level
-      if (activeProblem.parentId !== targetProblem.parentId) {
-        if (targetProblem.parentId && isDescendant(allOptions, targetProblem.parentId, activeProblem.id)) {
-          toast.error('Cannot nest a problem under its own descendant.');
-          return;
-        }
-        try {
-          onParentChange(activeProblem, targetProblem.parentId);
-        } catch (err) {
-          return;
-        }
-      }
-
-      const oldIndex = flatProblems.findIndex((p) => p.problem.id === active.id);
-      const newIndex = flatProblems.findIndex((p) => p.problem.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const reorderedList = arrayMove(flatProblems, oldIndex, newIndex);
-        onReorder(
-          reorderedList.map((item, index) => ({
-            id: item.problem.id,
-            sortOrder: index,
-          }))
-        );
-      }
-    }
-  };
+  const { active, over } = useDndContext();
+  const isOverTableOrItem = over?.id === 'active-table' || ids.includes(over?.id as string);
+  const isDraggingOverFromResolved = isOverTableOrItem && active?.data.current?.type === 'resolved';
 
   return (
-    <div className={cn("flex flex-col w-full", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
-      <div 
-        className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-left"
-        style={{ gridTemplateColumns: COLUMN_LAYOUT }}
-      >
-        <div className="w-[22px]" />
-        <div className="w-[14px]" />
-        <div className="text-left">Problem</div>
-        <div className="whitespace-nowrap text-left">Date Added</div>
-        <div className="text-left">Status</div>
-        <div className="text-left">Nest Under</div>
-        <div className="text-left">Actions</div>
-      </div>
-      <div className="flex flex-col">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          autoScroll={false}
-          onDragStart={(event) => {
-            setIsTableDragging(true);
-            const activeItem = flatProblems.find((p) => p.problem.id === event.active.id);
-            setActiveDragItem(activeItem || null);
-          }}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          onDragCancel={() => {
-            setDragOverState(null);
-            setIsTableDragging(false);
-            setActiveDragItem(null);
-          }}
-        >
-          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-            {flatProblems.map((item) => (
-              <SortableRow
-                key={item.problem.id}
-                item={item}
-                canManage={canManage}
-                allOptions={allOptions}
-                dragOverState={dragOverState}
-                onEdit={onEdit}
-                onStatusChange={onStatusChange}
-                onDelete={onDelete}
-                onParentChange={onParentChange}
-              />
-            ))}
-          </SortableContext>
-          <DragOverlay>
-            {activeDragItem ? (
-              <div className="bg-surface shadow-lg border border-accent rounded ring-2 ring-accent/20 opacity-60">
-                <ActiveProblemRow
-                  problem={activeDragItem.problem}
-                  depth={activeDragItem.depth}
+    <div ref={setNodeRef} className={cn("flex flex-col w-full relative rounded-b-lg transition-colors", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto", isDraggingOverFromResolved && "outline-dashed outline-2 outline-green outline-offset-[-2px]")}>
+      
+      {/* Drop overlay */}
+      {isDraggingOverFromResolved && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] rounded-b-lg pointer-events-none">
+          <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2">
+            +
+          </div>
+          <div className="text-green font-bold text-[13px]">
+            Drop to mark as Active
+          </div>
+        </div>
+      )}
+
+      {flatProblems.length === 0 ? (
+        <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic bg-surface rounded-b-lg">
+          No active problems recorded.
+        </div>
+      ) : (
+        <>
+          <div 
+            className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-left"
+            style={{ gridTemplateColumns: COLUMN_LAYOUT }}
+          >
+            <div className="w-[22px]" />
+            <div className="w-[14px]" />
+            <div className="text-left">Problem</div>
+            <div className="whitespace-nowrap text-left">Date Added</div>
+            <div className="text-left">Status</div>
+            <div className="text-left">Nest Under</div>
+            <div className="text-left">Actions</div>
+          </div>
+          <div className="flex flex-col">
+            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+              {flatProblems.map((item) => (
+                <SortableRow
+                  key={item.problem.id}
+                  item={item}
                   canManage={canManage}
-                  isDragging={false}
                   allOptions={allOptions}
-                  dragOverState={null}
-                  onEdit={() => {}}
-                  onStatusChange={() => {}}
-                  onDelete={() => {}}
-                  onParentChange={() => {}}
+                  dragOverState={dragOverState}
+                  onEdit={onEdit}
+                  onStatusChange={onStatusChange}
+                  onDelete={onDelete}
+                  onParentChange={onParentChange}
                 />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      </div>
+              ))}
+            </SortableContext>
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
