@@ -71,10 +71,18 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
     const t = parse(temperature);
     const o2 = parse(oxygenSaturation);
 
-    if (s !== null && (s < 50 || s > 300)) errs.sbp = '50–300';
-    if (d !== null && (d < 20 || d > 200)) errs.dbp = '20–200';
-    if (hr !== null && (hr < 20 || hr > 300)) errs.heartRate = '20–300';
-    if (rr !== null && (rr < 5 || rr > 60)) errs.respiratoryRate = '5–60';
+    if (s === null) errs.sbp = 'Required';
+    else if (s < 50 || s > 300) errs.sbp = '50–300';
+    
+    if (d === null) errs.dbp = 'Required';
+    else if (d < 20 || d > 200) errs.dbp = '20–200';
+    
+    if (hr === null) errs.heartRate = 'Required';
+    else if (hr < 20 || hr > 300) errs.heartRate = '20–300';
+    
+    if (rr === null) errs.respiratoryRate = 'Required';
+    else if (rr < 5 || rr > 60) errs.respiratoryRate = '5–60';
+
     if (t !== null && (t < 30.0 || t > 45.0)) errs.temperature = '30.0–45.0';
     if (o2 !== null && (o2 < 50 || o2 > 100)) errs.oxygenSaturation = '50–100';
 
@@ -82,12 +90,21 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
       errs.measuredAt = 'Date and Time are required';
     }
 
-    if (s === null && d === null && hr === null && rr === null && t === null && o2 === null) {
-      errs.form = 'At least one measurement is required.';
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  const handleRequiredChange = (field: string, val: string, setter: (val: string) => void) => {
+    setter(val);
+    if (!val) {
+      setErrors(prev => ({ ...prev, [field]: 'Required' }));
+    } else {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -160,7 +177,11 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                 disabled={saving}
                 className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
                 value={measureDate}
-                onChange={(e) => { setMeasureDate(e.target.value); setErrors(er => ({ ...er, measuredAt: '' })); }}
+                onChange={(e) => { 
+                  setMeasureDate(e.target.value); 
+                  if (!e.target.value) setErrors(er => ({ ...er, measuredAt: 'Required' }));
+                  else setErrors(er => { const next = {...er}; delete next.measuredAt; return next; });
+                }}
               />
               {errors.measuredAt && !measureDate && <div className="text-[10px] text-red mt-1">Required</div>}
             </div>
@@ -172,13 +193,17 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                 disabled={saving}
                 className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
                 value={measureTime}
-                onChange={(e) => { setMeasureTime(e.target.value); setErrors(er => ({ ...er, measuredAt: '' })); }}
+                onChange={(e) => { 
+                  setMeasureTime(e.target.value); 
+                  if (!e.target.value) setErrors(er => ({ ...er, measuredAt: 'Required' }));
+                  else setErrors(er => { const next = {...er}; delete next.measuredAt; return next; });
+                }}
               />
               {errors.measuredAt && !measureTime && <div className="text-[10px] text-red mt-1">Required</div>}
             </div>
 
             <div className="col-span-1">
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Systolic BP</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Systolic BP <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.sbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
@@ -186,7 +211,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                     disabled={saving}
                     className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={sbp}
-                    onChange={(e) => setSbp(e.target.value)}
+                    onChange={(e) => handleRequiredChange('sbp', e.target.value, setSbp)}
                   />
                 </div>
                 <span className="text-[11px] text-text-muted w-[40px]">mmHg</span>
@@ -195,7 +220,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             </div>
 
             <div className="col-span-1">
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Diastolic BP</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Diastolic BP <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.dbp ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
@@ -203,7 +228,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                     disabled={saving}
                     className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={dbp}
-                    onChange={(e) => setDbp(e.target.value)}
+                    onChange={(e) => handleRequiredChange('dbp', e.target.value, setDbp)}
                   />
                 </div>
                 <span className="text-[11px] text-text-muted w-[40px]">mmHg</span>
@@ -212,7 +237,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Heart Rate</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Heart Rate <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.heartRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
@@ -220,7 +245,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                     disabled={saving}
                     className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={heartRate}
-                    onChange={(e) => setHeartRate(e.target.value)}
+                    onChange={(e) => handleRequiredChange('heartRate', e.target.value, setHeartRate)}
                   />
                 </div>
                 <span className="text-[11px] text-text-muted w-[30px]">bpm</span>
@@ -229,7 +254,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             </div>
             
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Resp Rate</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Resp Rate <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.respiratoryRate ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
@@ -237,7 +262,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
                     disabled={saving}
                     className="w-full bg-transparent px-3 text-[13px] text-text-primary outline-none disabled:text-text-muted disabled:cursor-not-allowed"
                     value={respiratoryRate}
-                    onChange={(e) => setRespiratoryRate(e.target.value)}
+                    onChange={(e) => handleRequiredChange('respiratoryRate', e.target.value, setRespiratoryRate)}
                   />
                 </div>
                 <span className="text-[11px] text-text-muted w-[30px]">/min</span>
@@ -246,7 +271,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Temperature</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Temperature <span className="text-text-muted font-normal normal-case tracking-normal ml-1">(optional)</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.temperature ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
@@ -264,7 +289,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">O2 Saturation</label>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">O2 Saturation <span className="text-text-muted font-normal normal-case tracking-normal ml-1">(optional)</span></label>
               <div className="flex items-center gap-2">
                 <div className={`flex flex-1 items-center border ${errors.oxygenSaturation ? 'border-red-border focus-within:border-red-border focus-within:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus-within:border-accent focus-within:shadow-accent-focus'} rounded-[6px] ${saving ? 'bg-surface-2' : 'bg-surface'} transition-all h-[34px]`}>
                   <input
