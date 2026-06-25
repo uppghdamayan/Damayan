@@ -68,7 +68,7 @@ export function ActiveProblemRow({
       {...(canManage ? dragHandleProps?.attributes : {})}
       {...(canManage ? dragHandleProps?.listeners : {})}
       className={cn(
-        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150',
+        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry',
         canManage && 'cursor-grab active:cursor-grabbing',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
@@ -124,7 +124,6 @@ export function ActiveProblemRow({
         >
           <option value="ACTIVE">Active</option>
           <option value="RESOLVED">Resolved</option>
-          <option value="REMOVED">Removed</option>
         </select>
       </div>
 

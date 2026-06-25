@@ -39,7 +39,7 @@ export function ResolvedRow({
     <div
       style={style}
       className={cn(
-        "relative grid items-center gap-4 px-[14px] py-3 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] last:after:hidden bg-surface transition-all duration-150",
+        "relative grid items-center gap-4 px-[14px] py-3 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] last:after:hidden bg-surface transition-all duration-150 animate-row-entry",
         canManage && "cursor-grab active:cursor-grabbing",
         isDragging && "relative z-10 opacity-40 shadow-sm dragging"
       )}
