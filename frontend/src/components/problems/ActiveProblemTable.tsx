@@ -243,24 +243,10 @@ export function ActiveProblemTable({
     id: 'active-table',
   });
 
-  const { active, over } = useDndContext();
-  const isOverTableOrItem = over?.id === 'active-table' || ids.includes(over?.id as string);
-  const isDraggingOverFromResolved = isOverTableOrItem && active?.data.current?.type === 'resolved';
-
   return (
-    <div ref={setNodeRef} className={cn("flex flex-col w-full relative rounded-b-lg transition-colors", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto", isDraggingOverFromResolved && "outline-dashed outline-2 outline-green outline-offset-[-2px]")}>
+    <div ref={setNodeRef} className={cn("flex flex-col w-full relative rounded-b-lg transition-colors", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
       
-      {/* Drop overlay */}
-      {isDraggingOverFromResolved && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] rounded-b-lg pointer-events-none">
-          <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2">
-            +
-          </div>
-          <div className="text-green font-bold text-[13px]">
-            Drop to mark as Active
-          </div>
-        </div>
-      )}
+
 
       {flatProblems.length === 0 ? (
         <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic bg-surface rounded-b-lg">

@@ -74,6 +74,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const [activeDragItem, setActiveDragItem] = useState<{ problem: ProblemNode; depth: number } | null>(null);
   const [activeResolvedDragItem, setActiveResolvedDragItem] = useState<Problem | null>(null);
   const [activeDragRect, setActiveDragRect] = useState<DOMRect | null>(null);
+  const [currentOverId, setCurrentOverId] = useState<string | null>(null);
 
   const pointerPosition = useRef({ x: 0, y: 0 });
   useEffect(() => {
@@ -102,10 +103,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     try {
       if (editing) {
         await updateProblem.mutateAsync({ id: editing.id, title: values.title, icdCode: values.icdCode, parentId: values.parentId });
-        toast.success('Problem updated.');
+        toast.success(`'${values.title}' updated successfully.`);
       } else {
         await createProblem.mutateAsync({ title: values.title, icdCode: values.icdCode, parentId: values.parentId ?? undefined });
-        toast.success('Problem added to the list.');
+        toast.success(`'${values.title}' added to the list.`);
       }
       setModalOpen(false);
     } catch (err) {
@@ -117,9 +118,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     try {
       await updateProblem.mutateAsync({ id: p.id, status });
       const messages: Record<ProblemStatusValue, string> = {
-        ACTIVE: 'Problem reactivated.',
-        RESOLVED: 'Problem marked resolved.',
-        REMOVED: 'Problem removed from the active list.',
+        ACTIVE: `'${p.title}' has been reactivated.`,
+        RESOLVED: `'${p.title}' has been resolved.`,
+        REMOVED: `'${p.title}' has been removed.`,
       };
       toast.success(messages[status]);
     } catch (err) {
@@ -150,7 +151,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     if (!problemToDelete) return;
     deleteProblem.mutate(problemToDelete.id, {
       onSuccess: () => {
-        toast.success('Problem removed.');
+        toast.success(`'${problemToDelete.title}' has been permanently deleted.`);
         setDeleteModalOpen(false);
         setProblemToDelete(null);
       },
@@ -193,6 +194,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     const { over, active } = event;
     const activeData = active.data.current;
 
+    setCurrentOverId(over?.id as string | null);
+
     // Only apply merge styles for active items
     if (!over || activeData?.type === 'resolved') {
       setDragOverState(null);
@@ -216,6 +219,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setActiveResolvedDragItem(null);
     setActiveDragRect(null);
     setDragOverState(null);
+    setCurrentOverId(null);
 
     const { active, over } = event;
     if (!over) return;
@@ -241,7 +245,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
 
     // Dragging from Active
-    if (over.id === 'resolved-table') {
+    if (over.id === 'resolved-table' || resolvedProblems.some(p => p.id === over.id)) {
       const activeProblem = flatActiveProblems.find(p => p.problem.id === active.id)?.problem;
       if (activeProblem) {
         handleStatusChange(activeProblem, 'RESOLVED');
@@ -301,6 +305,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   if (isLoading) return <ProblemListSkeleton />;
 
+  const isOverResolvedTableOrItem = currentOverId === 'resolved-table' || resolvedProblems.some(p => p.id === currentOverId);
+  const showResolvedDropOverlay = isOverResolvedTableOrItem && activeDragItem !== null;
+
+  const isOverActiveTableOrItem = currentOverId === 'active-table' || flatActiveProblems.some(p => p.problem.id === currentOverId);
+  const showActiveDropOverlay = isOverActiveTableOrItem && activeResolvedDragItem !== null;
+
   return (
     <div className="flex flex-col gap-6">
       {canManage && (
@@ -327,10 +337,27 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           setActiveDragItem(null);
           setActiveResolvedDragItem(null);
           setActiveDragRect(null);
+          setCurrentOverId(null);
         }}
       >
         {/* MASTER PROBLEM LIST */}
-        <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
+        <div 
+          className={cn(
+            "bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
+            showActiveDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
+          )}
+        >
+          {showActiveDropOverlay && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] pointer-events-none">
+              <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2 shadow-sm">
+                +
+              </div>
+              <div className="text-green font-bold text-[13px] bg-white/90 px-4 py-1.5 rounded-full shadow-sm">
+                Drop to mark as Active
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
             <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
               📋
@@ -362,7 +389,23 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         </div>
 
         {/* RESOLVED PROBLEMS */}
-        <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
+        <div 
+          className={cn(
+            "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
+            showResolvedDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
+          )}
+        >
+          {showResolvedDropOverlay && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] pointer-events-none">
+              <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2 shadow-sm">
+                +
+              </div>
+              <div className="text-green font-bold text-[13px] bg-white/90 px-4 py-1.5 rounded-full shadow-sm">
+                Drop to mark as Resolved
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
             <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
               ✅
