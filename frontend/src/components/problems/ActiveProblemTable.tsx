@@ -22,6 +22,12 @@ interface ActiveProblemTableProps {
   dragOverState: { id: string; isMerge: boolean } | null;
   allOptions: Problem[];
   canManage: boolean;
+  isEditMode: boolean;
+  onRevert: () => void;
+  onSaveDraft: () => void;
+  onPublish: () => void;
+  isSaving: boolean;
+  lastAutoSaved?: Date | null;
   onEdit: (p: Problem) => void;
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
   onDelete: (p: Problem) => void;
@@ -231,6 +237,12 @@ export function ActiveProblemTable({
   dragOverState,
   allOptions,
   canManage,
+  isEditMode,
+  onRevert,
+  onSaveDraft,
+  onPublish,
+  isSaving,
+  lastAutoSaved,
   onEdit,
   onStatusChange,
   onDelete,
@@ -246,6 +258,52 @@ export function ActiveProblemTable({
     <div ref={setNodeRef} className={cn("flex flex-col w-full relative rounded-b-lg transition-colors", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
       
 
+
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <div className="flex items-center gap-3 px-[14px] py-[9px] bg-amber-500/10 border-b border-amber-400/25 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="relative flex h-2 w-2 flex-shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber-700">Editing Order</span>
+            <span className="text-[10px] text-amber-600/80 hidden md:inline">
+              — Changes are local and not yet visible to other doctors.
+            </span>
+            {lastAutoSaved && (
+              <span className="text-[9px] text-amber-500/70 hidden lg:inline flex-shrink-0">
+                Auto-saved {lastAutoSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={onRevert}
+              disabled={isSaving}
+              className="h-[24px] px-2.5 rounded text-[10px] font-semibold text-amber-700 border border-amber-400/50 hover:bg-amber-500/10 transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ↺ Revert
+            </button>
+            <button
+              onClick={onSaveDraft}
+              disabled={isSaving}
+              title="Saves your order locally only — does not affect other doctors"
+              className="h-[24px] px-2.5 rounded text-[10px] font-semibold text-text-secondary bg-surface-2 border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save Draft
+            </button>
+            <button
+              onClick={onPublish}
+              disabled={isSaving}
+              title="Publishes the order to all co-doctors"
+              className="h-[24px] px-2.5 rounded text-[10px] font-semibold bg-accent text-white border border-accent-hover hover:bg-accent-hover shadow-sm transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? '…' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {flatProblems.length === 0 ? (
         <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic bg-surface rounded-b-lg">
@@ -265,22 +323,32 @@ export function ActiveProblemTable({
             <div className="text-left">Nest Under</div>
             <div className="text-left">Actions</div>
           </div>
-          <div className="flex flex-col">
-            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-              {flatProblems.map((item) => (
-                <SortableRow
-                  key={item.problem.id}
-                  item={item}
-                  canManage={canManage}
-                  allOptions={allOptions}
-                  dragOverState={dragOverState}
-                  onEdit={onEdit}
-                  onStatusChange={onStatusChange}
-                  onDelete={onDelete}
-                  onParentChange={onParentChange}
-                />
-              ))}
-            </SortableContext>
+          <div className="flex flex-col relative min-h-[100px]">
+            {isSaving && (
+              <div className="absolute inset-0 z-10 bg-surface/40 backdrop-blur-[1.5px] flex items-center justify-center rounded-b-lg pointer-events-auto transition-all duration-200">
+                <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white dark:bg-surface rounded-full shadow-md border border-border/60 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="h-3.5 w-3.5 rounded-full border-2 border-accent border-r-transparent animate-spin" />
+                  <span className="text-[11px] font-semibold tracking-wide text-text-primary uppercase">Publishing...</span>
+                </div>
+              </div>
+            )}
+            <div className={cn("flex flex-col", isSaving && "pointer-events-none opacity-60 transition-opacity duration-200")}>
+              <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+                {flatProblems.map((item) => (
+                  <SortableRow
+                    key={item.problem.id}
+                    item={item}
+                    canManage={canManage && !isSaving}
+                    allOptions={allOptions}
+                    dragOverState={dragOverState}
+                    onEdit={onEdit}
+                    onStatusChange={onStatusChange}
+                    onDelete={onDelete}
+                    onParentChange={onParentChange}
+                  />
+                ))}
+              </SortableContext>
+            </div>
           </div>
         </>
       )}

@@ -166,7 +166,10 @@ export class ProblemsService {
       dto.items.map((item) =>
         this.prisma.problem.update({
           where: { id: item.id },
-          data: { sortOrder: item.sortOrder },
+          data: {
+            sortOrder: item.sortOrder,
+            ...(item.parentId !== undefined && { parentId: item.parentId }),
+          },
         }),
       ),
     );

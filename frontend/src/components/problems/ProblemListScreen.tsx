@@ -49,12 +49,40 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [problemToDelete, setProblemToDelete] = useState<Problem | null>(null);
 
+  // Edit mode — local draft ordering, not yet published
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
+  const [draftParents, setDraftParents] = useState<Record<string, string | null> | null>(null);
+  const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
+
+  // Ref to always hold the latest draft values for cleanup functions (avoids stale closures)
+  const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null }>({ isEditMode: false, draftOrder: null, draftParents: null });
+  // Ref to track which patient's draft has been restored (prevents double-restore)
+  const lastRestoredPatientRef = useRef<string | null>(null);
+
+  const draftStorageKey = `damayan_problem_draft_${patientId}`;
+
+  // Keep draftRef in sync so cleanup functions always see current values
+  useEffect(() => {
+    draftRef.current = { isEditMode, draftOrder, draftParents };
+  }, [isEditMode, draftOrder, draftParents]);
+
   const problems = data?.data ?? [];
   
   const activeProblems = useMemo(() => problems.filter(p => p.status === 'ACTIVE'), [problems]);
   const resolvedProblems = useMemo(() => problems.filter(p => p.status === 'RESOLVED'), [problems]);
   
-  const tree = useMemo(() => buildProblemTree(activeProblems), [activeProblems]);
+  const draftActiveProblems = useMemo(() => {
+    if (!isEditMode || !draftParents) return activeProblems;
+    return activeProblems.map(p => {
+      if (p.id in draftParents) {
+        return { ...p, parentId: draftParents[p.id] };
+      }
+      return p;
+    });
+  }, [activeProblems, isEditMode, draftParents]);
+
+  const tree = useMemo(() => buildProblemTree(draftActiveProblems), [draftActiveProblems]);
 
   const flatActiveProblems = useMemo(() => {
     const list: { problem: ProblemNode; depth: number }[] = [];
@@ -67,6 +95,73 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     traverse(tree, 0);
     return list;
   }, [tree]);
+
+  // In edit mode show the locally-reordered list; otherwise fall back to server order
+  const displayFlatProblems = useMemo(() => {
+    if (!draftOrder) return flatActiveProblems;
+    const ordered = draftOrder
+      .map(id => flatActiveProblems.find(item => item.problem.id === id))
+      .filter((item): item is { problem: ProblemNode; depth: number } => item !== undefined);
+    // Append any problems added after edit mode was entered
+    const missing = flatActiveProblems.filter(item => !draftOrder.includes(item.problem.id));
+    return [...ordered, ...missing];
+  }, [draftOrder, flatActiveProblems]);
+
+  // Restore a saved draft from localStorage once data has loaded for this patient
+  useEffect(() => {
+    if (isLoading) return;
+    if (lastRestoredPatientRef.current === patientId) return;
+    lastRestoredPatientRef.current = patientId;
+    // Reset any leftover edit state from a previous patient
+    setIsEditMode(false);
+    setDraftOrder(null);
+    setDraftParents(null);
+    setLastAutoSaved(null);
+    const saved = localStorage.getItem(`damayan_problem_draft_${patientId}`);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as { order: string[]; parents?: Record<string, string | null>; savedAt: string };
+      if (Array.isArray(parsed.order) && parsed.order.length > 0) {
+        setDraftOrder(parsed.order);
+        setDraftParents(parsed.parents || null);
+        setIsEditMode(true);
+        toast.info('Restored your unsaved draft order. Publish or revert when ready.', { duration: 5000 });
+      }
+    } catch {
+      localStorage.removeItem(`damayan_problem_draft_${patientId}`);
+    }
+  }, [patientId, isLoading]);
+
+  // Auto-save draft to localStorage every 10 seconds while in edit mode
+  useEffect(() => {
+    if (!isEditMode || !draftOrder) return;
+    const interval = setInterval(() => {
+      localStorage.setItem(
+        `damayan_problem_draft_${patientId}`,
+        JSON.stringify({ order: draftOrder, parents: draftParents, savedAt: new Date().toISOString() })
+      );
+      setLastAutoSaved(new Date());
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isEditMode, draftOrder, patientId]);
+
+  // Persist draft to localStorage on unmount (patient switch, tab close) and on page reload
+  useEffect(() => {
+    const persistDraft = () => {
+      const { isEditMode: editMode, draftOrder: order, draftParents: parents } = draftRef.current;
+      if (editMode && order) {
+        localStorage.setItem(
+          `damayan_problem_draft_${patientId}`,
+          JSON.stringify({ order, parents, savedAt: new Date().toISOString() })
+        );
+      }
+    };
+    window.addEventListener('beforeunload', persistDraft);
+    return () => {
+      window.removeEventListener('beforeunload', persistDraft);
+      persistDraft(); // also runs when component unmounts (patient switch / navigation)
+    };
+  }, [patientId]);
 
   // Drag and drop state
   const [dragOverState, setDragOverState] = useState<{ id: string; isMerge: boolean } | null>(null);
@@ -128,17 +223,36 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
   };
 
-  const handleParentChange = async (p: Problem, newParentId: string | null) => {
-    try {
-      await updateProblem.mutateAsync({ id: p.id, parentId: newParentId });
+  const handleParentChange = (p: Problem, newParentId: string | null) => {
+    if (!isEditMode) setIsEditMode(true);
+    setDraftParents(prev => ({ ...prev, [p.id]: newParentId }));
+    
+    // Also move it visually below its new parent
+    const currentOrder = draftOrder || flatActiveProblems.map(x => x.problem.id);
+    const activeIdx = currentOrder.indexOf(p.id);
+    let newOrder = [...currentOrder];
+    
+    if (activeIdx !== -1) {
+      newOrder.splice(activeIdx, 1);
+      
       if (newParentId) {
-        const parent = activeProblems.find((x) => x.id === newParentId);
-        toast.success(`'${p.title}' nested under '${parent?.title || 'Unknown'}'.`);
+        const targetIdx = newOrder.indexOf(newParentId);
+        if (targetIdx !== -1) {
+          newOrder.splice(targetIdx + 1, 0, p.id);
+        } else {
+          newOrder.push(p.id);
+        }
       } else {
-        toast.success(`'${p.title}' moved to top level.`);
+        newOrder.push(p.id); // move to bottom if made root
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update nesting.');
+      setDraftOrder(newOrder);
+    }
+
+    if (newParentId) {
+      const parent = draftActiveProblems.find((x) => x.id === newParentId);
+      toast.success(`'${p.title}' nested under '${parent?.title || 'Unknown'}' (Draft).`);
+    } else {
+      toast.success(`'${p.title}' moved to top level (Draft).`);
     }
   };
 
@@ -165,6 +279,43 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     reorderProblems.mutate({ items });
   };
 
+  const handleRevert = () => {
+    setIsEditMode(false);
+    setDraftOrder(null);
+    setDraftParents(null);
+    setLastAutoSaved(null);
+    localStorage.removeItem(draftStorageKey);
+    toast.info('Changes reverted to original order and nesting.');
+  };
+
+  // Save Draft: persists to localStorage only — does NOT call the API
+  // so other co-doctors never see unpublished edits
+  const handleSaveDraft = () => {
+    if (!draftOrder) return;
+    localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, savedAt: new Date().toISOString() }));
+    setLastAutoSaved(new Date());
+    toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
+  };
+
+  const handlePublish = () => {
+    const items = displayFlatProblems.map((item, index) => ({ 
+      id: item.problem.id, 
+      sortOrder: index,
+      ...(draftParents && draftParents[item.problem.id] !== undefined ? { parentId: draftParents[item.problem.id] } : {})
+    }));
+    reorderProblems.mutate({ items }, {
+      onSuccess: () => {
+        setIsEditMode(false);
+        setDraftOrder(null);
+        setDraftParents(null);
+        setLastAutoSaved(null);
+        localStorage.removeItem(draftStorageKey);
+        toast.success('Problem order and nesting published successfully.');
+      },
+      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to publish order.'),
+    });
+  };
+
   const findProblemById = (id: string, currentNodes: ProblemNode[]): ProblemNode | undefined => {
     for (const node of currentNodes) {
       if (node.id === id) return node;
@@ -185,7 +336,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       const p = resolvedProblems.find(x => x.id === active.id);
       setActiveResolvedDragItem(p || null);
     } else {
-      const activeItem = flatActiveProblems.find((p) => p.problem.id === active.id);
+      const activeItem = displayFlatProblems.find((p) => p.problem.id === active.id);
       setActiveDragItem(activeItem || null);
     }
   };
@@ -271,14 +422,14 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     if (isMerge) {
       const newParentId = targetProblem.id;
       if (activeProblem.id === newParentId) return;
-      if (isDescendant(activeProblems, newParentId, activeProblem.id)) {
+      if (isDescendant(draftActiveProblems, newParentId, activeProblem.id)) {
         toast.error('Cannot nest a problem under its own descendant.');
         return;
       }
       handleParentChange(activeProblem, newParentId);
     } else {
       if (activeProblem.parentId !== targetProblem.parentId) {
-        if (targetProblem.parentId && isDescendant(activeProblems, targetProblem.parentId, activeProblem.id)) {
+        if (targetProblem.parentId && isDescendant(draftActiveProblems, targetProblem.parentId, activeProblem.id)) {
           toast.error('Cannot nest a problem under its own descendant.');
           return;
         }
@@ -289,16 +440,13 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         }
       }
 
-      const oldIndex = flatActiveProblems.findIndex((p) => p.problem.id === active.id);
-      const newIndex = flatActiveProblems.findIndex((p) => p.problem.id === over.id);
+      const oldIndex = displayFlatProblems.findIndex((p) => p.problem.id === active.id);
+      const newIndex = displayFlatProblems.findIndex((p) => p.problem.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
-        const reorderedList = arrayMove(flatActiveProblems, oldIndex, newIndex);
-        handleReorder(
-          reorderedList.map((item, index) => ({
-            id: item.problem.id,
-            sortOrder: index,
-          }))
-        );
+        const reorderedList = arrayMove(displayFlatProblems, oldIndex, newIndex);
+        // Enter edit mode — do NOT call API yet
+        if (!isEditMode) setIsEditMode(true);
+        setDraftOrder(reorderedList.map(item => item.problem.id));
       }
     }
   };
@@ -308,7 +456,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const isOverResolvedTableOrItem = currentOverId === 'resolved-table' || resolvedProblems.some(p => p.id === currentOverId);
   const showResolvedDropOverlay = isOverResolvedTableOrItem && activeDragItem !== null;
 
-  const isOverActiveTableOrItem = currentOverId === 'active-table' || flatActiveProblems.some(p => p.problem.id === currentOverId);
+  const isOverActiveTableOrItem = currentOverId === 'active-table' || displayFlatProblems.some(p => p.problem.id === currentOverId);
   const showActiveDropOverlay = isOverActiveTableOrItem && activeResolvedDragItem !== null;
 
   return (
@@ -343,7 +491,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         {/* MASTER PROBLEM LIST */}
         <div 
           className={cn(
-            "bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
+            "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
+            isEditMode ? 'border-l-amber-500' : 'border-l-accent',
             showActiveDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
@@ -368,19 +517,35 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             <span className="ch-badge badge-active text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
               {activeProblems.length} Active
             </span>
-            <span className="ml-auto text-[10px] text-text-muted">
-              Drag rows to reorder · Priority auto-sorts within each level
-            </span>
+            {isEditMode ? (
+              <span className="ml-auto text-[10px] font-semibold text-amber-600 flex items-center gap-1.5">
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                </span>
+                Editing — changes not yet published
+              </span>
+            ) : (
+              <span className="ml-auto text-[10px] text-text-muted">
+                Drag rows to reorder · Priority auto-sorts within each level
+              </span>
+            )}
           </div>
 
           <ActiveProblemTable
             nodes={tree}
-            flatProblems={flatActiveProblems}
+            flatProblems={displayFlatProblems}
             isTableDragging={isTableDragging}
             activeDragItem={activeDragItem}
             dragOverState={dragOverState}
             allOptions={activeProblems}
             canManage={canManage}
+            isEditMode={isEditMode}
+            onRevert={handleRevert}
+            onSaveDraft={handleSaveDraft}
+            onPublish={handlePublish}
+            isSaving={reorderProblems.isPending}
+            lastAutoSaved={lastAutoSaved}
             onEdit={handleEdit}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
