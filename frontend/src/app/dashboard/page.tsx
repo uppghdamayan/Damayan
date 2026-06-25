@@ -35,7 +35,7 @@ export default function DashboardIndexPage() {
 
   return (
     <>
-      <div className="flex flex-col items-center h-full font-sans bg-bg">
+      <div className="flex flex-col items-center min-h-full font-sans bg-bg overflow-y-auto w-full py-6">
         {/* Zone A — Primary Action Area */}
         <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[600px] px-5 gap-0">
           {/* Icon container */}

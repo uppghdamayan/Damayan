@@ -25,6 +25,16 @@ export interface InitialNote {
   lastEditedAt?: string;
   createdAt: string;
   updatedAt: string;
+  author?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
+  lastEditor?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
 }
 
 export function useInitialNote(patientId: string | null) {

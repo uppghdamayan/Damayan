@@ -24,6 +24,7 @@ export class ProblemsService {
     return this.prisma.problem.findMany({
       where: { patientId },
       orderBy: { sortOrder: 'asc' },
+      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
     });
   }
 
@@ -40,6 +41,7 @@ export class ProblemsService {
     return client.problem.findMany({
       where: { patientId, status: ProblemStatus.ACTIVE },
       orderBy: { sortOrder: 'asc' },
+      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
     });
   }
 

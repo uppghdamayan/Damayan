@@ -37,6 +37,8 @@ export class ProgressNotesService {
         orderBy: { visit: { visitDatetime: 'desc' } },
         include: {
           visit: true,
+          author: { select: { firstName: true, lastName: true, role: true } },
+          lastEditor: { select: { firstName: true, lastName: true, role: true } },
         },
       }),
       this.prisma.progressNote.count({ where: { visit: { patientId } } }),
@@ -50,7 +52,7 @@ export class ProgressNotesService {
   async findOne(id: string) {
     const note = await this.prisma.progressNote.findUnique({
       where: { id },
-      include: { visit: true },
+      include: { visit: true, author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
     });
     if (!note) throw new NotFoundException('Progress Note not found');
     return note;

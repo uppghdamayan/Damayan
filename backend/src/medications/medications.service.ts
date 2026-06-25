@@ -25,6 +25,7 @@ export class MedicationsService {
     return this.prisma.medication.findMany({
       where: { patientId, ...(includeInactive ? {} : { isActive: true }) },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
     });
   }
 
@@ -41,6 +42,7 @@ export class MedicationsService {
     return client.medication.findMany({
       where: { patientId, isActive: true },
       orderBy: { createdAt: 'asc' },
+      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
     });
   }
 

@@ -21,6 +21,16 @@ export interface ProgressNote {
   createdAt: string;
   updatedAt: string;
   visit?: any;
+  author?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
+  lastEditor?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
 }
 
 export function useProgressNotes(patientId: string | null, page = 1, limit = 10) {

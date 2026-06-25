@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { usePatient } from '@/hooks/usePatients';
 import { usePatientStore } from '@/stores/patientStore';
@@ -78,23 +78,32 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
   const patientName = patient ? `${patient.lastName}, ${patient.firstName}` : '';
   const { title, subtitle } = getHeaderInfo(pathname, patientId);
 
+  // Dashboard route gets its own inline header — skip the standalone title block
+  const isDashboard = useMemo(() => {
+    const cleanPath = pathname.replace(`/dashboard/${patientId}`, '').toLowerCase();
+    return cleanPath === '' || cleanPath === '/';
+  }, [pathname, patientId]);
+
   return (
     <PatientProvider value={{ patient, isLoading }}>
       <div className="flex flex-col flex-1 overflow-hidden">
         <ScreenNav patientId={patientId} />
-        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
-          <div className="border-b border-border/40 pb-3">
-            <div className="flex flex-col gap-0.5">
-      
-              <h1 className="text-[20px] font-bold tracking-tight text-text-primary leading-tight font-sans">
-                {title}
-              </h1>
-              <span className="text-[11px] text-text-muted font-medium mt-0.5">
-                {subtitle}
-              </span>
-            </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex flex-col gap-3">
+            {!isDashboard && (
+              <div className="border-b border-border/40 pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <h1 className="text-[20px] font-bold tracking-tight text-text-primary leading-tight font-sans">
+                    {title}
+                  </h1>
+                  <span className="text-[11px] text-text-muted font-medium mt-0.5">
+                    {subtitle}
+                  </span>
+                </div>
+              </div>
+            )}
+            {children}
           </div>
-          {children}
         </div>
       </div>
     </PatientProvider>

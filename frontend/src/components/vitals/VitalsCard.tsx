@@ -47,7 +47,7 @@ export function VitalsCard({ patientId }: { patientId: string }) {
         <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-text-muted">{label}</span>
       </div>
       <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`text-[16px] ${getColorClass(severity)} leading-none`}>{valueStr}</span>
+        <span className={`font-mono text-[18px] ${getColorClass(severity)} leading-none`}>{valueStr}</span>
         {valueStr !== '—' && valueStr !== '—/—' && <span className="text-[11px] text-text-muted">{unit}</span>}
       </div>
       <div className="text-[10px] text-text-muted font-mono mt-0.5">
@@ -59,13 +59,20 @@ export function VitalsCard({ patientId }: { patientId: string }) {
   const timeStr = latest ? new Date(latest.measuredAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
 
   return (
-    <div className={`bg-surface border border-border ${isRecent ? 'border-l-[3px] border-l-accent' : ''} rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden`}>
-      <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border">
-        <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">❤️</div>
-        <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Vital Signs</span>
+    <div className={`bg-surface border border-border ${isRecent ? 'border-l-[3px] border-l-accent' : ''} rounded-card shadow-card overflow-hidden`}>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
+        <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">❤️</div>
+        <div className="flex-1 flex flex-col justify-center">
+          <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Vital Signs</span>
+          {latest?.measuredByUser && (
+            <span className="text-[9px] text-text-muted mt-0.5 normal-case tracking-normal">
+              Last recorded by: <span className="font-medium text-text-secondary">{latest.measuredByUser.firstName} {latest.measuredByUser.lastName}</span>
+            </span>
+          )}
+        </div>
         
         {noReadingToday && (
-          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-amber-border text-amber bg-amber-bg ml-3">
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] border border-amber-border text-amber bg-amber-bg ml-3">
             No reading today
           </span>
         )}
@@ -73,15 +80,15 @@ export function VitalsCard({ patientId }: { patientId: string }) {
         <div className="ml-auto">
           <Link
             href={`/dashboard/${patientId}/vitals`}
-            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary transition-colors flex items-center"
+            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
             Record Vitals
           </Link>
         </div>
       </div>
 
-      <div className="p-3">
-        <div className="grid grid-cols-5 gap-3">
+      <div className="p-2.5">
+        <div className="grid grid-cols-5 gap-2">
           {renderVitalCell(
             'Blood Pressure',
             latest ? formatBloodPressure(latest.sbp, latest.dbp) : '—/—',

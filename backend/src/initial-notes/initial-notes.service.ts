@@ -25,6 +25,7 @@ export class InitialNotesService {
   async findOne(patientId: string) {
     const note = await this.prisma.initialNote.findFirst({
       where: { visit: { patientId } },
+      include: { author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
     });
     if (!note) {
       throw new NotFoundException('Initial note not found for this patient.');
