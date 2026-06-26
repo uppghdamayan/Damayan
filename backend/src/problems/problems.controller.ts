@@ -46,6 +46,18 @@ export class ProblemsController {
     return { data };
   }
 
+  @Get('logs')
+  @ApiOperation({
+    summary: 'List problem logs for a patient — All roles',
+  })
+  @ApiOkResponse({
+    description: 'List of problem logs.',
+  })
+  async getLogs(@Param('patientId') patientId: string) {
+    const data = await this.problemsService.getLogs(patientId);
+    return { data };
+  }
+
   @Post('reorder')
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)

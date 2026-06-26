@@ -1,11 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
-import type { Problem, ProblemsResponse, ProblemStatusValue } from '@/types/problem';
+import type { Problem, ProblemsResponse, ProblemStatusValue, ProblemLogsResponse } from '@/types/problem';
 
 export function useProblems(patientId: string | null) {
   return useQuery<ProblemsResponse>({
     queryKey: ['problems', patientId],
     queryFn: () => apiRequest<ProblemsResponse>(`/patients/${patientId}/problems`),
+    enabled: !!patientId,
+    staleTime: 1000 * 20,
+  });
+}
+
+export function useProblemLogs(patientId: string | null) {
+  return useQuery<ProblemLogsResponse>({
+    queryKey: ['problem-logs', patientId],
+    queryFn: () => apiRequest<ProblemLogsResponse>(`/patients/${patientId}/problems/logs`),
     enabled: !!patientId,
     staleTime: 1000 * 20,
   });
@@ -29,6 +38,7 @@ interface ReorderInput {
 
 function invalidateProblems(qc: ReturnType<typeof useQueryClient>, patientId: string) {
   qc.invalidateQueries({ queryKey: ['problems', patientId] });
+  qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes Patient._count.problems
 }
 
@@ -102,6 +112,9 @@ export function useReorderProblems(patientId: string) {
     onError: (_err, _input, context) => {
       if (context?.previous) qc.setQueryData(['problems', patientId], context.previous);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['problems', patientId] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['problems', patientId] });
+      qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+    },
   });
 }

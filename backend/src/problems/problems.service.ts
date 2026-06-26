@@ -64,7 +64,7 @@ export class ProblemsService {
       await this.assertValidParent(patientId, dto.parentId);
     }
     const sortOrder = await this.getNextSortOrder(patientId);
-    return this.prisma.problem.create({
+    const problem = await this.prisma.problem.create({
       data: {
         patientId,
         parentId: dto.parentId ?? null,
@@ -75,6 +75,9 @@ export class ProblemsService {
         addedBy: userId,
       },
     });
+
+    await this.logAction(patientId, userId, 'Created', `Created problem '${problem.title}'`, this.prisma, problem.id);
+    return problem;
   }
 
   // ─────────────────────────────────────────────
@@ -108,6 +111,10 @@ export class ProblemsService {
 
       const data: Prisma.ProblemUpdateInput = {};
       data.updatedByUser = { connect: { id: userId } };
+      if (dto.title !== undefined && dto.title.trim() !== existing.title) {
+        await this.logAction(patientId, userId, 'Renamed', `Renamed problem from '${existing.title}' to '${dto.title.trim()}'`, tx, id);
+      }
+
       if (dto.title !== undefined) data.title = dto.title.trim();
       if (dto.icdCode !== undefined)
         data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
@@ -139,6 +146,20 @@ export class ProblemsService {
             data: { status: ProblemStatus.REMOVED },
           });
         }
+
+        let action = 'Updated';
+        let desc = `Status changed to ${dto.status}`;
+        if (dto.status === ProblemStatus.RESOLVED) {
+          action = 'Resolved';
+          desc = `Resolved problem '${existing.title}'`;
+        } else if (dto.status === ProblemStatus.REMOVED) {
+          action = 'Removed';
+          desc = `Removed problem '${existing.title}'`;
+        } else if (dto.status === ProblemStatus.ACTIVE) {
+          action = 'Reactivated';
+          desc = `Reactivated problem '${existing.title}'`;
+        }
+        await this.logAction(patientId, userId, action, desc, tx, id);
       }
 
       return tx.problem.update({ where: { id }, data });
@@ -183,6 +204,7 @@ export class ProblemsService {
         }),
       ),
     );
+    await this.logAction(patientId, userId, 'Published', `Published new problem list order and nesting`, this.prisma);
     return { updated: dto.items.length };
   }
 
@@ -244,11 +266,12 @@ export class ProblemsService {
           where: { id: match.id },
           data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
+        await this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from assessment`, client, match.id);
         continue;
       }
 
       const sortOrder = await this.getNextSortOrder(patientId, client);
-      await client.problem.create({
+      const newProb = await client.problem.create({
         data: {
           patientId,
           title: item.title,
@@ -258,6 +281,7 @@ export class ProblemsService {
           addedBy: userId,
         },
       });
+      await this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from assessment`, client, newProb.id);
     }
 
     // Mark missing items as REMOVED
@@ -270,6 +294,7 @@ export class ProblemsService {
           where: { id: ext.id },
           data: { status: ProblemStatus.REMOVED, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
+        await this.logAction(patientId, userId, 'Removed', `Removed problem '${ext.title}' automatically (not in assessment)`, client, ext.id);
       }
     }
   }
@@ -315,5 +340,52 @@ export class ProblemsService {
       }
       curr = node.parentId;
     }
+  }
+
+  // ─────────────────────────────────────────────
+  // PROBLEM LOGS
+  // ─────────────────────────────────────────────
+
+  async getLogs(patientId: string) {
+    await this.cleanupOldLogs(patientId);
+    return this.prisma.problemLog.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        editor: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+  }
+
+  private async cleanupOldLogs(patientId: string) {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    await this.prisma.problemLog.deleteMany({
+      where: {
+        patientId,
+        createdAt: {
+          lt: twoWeeksAgo,
+        },
+      },
+    });
+  }
+
+  private async logAction(
+    patientId: string,
+    editorId: string,
+    action: string,
+    description: string,
+    client: PrismaTx | PrismaService = this.prisma,
+    problemId?: string,
+  ) {
+    await client.problemLog.create({
+      data: {
+        patientId,
+        editorId,
+        action,
+        description,
+        problemId: problemId ?? null,
+      },
+    });
   }
 }

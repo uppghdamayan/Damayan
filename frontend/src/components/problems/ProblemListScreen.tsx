@@ -22,12 +22,14 @@ import {
   useUpdateProblem,
   useDeleteProblem,
   useReorderProblems,
+  useProblemLogs,
 } from '@/hooks/useProblems';
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant } from '@/lib/problem-utils';
 import { useAuthStore } from '@/stores/authStore';
 import { ActiveProblemTable, ActiveProblemRow } from './ActiveProblemTable';
 import { ResolvedProblemTable, ResolvedRow } from './ResolvedProblemTable';
+import { ProblemLogTable } from './ProblemLogTable';
 import { ProblemEditModal } from './ProblemEditModal';
 import { ProblemListSkeleton } from './ProblemListSkeleton';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
@@ -38,6 +40,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
 
   const { data, isLoading } = useProblems(patientId);
+  const { data: logsData, isLoading: logsLoading } = useProblemLogs(patientId);
   const { data: patient } = usePatient(patientId);
   const createProblem = useCreateProblem(patientId);
   const updateProblem = useUpdateProblem(patientId);
@@ -646,6 +649,30 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             canManage={canManage}
             onReactivate={(p) => handleStatusChange(p, 'ACTIVE')}
             onDelete={handleDelete}
+          />
+        </div>
+
+        {/* PROBLEM LOGS */}
+        <div 
+          className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0 shadow-sm border border-border">
+                📝
+              </div>
+              <h3 className="text-[13px] font-bold tracking-[0.3px] text-text-primary">
+                Master Problem List Logs
+              </h3>
+              <span className="ch-badge text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-3">
+                14-Day History
+              </span>
+            </div>
+          </div>
+
+          <ProblemLogTable
+            logs={logsData?.data ?? []}
+            isLoading={logsLoading}
           />
         </div>
 

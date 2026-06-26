@@ -31,3 +31,22 @@ export interface ProblemNode extends Problem {
 export interface ProblemsResponse {
   data: Problem[];
 }
+
+export interface ProblemLog {
+  id: string;
+  patientId: string;
+  problemId: string | null;
+  action: string;
+  description: string;
+  editorId: string;
+  createdAt: string;
+  editor: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  };
+}
+
+export interface ProblemLogsResponse {
+  data: ProblemLog[];
+}
