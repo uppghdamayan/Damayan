@@ -24,7 +24,10 @@ export class ProblemsService {
     return this.prisma.problem.findMany({
       where: { patientId },
       orderBy: { sortOrder: 'asc' },
-      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
+      include: {
+        addedByUser: { select: { firstName: true, lastName: true, role: true } },
+        updatedByUser: { select: { firstName: true, lastName: true, role: true } },
+      },
     });
   }
 
@@ -41,7 +44,10 @@ export class ProblemsService {
     return client.problem.findMany({
       where: { patientId, status: ProblemStatus.ACTIVE },
       orderBy: { sortOrder: 'asc' },
-      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
+      include: {
+        addedByUser: { select: { firstName: true, lastName: true, role: true } },
+        updatedByUser: { select: { firstName: true, lastName: true, role: true } },
+      },
     });
   }
 
@@ -79,6 +85,7 @@ export class ProblemsService {
     patientId: string,
     id: string,
     dto: UpdateProblemDto,
+    userId: string,
   ): Promise<Problem> {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.problem.findFirst({ where: { id, patientId } });
@@ -100,6 +107,7 @@ export class ProblemsService {
       }
 
       const data: Prisma.ProblemUpdateInput = {};
+      data.updatedByUser = { connect: { id: userId } };
       if (dto.title !== undefined) data.title = dto.title.trim();
       if (dto.icdCode !== undefined)
         data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
@@ -141,8 +149,8 @@ export class ProblemsService {
   // SOFT DELETE
   // ─────────────────────────────────────────────
 
-  async remove(patientId: string, id: string): Promise<Problem> {
-    return this.update(patientId, id, { status: ProblemStatus.REMOVED });
+  async remove(patientId: string, id: string, userId: string): Promise<Problem> {
+    return this.update(patientId, id, { status: ProblemStatus.REMOVED }, userId);
   }
 
   // ─────────────────────────────────────────────
@@ -152,6 +160,7 @@ export class ProblemsService {
   async reorder(
     patientId: string,
     dto: ReorderProblemsDto,
+    userId: string,
   ): Promise<{ updated: number }> {
     const ids = dto.items.map((i) => i.id);
     const owned = await this.prisma.problem.count({
@@ -169,6 +178,7 @@ export class ProblemsService {
           data: {
             sortOrder: item.sortOrder,
             ...(item.parentId !== undefined && { parentId: item.parentId }),
+            updatedBy: userId,
           },
         }),
       ),
@@ -232,7 +242,7 @@ export class ProblemsService {
         const sortOrder = await this.getNextSortOrder(patientId, client);
         await client.problem.update({
           where: { id: match.id },
-          data: { status: ProblemStatus.ACTIVE, sortOrder },
+          data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
         continue;
       }
@@ -258,7 +268,7 @@ export class ProblemsService {
         const sortOrder = await this.getNextSortOrder(patientId, client);
         await client.problem.update({
           where: { id: ext.id },
-          data: { status: ProblemStatus.REMOVED, sortOrder },
+          data: { status: ProblemStatus.REMOVED, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
       }
     }

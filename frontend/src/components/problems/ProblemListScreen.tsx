@@ -68,6 +68,44 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   }, [isEditMode, draftOrder, draftParents]);
 
   const problems = data?.data ?? [];
+
+  const lastPublishedEdit = useMemo(() => {
+    if (problems.length === 0) return null;
+    let latestProblem = problems[0];
+    let latestTime = new Date(latestProblem.updatedAt).getTime();
+    for (const p of problems) {
+      const t = new Date(p.updatedAt).getTime();
+      if (t > latestTime) {
+        latestTime = t;
+        latestProblem = p;
+      }
+    }
+    const editor = latestProblem.updatedByUser || latestProblem.addedByUser;
+    const editedAt = latestProblem.updatedBy ? latestProblem.updatedAt : latestProblem.createdAt;
+    return { editor, editedAt };
+  }, [problems]);
+
+  const editorDisplayName = useMemo(() => {
+    if (!lastPublishedEdit || !lastPublishedEdit.editor) return 'System';
+    const user = lastPublishedEdit.editor;
+    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
+    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
+    return `${user.firstName} ${user.lastName}`;
+  }, [lastPublishedEdit]);
+
+  const formattedLastEditedTime = useMemo(() => {
+    if (!lastPublishedEdit) return '';
+    const date = new Date(lastPublishedEdit.editedAt);
+    return date.toLocaleDateString('en-PH', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }) + ' · ' + date.toLocaleTimeString('en-PH', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }, [lastPublishedEdit]);
   
   const activeProblems = useMemo(() => problems.filter(p => p.status === 'ACTIVE'), [problems]);
   const resolvedProblems = useMemo(() => problems.filter(p => p.status === 'RESOLVED'), [problems]);
@@ -507,29 +545,47 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             </div>
           )}
 
-          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
-            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-              📋
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
-              Master Problem List
-            </span>
-            <span className="ch-badge badge-active text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
-              {activeProblems.length} Active
-            </span>
-            {isEditMode ? (
-              <span className="ml-auto text-[10px] font-semibold text-amber-600 flex items-center gap-1.5">
-                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+            {/* Left side */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0 shadow-sm border border-border">
+                  📋
+                </div>
+                <h3 className="text-[13px] font-bold tracking-[0.3px] text-text-primary">
+                  Master Problem List
+                </h3>
+                <span className="ch-badge badge-active text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
+                  {activeProblems.length} Active
                 </span>
-                Editing — changes not yet published
-              </span>
-            ) : (
-              <span className="ml-auto text-[10px] text-text-muted">
-                Drag rows to reorder · Priority auto-sorts within each level
-              </span>
-            )}
+              </div>
+              
+              {!isEditMode && lastPublishedEdit && (
+                <div className="text-[11px] text-text-muted flex items-center gap-1.5 pl-[34px] animate-in fade-in duration-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block" />
+                  <span className="bg-accent/5 dark:bg-accent/10 border border-accent/15 px-2.5 py-0.5 rounded-md text-text-secondary flex items-center gap-1 flex-wrap">
+                    Last edited by <span className="font-semibold text-accent">{editorDisplayName}</span> on <span className="font-mono text-text-primary font-medium">{formattedLastEditedTime}</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-2">
+              {isEditMode ? (
+                <span className="text-[10px] font-bold uppercase tracking-[0.5px] px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 text-amber-700 border border-amber-200 dark:border-amber-900/30 rounded-[4px] flex items-center gap-1.5 animate-pulse">
+                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
+                  </span>
+                  Draft Mode (Unpublished)
+                </span>
+              ) : (
+                <span className="text-[10px] text-text-muted font-medium bg-surface-3 border border-border px-2 py-1 rounded-[4px]">
+                  Drag rows to reorder · Priority auto-sorts within levels
+                </span>
+              )}
+            </div>
           </div>
 
           <ActiveProblemTable
@@ -571,16 +627,18 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             </div>
           )}
 
-          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 rounded-t-lg">
-            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-              ✅
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0 shadow-sm border border-border">
+                ✅
+              </div>
+              <h3 className="text-[13px] font-bold tracking-[0.3px] text-text-primary">
+                Resolved Problems
+              </h3>
+              <span className="ch-badge badge-resolved text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-green-border text-green bg-green-bg">
+                {resolvedProblems.length} Resolved
+              </span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
-              Resolved Problems
-            </span>
-            <span className="ch-badge badge-resolved text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-green-border text-green bg-green-bg">
-              {resolvedProblems.length} Resolved
-            </span>
           </div>
 
           <ResolvedProblemTable

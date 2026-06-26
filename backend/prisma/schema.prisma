@@ -95,6 +95,7 @@ model User {
   progressNotes   ProgressNote[] @relation("ProgressNoteAuthor")
   progressEdits   ProgressNote[] @relation("ProgressNoteEditor")
   problems        Problem[]    @relation("ProblemAddedBy")
+  problemsUpdated Problem[]    @relation("ProblemUpdatedBy")
   medications     Medication[] @relation("MedicationAddedBy")
   documents       Document[]   @relation("DocumentGeneratedBy")
   attachments     Attachment[] @relation("AttachmentUploadedBy")
@@ -249,6 +250,7 @@ model Problem {
   status    ProblemStatus @default(ACTIVE)
   sortOrder Int           @map("sort_order")
   addedBy   String?       @map("added_by") @db.Uuid
+  updatedBy   String?       @map("updated_by") @db.Uuid
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt      @map("updated_at")
 
@@ -257,6 +259,7 @@ model Problem {
   parent   Problem?  @relation("ProblemNesting", fields: [parentId], references: [id])
   children Problem[] @relation("ProblemNesting")
   addedByUser User?  @relation("ProblemAddedBy", fields: [addedBy], references: [id])
+  updatedByUser User?  @relation("ProblemUpdatedBy", fields: [updatedBy], references: [id])
 
   @@index([patientId, sortOrder])
   @@map("problems")

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { isDescendant } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px 3fr 1.5fr 1.2fr 2fr 120px 1.5fr';
+const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 120px';
 
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
@@ -69,6 +69,27 @@ export function ActiveProblemRow({
   const isMergeHover = dragOverState?.id === problem.id && dragOverState.isMerge;
   const isReorderHover = dragOverState?.id === problem.id && !dragOverState.isMerge;
 
+  const creator = problem.addedByUser;
+  const addedAt = problem.createdAt;
+
+  const getCreatorName = (user: typeof problem.addedByUser) => {
+    if (!user) return 'System';
+    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
+    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
+    return `${user.firstName} ${user.lastName}`;
+  };
+  const creatorName = getCreatorName(creator);
+
+  const formattedAddedDateTime = new Date(addedAt).toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }) + ' · ' + new Date(addedAt).toLocaleTimeString('en-PH', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
   return (
     <div
       {...(canManage ? dragHandleProps?.attributes : {})}
@@ -120,7 +141,17 @@ export function ActiveProblemRow({
         {new Date(problem.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
       </div>
 
-      {/* Column 5: Status */}
+      {/* Column 5: Added By */}
+      <div className="flex flex-col text-[11px] leading-tight text-text-secondary text-left min-w-0">
+        <span className="font-semibold text-text-primary truncate" title={creatorName}>
+          {creatorName}
+        </span>
+        <span className="text-[10px] text-text-muted font-mono whitespace-nowrap mt-0.5">
+          {formattedAddedDateTime}
+        </span>
+      </div>
+
+      {/* Column 6: Status */}
       <div className="flex justify-start">
         <select
           disabled={!canManage}
@@ -133,7 +164,7 @@ export function ActiveProblemRow({
         </select>
       </div>
 
-      {/* Column 6: Nest Under */}
+      {/* Column 7: Nest Under */}
       <div className="flex justify-start">
         <select
           disabled={!canManage}
@@ -150,7 +181,7 @@ export function ActiveProblemRow({
         </select>
       </div>
 
-      {/* Column 7: Actions */}
+      {/* Column 8: Actions */}
       <div className="flex items-center justify-start gap-1.5">
         {canManage && (
           <>
@@ -319,6 +350,7 @@ export function ActiveProblemTable({
             <div className="w-[14px]" />
             <div className="text-left">Problem</div>
             <div className="whitespace-nowrap text-left">Date Added</div>
+            <div className="text-left">Added By</div>
             <div className="text-left">Status</div>
             <div className="text-left">Nest Under</div>
             <div className="text-left">Actions</div>

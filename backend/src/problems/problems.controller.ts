@@ -56,8 +56,9 @@ export class ProblemsController {
   async reorder(
     @Param('patientId') patientId: string,
     @Body() dto: ReorderProblemsDto,
+    @CurrentUser() user: User,
   ) {
-    return this.problemsService.reorder(patientId, dto);
+    return this.problemsService.reorder(patientId, dto, user.id);
   }
 
   @Post()
@@ -84,8 +85,9 @@ export class ProblemsController {
     @Param('patientId') patientId: string,
     @Param('id') id: string,
     @Body() dto: UpdateProblemDto,
+    @CurrentUser() user: User,
   ) {
-    return this.problemsService.update(patientId, id, dto);
+    return this.problemsService.update(patientId, id, dto, user.id);
   }
 
   @Delete(':id')
@@ -95,7 +97,11 @@ export class ProblemsController {
   @ApiOperation({
     summary: 'Soft-delete a problem — sets status to REMOVED (Doctor, Admin)',
   })
-  async remove(@Param('patientId') patientId: string, @Param('id') id: string) {
-    return this.problemsService.remove(patientId, id);
+  async remove(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.problemsService.remove(patientId, id, user.id);
   }
 }

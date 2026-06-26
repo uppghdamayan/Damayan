@@ -16,6 +16,12 @@ export interface Problem {
     lastName: string;
     role: 'DOCTOR' | 'NURSE' | 'ADMIN';
   } | null;
+  updatedBy?: string | null;
+  updatedByUser?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
 }
 
 export interface ProblemNode extends Problem {
