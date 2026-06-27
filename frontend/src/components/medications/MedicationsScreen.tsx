@@ -163,7 +163,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         ) : (
           <div className="flex flex-col">
             {inactive.map((m) => (
-              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => {}} onDelete={() => {}} onStatusChange={(isActive) => handleStatusChange(m, isActive)} hideStatus={true} />
+              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => {}} onDelete={() => handleDelete(m)} onStatusChange={(isActive) => handleStatusChange(m, isActive)} hideStatus={true} />
             ))}
           </div>
         )}
@@ -186,7 +186,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         }}
         onConfirm={handleConfirmDelete}
         title="Remove Medication"
-        message={`Are you sure you want to remove "${medicationToDelete?.name}" from the active medication list? This action cannot be undone.`}
+        message={`Are you sure you want to remove "${medicationToDelete?.name}" from the medication list? This action cannot be undone.`}
         isDeleting={deleteMedication.isPending}
       />
     </div>
