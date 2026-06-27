@@ -9,7 +9,7 @@ import {
   useDeleteMedication,
 } from '@/hooks/useMedications';
 import { useAuthStore } from '@/stores/authStore';
-import { MedicationEntry, MED_COLUMN_LAYOUT } from './MedicationEntry';
+import { MedicationEntry, MED_COLUMN_LAYOUT, MED_COLUMN_LAYOUT_DISCONTINUED } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
@@ -48,6 +48,15 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       setModalOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save medication.');
+    }
+  };
+
+  const handleStatusChange = async (m: Medication, isActive: boolean) => {
+    try {
+      await updateMedication.mutateAsync({ id: m.id, isActive });
+      toast.success(`Medication marked as ${isActive ? 'active' : 'inactive'}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update status.');
     }
   };
 
@@ -105,6 +114,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             <div className="text-left">Unit</div>
             <div className="text-left">Instructions</div>
             <div className="text-left">Qty</div>
+            <div className="text-left">Status</div>
             <div className="text-left">Actions</div>
           </div>
         )}
@@ -116,25 +126,25 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         ) : (
           <div className="flex flex-col">
             {active.map((m) => (
-              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => handleEdit(m)} onDelete={() => handleDelete(m)} />
+              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => handleEdit(m)} onDelete={() => handleDelete(m)} onStatusChange={(isActive) => handleStatusChange(m, isActive)} />
             ))}
           </div>
         )}
       </div>
 
-      {inactive.length > 0 && (
-        <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
-            <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
-            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2 ml-auto">
-              {inactive.length} Discontinued
-            </span>
-          </div>
+      <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
+          <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2 ml-auto">
+            {inactive.length} Discontinued
+          </span>
+        </div>
 
+        {inactive.length > 0 && (
           <div 
             className="relative grid items-center gap-4 pl-[14px] pr-[28px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary"
-            style={{ gridTemplateColumns: MED_COLUMN_LAYOUT }}
+            style={{ gridTemplateColumns: MED_COLUMN_LAYOUT_DISCONTINUED }}
           >
             <div className="text-left">Medication</div>
             <div className="text-left">Formulation</div>
@@ -144,14 +154,20 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             <div className="text-left">Qty</div>
             <div className="text-left">Actions</div>
           </div>
+        )}
 
+        {inactive.length === 0 ? (
+          <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic">
+            No discontinued medications recorded.
+          </div>
+        ) : (
           <div className="flex flex-col">
             {inactive.map((m) => (
-              <MedicationEntry key={m.id} medication={m} canManage={false} onEdit={() => {}} onDelete={() => {}} />
+              <MedicationEntry key={m.id} medication={m} canManage={canManage} onEdit={() => {}} onDelete={() => {}} onStatusChange={(isActive) => handleStatusChange(m, isActive)} hideStatus={true} />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <MedicationFormModal
         open={modalOpen}

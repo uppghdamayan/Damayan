@@ -30,6 +30,7 @@ interface UpdateMedicationInput {
   formulation?: string | null;
   instructions?: string | null;
   quantity?: number | null;
+  isActive?: boolean;
 }
 
 function invalidateMedications(qc: ReturnType<typeof useQueryClient>, patientId: string) {
@@ -59,16 +60,35 @@ export function useUpdateMedication(patientId: string) {
       }),
     onMutate: async (variables) => {
       await qc.cancelQueries({ queryKey: ['medications', patientId, false] });
-      const previous = qc.getQueryData<MedicationsResponse>(['medications', patientId, false]);
-      if (previous) {
-        qc.setQueryData<MedicationsResponse>(['medications', patientId, false], {
-          data: previous.data.map((m) => (m.id === variables.id ? { ...m, ...variables, dose: variables.dose !== undefined ? String(variables.dose) : m.dose } : m)),
-        });
-      }
-      return { previous };
+      await qc.cancelQueries({ queryKey: ['medications', patientId, true] });
+
+      const previousFalse = qc.getQueryData<MedicationsResponse>(['medications', patientId, false]);
+      const previousTrue = qc.getQueryData<MedicationsResponse>(['medications', patientId, true]);
+
+      const updater = (previous: MedicationsResponse | undefined) => {
+        if (!previous) return previous;
+        return {
+          ...previous,
+          data: previous.data.map((m) =>
+            m.id === variables.id
+              ? {
+                  ...m,
+                  ...variables,
+                  dose: variables.dose !== undefined ? String(variables.dose) : m.dose,
+                }
+              : m
+          ),
+        };
+      };
+
+      if (previousFalse) qc.setQueryData<MedicationsResponse>(['medications', patientId, false], updater(previousFalse));
+      if (previousTrue) qc.setQueryData<MedicationsResponse>(['medications', patientId, true], updater(previousTrue));
+
+      return { previousFalse, previousTrue };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) qc.setQueryData(['medications', patientId, false], context.previous);
+      if (context?.previousFalse) qc.setQueryData(['medications', patientId, false], context.previousFalse);
+      if (context?.previousTrue) qc.setQueryData(['medications', patientId, true], context.previousTrue);
     },
     onSettled: () => invalidateMedications(qc, patientId),
   });

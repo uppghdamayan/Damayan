@@ -99,6 +99,7 @@ export class MedicationsService {
     if (dto.instructions !== undefined)
       data.instructions = dto.instructions?.trim() || null;
     if (dto.quantity !== undefined) data.quantity = dto.quantity ?? null;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
 
     return this.prisma.medication.update({ where: { id }, data });
   }
