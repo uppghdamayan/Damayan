@@ -13,7 +13,7 @@ import {
   usePublishInitialNote,
   useDeleteInitialNote
 } from '@/hooks/useInitialNote';
-import { useCopyForwardData } from '@/hooks/useProgressNotes';
+import { useCopyForwardData, useProgressNotes } from '@/hooks/useProgressNotes';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { usePatient } from '@/hooks/usePatients';
 import { useMedications } from '@/hooks/useMedications';
@@ -45,6 +45,9 @@ interface NoteActionBarProps {
   onUnsave?: () => void;
   showSaveAndClear?: boolean;
   showPublish?: boolean;
+  onCancel?: () => void;
+  onSaveChanges?: () => void;
+  saveLabel?: string;
 }
 
 function NoteActionBar({ 
@@ -55,14 +58,20 @@ function NoteActionBar({
   onClear,
   onUnsave,
   showSaveAndClear = true,
-  showPublish = true
+  showPublish = true,
+  onCancel,
+  onSaveChanges,
+  saveLabel
 }: NoteActionBarProps) {
   return (
     <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
       <span className="text-[11px] text-[var(--text-muted)]">
-        {showSaveAndClear ? (isSaving ? 'Saving…' : 'Draft auto-saves locally') : ''}
+        {showSaveAndClear && !onSaveChanges ? (isSaving ? 'Saving…' : 'Draft auto-saves locally') : ''}
       </span>
       <div className="flex items-center gap-2">
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="sec-btn">Cancel</button>
+        )}
         {showSaveAndClear && onClear && (
           <button type="button" onClick={onClear} className="sec-btn destructive">Clear Form</button>
         )}
@@ -73,6 +82,12 @@ function NoteActionBar({
           <button type="button" onClick={onSaveDraft} disabled={isSaving} className="sec-btn">
             {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SaveIcon className="w-3.5 h-3.5" />}
             {isSaving ? 'Saving...' : 'Save Draft'}
+          </button>
+        )}
+        {onSaveChanges && (
+          <button type="button" onClick={onSaveChanges} disabled={isSaving} className="sec-btn primary">
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SaveIcon className="w-3.5 h-3.5" />}
+            {isSaving ? 'Saving...' : (saveLabel || 'Save Changes')}
           </button>
         )}
         {showPublish && onPublish && (
@@ -160,6 +175,7 @@ function MedicationListReadOnly({ patientId }: { patientId: string }) {
 export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const router = useRouter();
   const { data: note, isLoading } = useInitialNote(patientId);
+  const { data: progressResponse, isLoading: progressLoading } = useProgressNotes(patientId);
   const { data: latestVitals } = useLatestVitals(patientId);
   const { data: patient } = usePatient(patientId);
   const { data: patientMedicationsResponse } = useMedications(patientId);
@@ -169,7 +185,23 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const deleteMutation = useDeleteInitialNote(patientId);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
 
+  const [isEditing, setIsEditing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+
+  const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
+  const isPublished = note?.status === 'PUBLISHED';
+  const canEditAll = !isPublished || !hasProgressNotes;
+  const isHistoryEditableOnly = isPublished && hasProgressNotes;
+
+  const historyInputClass = cn(
+    "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
+    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+  );
+
+  const historyTextareaClass = cn(
+    "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
+    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+  );
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -329,7 +361,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     if (note) {
       updateMutation.mutate({ id: note.id, data }, {
         onSuccess: () => {
-          router.push(`/dashboard/${patientId}/notes`);
+          if (isPublished) {
+            setIsEditing(false);
+          } else {
+            router.push(`/dashboard/${patientId}/notes`);
+          }
         }
       });
     } else {
@@ -419,7 +455,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || progressLoading) {
     return (
       <div className="flex flex-col gap-6 w-full animate-pulse pb-10">
         <div className="h-[90px] bg-surface border border-border rounded-card shadow-card" />
@@ -466,9 +502,26 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   return (
     <div className="flex flex-col gap-6 pb-32">
-      {note?.status === 'PUBLISHED' ? (
+      {note?.status === 'PUBLISHED' && !isEditing ? (
         // ==================== READ-ONLY PUBLISHED VIEW ====================
         <div className="flex flex-col gap-6 w-full">
+          {/* HEADER BAR FOR PUBLISHED NOTE */}
+          <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
+            <div className="flex flex-col">
+              <span className="text-[14px] font-bold text-[var(--text-primary)]">Initial Consultation Note</span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                Published by {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Author'} on {new Date(note.createdAt).toLocaleDateString()}
+                {note.lastEditor && ` · Last edited by ${note.lastEditor.firstName} ${note.lastEditor.lastName}`}
+              </span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsEditing(true)} 
+              className="sec-btn primary"
+            >
+              Edit Note
+            </button>
+          </div>
           {/* VITALS CARD */}
           <div className="bg-surface border border-accent-mid/30 rounded-card shadow-card overflow-hidden border-l-[3px] border-l-accent-mid">
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light border-b border-accent-mid">
@@ -481,48 +534,148 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
             <div className="p-4">
               {latestVitals ? (
-                <div className="border border-border rounded-card overflow-hidden">
-                  <table className="w-full border-collapse text-[12px]">
-                    <thead className="bg-surface-2 border-b border-border">
-                      <tr>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">Date / Time</th>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">BP</th>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">HR</th>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">Temp</th>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">SpO₂</th>
-                        <th className="px-3 py-1.5 text-left font-semibold text-[10px] text-[var(--text-secondary)] uppercase">By</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="hover:bg-surface-2">
-                        <td className="px-3 py-1.5 text-[var(--text-secondary)] font-mono">
-                          {new Date(latestVitals.measuredAt).toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                        <td className={cn("px-3 py-1.5 font-mono", getStatusColor(bpStatus))}>
-                          {formatBloodPressure(latestVitals.sbp, latestVitals.dbp)}
-                        </td>
-                        <td className={cn("px-3 py-1.5 font-mono", getStatusColor(hrStatus))}>
-                          {latestVitals.heartRate ?? '—'}
-                        </td>
-                        <td className={cn("px-3 py-1.5 font-mono", getStatusColor(tempStatus))}>
-                          {formatTemperature(Number(latestVitals.temperature))}
-                        </td>
-                        <td className={cn("px-3 py-1.5 font-mono", getStatusColor(o2Status))}>
-                          {latestVitals.oxygenSaturation ? `${latestVitals.oxygenSaturation}%` : '—'}
-                        </td>
-                        <td className="px-3 py-1.5 text-[var(--text-muted)]">
-                          {latestVitals.measuredByUser
-                            ? `${latestVitals.measuredByUser.lastName}`
-                            : (latestVitals.measuredBy ?? '—')}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-5 gap-2.5 max-[1439px]:grid-cols-3">
+                    {/* BP Card */}
+                    <div className={cn(
+                      "border rounded-card p-[9px_11px] transition-all",
+                      bpStatus === "critical" ? "bg-red-bg border-red-border" :
+                      bpStatus === "warn"     ? "bg-amber-bg border-amber-border" :
+                      "bg-surface-2 border-border"
+                    )}>
+                      <div className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
+                        bpStatus === "critical" ? "text-red" :
+                        bpStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-muted)]"
+                      )}>
+                        Blood Pressure
+                      </div>
+                      <div className={cn(
+                        "font-mono text-[18px] font-medium leading-[1.1]",
+                        bpStatus === "critical" ? "text-red" :
+                        bpStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-primary)]"
+                      )}>
+                        {latestVitals.sbp || '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px]">/</span>{latestVitals.dbp || '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> mmHg</span>
+                      </div>
+                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">diastolic / systolic</div>
+                    </div>
+
+                    {/* HR Card */}
+                    <div className={cn(
+                      "border rounded-card p-[9px_11px] transition-all",
+                      hrStatus === "critical" ? "bg-red-bg border-red-border" :
+                      hrStatus === "warn"     ? "bg-amber-bg border-amber-border" :
+                      "bg-surface-2 border-border"
+                    )}>
+                      <div className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
+                        hrStatus === "critical" ? "text-red" :
+                        hrStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-muted)]"
+                      )}>
+                        Heart Rate
+                      </div>
+                      <div className={cn(
+                        "font-mono text-[18px] font-medium leading-[1.1]",
+                        hrStatus === "critical" ? "text-red" :
+                        hrStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-primary)]"
+                      )}>
+                        {latestVitals.heartRate ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> bpm</span>
+                      </div>
+                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
+                    </div>
+
+                    {/* Temp Card */}
+                    <div className={cn(
+                      "border rounded-card p-[9px_11px] transition-all",
+                      tempStatus === "critical" ? "bg-red-bg border-red-border" :
+                      tempStatus === "warn"     ? "bg-amber-bg border-amber-border" :
+                      "bg-surface-2 border-border"
+                    )}>
+                      <div className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
+                        tempStatus === "critical" ? "text-red" :
+                        tempStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-muted)]"
+                      )}>
+                        Temperature
+                      </div>
+                      <div className={cn(
+                        "font-mono text-[18px] font-medium leading-[1.1]",
+                        tempStatus === "critical" ? "text-red" :
+                        tempStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-primary)]"
+                      )}>
+                        {formatTemperature(Number(latestVitals.temperature))}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> °C</span>
+                      </div>
+                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
+                    </div>
+
+                    {/* SpO2 Card */}
+                    <div className={cn(
+                      "border rounded-card p-[9px_11px] transition-all",
+                      o2Status === "critical" ? "bg-red-bg border-red-border" :
+                      o2Status === "warn"     ? "bg-amber-bg border-amber-border" :
+                      "bg-surface-2 border-border"
+                    )}>
+                      <div className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
+                        o2Status === "critical" ? "text-red" :
+                        o2Status === "warn"     ? "text-amber" :
+                        "text-[var(--text-muted)]"
+                      )}>
+                        Oxygen Saturation
+                      </div>
+                      <div className={cn(
+                        "font-mono text-[18px] font-medium leading-[1.1]",
+                        o2Status === "critical" ? "text-red" :
+                        o2Status === "warn"     ? "text-amber" :
+                        "text-[var(--text-primary)]"
+                      )}>
+                        {latestVitals.oxygenSaturation ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> %</span>
+                      </div>
+                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
+                    </div>
+
+                    {/* RR Card */}
+                    <div className={cn(
+                      "border rounded-card p-[9px_11px] transition-all",
+                      rrStatus === "critical" ? "bg-red-bg border-red-border" :
+                      rrStatus === "warn"     ? "bg-amber-bg border-amber-border" :
+                      "bg-surface-2 border-border"
+                    )}>
+                      <div className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
+                        rrStatus === "critical" ? "text-red" :
+                        rrStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-muted)]"
+                      )}>
+                        Respiratory Rate
+                      </div>
+                      <div className={cn(
+                        "font-mono text-[18px] font-medium leading-[1.1]",
+                        rrStatus === "critical" ? "text-red" :
+                        rrStatus === "warn"     ? "text-amber" :
+                        "text-[var(--text-primary)]"
+                      )}>
+                        {latestVitals.respiratoryRate ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> /min</span>
+                      </div>
+                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Timestamp & Recorder Info */}
+                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mt-2 px-1 font-sans">
+                    <span>
+                      Measured at: <strong className="text-[var(--text-secondary)]">{new Date(latestVitals.measuredAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
+                    </span>
+                    <span>
+                      Recorded by: <strong className="text-[var(--text-secondary)]">{latestVitals.measuredByUser ? `${latestVitals.measuredByUser.firstName} ${latestVitals.measuredByUser.lastName}` : (latestVitals.measuredBy ?? '—')}</strong>
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="text-[12px] text-[var(--text-muted)]">No vitals recorded for this note.</div>
@@ -531,41 +684,42 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
 
           {/* SUBJECTIVE CARD */}
-          <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
+          <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden">
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
               <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
                 💬
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
                 Subjective
               </span>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* Left Column */}
               <div className="flex flex-col gap-4">
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                     <span>🗣️</span> Chief Complaint
                   </div>
-                  <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] font-medium leading-[1.6]">
+                  <div className="pl-1 text-[13px] text-[var(--text-primary)] font-bold leading-relaxed">
                     {note.chiefComplaint || '—'}
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                     <span>📝</span> History of Present Illness
                   </div>
-                  <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                     {note.hpi || '—'}
                   </div>
                 </div>
 
                 {note.socialHistory && (
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                       <span>🏃‍♂️</span> Personal and Social History
                     </div>
-                    <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                       {note.socialHistory}
                     </div>
                   </div>
@@ -573,35 +727,36 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
                 {note.psychosocialHistory && (
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                       <span>🧠</span> Psychosocial History
                     </div>
-                    <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                       {note.psychosocialHistory}
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col gap-4">
+              {/* Right Column */}
+              <div className="flex flex-col gap-4 border-l border-border/60 pl-6 max-md:border-l-0 max-md:pl-0">
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                     <span>🏥</span> Past Medical History
                   </div>
-                  <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] flex flex-col gap-2 leading-[1.6]">
-                    <div><b>Comorbidities:</b> {note.pmhComorbidities || '—'}</div>
-                    <div><b>Surgeries:</b> {note.pmhSurgeries || '—'}</div>
-                    <div><b>Hospitalizations:</b> {note.pmhHospitalizations || '—'}</div>
-                    <div><b>Allergies:</b> <span className={note.allergies ? "text-red font-semibold" : ""}>{note.allergies || '—'}</span></div>
+                  <div className="pl-1 flex flex-col gap-2 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+                    <div><span className="font-semibold text-[var(--text-primary)]">Comorbidities:</span> {note.pmhComorbidities || 'None'}</div>
+                    <div><span className="font-semibold text-[var(--text-primary)]">Surgeries:</span> {note.pmhSurgeries || 'None'}</div>
+                    <div><span className="font-semibold text-[var(--text-primary)]">Hospitalizations:</span> {note.pmhHospitalizations || 'None'}</div>
+                    <div><span className="font-semibold text-[var(--text-primary)]">Allergies:</span> <span className={note.allergies ? "text-red font-bold" : ""}>{note.allergies || 'No known allergies'}</span></div>
                   </div>
                 </div>
 
                 {note.familyHistory && (
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                       <span>👨‍👩‍👧‍👦</span> Family Medical History
                     </div>
-                    <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                       {note.familyHistory}
                     </div>
                   </div>
@@ -609,10 +764,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
                 {isFemale && note.obHistory && (
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                       <span>♀️</span> OB/Menstrual History
                     </div>
-                    <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                       {note.obHistory}
                     </div>
                   </div>
@@ -624,33 +779,33 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           {/* OBJECTIVE & ASSESSMENT GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             {/* OBJECTIVE CARD */}
-            <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden h-full">
+            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden h-full">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
                   🔬
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
                   Objective
                 </span>
               </div>
-              <div className="p-4 flex flex-col gap-4">
+              <div className="p-5 flex flex-col gap-4">
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-purple-bg text-purple text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                     <span>🩺</span> Physical Examination
                   </div>
-                  <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                     {note.physicalExam || '—'}
                   </div>
                 </div>
 
                 {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-purple-bg text-purple text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                       <span>🧪</span> Labs and Imaging Results
                     </div>
-                    <div className="flex gap-1.5 flex-wrap p-3 bg-surface-2 border border-border rounded-btn min-h-[40px] items-center">
+                    <div className="flex gap-1.5 flex-wrap pl-1 mt-1">
                       {note.diagnostics.map((diag: string, idx: number) => (
-                        <span key={idx} className="text-[11px] px-2 py-0.5 bg-surface border border-border rounded-btn text-[var(--text-secondary)] font-medium">
+                        <span key={idx} className="text-[11px] font-semibold bg-blue-bg text-blue border border-blue-border px-2.5 py-0.5 rounded-[4px] shadow-sm">
                           {diag}
                         </span>
                       ))}
@@ -661,32 +816,34 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* ASSESSMENT CARD */}
-            <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden h-full">
+            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-card shadow-card overflow-hidden h-full">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
                   📋
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent flex-1">
                   Assessment
                 </span>
               </div>
-              <div className="p-4 flex flex-col gap-3">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+              <div className="p-5 flex flex-col gap-3">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-accent-light text-accent-hover text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                   <span>📌</span> Active Problems
                 </div>
-                <div className="flex flex-col gap-1.5 border border-border rounded-btn bg-surface-2 p-3">
+                <div className="flex flex-col gap-2.5 pl-1">
                   {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 ? (
                     note.assessment.map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2 text-[12px] text-[var(--text-primary)] font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent-mid" />
+                      <div key={idx} className="flex items-center gap-2.5 text-[15px] text-[var(--text-primary)] font-bold">
+                        <span className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
                         <span>{item.title}</span>
                         {item.icdCode && (
-                          <span className="font-mono text-[10px] text-[var(--text-muted)] ml-1">({item.icdCode})</span>
+                          <span className="font-mono text-[10px] text-[var(--text-muted)] bg-surface-2 border border-border px-1.5 py-0.5 rounded font-normal ml-1.5">
+                            {item.icdCode}
+                          </span>
                         )}
                       </div>
                     ))
                   ) : (
-                    <span className="text-[12px] text-[var(--text-muted)]">No active problems registered.</span>
+                    <span className="text-[13px] text-[var(--text-muted)]">No active problems registered.</span>
                   )}
                 </div>
               </div>
@@ -699,45 +856,45 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
                 💊
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
                 Plan / Management
               </span>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="flex flex-col gap-4">
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-green-bg text-green text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                     <span>🥦</span> Non-Pharmacologic Management
                   </div>
-                  <div className="p-3 bg-surface-2 border border-border rounded-btn text-[12px] text-[var(--text-primary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
                     {note.mgmtNonpharm || '—'}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+              <div className="flex flex-col gap-3 border-l border-border/60 pl-6 max-md:border-l-0 max-md:pl-0">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-green-bg text-green text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
                   <span>💊</span> Medications Prescribed
                 </div>
-                <div className="flex flex-col gap-1.5 border border-border rounded-btn bg-surface-2 p-3">
+                <div className="flex flex-col gap-3 pl-1">
                   {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
                     note.medicationSnapshot.map((med: any, idx: number) => (
-                      <div key={idx} className="flex flex-col text-[12px] pb-1.5 border-b border-border/50 last:border-b-0 last:pb-0">
-                        <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green" />
+                      <div key={idx} className="flex flex-col">
+                        <div className="flex items-center gap-2.5 text-[14px] text-[var(--text-primary)] font-bold">
+                          <span className="w-2 h-2 rounded-full bg-green shrink-0" />
                           <span>
                             {typeof med === 'string' ? med : med.name} {typeof med !== 'string' && med.dose ? med.dose : ''}{typeof med !== 'string' && med.unit ? med.unit : ''}
-                            {typeof med !== 'string' && med.formulation && ` ${med.formulation}`}
+                            {typeof med !== 'string' && med.formulation && ` · ${med.formulation}`}
                             {typeof med !== 'string' && med.quantity && ` (Qty: ${med.quantity})`}
                           </span>
                         </div>
                         {typeof med !== 'string' && med.instructions && (
-                          <span className="text-[10px] text-[var(--text-muted)] pl-3.5">{med.instructions}</span>
+                          <span className="text-[11px] text-[var(--text-muted)] pl-4.5 block mt-0.5">{med.instructions}</span>
                         )}
                       </div>
                     ))
                   ) : (
-                    <span className="text-[12px] text-[var(--text-muted)]">No medications prescribed.</span>
+                    <span className="text-[13px] text-[var(--text-muted)]">No medications prescribed.</span>
                   )}
                 </div>
               </div>
@@ -753,16 +910,34 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
           )}
 
+          {isPublished && (
+            <div className={cn(
+              "p-3 rounded-card text-[12px] font-medium border flex items-center justify-between",
+              isHistoryEditableOnly 
+                ? "bg-amber-bg border-amber-border text-amber"
+                : "bg-green-bg border-green-border text-green"
+            )}>
+              <span>
+                {isHistoryEditableOnly 
+                  ? "⚠ Note is published and has subsequent progress notes. You can only edit the history sections (Medical, Family, Personal, OB, Psychosocial)."
+                  : "ℹ Note is published but has no progress notes. You can edit any part of the note."}
+              </span>
+            </div>
+          )}
+
           <NoteActionBar 
             isSaving={isSaving}
-            onSaveDraft={() => handleSave(formValues)}
-            onClear={() => setShowClearModal(true)}
+            onSaveDraft={!isPublished ? () => handleSave(formValues) : undefined}
+            onSaveChanges={isPublished ? () => handleSave(formValues) : undefined}
+            onCancel={isPublished ? () => setIsEditing(false) : undefined}
+            onClear={!isPublished ? () => setShowClearModal(true) : undefined}
             onUnsave={note && note.status === 'DRAFT' ? () => setShowUnsaveModal(true) : undefined}
             showPublish={false}
+            showSaveAndClear={!isPublished}
           />
 
           <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
-            <fieldset disabled={isSaving || publishMutation.isPending || addingMed || addingProb} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
+            <fieldset disabled={isSaving || publishMutation.isPending} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
             {/* Latest Vitals Snapshot Strip */}
             <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">
@@ -778,7 +953,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <button
                   type="button"
                   onClick={() => router.push(`/dashboard/${patientId}/vitals`)}
-                  className="h-[26px] px-3 rounded-btn text-[10px] font-semibold bg-accent text-white border border-accent-hover hover:bg-accent-hover transition-all cursor-pointer"
+                  disabled={!canEditAll}
+                  className="h-[26px] px-3 rounded-btn text-[10px] font-semibold bg-accent text-white border border-accent-hover hover:bg-accent-hover transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Update ↗
                 </button>
@@ -824,7 +1000,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 1. Subjective Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-blue-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -833,6 +1009,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
                   Subjective
                 </span>
+                {isHistoryEditableOnly && (
+                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
+                    🔒 Read-Only
+                  </span>
+                )}
                 <span className="text-[10px] text-blue/70 font-medium">Patient's reported complaints and history</span>
               </div>
               {/* Card Body */}
@@ -844,8 +1025,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </label>
                   <input
                     {...form.register('chiefComplaint')}
+                    disabled={!canEditAll}
                     className={cn(
-                      "h-[36px] w-full px-3 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      "h-[36px] w-full px-3 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border",
                       form.formState.errors.chiefComplaint
                         ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
                         : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
@@ -867,8 +1049,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </label>
                   <textarea
                     {...form.register('hpi')}
+                    disabled={!canEditAll}
                     className={cn(
-                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border",
                       form.formState.errors.hpi
                         ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
                         : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
@@ -892,6 +1075,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-amber flex-1">
                   History
                 </span>
+                {isHistoryEditableOnly && (
+                  <span className="text-[9px] font-bold bg-[#FEF3C7] text-[#D97706] border border-[#FCD34D] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0 animate-pulse">
+                    ✏️ Editable
+                  </span>
+                )}
                 <span className="text-[10px] text-amber/70 font-medium">Medical, family, personal, and social background</span>
               </div>
               {/* Card Body */}
@@ -910,7 +1098,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       </label>
                       <input
                         {...form.register('pmhComorbidities')}
-                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        className={historyInputClass}
                         placeholder="e.g. Diabetes Mellitus (2018), Asthma"
                       />
                     </div>
@@ -920,7 +1108,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       </label>
                       <input
                         {...form.register('pmhSurgeries')}
-                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        className={historyInputClass}
                         placeholder="e.g. Appendectomy (2015)"
                       />
                     </div>
@@ -930,7 +1118,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       </label>
                       <input
                         {...form.register('pmhHospitalizations')}
-                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        className={historyInputClass}
                         placeholder="e.g. Dengue (2022)"
                       />
                     </div>
@@ -940,13 +1128,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       </label>
                       <input
                         {...form.register('allergies')}
-                        className="h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5]"
+                        className={historyInputClass}
                         placeholder="e.g. Penicillin (rash), Sulfa"
                       />
                     </div>
                   </div>
                 </CollapsibleSection>
-
+ 
                 <CollapsibleSection 
                   title="Family Medical History" 
                   variant="row"
@@ -956,12 +1144,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <div className="flex flex-col gap-1.5">
                     <textarea
                       {...form.register('familyHistory')}
-                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      className={historyTextareaClass}
                       placeholder="e.g. Father: Hypertension, CVA. Mother: DM."
                     />
                   </div>
                 </CollapsibleSection>
-
+ 
                 <CollapsibleSection 
                   title="Personal & Social History" 
                   variant="row"
@@ -971,12 +1159,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <div className="flex flex-col gap-1.5">
                     <textarea
                       {...form.register('socialHistory')}
-                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      className={historyTextareaClass}
                       placeholder="e.g. Non-smoker, occasional alcohol. Sedentary lifestyle."
                     />
                   </div>
                 </CollapsibleSection>
-
+ 
                 {isFemale && (
                   <CollapsibleSection 
                     title="OB / Menstrual History" 
@@ -987,13 +1175,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     <div className="flex flex-col gap-1.5">
                       <textarea
                         {...form.register('obHistory')}
-                        className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                        className={historyTextareaClass}
                         placeholder="e.g. G0P0. Regular menses. LMP: May 12, 2026."
                       />
                     </div>
                   </CollapsibleSection>
                 )}
-
+ 
                 <CollapsibleSection 
                   title="Psychosocial History" 
                   variant="row"
@@ -1003,7 +1191,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <div className="flex flex-col gap-1.5">
                     <textarea
                       {...form.register('psychosocialHistory')}
-                      className="w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65]"
+                      className={historyTextareaClass}
                       placeholder="e.g. Works as accountant, high stress lately. Good family support system."
                     />
                   </div>
@@ -1012,7 +1200,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 3. Objective Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-purple-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -1021,6 +1209,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
                   Objective
                 </span>
+                {isHistoryEditableOnly && (
+                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
+                    🔒 Read-Only
+                  </span>
+                )}
                 <span className="text-[10px] text-purple/70 font-medium">Physical exam and diagnostic results</span>
               </div>
               <div className="p-4 flex flex-col gap-4 bg-surface">
@@ -1031,8 +1224,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </label>
                   <textarea
                     {...form.register('physicalExam')}
+                    disabled={!canEditAll}
                     className={cn(
-                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5]",
+                      "w-full px-3 py-2.5 bg-white border-[1.5px] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[110px] leading-[1.65] transition-all duration-150 focus:bg-white placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border",
                       form.formState.errors.physicalExam
                         ? "border-red focus:border-red focus:shadow-[0_0_0_2px_rgba(239,68,68,0.2)]"
                         : "border-[#9BA3B5] focus:border-accent focus:shadow-accent-focus"
@@ -1058,23 +1252,31 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         onChange={field.onChange}
                         placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
                         isObjectFormat={false}
+                        disabled={!canEditAll}
                       />
                     )}
                   />
-                  <div className="mt-2">
-                    <AttachmentUploader />
-                  </div>
+                  {canEditAll && (
+                    <div className="mt-2">
+                      <AttachmentUploader />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* 4. Assessment Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">📊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
+                {isHistoryEditableOnly && (
+                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
+                    🔒 Read-Only
+                  </span>
+                )}
                 <span className="text-[10px] text-accent-hover/70 font-medium">Required to publish</span>
               </div>
               <div className="p-4 flex flex-col gap-3 bg-surface">
@@ -1098,7 +1300,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 </span>
                               )}
                             </div>
-                            {note?.status !== 'PUBLISHED' && (
+                            {canEditAll && (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1111,7 +1313,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                             )}
                           </div>
                         ))}
-                        {note?.status !== 'PUBLISHED' && (
+                        {canEditAll && (
                           <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
                             <div className="col-span-12 md:col-span-8 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
@@ -1167,7 +1369,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 5. Management Plan Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <Stethoscope className="w-3.5 h-3.5 text-green" />
@@ -1175,6 +1377,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
                   Plan / Management
                 </span>
+                {isHistoryEditableOnly && (
+                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
+                    🔒 Read-Only
+                  </span>
+                )}
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
               <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-surface">
@@ -1185,7 +1392,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </label>
                   <textarea
                     {...form.register('mgmtNonpharm')}
-                    className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5]"
+                    disabled={!canEditAll}
+                    className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
                     placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
                   />
                 </div>
@@ -1222,7 +1430,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
                                 )}
                               </div>
-                              {note?.status !== 'PUBLISHED' && (
+                              {canEditAll && (
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1235,7 +1443,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                               )}
                             </div>
                           ))}
-                          {note?.status !== 'PUBLISHED' && (
+                          {canEditAll && (
                             <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
                               <div className="col-span-12 flex flex-col gap-1">
                                 <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
@@ -1354,8 +1562,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             <NoteActionBar 
               isSaving={isSaving}
               isPublishing={publishMutation.isPending}
-              onPublish={handlePublish}
+              onPublish={!isPublished ? handlePublish : undefined}
+              onSaveChanges={isPublished ? () => handleSave(formValues) : undefined}
+              onCancel={isPublished ? () => setIsEditing(false) : undefined}
               showSaveAndClear={false}
+              showPublish={!isPublished}
             />
           </div>
         </>
