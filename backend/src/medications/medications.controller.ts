@@ -51,6 +51,13 @@ export class MedicationsController {
     return { data };
   }
 
+  @Get('logs')
+  @ApiOperation({ summary: 'Get medication logs for a patient' })
+  async findLogs(@Param('patientId') patientId: string) {
+    const data = await this.medicationsService.findLogs(patientId);
+    return { data };
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.ADMIN)
@@ -73,8 +80,9 @@ export class MedicationsController {
     @Param('patientId') patientId: string,
     @Param('id') id: string,
     @Body() dto: UpdateMedicationDto,
+    @CurrentUser() user: User,
   ) {
-    return this.medicationsService.update(patientId, id, dto);
+    return this.medicationsService.update(patientId, id, dto, user.id);
   }
 
   @Delete(':id')
@@ -82,9 +90,9 @@ export class MedicationsController {
   @Roles(Role.DOCTOR, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Soft-delete medication — sets is_active false (Doctor, Admin)',
+    summary: 'Hard-delete medication (Doctor, Admin)',
   })
-  async remove(@Param('patientId') patientId: string, @Param('id') id: string) {
-    return this.medicationsService.remove(patientId, id);
+  async remove(@Param('patientId') patientId: string, @Param('id') id: string, @CurrentUser() user: User) {
+    return this.medicationsService.remove(patientId, id, user.id);
   }
 }

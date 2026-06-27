@@ -3,7 +3,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma, Medication } from '@prisma/client';
+import { Prisma, Medication, MedicationLog } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
@@ -65,18 +65,32 @@ export class MedicationsService {
     dto: CreateMedicationDto,
     userId: string,
   ): Promise<Medication> {
-    return this.prisma.medication.create({
-      data: {
-        patientId,
-        name: dto.name.trim(),
-        dose: dto.dose,
-        unit: dto.unit,
-        formulation: dto.formulation?.trim() || null,
-        instructions: dto.instructions?.trim() || null,
-        quantity: dto.quantity ?? null,
-        isActive: true,
-        addedBy: userId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const med = await tx.medication.create({
+        data: {
+          patientId,
+          name: dto.name.trim(),
+          dose: dto.dose,
+          unit: dto.unit,
+          formulation: dto.formulation?.trim() || null,
+          instructions: dto.instructions?.trim() || null,
+          quantity: dto.quantity ?? null,
+          isActive: true,
+          addedBy: userId,
+        },
+      });
+
+      await tx.medicationLog.create({
+        data: {
+          patientId,
+          medicationId: med.id,
+          action: 'Created',
+          description: `Added medication: ${med.name}`,
+          editorId: userId,
+        },
+      });
+
+      return med;
     });
   }
 
@@ -87,8 +101,9 @@ export class MedicationsService {
     patientId: string,
     id: string,
     dto: UpdateMedicationDto,
+    userId: string,
   ): Promise<Medication> {
-    await this.findOne(patientId, id); // throws if not found / not owned by patient
+    const existing = await this.findOne(patientId, id); // throws if not found / not owned by patient
 
     const data: Prisma.MedicationUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
@@ -101,17 +116,72 @@ export class MedicationsService {
     if (dto.quantity !== undefined) data.quantity = dto.quantity ?? null;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
 
-    return this.prisma.medication.update({ where: { id }, data });
+    let action = 'Updated';
+    let description = `Updated medication: ${existing.name}`;
+
+    if (dto.isActive !== undefined && dto.isActive !== existing.isActive) {
+      if (dto.isActive) {
+        action = 'Reactivated';
+        description = `Reactivated medication: ${existing.name}`;
+      } else {
+        action = 'Discontinued';
+        description = `Discontinued medication: ${existing.name}`;
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.medication.update({ where: { id }, data });
+
+      await tx.medicationLog.create({
+        data: {
+          patientId,
+          medicationId: updated.id,
+          action,
+          description,
+          editorId: userId,
+        },
+      });
+
+      return updated;
+    });
   }
 
   // ─────────────────────────────────────────────
-  // SOFT DELETE — sets is_active = false; row is retained for audit/history.
+  // HARD DELETE — Removes medication from the database.
   // ─────────────────────────────────────────────
-  async remove(patientId: string, id: string): Promise<Medication> {
-    await this.findOne(patientId, id);
-    return this.prisma.medication.update({
-      where: { id },
-      data: { isActive: false },
+  async remove(patientId: string, id: string, userId: string): Promise<Medication> {
+    const med = await this.findOne(patientId, id);
+    return this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.medication.delete({
+        where: { id },
+      });
+
+      await tx.medicationLog.create({
+        data: {
+          patientId,
+          medicationId: null, // Medication is physically deleted
+          action: 'Removed',
+          description: `Removed medication: ${med.name}`,
+          editorId: userId,
+        },
+      });
+
+      return deleted;
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // FETCH LOGS
+  // ─────────────────────────────────────────────
+  async findLogs(patientId: string): Promise<MedicationLog[]> {
+    return this.prisma.medicationLog.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        editor: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+      },
     });
   }
 

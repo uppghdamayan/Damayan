@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
-import type { Medication, MedicationsResponse, MedUnitValue } from '@/types/medication';
+import type { Medication, MedicationsResponse, MedUnitValue, MedicationLogsResponse } from '@/types/medication';
 
 export function useMedications(patientId: string | null, includeInactive = false) {
   return useQuery<MedicationsResponse>({
@@ -35,6 +35,7 @@ interface UpdateMedicationInput {
 
 function invalidateMedications(qc: ReturnType<typeof useQueryClient>, patientId: string) {
   qc.invalidateQueries({ queryKey: ['medications', patientId] });
+  qc.invalidateQueries({ queryKey: ['medication-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes any banner-level counts
 }
 
@@ -100,5 +101,14 @@ export function useDeleteMedication(patientId: string) {
     mutationFn: (id: string) =>
       apiRequest<Medication>(`/patients/${patientId}/medications/${id}`, { method: 'DELETE' }),
     onSuccess: () => invalidateMedications(qc, patientId),
+  });
+}
+
+export function useMedicationLogs(patientId: string | null) {
+  return useQuery<MedicationLogsResponse>({
+    queryKey: ['medication-logs', patientId],
+    queryFn: () => apiRequest<MedicationLogsResponse>(`/patients/${patientId}/medications/logs`),
+    enabled: !!patientId,
+    staleTime: 1000 * 20,
   });
 }

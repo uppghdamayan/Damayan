@@ -23,3 +23,22 @@ export interface Medication {
 export interface MedicationsResponse {
   data: Medication[];
 }
+
+export interface MedicationLog {
+  id: string;
+  patientId: string;
+  medicationId: string | null;
+  action: string;
+  description: string;
+  editorId: string;
+  createdAt: string;
+  editor: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  };
+}
+
+export interface MedicationLogsResponse {
+  data: MedicationLog[];
+}

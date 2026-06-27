@@ -11,6 +11,8 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { MedicationEntry, MED_COLUMN_LAYOUT, MED_COLUMN_LAYOUT_DISCONTINUED } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
+import { useMedicationLogs } from '@/hooks/useMedications';
+import { MedicationLogTable } from './MedicationLogTable';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { Medication, MedUnitValue } from '@/types/medication';
@@ -23,6 +25,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const createMedication = useCreateMedication(patientId);
   const updateMedication = useUpdateMedication(patientId);
   const deleteMedication = useDeleteMedication(patientId);
+  
+  const { data: logsData, isLoading: logsLoading } = useMedicationLogs(patientId);
+  const logs = logsData?.data ?? [];
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Medication | null>(null);
@@ -167,6 +172,17 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+        <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
+          <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">📜</div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Medication Logs</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2 ml-auto">
+            {logs.length} Entries
+          </span>
+        </div>
+        <MedicationLogTable logs={logs} isLoading={logsLoading} />
       </div>
 
       <MedicationFormModal

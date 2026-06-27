@@ -101,6 +101,7 @@ model User {
   attachments     Attachment[] @relation("AttachmentUploadedBy")
   auditLogs       AuditLog[]   @relation("AuditLogUser")
   problemLogs     ProblemLog[] @relation("ProblemLogEditor")
+  medicationLogs  MedicationLog[] @relation("MedicationLogEditor")
 
   @@map("users")
 }
@@ -138,6 +139,7 @@ model Patient {
   attachments Attachment[]
   auditLogs   AuditLog[]   @relation("AuditLogPatient")
   problemLogs ProblemLog[] @relation("ProblemLogPatient")
+  medicationLogs MedicationLog[] @relation("MedicationLogPatient")
 
   @@index([lastName, firstName])
   @@map("patients")
@@ -409,4 +411,24 @@ model ProblemLog {
 
   @@index([patientId, createdAt(sort: Desc)])
   @@map("problem_logs")
+}
+
+// ─────────────────────────────────────────────
+// MEDICATION LOG
+// ─────────────────────────────────────────────
+
+model MedicationLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  patientId   String   @map("patient_id") @db.Uuid
+  medicationId String?  @map("medication_id") @db.Uuid
+  action      String   @db.VarChar(50) 
+  description String   
+  editorId    String   @map("editor_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  editor  User    @relation("MedicationLogEditor", fields: [editorId], references: [id])
+  patient Patient @relation("MedicationLogPatient", fields: [patientId], references: [id])
+
+  @@index([patientId, createdAt(sort: Desc)])
+  @@map("medication_logs")
 }
