@@ -1,11 +1,11 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { formatDose } from '@/lib/medication-utils';
+
 import type { Medication } from '@/types/medication';
 
-export const MED_COLUMN_LAYOUT = '1.8fr 1.2fr 0.8fr 0.8fr 1.2fr 0.8fr 110px 160px';
-export const MED_COLUMN_LAYOUT_DISCONTINUED = '1.8fr 1.2fr 0.8fr 0.8fr 1.2fr 0.8fr 160px';
+export const MED_COLUMN_LAYOUT = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 110px 160px';
+export const MED_COLUMN_LAYOUT_DISCONTINUED = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 160px';
 
 interface MedicationEntryProps {
   medication: Medication;
@@ -32,12 +32,8 @@ export function MedicationEntry({ medication, canManage, onEdit, onDelete, onSta
         {medication.formulation || '-'}
       </div>
 
-      <div className={cn("text-[12px] font-mono", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
+      <div className={cn("text-[12px] font-mono", medication.isActive ? "text-accent font-semibold" : "text-text-muted")}>
         {medication.dose}
-      </div>
-
-      <div className={cn("text-[12px] font-mono", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        {medication.unit.toLowerCase()}
       </div>
 
       <div className={cn("text-[12px] truncate pr-2", medication.isActive ? "text-text-secondary" : "text-text-muted")}>

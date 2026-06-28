@@ -1,19 +1,26 @@
 import type { Medication } from '@/types/medication';
+import medicationsData from '@/data/medications.json';
 
-export const COMMON_MEDICATIONS = [
-  'Amoxicillin', 'Amlodipine', 'Losartan', 'Metformin', 'Paracetamol',
-  'Cetirizine', 'Mefenamic Acid', 'Salbutamol', 'Omeprazole', 'Atorvastatin',
-  'Captopril', 'Clopidogrel', 'Metoprolol', 'Simvastatin', 'Co-Amoxiclav',
-  'Cefalexin', 'Ascorbic Acid', 'Multivitamins', 'Loperamide', 'Ibuprofen',
-] as const;
+export interface MedicationDictionaryEntry {
+  Molecule: string;
+  Route: string;
+}
 
-/** Merge the static common list with names already on file for this patient
+export const MEDICATION_DICTIONARY = medicationsData as MedicationDictionaryEntry[];
+
+/** Merge the static dictionary list with names already on file for this patient
  *  (active + inactive), de-duplicated case-insensitively, for the
  *  MedicationForm name-field autocomplete. */
 export function buildMedicationSuggestions(patientMedications: Medication[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const name of [...patientMedications.map((m) => m.name), ...COMMON_MEDICATIONS]) {
+  
+  const allNames = [
+    ...patientMedications.map((m) => m.name),
+    ...MEDICATION_DICTIONARY.map((d) => d.Molecule)
+  ];
+
+  for (const name of allNames) {
     const key = name.trim().toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -32,8 +39,3 @@ export function mostRecentMedicationUpdate(medications: Medication[]): string | 
   return medications.reduce((latest, m) => (m.updatedAt > latest ? m.updatedAt : latest), medications[0].updatedAt);
 }
 
-export function formatDose(medication: Pick<Medication, 'dose' | 'unit'>): string {
-  const num = Number(medication.dose);
-  const trimmed = num % 1 === 0 ? num.toString() : num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-  return `${trimmed} ${medication.unit.toLowerCase()}`;
-}

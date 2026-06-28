@@ -15,7 +15,7 @@ import { useMedicationLogs } from '@/hooks/useMedications';
 import { MedicationLogTable } from './MedicationLogTable';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import type { Medication, MedUnitValue } from '@/types/medication';
+import type { Medication } from '@/types/medication';
 
 export function MedicationsScreen({ patientId }: { patientId: string }) {
   const { user } = useAuthStore();
@@ -41,7 +41,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const handleAdd = () => { setEditing(null); setModalOpen(true); };
   const handleEdit = (m: Medication) => { setEditing(m); setModalOpen(true); };
 
-  const handleSave = async (values: { name: string; dose: number; unit: MedUnitValue; formulation?: string; instructions?: string; quantity?: number }) => {
+  const handleSave = async (values: { name: string; dose: string; formulation?: string; instructions?: string; quantity?: number }) => {
     try {
       if (editing) {
         await updateMedication.mutateAsync({ id: editing.id, ...values });
@@ -116,7 +116,6 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             <div className="text-left">Medication</div>
             <div className="text-left">Formulation</div>
             <div className="text-left">Dose</div>
-            <div className="text-left">Unit</div>
             <div className="text-left">Instructions</div>
             <div className="text-left">Qty</div>
             <div className="text-left">Status</div>
@@ -154,7 +153,6 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             <div className="text-left">Medication</div>
             <div className="text-left">Formulation</div>
             <div className="text-left">Dose</div>
-            <div className="text-left">Unit</div>
             <div className="text-left">Instructions</div>
             <div className="text-left">Qty</div>
             <div className="text-left">Actions</div>

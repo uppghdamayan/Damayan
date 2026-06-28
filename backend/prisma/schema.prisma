@@ -40,14 +40,6 @@ enum ProblemStatus {
   REMOVED
 }
 
-enum MedUnit {
-  MG
-  G
-  MCG
-  ML
-  UNITS
-}
-
 enum DocumentType {
   MEDICAL_CERTIFICATE
   LAB_REQUEST
@@ -277,8 +269,7 @@ model Medication {
   id           String   @id @default(uuid()) @db.Uuid
   patientId    String   @map("patient_id") @db.Uuid
   name         String   @db.VarChar(255)
-  dose         Decimal  @db.Decimal(8, 2)
-  unit         MedUnit  @default(MG)
+  dose         String   @db.VarChar(255)
   formulation  String?  @db.VarChar(50)
   instructions String?  @db.VarChar(50)
   quantity     Int?

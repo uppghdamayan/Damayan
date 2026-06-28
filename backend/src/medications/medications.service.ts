@@ -70,8 +70,7 @@ export class MedicationsService {
         data: {
           patientId,
           name: dto.name.trim(),
-          dose: dto.dose,
-          unit: dto.unit,
+          dose: dto.dose.trim(),
           formulation: dto.formulation?.trim() || null,
           instructions: dto.instructions?.trim() || null,
           quantity: dto.quantity ?? null,
@@ -107,8 +106,7 @@ export class MedicationsService {
 
     const data: Prisma.MedicationUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
-    if (dto.dose !== undefined) data.dose = dto.dose;
-    if (dto.unit !== undefined) data.unit = dto.unit;
+    if (dto.dose !== undefined) data.dose = dto.dose.trim();
     if (dto.formulation !== undefined)
       data.formulation = dto.formulation?.trim() || null;
     if (dto.instructions !== undefined)
@@ -204,8 +202,7 @@ export class MedicationsService {
     patientId: string,
     items: {
       name: string;
-      dose: number;
-      unit: string;
+      dose: string;
       formulation?: string;
       instructions?: string;
       quantity?: number;
@@ -223,8 +220,7 @@ export class MedicationsService {
       const match = existing.find(
         (m) =>
           m.name.toLowerCase() === item.name.trim().toLowerCase() &&
-          Number(m.dose) === Number(item.dose) &&
-          m.unit === item.unit,
+          String(m.dose).toLowerCase() === item.dose.trim().toLowerCase(),
       );
       if (match) {
         keptIds.add(match.id);
@@ -235,8 +231,7 @@ export class MedicationsService {
         data: {
           patientId,
           name: item.name.trim(),
-          dose: item.dose,
-          unit: item.unit as any,
+          dose: item.dose.trim(),
           formulation: item.formulation?.trim() || null,
           instructions: item.instructions?.trim() || null,
           quantity: item.quantity ?? null,

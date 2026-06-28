@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
-import type { Medication, MedicationsResponse, MedUnitValue, MedicationLogsResponse } from '@/types/medication';
+import type { Medication, MedicationsResponse, MedicationLogsResponse } from '@/types/medication';
 
 export function useMedications(patientId: string | null, includeInactive = false) {
   return useQuery<MedicationsResponse>({
@@ -16,8 +16,7 @@ export function useMedications(patientId: string | null, includeInactive = false
 
 interface CreateMedicationInput {
   name: string;
-  dose: number;
-  unit: MedUnitValue;
+  dose: string;
   formulation?: string;
   instructions?: string;
   quantity?: number;
@@ -25,8 +24,7 @@ interface CreateMedicationInput {
 interface UpdateMedicationInput {
   id: string;
   name?: string;
-  dose?: number;
-  unit?: MedUnitValue;
+  dose?: string;
   formulation?: string | null;
   instructions?: string | null;
   quantity?: number | null;

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useMedications } from '@/hooks/useMedications';
-import { isRecentlyUpdated, mostRecentMedicationUpdate, formatDose } from '@/lib/medication-utils';
+import { isRecentlyUpdated, mostRecentMedicationUpdate } from '@/lib/medication-utils';
 import { MedicationListCardEmpty } from './MedicationListCardEmpty';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
 import { ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
@@ -88,7 +88,7 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
               >
                 <div className="text-[12px] text-text-primary font-medium truncate pr-2">{m.name}</div>
                 <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
-                <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{formatDose(m)}</div>
+                <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
                 <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>
               </div>
             );
@@ -113,7 +113,7 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
                     >
                       <div className="text-[12px] text-text-primary font-medium truncate pr-2">{m.name}</div>
                       <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
-                      <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{formatDose(m)}</div>
+                      <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
                       <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>
                     </div>
                   );

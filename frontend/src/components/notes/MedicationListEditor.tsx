@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMedications, useCreateMedication, useDeleteMedication } from '@/hooks/useMedications';
 import { PlusIcon, TrashIcon } from 'lucide-react';
-import type { MedUnitValue } from '@/types/medication';
+
 
 interface MedicationListEditorProps {
   patientId: string;
@@ -14,21 +14,19 @@ export function MedicationListEditor({ patientId }: MedicationListEditorProps) {
 
   const [name, setName] = useState('');
   const [dose, setDose] = useState('');
-  const [unit, setUnit] = useState<MedUnitValue>('MG');
+
   const [instructions, setInstructions] = useState('');
 
   const handleAdd = () => {
     if (!name || !dose) return;
     createMutation.mutate({
       name,
-      dose: parseFloat(dose),
-      unit,
+      dose,
       instructions,
     }, {
       onSuccess: () => {
         setName('');
         setDose('');
-        setUnit('MG');
         setInstructions('');
       }
     });
@@ -44,7 +42,7 @@ export function MedicationListEditor({ patientId }: MedicationListEditorProps) {
             <div key={med.id} className="flex items-center justify-between p-2 bg-surface-2 border border-border rounded-btn">
               <div className="flex flex-col">
                 <span className="text-[12px] font-medium text-[var(--text-primary)]">
-                  {med.name} {med.dose}{med.unit}
+                  {med.name} {med.dose}
                 </span>
                 {med.instructions && (
                   <span className="text-[10px] text-[var(--text-muted)]">{med.instructions}</span>
@@ -72,29 +70,15 @@ export function MedicationListEditor({ patientId }: MedicationListEditorProps) {
             placeholder="e.g. Lisinopril"
           />
         </div>
-        <div className="col-span-6 flex flex-col gap-1">
+        <div className="col-span-12 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Dose</label>
           <input
-            type="number"
+            type="text"
             value={dose}
             onChange={(e) => setDose(e.target.value)}
             className="h-[28px] px-2 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
-            placeholder="e.g. 10"
+            placeholder="e.g. 10mg"
           />
-        </div>
-        <div className="col-span-6 flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Unit</label>
-          <select
-            value={unit}
-            onChange={(e) => setUnit(e.target.value as MedUnitValue)}
-            className="h-[28px] px-1 text-[12px] rounded border border-border outline-none focus:border-accent w-full bg-surface"
-          >
-            <option value="MG">MG</option>
-            <option value="G">G</option>
-            <option value="MCG">MCG</option>
-            <option value="ML">ML</option>
-            <option value="UNITS">UNITS</option>
-          </select>
         </div>
         <div className="col-span-12 flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Sig / Instructions</label>
