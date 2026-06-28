@@ -192,8 +192,7 @@ export class InitialNotesService {
         .filter(m => m && m.name && String(m.name).trim() !== '')
         .map((m) => ({
           name: String(m.name).trim(),
-          dose: m.dose !== undefined && m.dose !== null ? Number(m.dose) : 0,
-          unit: m.unit || 'MG',
+          dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
           formulation: m.formulation,
           quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
           instructions: m.instructions,

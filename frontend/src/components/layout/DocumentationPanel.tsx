@@ -7,6 +7,7 @@ import { Pen, Edit, ClipboardList, ArrowRight } from 'lucide-react';
 import { ProgressNoteForm } from '@/components/notes/ProgressNoteForm';
 import { useParams, useRouter } from 'next/navigation';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { Button } from '@/components/ui/button';
 
 
@@ -19,7 +20,18 @@ export function DocumentationPanel() {
   const params = useParams();
   const patientId = params?.patientId as string | undefined;
   const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId || null);
+  const { data: progressNotesResponse } = useProgressNotes(patientId || null);
+  const dbDraft = progressNotesResponse?.data?.find(n => n.status === 'DRAFT');
   const hasNoInitialNote = patientId && !initialNoteLoading && (!initialNote || initialNote.status !== 'PUBLISHED');
+
+  const prevPatientIdRef = useRef(patientId);
+  useEffect(() => {
+    if (patientId && prevPatientIdRef.current && patientId !== prevPatientIdRef.current) {
+      closeNoteEditor();
+      setDocumentationPanelOpen(false);
+    }
+    prevPatientIdRef.current = patientId;
+  }, [patientId, closeNoteEditor, setDocumentationPanelOpen]);
 
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -81,7 +93,7 @@ export function DocumentationPanel() {
           {activeNoteEditor.mode !== null ? (
             <ProgressNoteForm 
               patientId={activeNoteEditor.patientId!} 
-              noteId={activeNoteEditor.noteId ?? undefined} 
+              noteId={activeNoteEditor.noteId ?? dbDraft?.id ?? undefined} 
               onClose={() => closeNoteEditor()} 
             />
           ) : initialNoteLoading ? (
@@ -139,6 +151,7 @@ export function DocumentationPanel() {
           ) : (
             <ProgressNoteForm 
               patientId={patientId!} 
+              noteId={dbDraft?.id}
               onClose={() => closeNoteEditor()} 
             />
           )}

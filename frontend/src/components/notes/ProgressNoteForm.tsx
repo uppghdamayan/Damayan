@@ -11,17 +11,17 @@ import {
   useCreateProgressNote, 
   useUpdateProgressNote, 
   usePublishProgressNote,
-  useCopyForwardData
+  useCopyForwardData,
+  useDeleteProgressNote
 } from '@/hooks/useProgressNotes';
 import { usePatient } from '@/hooks/usePatients';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
-import type { MedUnitValue } from '@/types/medication';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
-import { TrashIcon } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, Save, Check } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -81,14 +81,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const createMutation = useCreateProgressNote(patientId);
   const updateMutation = useUpdateProgressNote(patientId);
   const publishMutation = usePublishProgressNote(patientId);
-  const { openExistingProgressNote } = useUiStore();
+  const deleteMutation = useDeleteProgressNote(patientId);
+  const { openExistingProgressNote, setActiveScreen, setDocumentationPanelOpen } = useUiStore();
 
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
-  const [newMedUnit, setNewMedUnit] = useState<MedUnitValue>('MG');
-  const [newMedFormulation, setNewMedFormulation] = useState('');
+    const [newMedFormulation, setNewMedFormulation] = useState('');
   const [newMedInstructions, setNewMedInstructions] = useState('');
   const [newMedQuantity, setNewMedQuantity] = useState('');
 
@@ -116,7 +117,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
 
       const draftMeds = (note.medicationSnapshot as any[]) || [];
-      const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : m);
+      const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
 
       form.reset({
         subjective: note.subjective,
@@ -131,8 +132,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           ? validMeds
           : (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
-              dose: m.dose ? Number(m.dose) : undefined,
-              unit: m.unit,
+              dose: m.dose || undefined,
               formulation: m.formulation || undefined,
               quantity: m.quantity || undefined,
               instructions: m.instructions || undefined,
@@ -148,10 +148,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
           
           const draftMeds = parsed.medicationSnapshot as any[] || [];
-          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : {
+          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : {
             name: m.name,
-            dose: m.dose ? Number(m.dose) : undefined,
-            unit: m.unit,
+            dose: m.dose || undefined,
             formulation: m.formulation || undefined,
             quantity: m.quantity || undefined,
             instructions: m.instructions || undefined,
@@ -166,8 +165,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           if (validMeds.length === 0) {
             parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
-              dose: m.dose ? Number(m.dose) : undefined,
-              unit: m.unit,
+              dose: m.dose || undefined,
               formulation: m.formulation || undefined,
               quantity: m.quantity || undefined,
               instructions: m.instructions || undefined,
@@ -192,8 +190,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
-          dose: m.dose ? Number(m.dose) : undefined,
-          unit: m.unit,
+          dose: m.dose || undefined,
           formulation: m.formulation || undefined,
           quantity: m.quantity || undefined,
           instructions: m.instructions || undefined,
@@ -205,13 +202,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const formValues = form.watch();
 
-  const handleSave = (data: ProgressNoteDraftValues) => {
+  const handleDraftToggle = () => {
     if (noteId) {
-      updateMutation.mutate({ id: noteId, data });
+      deleteMutation.mutate(noteId, {
+        onSuccess: () => {
+          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          onClose();
+        }
+      });
     } else {
-      createMutation.mutate(data, {
+      createMutation.mutate(formValues, {
         onSuccess: (newNote) => {
-          openExistingProgressNote(patientId, newNote.id);
+          setLastSaved(new Date());
+          onClose();
+          setDocumentationPanelOpen(false);
+          setActiveScreen('note-timeline');
         }
       });
     }
@@ -219,6 +224,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   useAutoSave(formValues, (data) => {
     localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(data));
+    setLastSaved(new Date());
   }, `damayan:draft:${patientId}:progress`, 5000);
 
   const handlePublish = async () => {
@@ -236,6 +242,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             onSuccess: () => {
               localStorage.removeItem(`damayan:draft:${patientId}:progress`);
               onClose();
+              setDocumentationPanelOpen(false);
+              setActiveScreen('note-timeline');
             }
           });
         }
@@ -247,6 +255,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             onSuccess: () => {
               localStorage.removeItem(`damayan:draft:${patientId}:progress`);
               onClose();
+              setDocumentationPanelOpen(false);
+              setActiveScreen('note-timeline');
             }
           });
         }
@@ -258,49 +268,130 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return <div className="p-6 animate-pulse text-[var(--text-muted)]">Loading workspace...</div>;
   }
 
-  const isSaving = updateMutation.isPending || createMutation.isPending;
+  const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending;
   const isPublished = note?.status === 'PUBLISHED';
+  const isDisabled = isPublished || isSaving || deleteMutation.isPending;
+  const isUpdateActive = !!form.formState.isDirty;
 
   return (
-    <div className="flex flex-col h-full bg-surface-2">
+    <div className="flex flex-col h-full bg-surface-2 panel-container">
+      <style>{`
+        .panel-container {
+          container-type: inline-size;
+        }
+        @container (max-width: 410px) {
+          .title-text {
+            display: none !important;
+          }
+          .btn-text {
+            display: none !important;
+          }
+          .header-btn {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            gap: 0 !important;
+          }
+        }
+        @keyframes slight-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .blink-animation {
+          animation: slight-blink 2s ease-in-out infinite;
+        }
+      `}</style>
       {/* Sticky header */}
       <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10 shrink-0 bg-accent-light border-b border-accent-mid">
         <div className="flex flex-col">
           <span className="text-[13px] font-bold flex items-center gap-2 text-accent-hover">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Progress Note
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span className="title-text shrink-0">Progress Note</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-green flex items-center gap-1">
+          <span className="font-mono text-[10px] text-green flex items-center gap-1 shrink-0" title={lastSaved ? `Last saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosaved'}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <circle cx="5" cy="5" r="4" fill="var(--green-border)" />
               <path d="M3 5l1.5 1.5L7 3.5" stroke="white" strokeWidth="1.2" />
             </svg>
-            Autosaved
+            {!isUpdateActive && 'Autosaved'}
           </span>
-          <Badge variant={isPublished ? 'active' : 'draft'}>
-            {isPublished ? 'Published' : 'Draft'}
-          </Badge>
+          {isPublished && (
+            <Badge variant="active">
+              Published
+            </Badge>
+          )}
+          {!isPublished && noteId && (
+            <Badge variant="draft">
+              Draft
+            </Badge>
+          )}
           {!isPublished && (
             <div className="flex items-center gap-2 ml-2">
               <Button 
-                onClick={() => handleSave(formValues)} 
-                disabled={isSaving} 
+                onClick={handleDraftToggle} 
+                disabled={isSaving || deleteMutation.isPending} 
                 variant="outline" 
                 size="xs"
-                className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary"
+                className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                title={noteId ? 'Undraft' : 'Draft'}
               >
-                Save
+                {deleteMutation.isPending || (isSaving && !noteId) ? (
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5 shrink-0" />
+                ) : noteId ? (
+                  <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span className="btn-text">{noteId ? 'Undraft' : 'Draft'}</span>
               </Button>
+              {form.formState.isDirty && (
+                <Button 
+                  onClick={() => {
+                    if (noteId) {
+                      updateMutation.mutate({ id: noteId, data: formValues }, {
+                        onSuccess: () => {
+                          setLastSaved(new Date());
+                          form.reset(formValues);
+                        }
+                      });
+                    } else {
+                      createMutation.mutate(formValues, {
+                        onSuccess: () => {
+                          setLastSaved(new Date());
+                          form.reset(formValues);
+                        }
+                      });
+                    }
+                  }} 
+                  disabled={updateMutation.isPending || createMutation.isPending} 
+                  variant="outline" 
+                  size="xs"
+                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                  title="Update Draft"
+                >
+                  {updateMutation.isPending || createMutation.isPending ? (
+                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5 shrink-0" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span className="btn-text">Update Draft</span>
+                </Button>
+              )}
               <Button 
                 onClick={handlePublish} 
-                disabled={publishMutation.isPending} 
+                disabled={isSaving || publishMutation.isPending} 
                 variant="default" 
                 size="xs"
-                className="h-6 px-2.5 text-[11px] font-semibold bg-accent hover:bg-accent-hover text-white border-accent-hover"
+                className="h-6 px-2.5 text-[11px] font-semibold bg-accent hover:bg-accent-hover text-white border-accent-hover cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                title="Finalize"
               >
-                Finalize
+                {isSaving || publishMutation.isPending ? (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5 shrink-0" />
+                ) : (
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span className="btn-text">Finalize</span>
               </Button>
             </div>
           )}
@@ -332,10 +423,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <div className="p-[14px]">
                 <textarea
                   {...form.register('subjective')}
-                  className="w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed ${(!formValues.subjective || !formValues.subjective.trim()) && !isPublished ? 'border-red focus:border-red' : 'border-border-strong focus:border-accent'}`}
                   placeholder="Enter subjective findings..."
-                  disabled={isPublished}
+                  disabled={isDisabled}
                 />
+                {(!formValues.subjective || !formValues.subjective.trim()) && !isPublished && (
+                  <p className="text-[10px] text-red mt-1.5 font-medium">Subjective is required to publish this note.</p>
+                )}
               </div>
             </div>
 
@@ -350,10 +444,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <div className="p-[14px]">
                 <textarea
                   {...form.register('objective')}
-                  className="w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed ${(!formValues.objective || !formValues.objective.trim()) && !isPublished ? 'border-red focus:border-red' : 'border-border-strong focus:border-accent'}`}
                   placeholder="Enter objective findings..."
-                  disabled={isPublished}
+                  disabled={isDisabled}
                 />
+                {(!formValues.objective || !formValues.objective.trim()) && !isPublished && (
+                  <p className="text-[10px] text-red mt-1.5 font-medium">Objective is required to publish this note.</p>
+                )}
               </div>
             </div>
 
@@ -369,7 +466,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   {...form.register('labs')}
                   className="w-full min-h-[50px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter new lab/imaging results..."
-                  disabled={isPublished}
+                  disabled={isDisabled}
                 />
               </div>
             </div>
@@ -378,72 +475,89 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">📊</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Current Problem List</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Assessment / Problem List</span>
               </div>
               <div className="p-[14px]">
                 <Controller
                   control={form.control}
                   name="problemListSnapshot"
                   render={({ field }) => (
-                    <div className="flex flex-col gap-1">
-                      {field.value?.map((prob: any, idx: number) => (
-                        <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                          <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
-                          <div className="flex-1 min-w-0 truncate">
-                            {typeof prob === 'string' ? prob : prob.title}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        {field.value?.map((prob: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-1 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] text-text-primary">
+                            <span className="font-medium">{typeof prob === 'string' ? prob : prob.title}</span>
                             {typeof prob !== 'string' && prob.icdCode && (
-                              <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
-                                {prob.icdCode}
-                              </span>
+                              <span className="text-[10px] text-text-muted">({prob.icdCode})</span>
+                            )}
+                            {typeof prob !== 'string' && prob.isNew && (
+                              <span className="text-[9px] font-bold text-green bg-green/15 px-1 py-0.5 rounded uppercase tracking-wider blink-animation shrink-0">New</span>
+                            )}
+                            {!isPublished && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newProbs = [...(field.value || [])];
+                                  newProbs.splice(idx, 1);
+                                  field.onChange(newProbs);
+                                }}
+                                disabled={isDisabled}
+                                className="text-text-muted hover:text-red transition-colors ml-1 disabled:opacity-50 flex items-center justify-center"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                              </button>
                             )}
                           </div>
-                          {!isPublished && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => {
-                                const newProbs = [...(field.value || [])];
-                                newProbs.splice(idx, 1);
-                                field.onChange(newProbs);
-                              }}
-                              className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                            >
-                              <TrashIcon className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                        {field.value?.length === 0 && (
+                          <span className="text-[12px] text-text-muted italic">No problems added yet.</span>
+                        )}
+                      </div>
                       {!isPublished && (
-                        <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-card">
-                          <div className="col-span-12 md:col-span-8 flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
-                            <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
-                          </div>
-                          <div className="col-span-12 md:col-span-4 flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
-                            <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
-                          </div>
-                          <div className="col-span-12 flex justify-end mt-1">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="xs"
-                              onClick={() => {
-                                const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                                const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
-                                if (titleEl.value.trim()) {
-                                  const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined }];
-                                  field.onChange(newProbs);
-                                  titleEl.value = '';
-                                  icdEl.value = '';
-                                }
-                              }}
-                              className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
-                            >
-                              + Add Problem
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <input 
+                            id="newProbTitle" 
+                            disabled={isDisabled} 
+                            placeholder="Problem Title (e.g. Hypertension)" 
+                            className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent flex-1 bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                document.getElementById('addProbBtn')?.click();
+                              }
+                            }}
+                          />
+                          <input 
+                            id="newProbIcd" 
+                            disabled={isDisabled} 
+                            placeholder="ICD-10 (Optional)" 
+                            className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent w-[120px] bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                document.getElementById('addProbBtn')?.click();
+                              }
+                            }}
+                          />
+                          <Button
+                            id="addProbBtn"
+                            type="button"
+                            variant="secondary"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
+                              const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
+                              if (titleEl.value.trim()) {
+                                const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined, isNew: true }];
+                                field.onChange(newProbs);
+                                titleEl.value = '';
+                                icdEl.value = '';
+                              }
+                            }}
+                            className="h-[32px] px-3 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded-[6px] font-medium text-[11px] flex items-center gap-1 transition-all"
+                          >
+                            + Add
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -463,7 +577,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   {...form.register('mgmtNonpharm')}
                   className="w-full min-h-[60px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter non-pharmacologic management..."
-                  disabled={isPublished}
+                  disabled={isDisabled}
                 />
               </div>
             </div>
@@ -484,6 +598,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       onChange={field.onChange}
                       placeholder="Type test name and press Enter"
                       isObjectFormat={false}
+                      disabled={isDisabled}
                     />
                   )}
                 />
@@ -506,10 +621,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       <div className="flex flex-col gap-1">
                         {meds.map((med: any, idx: number) => (
                           <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                            <div className="flex-1 min-w-0 truncate">
+                            <div className="flex-1 min-w-0 truncate flex items-center flex-wrap">
                               <strong>{typeof med === 'string' ? med : med.name}</strong> 
                               {typeof med !== 'string' && med.dose && (
-                                <span className="font-mono text-accent font-semibold ml-1.5">{med.dose}{med.unit}</span>
+                                <span className="font-mono text-accent font-semibold ml-1.5">{med.dose}</span>
                               )}
                               {typeof med !== 'string' && med.formulation && (
                                 <span className="text-text-secondary ml-1.5">{med.formulation}</span>
@@ -519,6 +634,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                               )}
                               {typeof med !== 'string' && med.instructions && (
                                 <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                              )}
+                              {typeof med !== 'string' && med.isNew && (
+                                <span className="text-[9px] font-bold text-green bg-green/15 px-1 py-0.5 rounded uppercase tracking-wider ml-1.5 shrink-0 blink-animation">New</span>
                               )}
                             </div>
                             {!isPublished && (
@@ -531,7 +649,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                   newMeds.splice(idx, 1);
                                   field.onChange(newMeds);
                                 }}
-                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                disabled={isDisabled}
+                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md disabled:opacity-50"
                               >
                                 <TrashIcon className="w-3.5 h-3.5" />
                               </Button>
@@ -547,32 +666,20 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 onChange={setNewMedName}
                                 options={nameOptions}
                                 placeholder="e.g. Lisinopril"
+                                disabled={isDisabled}
                                 className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
                               />
                             </div>
-                            <div className="col-span-6 flex flex-col gap-1">
+                            <div className="col-span-12 md:col-span-12 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
                               <input 
-                                type="number" 
+                                type="text" 
                                 value={newMedDose}
                                 onChange={(e) => setNewMedDose(e.target.value)}
-                                placeholder="e.g. 10" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                placeholder="e.g. 10mg" 
+                                disabled={isDisabled}
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
-                            </div>
-                            <div className="col-span-6 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Unit</label>
-                              <select 
-                                value={newMedUnit}
-                                onChange={(e) => setNewMedUnit(e.target.value as MedUnitValue)}
-                                className="h-[28px] px-1 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all cursor-pointer focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
-                              >
-                                <option value="MG">MG</option>
-                                <option value="G">G</option>
-                                <option value="MCG">MCG</option>
-                                <option value="ML">ML</option>
-                                <option value="UNITS">UNITS</option>
-                              </select>
                             </div>
                             <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
@@ -580,7 +687,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 value={newMedFormulation}
                                 onChange={(e) => setNewMedFormulation(e.target.value)}
                                 placeholder="e.g. Tablet, Syrup" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                disabled={isDisabled}
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
                             </div>
                             <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
@@ -590,7 +698,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 value={newMedQuantity}
                                 onChange={(e) => setNewMedQuantity(e.target.value)}
                                 placeholder="e.g. 30" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                disabled={isDisabled}
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
                             </div>
                             <div className="col-span-12 flex flex-col gap-1">
@@ -599,7 +708,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 value={newMedInstructions}
                                 onChange={(e) => setNewMedInstructions(e.target.value)}
                                 placeholder="e.g. Take 1 tab daily" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                disabled={isDisabled}
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
                             </div>
                             <div className="col-span-12 flex justify-end mt-1">
@@ -607,19 +717,19 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 type="button"
                                 variant="secondary"
                                 size="xs"
+                                disabled={isDisabled}
                                 onClick={() => {
                                   if (newMedName.trim() && newMedDose.trim()) {
                                     field.onChange([...meds, { 
                                       name: newMedName.trim(), 
-                                      dose: parseFloat(newMedDose), 
-                                      unit: newMedUnit, 
+                                      dose: newMedDose.trim(), 
                                       formulation: newMedFormulation.trim() || undefined,
                                       quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
-                                      instructions: newMedInstructions.trim() 
+                                      instructions: newMedInstructions.trim(),
+                                      isNew: true
                                     }]);
                                     setNewMedName('');
                                     setNewMedDose('');
-                                    setNewMedUnit('MG');
                                     setNewMedFormulation('');
                                     setNewMedQuantity('');
                                     setNewMedInstructions('');

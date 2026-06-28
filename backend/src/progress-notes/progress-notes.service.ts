@@ -232,8 +232,7 @@ export class ProgressNotesService {
         .filter(m => m && m.name && String(m.name).trim() !== '')
         .map((m) => ({
           name: String(m.name).trim(),
-          dose: m.dose !== undefined && m.dose !== null ? Number(m.dose) : 0,
-          unit: m.unit || 'MG',
+          dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
           formulation: m.formulation,
           quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
           instructions: m.instructions,
@@ -287,8 +286,20 @@ export class ProgressNotesService {
 
       if (!note) throw new NotFoundException('Note not found');
       if (note.authorId !== userId && userId !== 'admin') throw new ForbiddenException('Not authorized to delete this note');
-      if (note.status !== NoteStatus.DRAFT) throw new BadRequestException('Only draft notes can be deleted');
       if (note.visit.patientId !== patientId) throw new BadRequestException('Note does not belong to this patient');
+
+      if (note.status !== NoteStatus.DRAFT) {
+        // Ensure there are no newer progress notes
+        const newerNote = await tx.progressNote.findFirst({
+          where: {
+            visit: { patientId },
+            createdAt: { gt: note.createdAt },
+          },
+        });
+        if (newerNote) {
+          throw new BadRequestException('Only the latest progress note can be deleted');
+        }
+      }
 
       await tx.progressNote.delete({ where: { id } });
       await tx.visit.delete({ where: { id: note.visitId } });

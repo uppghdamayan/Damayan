@@ -40,6 +40,8 @@ export function TimelineEntry({
     minute: '2-digit',
   });
 
+  const showEditActions = isInitial || note.status === 'DRAFT';
+
   return (
     <div 
       className={cn(
@@ -86,17 +88,19 @@ export function TimelineEntry({
           
           <div className="flex items-center gap-1.5">
             {/* Edit / View Action */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClickEdit();
-              }}
-              className="h-6 w-6 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 text-[var(--text-secondary)] flex items-center justify-center transition-all cursor-pointer"
-              title={note.status === 'PUBLISHED' ? 'View Full Note' : 'Edit Draft'}
-            >
-              <Edit className="w-3.5 h-3.5" />
-            </button>
+            {showEditActions && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClickEdit();
+                }}
+                className="h-6 w-6 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 text-[var(--text-secondary)] flex items-center justify-center transition-all cursor-pointer"
+                title={note.status === 'PUBLISHED' ? 'View Full Note' : 'Edit Draft'}
+              >
+                <Edit className="w-3.5 h-3.5" />
+              </button>
+            )}
             
             <ChevronDown 
               className={cn(
@@ -131,18 +135,21 @@ export function TimelineEntry({
                 }}
                 className="h-[26px] px-3 rounded-btn text-[11px] font-semibold bg-red/10 text-red border border-red/20 hover:bg-red hover:text-white transition-all cursor-pointer"
               >
-                Delete Note
+                {note.status === 'DRAFT' && !isInitial ? 'Undraft Note' : 'Delete Note'}
               </button>
             ) : (
               <div /> // Spacer to keep Edit button on the right
             )}
-            <button
-              type="button"
-              onClick={onClickEdit}
-              className="h-[26px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-[var(--text-secondary)] border border-border hover:bg-surface-3 hover:text-[var(--text-primary)] transition-all cursor-pointer"
-            >
-              {note.status === 'PUBLISHED' ? 'View Full Note ↗' : 'Edit Draft ↗'}
-            </button>
+            
+            {showEditActions && (
+              <button
+                type="button"
+                onClick={onClickEdit}
+                className="h-[26px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-[var(--text-secondary)] border border-border hover:bg-surface-3 hover:text-[var(--text-primary)] transition-all cursor-pointer"
+              >
+                {note.status === 'PUBLISHED' ? 'View Full Note ↗' : 'Edit Draft ↗'}
+              </button>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

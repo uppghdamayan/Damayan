@@ -3,13 +3,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { buildMedicationSuggestions } from '@/lib/medication-utils';
-import type { Medication, MedUnitValue } from '@/types/medication';
+import { buildMedicationSuggestions, MEDICATION_DICTIONARY } from '@/lib/medication-utils';
+import type { Medication } from '@/types/medication';
 
 interface MedicationFormValues {
   name: string;
   dose: string;
-  unit: MedUnitValue;
   formulation: string;
   instructions: string;
   quantity: string;
@@ -21,15 +20,14 @@ interface MedicationFormModalProps {
   editing: Medication | null;
   suggestions: Medication[];
   saving: boolean;
-  onSave: (values: { name: string; dose: number; unit: MedUnitValue; formulation?: string; instructions?: string; quantity?: number }) => void;
+  onSave: (values: { name: string; dose: string; formulation?: string; instructions?: string; quantity?: number }) => void;
 }
 
-const UNIT_OPTIONS: MedUnitValue[] = ['MG', 'G', 'MCG', 'ML', 'UNITS'];
 const FORMULATION_OPTIONS = [
   'Tablet', 'Capsule', 'Syrup', 'Suspension', 'Injection', 'Cream', 'Ointment', 'Drops', 'Patch', 'Suppository', 'Inhaler', 'Lotion', 'Gel'
 ];
 
-const emptyValues: MedicationFormValues = { name: '', dose: '', unit: 'MG', formulation: '', instructions: '', quantity: '' };
+const emptyValues: MedicationFormValues = { name: '', dose: '', formulation: '', instructions: '', quantity: '' };
 
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 
@@ -43,8 +41,7 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
         editing
           ? {
               name: editing.name,
-              dose: String(Number(editing.dose)),
-              unit: editing.unit,
+              dose: editing.dose,
               formulation: editing.formulation ?? '',
               instructions: editing.instructions ?? '',
               quantity: editing.quantity != null ? String(editing.quantity) : '',
@@ -64,9 +61,8 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     if (!values.name.trim()) e.name = 'Medication name is required.';
     else if (values.name.length > 255) e.name = 'Max 255 characters.';
 
-    const doseNum = parseFloat(values.dose);
-    if (!values.dose || isNaN(doseNum) || doseNum <= 0) e.dose = 'Dose must be a number greater than 0.';
-    else if (doseNum > 99999.99) e.dose = 'Dose is too large.';
+    if (!values.dose.trim()) e.dose = 'Dose is required.';
+    else if (values.dose.length > 255) e.dose = 'Max 255 characters.';
 
     if (values.instructions && values.instructions.length > 50) e.instructions = 'Max 50 characters.';
 
@@ -83,8 +79,7 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     if (!validate()) return;
     onSave({
       name: values.name.trim(),
-      dose: parseFloat(values.dose),
-      unit: values.unit,
+      dose: values.dose.trim(),
       formulation: values.formulation.trim() || undefined,
       instructions: values.instructions.trim() || undefined,
       quantity: values.quantity ? parseInt(values.quantity, 10) : undefined,
@@ -121,9 +116,18 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
               Medication Name <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
             </label>
             <ComboboxInput
-              autoFocus
               value={values.name}
-              onChange={(val) => { setValues(v => ({ ...v, name: val })); setErrors(er => ({ ...er, name: '' })); }}
+              onChange={(val) => { 
+                setValues(v => {
+                  const newState = { ...v, name: val };
+                  const dictEntry = MEDICATION_DICTIONARY.find(d => d.Molecule.toLowerCase() === val.toLowerCase());
+                  if (dictEntry) {
+                    newState.formulation = dictEntry.Route;
+                  }
+                  return newState;
+                }); 
+                setErrors(er => ({ ...er, name: '' })); 
+              }}
               options={nameOptions}
               placeholder="e.g. Losartan"
               hasError={!!errors.name}
@@ -132,29 +136,20 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             {errors.name && <p className="text-[12px] text-red mt-1">{errors.name}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mb-3.5">
+          <div className="grid grid-cols-2 gap-3 mb-3.5">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
                 Dose <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
               </label>
               <input
-                type="number" step="0.01" min="0.01"
+                type="text"
                 value={values.dose}
                 onChange={(e) => { setValues((v) => ({ ...v, dose: e.target.value })); setErrors((er) => ({ ...er, dose: '' })); }}
-                placeholder="50"
+                placeholder="e.g. 500 mg, 1 tablet"
+                maxLength={255}
                 className={inputCn(!!errors.dose)}
               />
               {errors.dose && <p className="text-[12px] text-red mt-1">{errors.dose}</p>}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">Unit</label>
-              <ComboboxInput
-                value={values.unit}
-                onChange={(val) => { setValues(v => ({ ...v, unit: val as MedUnitValue })); }}
-                options={UNIT_OPTIONS}
-                readOnly
-                lowercaseOnly
-              />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">Formulation</label>

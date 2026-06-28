@@ -24,19 +24,24 @@ export function TagInputField({
 }: TagInputFieldProps) {
   const [inputValue, setInputValue] = useState('');
 
+  const handleAdd = () => {
+    if (disabled) return;
+    const val = inputValue.trim();
+    if (val) {
+      if (isObjectFormat) {
+        onChange([...value, { title: val }]);
+      } else {
+        onChange([...value, val]);
+      }
+      setInputValue('');
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (disabled) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      const val = inputValue.trim();
-      if (val) {
-        if (isObjectFormat) {
-          onChange([...value, { title: val }]);
-        } else {
-          onChange([...value, val]);
-        }
-        setInputValue('');
-      }
+      handleAdd();
     }
   };
 
@@ -69,14 +74,24 @@ export function TagInputField({
         ))}
       </div>
       {!disabled && (
-        <input
-          type="text"
-          className="w-full h-[34px] px-2.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/70"
-          placeholder={placeholder}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            className="flex-1 h-[34px] px-2.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/70"
+            placeholder={placeholder}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!inputValue.trim()}
+            className="h-[34px] cursor-pointer px-3 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            + Add
+          </button>
+        </div>
       )}
     </div>
   );

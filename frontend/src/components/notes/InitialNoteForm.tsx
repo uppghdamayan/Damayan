@@ -18,7 +18,6 @@ import { useLatestVitals } from '@/hooks/useVitals';
 import { usePatient } from '@/hooks/usePatients';
 import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
-import type { MedUnitValue } from '@/types/medication';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
@@ -161,7 +160,7 @@ function MedicationListReadOnly({ patientId }: { patientId: string }) {
         <div key={med.id} className="flex flex-col text-[12px]">
           <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
             <span className="w-1.5 h-1.5 rounded-full bg-green" />
-            <span>{med.name} {med.dose}{med.unit}</span>
+            <span>{med.name} {med.dose}</span>
           </div>
           {med.instructions && (
             <span className="text-[10px] text-[var(--text-muted)] pl-3.5">{med.instructions}</span>
@@ -211,8 +210,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
-  const [newMedUnit, setNewMedUnit] = useState<MedUnitValue>('MG');
-  const [newMedFormulation, setNewMedFormulation] = useState('');
+    const [newMedFormulation, setNewMedFormulation] = useState('');
   const [newMedInstructions, setNewMedInstructions] = useState('');
   const [newMedQuantity, setNewMedQuantity] = useState('');
 
@@ -276,8 +274,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             ? validMeds
             : (copyForward?.activeMedications || []).map((m: any) => ({
                 name: m.name,
-                dose: m.dose ? Number(m.dose) : undefined,
-                unit: m.unit,
+                dose: m.dose || undefined,
                 formulation: m.formulation || undefined,
                 quantity: m.quantity || undefined,
                 instructions: m.instructions || undefined,
@@ -295,10 +292,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           const draftProblems = parsed.assessment as any[] || [];
           const validProblems = draftProblems.filter((p: any) => p && p.title);
           const draftMeds = parsed.medicationSnapshot as any[] || [];
-          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '', unit: 'MG' } : {
+          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : {
             name: m.name,
-            dose: m.dose ? Number(m.dose) : undefined,
-            unit: m.unit,
+            dose: m.dose || undefined,
             formulation: m.formulation || undefined,
             quantity: m.quantity || undefined,
             instructions: m.instructions || undefined,
@@ -313,8 +309,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           if (validMeds.length === 0) {
             parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
-              dose: m.dose ? Number(m.dose) : undefined,
-              unit: m.unit,
+              dose: m.dose || undefined,
               formulation: m.formulation || undefined,
               quantity: m.quantity || undefined,
               instructions: m.instructions || undefined,
@@ -342,8 +337,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
-          dose: m.dose ? Number(m.dose) : undefined,
-          unit: m.unit,
+          dose: m.dose || undefined,
           formulation: m.formulation || undefined,
           quantity: m.quantity || undefined,
           instructions: m.instructions || undefined,
@@ -1455,30 +1449,16 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
                                 />
                               </div>
-                              <div className="col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
-                                <input 
-                                  type="number" 
-                                  value={newMedDose}
-                                  onChange={(e) => setNewMedDose(e.target.value)}
-                                  placeholder="e.g. 10" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Unit</label>
-                                <select 
-                                  value={newMedUnit}
-                                  onChange={(e) => setNewMedUnit(e.target.value as MedUnitValue)}
-                                  className="h-[28px] px-1 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all cursor-pointer focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
-                                >
-                                  <option value="MG">MG</option>
-                                  <option value="G">G</option>
-                                  <option value="MCG">MCG</option>
-                                  <option value="ML">ML</option>
-                                  <option value="UNITS">UNITS</option>
-                                </select>
-                              </div>
+                              <div className="col-span-12 md:col-span-12 flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+                              <input 
+                                type="text" 
+                                value={newMedDose}
+                                onChange={(e) => setNewMedDose(e.target.value)}
+                                placeholder="e.g. 10mg" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                              />
+                            </div>
                               <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
                                 <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
                                 <input 
@@ -1526,15 +1506,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                     setTimeout(() => {
                                       field.onChange([...meds, { 
                                         name: newMedName.trim(), 
-                                        dose: parseFloat(newMedDose), 
-                                        unit: newMedUnit, 
+                                        dose: newMedDose.trim(), 
                                         formulation: newMedFormulation.trim() || undefined,
                                         quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
                                         instructions: newMedInstructions.trim() 
                                       }]);
                                       setNewMedName('');
                                       setNewMedDose('');
-                                      setNewMedUnit('MG');
                                       setNewMedFormulation('');
                                       setNewMedQuantity('');
                                       setNewMedInstructions('');
@@ -1591,8 +1569,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
             medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
-              dose: m.dose ? Number(m.dose) : undefined,
-              unit: m.unit,
+              dose: m.dose || undefined,
               formulation: m.formulation || undefined,
               quantity: m.quantity || undefined,
               instructions: m.instructions || undefined,

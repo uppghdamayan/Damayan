@@ -8,8 +8,9 @@ import { useState, useMemo } from 'react';
 import { mapNoteToTimelineView } from '@/lib/notes-utils';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { ClipboardList, ArrowRight, Trash2 } from 'lucide-react';
-import { useDeleteAllDraftProgressNotes, useDeleteProgressNote } from '@/hooks/useProgressNotes';
+import { ClipboardList, ArrowRight } from 'lucide-react';
+import { useDeleteProgressNote } from '@/hooks/useProgressNotes';
+import { cn } from '@/lib/utils';
 
 
 interface NoteTimelineProps {
@@ -29,9 +30,6 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [deleteDraftNoteId, setDeleteDraftNoteId] = useState<string | null>(null);
-  const [showClearDraftsModal, setShowClearDraftsModal] = useState(false);
-
-  const deleteAllDraftsMutation = useDeleteAllDraftProgressNotes(patientId);
   const deleteProgressNoteMutation = useDeleteProgressNote(patientId);
 
   const handleToggleNote = (id: string) => {
@@ -85,6 +83,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
     triggerNewNote();
   };
 
+  const firstProgressNoteId = mappedNotes.find(n => n.kind === 'progress')?.id;
+
   return (
     <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-2">
@@ -102,14 +102,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {hasDrafts && (
-            <button 
-              onClick={() => setShowClearDraftsModal(true)}
-              className="h-[24px] px-3 bg-red hover:bg-red-hover text-white rounded text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" /> Clear Drafts
-            </button>
-          )}
+
           {initialNote?.status === 'PUBLISHED' && !hasDrafts && (
             <button 
               onClick={handleNewNote}
@@ -122,11 +115,6 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
       </div>
 
       <div className="flex flex-col gap-3 relative">
-        {/* Simple timeline line */}
-        {mappedNotes.length > 0 && (
-          <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-border -z-10" />
-        )}
-
         {mappedNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center p-8 bg-surface border border-border rounded-card shadow-card mt-4 min-h-[260px]">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-4 transition-transform hover:scale-110 duration-300">
@@ -151,14 +139,36 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             // Diff baseline: chronologically diff against the next note older in sorted order (index index + 1).
             // Decided per fix.md §6.3.
             const previousNote = index < mappedNotes.length - 1 ? mappedNotes[index + 1] : null;
+            const isOpenNote = expandedNotes.has(note.id);
 
             return (
-              <div key={note.id} className="relative pl-8">
-                <div className="absolute left-1.5 top-5 w-3.5 h-3.5 rounded-full bg-surface border-2 border-accent" />
+              <div key={note.id} className="relative pl-8 pb-5 last:pb-0">
+                {/* Connecting line to the next item */}
+                {index < mappedNotes.length - 1 && (
+                  <div 
+                    className="absolute bg-border-strong/50" 
+                    style={{ left: '15px', top: '36px', bottom: '-34px', width: '2px' }} 
+                  />
+                )}
+                {/* Modern timeline dot */}
+                <div 
+                  className={cn(
+                    "absolute w-3.5 h-3.5 rounded-full bg-surface border-2 flex items-center justify-center z-10 transition-all duration-200",
+                    isOpenNote 
+                      ? "border-accent shadow-[0_0_0_5px_rgba(10,110,95,0.2)] scale-110"
+                      : (note.status === 'PUBLISHED' ? "border-accent shadow-[0_0_0_3px_rgba(10,110,95,0.08)]" : "border-yellow-border shadow-[0_0_0_3px_rgba(217,119,6,0.08)]")
+                  )}
+                  style={{ left: '9px', top: '22px' }}
+                >
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-all duration-200",
+                    isOpenNote ? "scale-125 bg-accent" : (note.status === 'PUBLISHED' ? "bg-accent" : "bg-yellow-border")
+                  )} />
+                </div>
                 <TimelineEntry 
                   note={note}
                   previousNote={previousNote}
-                  isOpen={expandedNotes.has(note.id)}
+                  isOpen={isOpenNote}
                   onToggle={() => handleToggleNote(note.id)}
                   onClickEdit={() => {
                     const rawNote = allNotesRaw[index];
@@ -171,7 +181,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                   onDelete={
                     (note.kind === 'initial' && mappedNotes.length === 1 && note.status !== 'DRAFT')
                       ? () => setDeleteNoteId(note.id)
-                      : (note.kind === 'progress' && note.status === 'DRAFT')
+                      : (note.kind === 'progress' && (note.status === 'DRAFT' || note.id === firstProgressNoteId))
                         ? () => setDeleteDraftNoteId(note.id)
                         : undefined
                   }
@@ -197,18 +207,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         message="Are you sure you want to delete this Initial Note? This action cannot be undone."
       />
 
-      <DeleteConfirmModal
-        open={showClearDraftsModal}
-        onClose={() => setShowClearDraftsModal(false)}
-        onConfirm={() => {
-          deleteAllDraftsMutation.mutate(undefined, {
-            onSuccess: () => setShowClearDraftsModal(false),
-          });
-        }}
-        isDeleting={deleteAllDraftsMutation.isPending}
-        title="Clear Draft Progress Notes"
-        message="Are you sure you want to delete all draft progress notes for this patient? This action cannot be undone."
-      />
+
 
       <DeleteConfirmModal
         open={!!deleteDraftNoteId}
@@ -221,8 +220,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           }
         }}
         isDeleting={deleteProgressNoteMutation.isPending}
-        title="Delete Progress Note Draft"
-        message="Are you sure you want to delete this draft? This action cannot be undone."
+        title={mappedNotes.find(n => n.id === deleteDraftNoteId)?.status === 'DRAFT' ? "Undraft Progress Note" : "Delete Progress Note"}
+        message={mappedNotes.find(n => n.id === deleteDraftNoteId)?.status === 'DRAFT' ? "Are you sure you want to undraft this progress note? This action cannot be undone." : "Are you sure you want to delete this progress note? This action cannot be undone."}
       />
     </div>
   );

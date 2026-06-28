@@ -2,15 +2,11 @@ import {
   IsString,
   IsNotEmpty,
   MaxLength,
-  IsEnum,
-  IsNumber,
   IsOptional,
   IsInt,
   Min,
-  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MedUnit } from '@prisma/client';
 
 export class CreateMedicationDto {
   @ApiProperty({ example: 'Losartan' })
@@ -19,15 +15,11 @@ export class CreateMedicationDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: 50, description: 'Numeric dose amount, > 0' })
-  @IsNumber()
-  @Min(0.01)
-  @Max(99999.99)
-  dose: number;
-
-  @ApiProperty({ enum: MedUnit, example: MedUnit.MG })
-  @IsEnum(MedUnit)
-  unit: MedUnit;
+  @ApiProperty({ example: '50 mg', description: 'Free text dose amount' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  dose: string;
 
   @ApiPropertyOptional({ example: 'Tablet' })
   @IsOptional()

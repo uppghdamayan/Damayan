@@ -1,7 +1,7 @@
 import { InitialNote } from '@/hooks/useInitialNote';
 import { ProgressNote } from '@/hooks/useProgressNotes';
 
-export type MedUnitValue = 'MG' | 'G' | 'MCG' | 'ML' | 'UNITS';
+
 
 export interface TimelineNoteView {
   id: string;

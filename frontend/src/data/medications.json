@@ -1,0 +1,1462 @@
+[
+  {
+    "Molecule": "Abacavir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Abacavir/Lamivudine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Abiraterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Acetazolamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Acetylcysteine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Aciclovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Activated Charcoal",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Albendazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Alcohol, Ethyl",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Alendronate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Alendronate + Cholecalciferol/Vitamin D3",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Alfuzosin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Allopurinol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Alprazolam",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Aluminum + Magnesium",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Amiodarone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Amlodipine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Amoxicillin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Amoxicillin + Clavulanic acid (Co-amoxiclav)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Anastrozole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Apixaban",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Aripriprazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Artemether + Lumefantrin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ascorbic acid (Vitamin C)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Aspirin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Atenolol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Atorvastatin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Atropine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Azathioprine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Azithromycin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bacitracin + Neomycin + Polymixin B",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Baclofen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Barium",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bedaquiline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Benzoyl peroxide",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Betahistine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Betamethasone",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Bicalutamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Biperiden",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bisacodyl",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bisoprolol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bromazepam",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bromocriptine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Bumetanide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Butamirate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Calamine",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Calcipotriol",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Calcipotriol + Betamethasone",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Calcitriol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Calcium",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Calcium + Cholecalciferol/Vitamin D3",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Calcium Sennosides",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Capecitabine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Captopril",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Carbamazepine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Carvedilol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Castor Oil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cefalexin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cefixime",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cefuroxime",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Celecoxib",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cetirizine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Chlorambucil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Chloramphenicol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Chloroquine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Chlorphenamine (Chlorpheniramine)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Chlorpromazine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ciclosporin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cilostazol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cinnarizine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ciprofloxacin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clarithromycin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clindamycin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clobetasol",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Clofazimine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clomifene",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clonazepam",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clonidine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clopidogrel",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clotrimazole",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Cloxacillin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Clozapine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Codeine + A1",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Colchicine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Conjugated Estrogen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Crotamiton",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Cycloserine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Cyproterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dabigatran",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Daclatasvir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Danazol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dantrolene",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dapagliflozin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dapsone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Deferasirox",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Deferiprone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Delamanid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Desmopressin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dexamethasone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dextromethorphan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diazepam",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diclofenac",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dicycloverine (Dicyclomine)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diethylcarbamazine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Digoxin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diloxanide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diltiazem",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Diphenhydramine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dipyridamole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dolutegravir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Domperidone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Donepezil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Donepezil Hydrochloride",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Doxycycline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Dydrogesterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Efavirenz",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Emtricitabine + Tenofovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Enalapril",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Enalapril + Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Entecavir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Enteral Nutrition - Modular",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Enteral Nutrition - Pediatric Polymeric",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Enteral Nutrition - Semi-elemental",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Eperisone hydrochloride",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ergotamine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Erythromycin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Escitalopram",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ethambutol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ethinylestradiol + Desogestrel",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ethinylestradiol + Levonorgestrel",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ethinylestradiol + Norethisterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ethinylestradiol + Norgestrel",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Everolimus",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Famotidine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Felodipine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fenofibrate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fentanyl",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ferrous Salt",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ferrous Salt + Folic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Finasteride",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fluconazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Flucytosine (5-fluoroyctosine)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Flunarizine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fluocinonide",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Fluoxetine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Flutamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Folic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fosfomycin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Furosemide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Fusidic Acid/Fusidate Sodium",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Gabapentin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Gliclazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Glycerin (Glycerol)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Haloperidol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydralazine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydrocortisone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydrogen Peroxide",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Hydroxychloroquine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydroxyurea",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hydroxyzine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Hyoscine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ibuprofen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Imiquinod",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Indapamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Insulin Glargine",
+    "Route": "SC"
+  },
+  {
+    "Molecule": "Iodine",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Iodine + Potassium iodide (Lugol's Solution)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Iodized Oil Fluid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Irbesartan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Irbesartan + Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoniazid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoniazid + Rifampicin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoniazid + Rifampicin + Ethambutol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoniazid + Rifampicin + Pyrazinamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoniazid + Rifampicin + Pyrazinamide + Ethambutol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isosorbide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Isoxsuprine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Itraconazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ivermectin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ketoconazole",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Ketoprofen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lactulose",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lagundi (Vitex negundo L. [Fam. Verbenaceae])",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamivudine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamivudine + Efavirenz + Tenofovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamivudine + Tenofovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamivudine + Zidovudine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamivudine + Zidovudine + Nevirapine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lamotrigine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lansoprazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Letrozole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Levetiracetam",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Levodopa + Carbidopa",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Levofloxacin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Levonorgestrel",
+    "Route": "SC"
+  },
+  {
+    "Molecule": "Levothyroxine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Linezolid *Reserve antimicrobial",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lithium",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Live Attenuated Bivalent Oral Polio Vaccine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Loperamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lopinavir + Ritonavir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Loratadine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Losartan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Losartan + Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Lynestrenol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mebendazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mebeverine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mecobalamin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Medroxyprogesterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mefenamic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mefloquine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Megestrol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Melphalan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Memantine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mercaptopurine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mesalazine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Metformin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methimazole/Thiamazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methotrexate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methyldopa",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methylene Blue",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methylphenidate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Methylprednisolone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Metoprolol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Metronidazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Miconazole",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Monobasic/Dibasic Sodium Phosphate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Montelukast",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Morphine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Moxifloxacin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Multivitamins",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mupirocin",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Mycophenolate Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Mycophenolate Mofetil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "N-acetyl Penicillamine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nalidixic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Naltrexone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Naproxen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nevirapine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nicotine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nifedipine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nimodipine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nitrofurantoin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Norethisterone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Nystatin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ofloxacin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Olanzapine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Omeprazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ondansetron",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Oral Rehydration Salts (ORS 75-replacement)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Oseltamivir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Oxcarbazepine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Oxycodone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Oxycodone + Naloxone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pantoprazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Para-amino salicylic acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Paracetamol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Permethrin",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Petrolatum/Petroleum",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Phenobarbital",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Phenoxymethyl Penicillin/Penicillin V",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Phenytoin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Potassium Citrate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Potassium Chloride",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Praziquantel",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Prednisolone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Prednisone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Primaquine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Propranolol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Propylthiouracyl",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Prothionamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pyrazinamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pyridostigmine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pyridoxine/Vitamin B6",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pyrimethamine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Quetiapine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Quinine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rabeprazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ranitidine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Retinol/Vitamin A",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ribavirin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rifabutin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rifampicin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rifapentine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rifaximin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rilpivirine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Risperidone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rivaroxaban",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rivastigmine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rosuvastatin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Rotavirus Vaccine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sacubitril + Valsartan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Salbutamol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Salicylic Acid",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Sambong (Blumea balsamifera)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Selegiline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Selenium",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Sertraline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sevelamer",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Silver Sulfadiazine",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Simvastatin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sirolimus",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium Bicarbonate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium bicarbonate + Glutamic acid + Tartaric acid + Silicon resin (Gas Forming Agent)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium Iodide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium Valproate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium Valproate + Valproic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sodium Valproate + Valproic Acid (Divalproex Sodium)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sofosbuvir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sofosbuvir + Ledipasvir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sofosbuvir + Velpatasvir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Spironolactone",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Standard Senna Concentrate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Succimer/Dimercapto succinic acid (DMSA)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sucralfate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sulfamethoxazole + Trimethoprim (Cotrimoxazole)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Sulfur",
+    "Route": "Topical"
+  },
+  {
+    "Molecule": "Sumatriptan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tacrolimus",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tamoxifen",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tamsulosin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tegafur + Uracil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Telmisartan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Telmisartan + Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tenofovir + Lamivudine + Dolutegravir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tenofovir alafenamide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tenofovir disoproxil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Terazosin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Terbinafine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Terbutaline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tetracycline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Theophylline (Anhydrous)",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Thiamine/Vitamin B1",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tolvaptan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Topiramate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Trace Elements",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tramadol",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tranexamic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Triclabendazole",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Trimetazidine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Tsaang Gubat [Carmona retusa (Vahl) Masam]",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Typhoid Vaccine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Ursodeoxycholic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Valaciclovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Valganciclovir",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Valproic Acid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Valsartan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Valsartan + Hydrochlorothiazide",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Varenicline",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Verapamil",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Vitamin B1  + B6 + B12",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Voriconazole *Reserve antimicrobial",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Warfarin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Zidovudine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Zidovudine + Lamivudine",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Zinc",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Zolmitriptan",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Zolpidem",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Multiple Micronutrient Supplement",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pancreatin",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pretomanid",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Pyronaridine tetraphosphate/artesunate",
+    "Route": "Oral"
+  },
+  {
+    "Molecule": "Japanese Encephalitis Vaccine",
+    "Route": "SC"
+  },
+  {
+    "Molecule": "Silver Diamine Fluoride",
+    "Route": "Topical"
+  }
+]

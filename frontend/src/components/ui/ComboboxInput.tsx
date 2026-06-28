@@ -13,6 +13,7 @@ interface ComboboxInputProps {
   maxLength?: number;
   lowercaseOnly?: boolean;
   className?: string; // Additional classes for custom styling
+  disabled?: boolean;
 }
 
 export function ComboboxInput({
@@ -26,6 +27,7 @@ export function ComboboxInput({
   maxLength,
   lowercaseOnly = false,
   className,
+  disabled = false,
 }: ComboboxInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -99,7 +101,8 @@ export function ComboboxInput({
     hasError
       ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
       : (className ? '' : 'border-border focus:border-accent focus:shadow-accent-focus'),
-    readOnly && 'cursor-pointer'
+    readOnly && 'cursor-pointer',
+    disabled && 'opacity-50 cursor-not-allowed bg-surface-2'
   );
 
   return (
@@ -108,8 +111,9 @@ export function ComboboxInput({
         ref={inputRef}
         autoFocus={autoFocus}
         value={lowercaseOnly ? value.toLowerCase() : value}
+        disabled={disabled}
         onChange={(e) => {
-          if (!readOnly) {
+          if (!readOnly && !disabled) {
             onChange(e.target.value);
             setIsOpen(true);
             setHighlightedIndex(0);
@@ -135,9 +139,12 @@ export function ComboboxInput({
       />
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
-          setIsOpen((prev) => !prev);
-          inputRef.current?.focus();
+          if (!disabled) {
+            setIsOpen((prev) => !prev);
+            inputRef.current?.focus();
+          }
         }}
         tabIndex={-1}
         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
