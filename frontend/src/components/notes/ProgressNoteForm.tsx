@@ -676,9 +676,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 type="text" 
                                 value={newMedDose}
                                 onChange={(e) => setNewMedDose(e.target.value)}
-                                placeholder="e.g. 10mg" 
-                                disabled={isDisabled}
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                                placeholder="e.g. 10" 
+                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
                               />
                             </div>
                             <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
