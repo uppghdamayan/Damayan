@@ -136,7 +136,9 @@ export function mapNoteToTimelineView(
 
     const author = initialNote.author;
     const lastEditor = (initialNote as any).lastEditor;
-    const lastEditorName = lastEditor ? `${lastEditor.firstName} ${lastEditor.lastName}` : undefined;
+    const lastEditorName = lastEditor 
+      ? `${lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}${lastEditor.lastName}, ${lastEditor.firstName}`
+      : undefined;
     const lastEditedAt = (initialNote as any).lastEditedAt;
     
     let displayUser = author;
@@ -206,6 +208,10 @@ export function mapNoteToTimelineView(
 
     const author = progressNote.author;
     const lastEditor = (progressNote as any).lastEditor;
+    const lastEditorName = lastEditor 
+      ? `${lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}${lastEditor.lastName}, ${lastEditor.firstName}`
+      : undefined;
+    const lastEditedAt = (progressNote as any).lastEditedAt;
     
     let displayUser = author;
     let displayUserId = progressNote.authorId;
@@ -235,6 +241,8 @@ export function mapNoteToTimelineView(
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
       isDisplayedUserAuthor,
+      lastEditorName,
+      lastEditedAt,
       previewText: progressNote.subjective ? progressNote.subjective.slice(0, 65) + (progressNote.subjective.length > 65 ? '...' : '') : '',
       isLatest,
       sections: {

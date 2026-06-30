@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Edit } from 'lucide-react';
 
 interface NoteStatusBadgeProps {
   status: 'DRAFT' | 'PUBLISHED';
@@ -14,13 +15,14 @@ export function NoteStatusBadge({ status, lastEditedBy, lastEditedAt }: NoteStat
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col items-end gap-1">
       <span className={cn(badgeBase, variants[status])}>
         {status}
       </span>
       {status === 'PUBLISHED' && lastEditedBy && lastEditedAt && (
-        <span className="text-[11px] text-[var(--text-muted)]">
-          Last edited by {lastEditedBy} at {new Date(lastEditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <span className="text-[9px] font-bold tracking-[0.5px] text-[var(--text-muted)] flex items-center gap-1">
+          <Edit className="w-2.5 h-2.5" />
+          Edited by {lastEditedBy} · {new Date(lastEditedAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} · {new Date(lastEditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       )}
     </div>

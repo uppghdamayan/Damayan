@@ -77,7 +77,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Assessment */}
-      {(note.sections.assessment?.length > 0 || assessmentDiff.length > 0) && (
+      {((note.sections.assessment && note.sections.assessment.length > 0) || assessmentDiff.length > 0) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--red)] pb-1 w-full text-[var(--red)] font-bold">
             <ClipboardList className="w-3.5 h-3.5" />
@@ -120,7 +120,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Diagnostics */}
-      {(note.sections.diagnostics?.length > 0 || diagDiff.length > 0) && (
+      {((note.sections.diagnostics && note.sections.diagnostics.length > 0) || diagDiff.length > 0) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
             <Search className="w-3.5 h-3.5" />
@@ -151,7 +151,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Medications */}
-      {(note.sections.medications?.length > 0 || medDiff.length > 0) && (
+      {((note.sections.medications && note.sections.medications.length > 0) || medDiff.length > 0) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
             <Pill className="w-3.5 h-3.5" />

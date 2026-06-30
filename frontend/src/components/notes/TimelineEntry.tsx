@@ -64,27 +64,12 @@ export function TimelineEntry({
         className="p-3.5 cursor-pointer flex flex-col gap-2 select-none"
       >
         {/* Header line */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[13px] font-bold text-[var(--text-primary)]">
-                {isInitial ? 'Initial Consultation Note' : 'Progress Note'}
-              </span>
-              <Badge variant={note.status === 'PUBLISHED' ? 'published' : 'draft'}>
-                {note.status}
-              </Badge>
-              {note.isLatest && (
-                <Badge variant="active">Latest Note</Badge>
-              )}
-              {isInitial && note.status === 'PUBLISHED' && (
-                // Inherited badge condition: only show if the Initial Note is published.
-                <Badge variant="published" className="flex items-center gap-1 normal-case font-medium">
-                  <Pin className="w-2.5 h-2.5 shrink-0" />
-                  <span>Inherited by today's note</span>
-                </Badge>
-              )}
-            </div>
-            <span className="text-[11px] text-[var(--text-muted)] font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <span className="text-[13px] font-bold text-[var(--text-primary)]">
+              {isInitial ? 'Initial Consultation Note' : 'Progress Note'}
+            </span>
+            <div className="text-[11px] text-[var(--text-muted)] font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
               <span>{formattedDate} · {formattedTime} · By</span>
               <span className="font-bold text-[var(--text-primary)] px-1 bg-surface-3 rounded border border-border">
                 {note.authorName}
@@ -98,40 +83,57 @@ export function TimelineEntry({
                   Not Author
                 </Badge>
               )}
-              {note.lastEditorName && note.lastEditedAt && note.status === 'PUBLISHED' && (
-                <>
-                  <span className="ml-1 text-[11px] text-[var(--text-muted)]">·</span>
-                  <Badge variant="outline" className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] uppercase border-[var(--text-muted)] text-[var(--text-secondary)] bg-surface-2 ml-1">
-                    <Edit className="w-2.5 h-2.5" />
-                    Edited by {note.lastEditorName} at {new Date(note.lastEditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Badge>
-                </>
-              )}
-            </span>
+            </div>
           </div>
           
-          <div className="flex items-center gap-1.5">
-            {/* Edit / View Action */}
-            {showEditActions && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClickEdit();
-                }}
-                className="h-6 w-6 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 text-[var(--text-secondary)] flex items-center justify-center transition-all cursor-pointer"
-                title={note.status === 'PUBLISHED' ? 'View Full Note' : 'Edit Draft'}
-              >
-                <Edit className="w-3.5 h-3.5" />
-              </button>
-            )}
-            
-            <ChevronDown 
-              className={cn(
-                "w-4 h-4 text-[var(--text-muted)] transition-transform duration-200 shrink-0",
-                isOpen ? "rotate-180 text-accent" : ""
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Status & Trait Badges */}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <Badge variant={note.status === 'PUBLISHED' ? 'published' : 'draft'}>
+                  {note.status}
+                </Badge>
+                {note.isLatest && (
+                  <Badge variant="active">Latest Note</Badge>
+                )}
+                {isInitial && note.status === 'PUBLISHED' && (
+                  // Inherited badge condition: only show if the Initial Note is published.
+                  <Badge variant="published" className="flex items-center gap-1 normal-case font-medium">
+                    <Pin className="w-2.5 h-2.5 shrink-0" />
+                    <span>Inherited by today's note</span>
+                  </Badge>
+                )}
+              </div>
+              {note.lastEditorName && note.lastEditedAt && note.status === 'PUBLISHED' && (
+                <div className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] text-[var(--text-muted)]">
+                  <Edit className="w-2.5 h-2.5" />
+                  Edited by {note.lastEditorName} · {new Date(note.lastEditedAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} · {new Date(note.lastEditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               )}
-            />
+            </div>
+            
+            <div className="flex items-center gap-1.5 border-l border-border pl-3">
+              {showEditActions && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClickEdit();
+                  }}
+                  className="h-6 w-6 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 text-[var(--text-secondary)] flex items-center justify-center transition-all cursor-pointer"
+                  title={note.status === 'PUBLISHED' ? 'View Full Note' : 'Edit Draft'}
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
+              )}
+              
+              <ChevronDown 
+                className={cn(
+                  "w-4 h-4 text-[var(--text-muted)] transition-transform duration-200 shrink-0",
+                  isOpen ? "rotate-180 text-accent" : ""
+                )}
+              />
+            </div>
           </div>
         </div>
 

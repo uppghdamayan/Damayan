@@ -538,24 +538,23 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] text-[var(--text-muted)]">
                   Published by {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Author'} on {new Date(note.createdAt).toLocaleDateString()}
                 </span>
-                {note.lastEditor && (
-                  <>
-                    <span className="text-[10px] text-[var(--text-muted)]">·</span>
-                    <Badge variant="outline" className="flex items-center gap-1 text-[9px] font-bold tracking-[0.5px] uppercase border-[var(--text-muted)] text-[var(--text-secondary)] bg-surface-2">
-                      <Edit className="w-2.5 h-2.5" />
-                      Edited by {note.lastEditor.firstName} {note.lastEditor.lastName} at {new Date(note.lastEditedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Badge>
-                  </>
-                )}
               </div>
             </div>
-            <button 
-              type="button" 
-              onClick={() => setIsEditing(true)} 
-              className="sec-btn primary"
-            >
-              Edit Note
-            </button>
+            <div className="flex flex-col items-end gap-1.5">
+              <button 
+                type="button" 
+                onClick={() => setIsEditing(true)} 
+                className="sec-btn primary shrink-0"
+              >
+                Edit Note
+              </button>
+              {note.lastEditor && (
+                <div className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] text-[var(--text-muted)]">
+                  <Edit className="w-2.5 h-2.5" />
+                  Edited by {note.lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}{note.lastEditor.lastName}, {note.lastEditor.firstName} · {new Date(note.lastEditedAt || new Date()).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} · {new Date(note.lastEditedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
           </div>
           {/* VITALS CARD */}
           <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
