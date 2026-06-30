@@ -494,6 +494,31 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       : (latestVitals.measuredBy ?? '—')
     : '';
 
+  const renderVitalCell = (
+    label: string,
+    valueStr: string,
+    unit: string,
+    status: 'normal' | 'warn' | 'critical' | 'unknown',
+    subText?: string
+  ) => (
+    <div className="bg-surface-2 border border-border rounded-lg px-3 py-2.5 flex flex-col gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-text-muted">{label}</span>
+      <div className="flex items-baseline gap-1 mt-0.5">
+        <span className={`font-mono text-[18px] ${
+          status === 'critical' ? 'text-red font-semibold' :
+          status === 'warn' ? 'text-amber font-medium' :
+          'text-text-primary font-bold'
+        } leading-none`}>
+          {valueStr}
+        </span>
+        {valueStr !== '—' && valueStr !== '—/—' && <span className="text-[11px] text-text-muted">{unit}</span>}
+      </div>
+      <div className="text-[10px] text-text-muted font-sans mt-0.5">
+        {subText || '—'}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6 pb-32">
       {note?.status === 'PUBLISHED' && !isEditing ? (
@@ -517,203 +542,109 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </button>
           </div>
           {/* VITALS CARD */}
-          <div className="bg-surface border border-accent-mid/30 rounded-card shadow-card overflow-hidden border-l-[3px] border-l-accent-mid">
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light border-b border-accent-mid">
-              <div className="w-[26px] h-[26px] rounded-icon bg-surface flex items-center justify-center text-[12px] text-accent flex-shrink-0">
-                🫀
+          <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
+              <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
+                <Heart size={14} className="text-accent" strokeWidth={2.5} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
-                Latest Vital Signs
+              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+                Vital Signs
               </span>
             </div>
-            <div className="p-4">
+            <div className="p-3.5">
               {latestVitals ? (
                 <div className="flex flex-col gap-2">
                   <div className="grid grid-cols-5 gap-2.5 max-[1439px]:grid-cols-3">
-                    {/* BP Card */}
-                    <div className={cn(
-                      "border rounded-card p-[9px_11px] transition-all",
-                      bpStatus === "critical" ? "bg-red-bg border-red-border" :
-                      bpStatus === "warn"     ? "bg-amber-bg border-amber-border" :
-                      "bg-surface-2 border-border"
-                    )}>
-                      <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
-                        bpStatus === "critical" ? "text-red" :
-                        bpStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-muted)]"
-                      )}>
-                        Blood Pressure
-                      </div>
-                      <div className={cn(
-                        "font-mono text-[18px] font-medium leading-[1.1]",
-                        bpStatus === "critical" ? "text-red" :
-                        bpStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-primary)]"
-                      )}>
-                        {latestVitals.sbp || '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px]">/</span>{latestVitals.dbp || '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> mmHg</span>
-                      </div>
-                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">diastolic / systolic</div>
-                    </div>
-
-                    {/* HR Card */}
-                    <div className={cn(
-                      "border rounded-card p-[9px_11px] transition-all",
-                      hrStatus === "critical" ? "bg-red-bg border-red-border" :
-                      hrStatus === "warn"     ? "bg-amber-bg border-amber-border" :
-                      "bg-surface-2 border-border"
-                    )}>
-                      <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
-                        hrStatus === "critical" ? "text-red" :
-                        hrStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-muted)]"
-                      )}>
-                        Heart Rate
-                      </div>
-                      <div className={cn(
-                        "font-mono text-[18px] font-medium leading-[1.1]",
-                        hrStatus === "critical" ? "text-red" :
-                        hrStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-primary)]"
-                      )}>
-                        {latestVitals.heartRate ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> bpm</span>
-                      </div>
-                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
-                    </div>
-
-                    {/* Temp Card */}
-                    <div className={cn(
-                      "border rounded-card p-[9px_11px] transition-all",
-                      tempStatus === "critical" ? "bg-red-bg border-red-border" :
-                      tempStatus === "warn"     ? "bg-amber-bg border-amber-border" :
-                      "bg-surface-2 border-border"
-                    )}>
-                      <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
-                        tempStatus === "critical" ? "text-red" :
-                        tempStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-muted)]"
-                      )}>
-                        Temperature
-                      </div>
-                      <div className={cn(
-                        "font-mono text-[18px] font-medium leading-[1.1]",
-                        tempStatus === "critical" ? "text-red" :
-                        tempStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-primary)]"
-                      )}>
-                        {formatTemperature(Number(latestVitals.temperature))}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> °C</span>
-                      </div>
-                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
-                    </div>
-
-                    {/* SpO2 Card */}
-                    <div className={cn(
-                      "border rounded-card p-[9px_11px] transition-all",
-                      o2Status === "critical" ? "bg-red-bg border-red-border" :
-                      o2Status === "warn"     ? "bg-amber-bg border-amber-border" :
-                      "bg-surface-2 border-border"
-                    )}>
-                      <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
-                        o2Status === "critical" ? "text-red" :
-                        o2Status === "warn"     ? "text-amber" :
-                        "text-[var(--text-muted)]"
-                      )}>
-                        Oxygen Saturation
-                      </div>
-                      <div className={cn(
-                        "font-mono text-[18px] font-medium leading-[1.1]",
-                        o2Status === "critical" ? "text-red" :
-                        o2Status === "warn"     ? "text-amber" :
-                        "text-[var(--text-primary)]"
-                      )}>
-                        {latestVitals.oxygenSaturation ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> %</span>
-                      </div>
-                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
-                    </div>
-
-                    {/* RR Card */}
-                    <div className={cn(
-                      "border rounded-card p-[9px_11px] transition-all",
-                      rrStatus === "critical" ? "bg-red-bg border-red-border" :
-                      rrStatus === "warn"     ? "bg-amber-bg border-amber-border" :
-                      "bg-surface-2 border-border"
-                    )}>
-                      <div className={cn(
-                        "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5",
-                        rrStatus === "critical" ? "text-red" :
-                        rrStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-muted)]"
-                      )}>
-                        Respiratory Rate
-                      </div>
-                      <div className={cn(
-                        "font-mono text-[18px] font-medium leading-[1.1]",
-                        rrStatus === "critical" ? "text-red" :
-                        rrStatus === "warn"     ? "text-amber" :
-                        "text-[var(--text-primary)]"
-                      )}>
-                        {latestVitals.respiratoryRate ?? '—'}<span className="text-[10px] text-[var(--text-muted)] ml-[1px] font-sans font-normal"> /min</span>
-                      </div>
-                      <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'}</div>
-                    </div>
+                    {renderVitalCell(
+                      'Blood Pressure',
+                      latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
+                      'mmHg',
+                      bpStatus,
+                      'systolic / diastolic'
+                    )}
+                    {renderVitalCell(
+                      'Heart Rate',
+                      latestVitals.heartRate?.toString() ?? '—',
+                      'bpm',
+                      hrStatus,
+                      hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    )}
+                    {renderVitalCell(
+                      'Resp Rate',
+                      latestVitals.respiratoryRate?.toString() ?? '—',
+                      '/min',
+                      rrStatus,
+                      rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    )}
+                    {renderVitalCell(
+                      'Temperature',
+                      formatTemperature(Number(latestVitals.temperature)),
+                      '°C',
+                      tempStatus,
+                      tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    )}
+                    {renderVitalCell(
+                      'SpO2',
+                      latestVitals.oxygenSaturation?.toString() ?? '—',
+                      '%',
+                      o2Status,
+                      o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'
+                    )}
                   </div>
                   
                   {/* Timestamp & Recorder Info */}
-                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mt-2 px-1 font-sans">
+                  <div className="flex items-center justify-between text-[9px] text-text-muted mt-2 px-1 font-sans">
                     <span>
-                      Measured at: <strong className="text-[var(--text-secondary)]">{new Date(latestVitals.measuredAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
+                      Measured at: <strong className="text-text-secondary">{new Date(latestVitals.measuredAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
                     </span>
                     <span>
-                      Recorded by: <strong className="text-[var(--text-secondary)]">{latestVitals.measuredByUser ? `${latestVitals.measuredByUser.firstName} ${latestVitals.measuredByUser.lastName}` : (latestVitals.measuredBy ?? '—')}</strong>
+                      Recorded by: <strong className="text-text-secondary">{latestVitals.measuredByUser ? `${latestVitals.measuredByUser.firstName} ${latestVitals.measuredByUser.lastName}` : (latestVitals.measuredBy ?? '—')}</strong>
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="text-[12px] text-[var(--text-muted)]">No vitals recorded for this note.</div>
+                <div className="text-[12px] text-text-muted p-1">No vitals recorded for this note.</div>
               )}
             </div>
           </div>
 
           {/* SUBJECTIVE CARD */}
-          <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden">
+          <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
               <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                💬
+                <MessageSquare size={14} className="text-accent" strokeWidth={2.5} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
                 Subjective
               </span>
             </div>
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Left Column */}
               <div className="flex flex-col gap-4">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
                     <span>🗣️</span> Chief Complaint
                   </div>
-                  <div className="pl-1 text-[13px] text-[var(--text-primary)] font-bold leading-relaxed">
+                  <div className="text-[12px] text-text-primary font-semibold leading-relaxed">
                     {note.chiefComplaint || '—'}
                   </div>
                 </div>
 
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
                     <span>📝</span> History of Present Illness
                   </div>
-                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                     {note.hpi || '—'}
                   </div>
                 </div>
 
                 {note.socialHistory && (
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
                       <span>🏃‍♂️</span> Personal and Social History
                     </div>
-                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                       {note.socialHistory}
                     </div>
                   </div>
@@ -721,10 +652,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
                 {note.psychosocialHistory && (
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-blue-bg/60 text-blue text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
                       <span>🧠</span> Psychosocial History
                     </div>
-                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                       {note.psychosocialHistory}
                     </div>
                   </div>
@@ -732,25 +663,39 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               </div>
 
               {/* Right Column */}
-              <div className="flex flex-col gap-4 border-l border-border/60 pl-6 max-md:border-l-0 max-md:pl-0">
+              <div className="flex flex-col gap-4 border-l border-border pl-6 max-md:border-l-0 max-md:pl-0">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-2 flex items-center gap-1.5">
                     <span>🏥</span> Past Medical History
                   </div>
-                  <div className="pl-1 flex flex-col gap-2 text-[13px] text-[var(--text-secondary)] leading-relaxed">
-                    <div><span className="font-semibold text-[var(--text-primary)]">Comorbidities:</span> {note.pmhComorbidities || 'None'}</div>
-                    <div><span className="font-semibold text-[var(--text-primary)]">Surgeries:</span> {note.pmhSurgeries || 'None'}</div>
-                    <div><span className="font-semibold text-[var(--text-primary)]">Hospitalizations:</span> {note.pmhHospitalizations || 'None'}</div>
-                    <div><span className="font-semibold text-[var(--text-primary)]">Allergies:</span> <span className={note.allergies ? "text-red font-bold" : ""}>{note.allergies || 'No known allergies'}</span></div>
+                  <div className="flex flex-col gap-3 text-[12px] bg-surface-2 border border-border rounded-lg p-3">
+                    <div>
+                      <span className="font-semibold text-text-primary block mb-0.5">Comorbidities</span>
+                      <span className="text-text-secondary leading-relaxed">{note.pmhComorbidities || 'None'}</span>
+                    </div>
+                    <div className="border-t border-border/50 pt-2">
+                      <span className="font-semibold text-text-primary block mb-0.5">Surgeries</span>
+                      <span className="text-text-secondary leading-relaxed">{note.pmhSurgeries || 'None'}</span>
+                    </div>
+                    <div className="border-t border-border/50 pt-2">
+                      <span className="font-semibold text-text-primary block mb-0.5">Hospitalizations</span>
+                      <span className="text-text-secondary leading-relaxed">{note.pmhHospitalizations || 'None'}</span>
+                    </div>
+                    <div className="border-t border-border/50 pt-2">
+                      <span className="font-semibold text-text-primary block mb-0.5">Allergies</span>
+                      <span className={cn("leading-relaxed", note.allergies ? "text-red font-bold" : "text-text-secondary")}>
+                        {note.allergies || 'No known allergies'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {note.familyHistory && (
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-1 flex items-center gap-1.5">
                       <span>👨‍👩‍👧‍👦</span> Family Medical History
                     </div>
-                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                       {note.familyHistory}
                     </div>
                   </div>
@@ -758,10 +703,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
                 {isFemale && note.obHistory && (
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-amber-bg text-amber text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-1 flex items-center gap-1.5">
                       <span>♀️</span> OB/Menstrual History
                     </div>
-                    <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                       {note.obHistory}
                     </div>
                   </div>
@@ -771,35 +716,35 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
 
           {/* OBJECTIVE & ASSESSMENT GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
             {/* OBJECTIVE CARD */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden h-full">
+            <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                  🔬
+                  <Microscope size={14} className="text-accent" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
                   Objective
                 </span>
               </div>
-              <div className="p-5 flex flex-col gap-4">
+              <div className="p-4 flex flex-col gap-4 flex-1">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-purple-bg text-purple text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-purple mb-1 flex items-center gap-1.5">
                     <span>🩺</span> Physical Examination
                   </div>
-                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                     {note.physicalExam || '—'}
                   </div>
                 </div>
 
                 {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-purple-bg text-purple text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-purple mb-1.5 flex items-center gap-1.5">
                       <span>🧪</span> Labs and Imaging Results
                     </div>
-                    <div className="flex gap-1.5 flex-wrap pl-1 mt-1">
+                    <div className="flex gap-1.5 flex-wrap">
                       {note.diagnostics.map((diag: string, idx: number) => (
-                        <span key={idx} className="text-[11px] font-semibold bg-blue-bg text-blue border border-blue-border px-2.5 py-0.5 rounded-[4px] shadow-sm">
+                        <span key={idx} className="text-[10px] font-bold uppercase tracking-[0.5px] bg-surface-2 text-text-secondary border border-border px-2 py-0.5 rounded-[4px] shadow-sm">
                           {diag}
                         </span>
                       ))}
@@ -810,34 +755,39 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* ASSESSMENT CARD */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-card shadow-card overflow-hidden h-full">
+            <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                  📋
+                  <ClipboardList size={14} className="text-accent" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
                   Assessment
                 </span>
               </div>
-              <div className="p-5 flex flex-col gap-3">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-accent-light text-accent-hover text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+              <div className="p-4 flex flex-col gap-3 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-accent-hover mb-1 flex items-center gap-1.5">
                   <span>📌</span> Active Problems
                 </div>
-                <div className="flex flex-col gap-2.5 pl-1">
+                <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface-2/30">
                   {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 ? (
-                    note.assessment.map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2.5 text-[15px] text-[var(--text-primary)] font-bold">
-                        <span className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
-                        <span>{item.title}</span>
-                        {item.icdCode && (
-                          <span className="font-mono text-[10px] text-[var(--text-muted)] bg-surface-2 border border-border px-1.5 py-0.5 rounded font-normal ml-1.5">
-                            {item.icdCode}
-                          </span>
-                        )}
-                      </div>
-                    ))
+                    note.assessment.map((item: any, idx: number) => {
+                      const isLast = idx === note.assessment.length - 1;
+                      return (
+                        <div key={idx} className={cn("flex items-center gap-2 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
+                          <span className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[12px] text-text-primary font-medium">{item.title}</span>
+                          </div>
+                          {item.icdCode && (
+                            <span className="font-mono text-[9px] text-text-muted bg-surface-2 border border-border px-1.5 py-[2px] rounded flex-shrink-0">
+                              {item.icdCode}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
                   ) : (
-                    <span className="text-[13px] text-[var(--text-muted)]">No active problems registered.</span>
+                    <div className="p-3 text-[12px] text-text-muted text-center bg-surface">No active problems registered.</div>
                   )}
                 </div>
               </div>
@@ -845,51 +795,61 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
 
           {/* PLAN / MANAGEMENT CARD */}
-          <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden border-l-[3px] border-l-green-border">
+          <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
               <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                💊
+                <Stethoscope size={14} className="text-accent" strokeWidth={2.5} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
                 Plan / Management
               </span>
             </div>
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="flex flex-col gap-4">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-green-bg text-green text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1 flex items-center gap-1.5">
                     <span>🥦</span> Non-Pharmacologic Management
                   </div>
-                  <div className="pl-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap leading-[1.6]">
+                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
                     {note.mgmtNonpharm || '—'}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 border-l border-border/60 pl-6 max-md:border-l-0 max-md:pl-0">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-btn bg-green-bg text-green text-[11px] font-bold uppercase tracking-[0.5px] mb-2">
-                  <span>💊</span> Medications Prescribed
-                </div>
-                <div className="flex flex-col gap-3 pl-1">
-                  {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
-                    note.medicationSnapshot.map((med: any, idx: number) => (
-                      <div key={idx} className="flex flex-col">
-                        <div className="flex items-center gap-2.5 text-[14px] text-[var(--text-primary)] font-bold">
-                          <span className="w-2 h-2 rounded-full bg-green shrink-0" />
-                          <span>
-                            {typeof med === 'string' ? med : med.name} {typeof med !== 'string' && med.dose ? med.dose : ''}{typeof med !== 'string' && med.unit ? med.unit : ''}
-                            {typeof med !== 'string' && med.formulation && ` · ${med.formulation}`}
-                            {typeof med !== 'string' && med.quantity && ` (Qty: ${med.quantity})`}
-                          </span>
-                        </div>
-                        {typeof med !== 'string' && med.instructions && (
-                          <span className="text-[11px] text-[var(--text-muted)] pl-4.5 block mt-0.5">{med.instructions}</span>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-[13px] text-[var(--text-muted)]">No medications prescribed.</span>
-                  )}
+              <div className="flex flex-col gap-3 border-l border-border pl-6 max-md:border-l-0 max-md:pl-0">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center gap-1.5">
+                    <span>💊</span> Medications Prescribed
+                  </div>
+                  <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface-2/30">
+                    {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
+                      note.medicationSnapshot.map((med: any, idx: number, arr) => {
+                        const isLast = idx === arr.length - 1;
+                        const medName = typeof med === 'string' ? med : med.name;
+                        const medDetails = typeof med !== 'string' 
+                          ? `${med.dose ?? ''}${med.unit ?? ''}${med.formulation ? ` · ${med.formulation}` : ''}${med.quantity ? ` (Qty: ${med.quantity})` : ''}`
+                          : '';
+                        const instructions = typeof med !== 'string' ? med.instructions : '';
+
+                        return (
+                          <div key={idx} className={cn("flex flex-col gap-0.5 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
+                              <span className="text-[12px] font-bold text-text-primary">{medName}</span>
+                              {medDetails && <span className="text-[11px] text-text-muted ml-auto font-medium">{medDetails}</span>}
+                            </div>
+                            {instructions && (
+                              <div className="text-[11px] text-text-secondary pl-3.5 leading-normal mt-0.5 font-medium">
+                                {instructions}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-3 text-[12px] text-text-muted text-center bg-surface">No medications prescribed.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -968,6 +928,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   status={hrStatus} 
                 />
                 <VitalMiniCell 
+                  label="RR" 
+                  value={latestVitals?.respiratoryRate ?? '—'} 
+                  unit="/min" 
+                  status={rrStatus} 
+                />
+                <VitalMiniCell 
                   label="Temp" 
                   value={latestVitals?.temperature ? formatTemperature(Number(latestVitals.temperature)) : '—'} 
                   unit="°C" 
@@ -978,12 +944,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   value={latestVitals?.oxygenSaturation ?? '—'} 
                   unit="%" 
                   status={o2Status} 
-                />
-                <VitalMiniCell 
-                  label="RR" 
-                  value={latestVitals?.respiratoryRate ?? '—'} 
-                  unit="/min" 
-                  status={rrStatus} 
                 />
               </div>
               {!latestVitals && (

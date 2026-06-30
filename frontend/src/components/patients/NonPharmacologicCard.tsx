@@ -38,7 +38,7 @@ export function NonPharmacologicCard({ patientId }: { patientId: string }) {
 
   if (initialLoading || progressLoading) {
     return (
-      <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card overflow-hidden animate-pulse">
+      <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden animate-pulse">
         <div className="px-3.5 py-2.5 bg-surface-2 border-b border-border h-9" />
         <div className="p-4 h-20 bg-surface" />
       </div>
@@ -46,7 +46,7 @@ export function NonPharmacologicCard({ patientId }: { patientId: string }) {
   }
 
   return (
-    <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card overflow-hidden">
+    <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
       <div className="bg-surface-2 border-b border-border px-3.5 py-2.5 flex items-center gap-2.5">
         <div className="w-[26px] h-[26px] bg-green-bg text-green rounded-icon flex items-center justify-center text-[12px] flex-shrink-0">
           🏃
@@ -69,9 +69,8 @@ export function NonPharmacologicCard({ patientId }: { patientId: string }) {
           )}
         </div>
       </div>
-      <div className="p-3 px-3.5 text-[12px] leading-relaxed text-text-secondary whitespace-pre-wrap max-h-[80px] overflow-hidden relative">
+      <div className="p-3 px-3.5 text-[12px] leading-relaxed text-text-secondary whitespace-pre-wrap">
         {text}
-        <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
       </div>
     </div>
   );

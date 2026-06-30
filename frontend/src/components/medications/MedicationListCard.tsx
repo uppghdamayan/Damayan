@@ -34,8 +34,7 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
   return (
     <div
       className={cn(
-        'bg-surface border rounded-card shadow-card overflow-hidden',
-        recent ? 'border-l-[3px] border-l-accent border-border' : 'border-border',
+        'bg-surface border rounded-card shadow-card overflow-hidden border-border'
       )}
     >
       <div className="bg-surface-2 border-b border-border px-3.5 py-2.5 flex items-center gap-2.5">

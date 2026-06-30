@@ -1,7 +1,7 @@
 import { useLatestVitals } from '@/hooks/useVitals';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
-  classifyTemperature,
+  classifyTemperature, classifyRespiratoryRate,
   formatBloodPressure, formatTemperature
 } from '@/lib/vitals-utils';
 import { cn } from '@/lib/utils';
@@ -34,7 +34,7 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
 
   return (
     <div className="bg-surface border border-accent-mid rounded-[8px] shadow-[0_4px_12px_rgba(10,110,95,0.08)] mb-4 overflow-hidden">
-      <div className="flex items-center justify-between px-[14px] py-[10px] bg-accent-light border-b border-accent-mid rounded-t-[7px]">
+      <div className="flex items-center justify-between px-[14px] py-[10px] bg-accent-light/40 border-b border-accent-mid/40 rounded-t-[7px]">
         <div className="flex items-center gap-[9px]">
           <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface text-accent shrink-0">🫀</div>
           <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">Latest Vital Signs</span>
@@ -55,6 +55,7 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
                 <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">Date / Time</th>
                 <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">BP</th>
                 <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">HR</th>
+                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">RR</th>
                 <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">Temp</th>
                 <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-[10px] py-2 text-left border-b border-border bg-surface-2">SpO₂</th>
               </tr>
@@ -69,6 +70,9 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
                 </td>
                 <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(hrStatus))}>
                   {vitals.heartRate ?? '—'}
+                </td>
+                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(classifyRespiratoryRate(vitals.respiratoryRate)))}>
+                  {vitals.respiratoryRate ?? '—'}
                 </td>
                 <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(tempStatus))}>
                   {formatTemperature(Number(vitals.temperature))}
