@@ -166,6 +166,11 @@ export class ProgressNotesService {
     });
   }
 
+  async createAndPublish(patientId: string, dto: CreateProgressNoteDto, userId: string) {
+    const note = await this.create(patientId, dto, userId);
+    return this.publish(patientId, note.id, userId);
+  }
+
   async update(id: string, dto: UpdateProgressNoteDto, userId: string) {
     const note = await this.prisma.progressNote.findUnique({ where: { id } });
     if (!note) throw new NotFoundException('Note not found');

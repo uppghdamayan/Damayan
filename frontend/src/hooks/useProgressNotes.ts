@@ -82,6 +82,27 @@ export function useCreateProgressNote(patientId: string) {
   });
 }
 
+export function useCreateAndPublishProgressNote(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<ProgressNote>) => 
+      apiRequest<ProgressNote>(`/patients/${patientId}/progress-notes/create-and-publish`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['visits', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+    },
+    onError: (err, variables) => {
+      localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables));
+    }
+  });
+}
+
 export function useUpdateProgressNote(patientId: string) {
   const queryClient = useQueryClient();
   return useMutation({

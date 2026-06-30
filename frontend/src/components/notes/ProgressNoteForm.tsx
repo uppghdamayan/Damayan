@@ -9,6 +9,7 @@ import {
 import { 
   useProgressNote, 
   useCreateProgressNote, 
+  useCreateAndPublishProgressNote,
   useUpdateProgressNote, 
   usePublishProgressNote,
   useCopyForwardData,
@@ -79,6 +80,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const { data: note, isLoading: noteLoading } = useProgressNote(noteId || null);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
   const createMutation = useCreateProgressNote(patientId);
+  const createAndPublishMutation = useCreateAndPublishProgressNote(patientId);
   const updateMutation = useUpdateProgressNote(patientId);
   const publishMutation = usePublishProgressNote(patientId);
   const deleteMutation = useDeleteProgressNote(patientId);
@@ -288,27 +290,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         }
       });
     } else {
-      createMutation.mutate(formValues, {
-        onSuccess: (newNote) => {
-          const noteIdToPublish = (newNote as any)?.data?.id || newNote?.id;
-          if (!noteIdToPublish) {
-            setPublishError('Failed to retrieve new note ID for publishing');
-            return;
-          }
-          publishMutation.mutate(noteIdToPublish, {
-            onSuccess: () => {
-              localStorage.removeItem(`damayan:draft:${patientId}:progress`);
-              onClose();
-              setDocumentationPanelOpen(false);
-              setActiveScreen('note-timeline');
-            },
-            onError: (err: any) => {
-              setPublishError(err?.message || 'Failed to publish note');
-            }
-          });
+      createAndPublishMutation.mutate(formValues, {
+        onSuccess: () => {
+          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          onClose();
+          setDocumentationPanelOpen(false);
+          setActiveScreen('note-timeline');
         },
         onError: (err: any) => {
-          setPublishError(err?.message || 'Failed to create note before publishing');
+          setPublishError(err?.message || 'Failed to create and publish note');
         }
       });
     }
@@ -347,13 +337,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     );
   }
 
-  const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending;
+  const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending || createAndPublishMutation.isPending;
+  const isPublishing = publishMutation.isPending || createAndPublishMutation.isPending;
   const isPublished = note?.status === 'PUBLISHED';
   const isDisabled = isPublished || isSaving || deleteMutation.isPending;
   const isUpdateActive = !!form.formState.isDirty;
 
+  const loadingMessage = isPublishing ? "Finalizing note..." : "Saving draft...";
+
   return (
-    <div className="flex flex-col h-full bg-surface-2 panel-container">
+    <div className="flex flex-col h-full bg-surface-2 panel-container relative">
+      {isSaving && (
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-3">
+          <div className="w-8 h-8 border-3 border-accent border-t-transparent rounded-full animate-spin" />
+          <span className="text-[12px] font-semibold text-text-secondary">{loadingMessage}</span>
+        </div>
+      )}
       <style>{`
         .panel-container {
           container-type: inline-size;
@@ -501,13 +500,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               )}
               <Button 
                 onClick={handlePublish} 
-                disabled={isSaving || publishMutation.isPending} 
+                disabled={isSaving || publishMutation.isPending || createAndPublishMutation.isPending} 
                 variant="default" 
                 size="xs"
                 className="h-6 px-2.5 text-[11px] font-semibold bg-accent hover:bg-accent-hover text-white border-accent-hover cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
                 title="Finalize"
               >
-                {isSaving || publishMutation.isPending ? (
+                {isSaving || publishMutation.isPending || createAndPublishMutation.isPending ? (
                   <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5 shrink-0" />
                 ) : (
                   <Check className="w-3.5 h-3.5 shrink-0" />

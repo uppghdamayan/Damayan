@@ -77,10 +77,28 @@ export class ProgressNotesController {
   @Roles(Role.DOCTOR, Role.ADMIN)
   create(
     @Param('patientId') patientId: string,
-    @Body() dto: CreateProgressNoteDto,
+    @Body() createProgressNoteDto: CreateProgressNoteDto,
     @Request() req,
   ) {
-    return this.progressNotesService.create(patientId, dto, req.user.id);
+    return this.progressNotesService.create(
+      patientId,
+      createProgressNoteDto,
+      req.user.id,
+    );
+  }
+
+  @Post('create-and-publish')
+  @Roles(Role.DOCTOR, Role.ADMIN)
+  createAndPublish(
+    @Param('patientId') patientId: string,
+    @Body() createProgressNoteDto: CreateProgressNoteDto,
+    @Request() req,
+  ) {
+    return this.progressNotesService.createAndPublish(
+      patientId,
+      createProgressNoteDto,
+      req.user.id,
+    );
   }
 
   @Patch(':id')
