@@ -63,12 +63,13 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
 
   // Map to TimelineNoteView and identify latest
   const mappedNotes = useMemo(() => {
+    const initialNoteAuthorId = initialNote?.authorId;
     return allNotesRaw.map((note, index) => {
       // The latest note is the first one in the sorted list (since newest first)
       const isLatest = index === 0;
-      return mapNoteToTimelineView(note, isLatest);
+      return mapNoteToTimelineView(note, isLatest, initialNoteAuthorId);
     });
-  }, [allNotesRaw]);
+  }, [allNotesRaw, initialNote]);
 
   if (initialLoading || progressLoading || actionLoading) {
     return (

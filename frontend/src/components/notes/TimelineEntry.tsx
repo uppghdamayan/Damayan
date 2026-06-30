@@ -11,6 +11,7 @@ import { ChevronDown, Pin, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TimelineNoteView } from '@/lib/notes-utils';
 import { NoteFormattedSections } from './NoteFormattedSections';
+import { useAuthStore } from '@/stores/authStore';
 
 interface TimelineEntryProps {
   note: TimelineNoteView;
@@ -29,6 +30,8 @@ export function TimelineEntry({
   onClickEdit,
   onDelete,
 }: TimelineEntryProps) {
+  const { user } = useAuthStore();
+  const isDisplayedUserAuthor = note.isDisplayedUserAuthor;
   const isInitial = note.kind === 'initial';
   const formattedDate = new Date(note.createdAt).toLocaleDateString(undefined, {
     month: 'short',
@@ -81,8 +84,20 @@ export function TimelineEntry({
                 </Badge>
               )}
             </div>
-            <span className="text-[11px] text-[var(--text-muted)] font-medium">
-              {formattedDate} · {formattedTime}
+            <span className="text-[11px] text-[var(--text-muted)] font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span>{formattedDate} · {formattedTime} · By</span>
+              <span className="font-bold text-[var(--text-primary)] px-1 bg-surface-3 rounded border border-border">
+                {note.authorName}
+              </span>
+              {isDisplayedUserAuthor ? (
+                <Badge variant="saved" className="text-[10px] font-bold uppercase tracking-[0.5px]">
+                  Author
+                </Badge>
+              ) : (
+                <Badge variant="resolved" className="text-[10px] font-bold uppercase tracking-[0.5px]">
+                  Not Author
+                </Badge>
+              )}
             </span>
           </div>
           

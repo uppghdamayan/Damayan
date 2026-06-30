@@ -8,7 +8,10 @@ export interface TimelineNoteView {
   kind: 'initial' | 'progress';
   status: 'DRAFT' | 'PUBLISHED';
   createdAt: string;
+  authorId?: string | null;
   authorName: string;
+  authorRole?: string;
+  isDisplayedUserAuthor: boolean;
   previewText: string;       // first ~65 chars of chief complaint (initial) or subjective (progress)
   isLatest: boolean;
   sections: {
@@ -74,7 +77,8 @@ export function diffListItems(
  */
 export function mapNoteToTimelineView(
   note: InitialNote | ProgressNote,
-  isLatest: boolean
+  isLatest: boolean,
+  initialNoteAuthorId?: string | null
 ): TimelineNoteView {
   const isInitial = 'chiefComplaint' in note;
   
@@ -128,12 +132,34 @@ export function mapNoteToTimelineView(
         }).filter(Boolean)
       : [];
 
+    const author = initialNote.author;
+    const lastEditor = (initialNote as any).lastEditor;
+    
+    let displayUser = author;
+    let displayUserId = initialNote.authorId;
+
+    if (initialNote.lastEditedBy && initialNote.lastEditedBy !== initialNote.authorId) {
+      if (lastEditor) {
+        displayUser = lastEditor;
+        displayUserId = initialNote.lastEditedBy;
+      }
+    }
+
+    let isDisplayedUserAuthor = displayUserId === initialNote.authorId;
+
+    const authorName = displayUser 
+      ? `${displayUser.role === 'DOCTOR' ? 'Dr. ' : ''}${displayUser.lastName}, ${displayUser.firstName}`
+      : 'Dr. Reyes, Ana M.';
+
     return {
       id: initialNote.id,
       kind: 'initial',
       status: initialNote.status,
       createdAt: initialNote.createdAt,
-      authorName: initialNote.lastEditedBy || 'Dr. Reyes, Ana M.',
+      authorId: initialNote.authorId,
+      authorName,
+      authorRole: displayUser?.role || 'DOCTOR',
+      isDisplayedUserAuthor,
       previewText: initialNote.chiefComplaint ? initialNote.chiefComplaint.slice(0, 65) + (initialNote.chiefComplaint.length > 65 ? '...' : '') : '',
       isLatest,
       sections: {
@@ -172,12 +198,37 @@ export function mapNoteToTimelineView(
         }).filter(Boolean)
       : [];
 
+    const author = progressNote.author;
+    const lastEditor = (progressNote as any).lastEditor;
+    
+    let displayUser = author;
+    let displayUserId = progressNote.authorId;
+
+    if (progressNote.lastEditedBy && progressNote.lastEditedBy !== progressNote.authorId) {
+      if (lastEditor) {
+        displayUser = lastEditor;
+        displayUserId = progressNote.lastEditedBy;
+      }
+    }
+
+    let isDisplayedUserAuthor = false;
+    if (initialNoteAuthorId) {
+      isDisplayedUserAuthor = displayUserId === initialNoteAuthorId;
+    }
+
+    const authorName = displayUser 
+      ? `${displayUser.role === 'DOCTOR' ? 'Dr. ' : ''}${displayUser.lastName}, ${displayUser.firstName}`
+      : 'Dr. Reyes, Ana M.';
+
     return {
       id: progressNote.id,
       kind: 'progress',
       status: progressNote.status,
       createdAt: progressNote.createdAt,
-      authorName: progressNote.lastEditedBy || 'Dr. Reyes, Ana M.',
+      authorId: progressNote.authorId,
+      authorName,
+      authorRole: displayUser?.role || 'DOCTOR',
+      isDisplayedUserAuthor,
       previewText: progressNote.subjective ? progressNote.subjective.slice(0, 65) + (progressNote.subjective.length > 65 ? '...' : '') : '',
       isLatest,
       sections: {
