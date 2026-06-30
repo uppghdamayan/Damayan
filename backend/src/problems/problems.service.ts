@@ -227,6 +227,7 @@ export class ProblemsService {
     patientId: string,
     assessmentItems: { title: string; icdCode?: string }[],
     userId: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
     const validItems = assessmentItems.filter((i) => i.title?.trim());
@@ -266,7 +267,7 @@ export class ProblemsService {
           where: { id: match.id },
           data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
-        await this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from assessment`, client, match.id);
+        await this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from ${sourceNote}`, client, match.id);
         continue;
       }
 
@@ -277,7 +278,7 @@ export class ProblemsService {
           where: { id: match.id },
           data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
-        await this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from assessment`, client, match.id);
+        await this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from ${sourceNote}`, client, match.id);
         continue;
       }
 
@@ -292,7 +293,7 @@ export class ProblemsService {
           addedBy: userId,
         },
       });
-      await this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from assessment`, client, newProb.id);
+      await this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from ${sourceNote}`, client, newProb.id);
     }
 
     // Mark missing items as RESOLVED
@@ -305,7 +306,7 @@ export class ProblemsService {
           where: { id: ext.id },
           data: { status: ProblemStatus.RESOLVED, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
-        await this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in assessment)`, client, ext.id);
+        await this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`, client, ext.id);
       }
     }
   }

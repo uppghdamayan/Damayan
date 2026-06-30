@@ -71,7 +71,13 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
     });
   }, [allNotesRaw, initialNote]);
 
-  if (initialLoading || progressLoading || actionLoading) {
+  // Only show skeleton on initial load when there's no data yet.
+  // This prevents brief loading flashes when queries are invalidated after mutations.
+  const isInitialLoading = initialLoading && initialNote === undefined;
+  const isProgressLoading = progressLoading && progressNotesResponse === undefined;
+  const isActionLoading = actionLoading && initialNote === undefined;
+
+  if (isInitialLoading || isProgressLoading || isActionLoading) {
     return (
       <div className="animate-pulse flex flex-col gap-4 p-4 w-full">
         <div className="h-24 bg-surface-2 rounded-card" />

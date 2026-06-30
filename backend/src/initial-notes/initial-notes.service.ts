@@ -160,6 +160,7 @@ export class InitialNotesService {
             patientId,
             assessmentItems,
             userId,
+            'Initial Note',
             tx,
           );
         }
@@ -178,6 +179,7 @@ export class InitialNotesService {
             patientId,
             medicationItems,
             userId,
+            'Initial Note',
             tx,
           );
         }
@@ -242,6 +244,7 @@ export class InitialNotesService {
         patientId,
         assessmentItems,
         userId,
+        'Initial Note',
         tx,
       );
 
@@ -258,6 +261,7 @@ export class InitialNotesService {
         patientId,
         medicationItems,
         userId,
+        'Initial Note',
         tx,
       );
 

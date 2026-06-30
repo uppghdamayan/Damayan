@@ -4,6 +4,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, X, ListFilter, Check, RotateCcw, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProblemLog } from '@/types/problem';
+import { DateRange } from 'react-day-picker';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 
 const COLUMN_LAYOUT = '1.2fr 1.5fr 3fr 1fr';
 const ITEMS_PER_PAGE = 10;
@@ -27,6 +29,7 @@ interface ProblemLogTableProps {
 export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAction, setSelectedAction] = useState('All');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,7 +48,7 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
   // Reset page to 1 when filters or search query changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedAction]);
+  }, [searchQuery, selectedAction, dateRange]);
 
   // Filter logs client-side (instant and responsive)
   const filteredLogs = useMemo(() => {
@@ -65,9 +68,26 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
       
       const matchesSearch = !query || editorName.includes(query) || description.includes(query);
       
-      return matchesAction && matchesSearch;
+      let matchesDate = true;
+      if (dateRange?.from) {
+        const logDate = new Date(log.createdAt);
+        logDate.setHours(0, 0, 0, 0);
+        
+        const start = new Date(dateRange.from);
+        start.setHours(0, 0, 0, 0);
+        
+        if (logDate < start) matchesDate = false;
+
+        if (dateRange.to) {
+          const end = new Date(dateRange.to);
+          end.setHours(0, 0, 0, 0);
+          if (logDate > end) matchesDate = false;
+        }
+      }
+      
+      return matchesAction && matchesSearch && matchesDate;
     });
-  }, [logs, searchQuery, selectedAction]);
+  }, [logs, searchQuery, selectedAction, dateRange]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
@@ -78,11 +98,12 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
     return filteredLogs.slice(startIndex, endIndex);
   }, [filteredLogs, startIndex, endIndex]);
 
-  const hasActiveFilters = searchQuery !== '' || selectedAction !== 'All';
+  const hasActiveFilters = searchQuery !== '' || selectedAction !== 'All' || !!dateRange?.from;
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedAction('All');
+    setDateRange(undefined);
   };
 
   if (isLoading) {
@@ -188,6 +209,12 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
               </div>
             )}
           </div>
+
+          {/* Date Range Picker */}
+          <DatePickerWithRange
+            date={dateRange}
+            setDate={setDateRange}
+          />
         </div>
 
         {/* Right Side: Reset Filters */}

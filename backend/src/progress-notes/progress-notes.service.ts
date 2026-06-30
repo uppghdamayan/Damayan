@@ -233,6 +233,7 @@ export class ProgressNotesService {
         patientId,
         snapshotItems,
         userId,
+        'Progress Note',
         tx,
       );
 
@@ -249,6 +250,7 @@ export class ProgressNotesService {
         patientId,
         snapshotMeds,
         userId,
+        'Progress Note',
         tx,
       );
 
@@ -347,8 +349,8 @@ export class ProgressNotesService {
             instructions: m.instructions,
           }));
 
-        await this.problemsService.upsertFromAssessment(patientId, validProblems, userId, tx);
-        await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, tx);
+        await this.problemsService.upsertFromAssessment(patientId, validProblems, userId, 'Progress Note', tx);
+        await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, 'Progress Note', tx);
       }
 
       await tx.progressNote.delete({ where: { id } });

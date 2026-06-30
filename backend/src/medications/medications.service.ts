@@ -208,6 +208,7 @@ export class MedicationsService {
       quantity?: number;
     }[],
     userId: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
     const keptIds = new Set<string>();
@@ -234,7 +235,7 @@ export class MedicationsService {
               patientId,
               medicationId: match.id,
               action: 'Reactivated',
-              description: `Reactivated medication '${match.name}' from note`,
+              description: `Reactivated medication '${match.name}' from ${sourceNote}`,
               editorId: userId,
             },
           });
@@ -268,7 +269,7 @@ export class MedicationsService {
             patientId,
             medicationId: ext.id,
             action: 'Discontinued',
-            description: `Discontinued medication '${ext.name}' automatically (not in note)`,
+            description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
             editorId: userId,
           },
         });
