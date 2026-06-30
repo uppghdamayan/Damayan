@@ -128,6 +128,8 @@ export function useDeleteAllDraftProgressNotes(patientId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       localStorage.removeItem(`damayan:draft:${patientId}:progress`);
     },
   });
@@ -143,6 +145,8 @@ export function useDeleteProgressNote(patientId: string) {
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
     },
   });

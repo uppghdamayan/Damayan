@@ -23,8 +23,9 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { AttachmentUploader } from './AttachmentUploader';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -428,7 +429,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     } else {
       createMutation.mutate(formValues, {
         onSuccess: (newNote) => {
-          publishMutation.mutate(newNote.id, {
+          const noteIdToPublish = (newNote as any)?.data?.id || newNote?.id;
+          if (!noteIdToPublish) {
+            setPublishError('Failed to retrieve new note ID for publishing');
+            return;
+          }
+          publishMutation.mutate(noteIdToPublish, {
             onSuccess: () => {
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
@@ -528,10 +534,20 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
             <div className="flex flex-col">
               <span className="text-[14px] font-bold text-[var(--text-primary)]">Initial Consultation Note</span>
-              <span className="text-[10px] text-[var(--text-muted)]">
-                Published by {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Author'} on {new Date(note.createdAt).toLocaleDateString()}
-                {note.lastEditor && ` · Last edited by ${note.lastEditor.firstName} ${note.lastEditor.lastName}`}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  Published by {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Author'} on {new Date(note.createdAt).toLocaleDateString()}
+                </span>
+                {note.lastEditor && (
+                  <>
+                    <span className="text-[10px] text-[var(--text-muted)]">·</span>
+                    <Badge variant="outline" className="flex items-center gap-1 text-[9px] font-bold tracking-[0.5px] uppercase border-[var(--text-muted)] text-[var(--text-secondary)] bg-surface-2">
+                      <Edit className="w-2.5 h-2.5" />
+                      Edited by {note.lastEditor.firstName} {note.lastEditor.lastName} at {new Date(note.lastEditedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Badge>
+                  </>
+                )}
+              </div>
             </div>
             <button 
               type="button" 

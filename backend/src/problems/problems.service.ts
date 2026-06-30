@@ -235,7 +235,7 @@ export class ProblemsService {
     const existing = await client.problem.findMany({
       where: {
         patientId,
-        status: { in: [ProblemStatus.ACTIVE, ProblemStatus.RESOLVED] },
+        status: { in: [ProblemStatus.ACTIVE, ProblemStatus.RESOLVED, ProblemStatus.REMOVED] },
       },
     });
 
@@ -270,6 +270,17 @@ export class ProblemsService {
         continue;
       }
 
+      if (match && match.status === ProblemStatus.REMOVED) {
+        keptIds.add(match.id);
+        const sortOrder = await this.getNextSortOrder(patientId, client);
+        await client.problem.update({
+          where: { id: match.id },
+          data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
+        });
+        await this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from assessment`, client, match.id);
+        continue;
+      }
+
       const sortOrder = await this.getNextSortOrder(patientId, client);
       const newProb = await client.problem.create({
         data: {
@@ -284,17 +295,17 @@ export class ProblemsService {
       await this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from assessment`, client, newProb.id);
     }
 
-    // Mark missing items as REMOVED
+    // Mark missing items as RESOLVED
     for (const ext of existing) {
-      // We only auto-remove ACTIVE problems that were dropped from the snapshot.
+      // We only auto-resolve ACTIVE problems that were dropped from the snapshot.
       // We don't touch already RESOLVED problems that are not mentioned.
       if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
         const sortOrder = await this.getNextSortOrder(patientId, client);
         await client.problem.update({
           where: { id: ext.id },
-          data: { status: ProblemStatus.REMOVED, sortOrder, updatedByUser: { connect: { id: userId } } },
+          data: { status: ProblemStatus.RESOLVED, sortOrder, updatedByUser: { connect: { id: userId } } },
         });
-        await this.logAction(patientId, userId, 'Removed', `Removed problem '${ext.title}' automatically (not in assessment)`, client, ext.id);
+        await this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in assessment)`, client, ext.id);
       }
     }
   }

@@ -142,6 +142,63 @@ export class InitialNotesService {
     if (note.status === NoteStatus.PUBLISHED) {
       data.lastEditor = { connect: { id: userId } };
       data.lastEditedAt = new Date();
+
+      return this.prisma.$transaction(async (tx) => {
+        const updatedNote = await tx.initialNote.update({ where: { id }, data });
+
+        const beforeProblems = await this.problemsService.findActiveForPatient(patientId, tx);
+        const beforeMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+
+        if (updateData.assessment) {
+          const assessmentItems = (updateData.assessment as any[] || [])
+            .filter(a => a && a.title && String(a.title).trim() !== '')
+            .map((a) => ({
+              title: String(a.title).trim(),
+              icdCode: a.icdCode,
+            }));
+          await this.problemsService.upsertFromAssessment(
+            patientId,
+            assessmentItems,
+            userId,
+            tx,
+          );
+        }
+
+        if (updateData.medicationSnapshot) {
+          const medicationItems = (updateData.medicationSnapshot as any[] || [])
+            .filter(m => m && m.name && String(m.name).trim() !== '')
+            .map((m) => ({
+              name: String(m.name).trim(),
+              dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
+              formulation: m.formulation,
+              quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
+              instructions: m.instructions,
+            }));
+          await this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            medicationItems,
+            userId,
+            tx,
+          );
+        }
+
+        const afterProblems = await this.problemsService.findActiveForPatient(patientId, tx);
+        const afterMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+        const problemChanges = diffByTitle(beforeProblems, afterProblems);
+        const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+
+        await this.visitsService.updateChangeSummary(
+          note.visitId,
+          problemChanges,
+          medicationChanges,
+          tx,
+        );
+
+        return updatedNote;
+      }, {
+        timeout: 20000,
+        maxWait: 10000,
+      });
     }
 
     return this.prisma.initialNote.update({ where: { id }, data });
@@ -223,6 +280,9 @@ export class InitialNotesService {
       });
 
       return published;
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 

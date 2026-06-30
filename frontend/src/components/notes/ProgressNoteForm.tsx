@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { 
@@ -21,7 +21,7 @@ import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
-import { TrashIcon, Trash2, FileText, Save, Check } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -125,10 +125,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         labs: (note as any).labs || '',
         mgmtNonpharm: note.mgmtNonpharm || '',
         diagnostics: note.diagnostics || [],
-        problemListSnapshot: validProblems.length > 0
+        problemListSnapshot: (note.problemListSnapshot !== undefined && note.problemListSnapshot !== null)
           ? validProblems
           : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
-        medicationSnapshot: validMeds.length > 0
+        medicationSnapshot: (note.medicationSnapshot !== undefined && note.medicationSnapshot !== null)
           ? validMeds
           : (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
@@ -156,13 +156,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             instructions: m.instructions || undefined,
           });
 
-          if (validProblems.length === 0) {
+          if (parsed.problemListSnapshot === undefined || parsed.problemListSnapshot === null) {
             parsed.problemListSnapshot = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
           } else {
             parsed.problemListSnapshot = validProblems;
           }
 
-          if (validMeds.length === 0) {
+          if (parsed.medicationSnapshot === undefined || parsed.medicationSnapshot === null) {
             parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
               dose: m.dose || undefined,
@@ -198,7 +198,40 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         visitDatetime: new Date().toISOString(),
       });
     }
-  }, [note, noteId, copyLoading, form, patientId, copyForward]);
+  }, [noteId, note, copyForward, copyLoading, patientId, form]);
+
+  const previousCopyForward = useRef<any>(null);
+
+  useEffect(() => {
+    if (!copyForward || copyLoading) return;
+    
+    // If copyForward changed after initial load, instantly sync the form's snapshots
+    if (previousCopyForward.current) {
+      const oldProblems = JSON.stringify(previousCopyForward.current.activeProblems);
+      const newProblems = JSON.stringify(copyForward.activeProblems);
+      const oldMeds = JSON.stringify(previousCopyForward.current.activeMedications);
+      const newMeds = JSON.stringify(copyForward.activeMedications);
+
+      if (oldProblems !== newProblems || oldMeds !== newMeds) {
+        const currentValues = form.getValues();
+        form.reset({
+          ...currentValues,
+          problemListSnapshot: copyForward.activeProblems.map((p: any) => ({ 
+            title: p.title, 
+            icdCode: p.icdCode || undefined 
+          })),
+          medicationSnapshot: copyForward.activeMedications.map((m: any) => ({
+            name: m.name,
+            dose: m.dose || undefined,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+          })),
+        });
+      }
+    }
+    previousCopyForward.current = copyForward;
+  }, [copyForward, copyLoading, form]);
 
   const formValues = form.watch();
 
@@ -244,28 +277,74 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               onClose();
               setDocumentationPanelOpen(false);
               setActiveScreen('note-timeline');
+            },
+            onError: (err: any) => {
+              setPublishError(err?.message || 'Failed to publish note');
             }
           });
+        },
+        onError: (err: any) => {
+          setPublishError(err?.message || 'Failed to update note before publishing');
         }
       });
     } else {
       createMutation.mutate(formValues, {
         onSuccess: (newNote) => {
-          publishMutation.mutate(newNote.id, {
+          const noteIdToPublish = (newNote as any)?.data?.id || newNote?.id;
+          if (!noteIdToPublish) {
+            setPublishError('Failed to retrieve new note ID for publishing');
+            return;
+          }
+          publishMutation.mutate(noteIdToPublish, {
             onSuccess: () => {
               localStorage.removeItem(`damayan:draft:${patientId}:progress`);
               onClose();
               setDocumentationPanelOpen(false);
               setActiveScreen('note-timeline');
+            },
+            onError: (err: any) => {
+              setPublishError(err?.message || 'Failed to publish note');
             }
           });
+        },
+        onError: (err: any) => {
+          setPublishError(err?.message || 'Failed to create note before publishing');
         }
       });
     }
   };
 
   if ((noteId && noteLoading) || (!noteId && copyLoading)) {
-    return <div className="p-6 animate-pulse text-[var(--text-muted)]">Loading workspace...</div>;
+    return (
+      <div className="flex flex-col h-full bg-surface-2 p-6 animate-pulse gap-6">
+        {/* Header Skeleton */}
+        <div className="flex justify-between items-center pb-4 border-b border-border">
+          <div className="h-6 w-48 bg-surface-3 rounded-[4px]" />
+          <div className="flex gap-2">
+            <div className="h-6 w-24 bg-surface-3 rounded-[4px]" />
+            <div className="h-6 w-24 bg-surface-3 rounded-[4px]" />
+          </div>
+        </div>
+
+        {/* Text Areas Skeleton */}
+        <div className="flex flex-col gap-2 mt-2">
+          <div className="h-4 w-32 bg-surface-3 rounded-[4px]" />
+          <div className="h-32 w-full bg-surface-3 rounded-[6px]" />
+        </div>
+        
+        <div className="flex flex-col gap-2 mt-4">
+          <div className="h-4 w-32 bg-surface-3 rounded-[4px]" />
+          <div className="h-32 w-full bg-surface-3 rounded-[6px]" />
+        </div>
+
+        {/* Dynamic Sections Skeleton */}
+        <div className="flex flex-col gap-3 mt-6">
+          <div className="h-5 w-40 bg-surface-3 rounded-[4px]" />
+          <div className="h-10 w-full bg-surface-3 rounded-[6px]" />
+          <div className="h-10 w-full bg-surface-3 rounded-[6px]" />
+        </div>
+      </div>
+    );
   }
 
   const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending;
@@ -309,13 +388,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-green flex items-center gap-1 shrink-0" title={lastSaved ? `Last saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosaved'}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <circle cx="5" cy="5" r="4" fill="var(--green-border)" />
-              <path d="M3 5l1.5 1.5L7 3.5" stroke="white" strokeWidth="1.2" />
-            </svg>
-            {!isUpdateActive && 'Autosaved'}
-          </span>
+          {!noteId && (
+            <span className="font-mono text-[10px] text-green flex items-center gap-1 shrink-0" title={lastSaved ? `Last saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosaved'}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <circle cx="5" cy="5" r="4" fill="var(--green-border)" />
+                <path d="M3 5l1.5 1.5L7 3.5" stroke="white" strokeWidth="1.2" />
+              </svg>
+              {!isUpdateActive && 'Autosaved'}
+            </span>
+          )}
           {isPublished && (
             <Badge variant="active">
               Published
@@ -345,32 +426,72 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 )}
                 <span className="btn-text">{noteId ? 'Undraft' : 'Draft'}</span>
               </Button>
-              {form.formState.isDirty && (
+              {form.formState.isDirty && !noteId && (
                 <Button 
                   onClick={() => {
-                    if (noteId) {
-                      updateMutation.mutate({ id: noteId, data: formValues }, {
-                        onSuccess: () => {
-                          setLastSaved(new Date());
-                          form.reset(formValues);
-                        }
-                      });
-                    } else {
-                      createMutation.mutate(formValues, {
-                        onSuccess: () => {
-                          setLastSaved(new Date());
-                          form.reset(formValues);
-                        }
-                      });
-                    }
+                    const defaultProblems = (copyForward?.activeProblems || []).map((p: any) => ({
+                      title: p.title,
+                      icdCode: p.icdCode || undefined
+                    }));
+                    const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
+                      name: m.name,
+                      dose: m.dose || undefined,
+                      formulation: m.formulation || undefined,
+                      quantity: m.quantity || undefined,
+                      instructions: m.instructions || undefined,
+                    }));
+                    
+                    form.reset({
+                      subjective: '',
+                      objective: '',
+                      labs: '',
+                      mgmtNonpharm: '',
+                      diagnostics: [],
+                      problemListSnapshot: defaultProblems,
+                      medicationSnapshot: defaultMeds,
+                      visitDatetime: formValues.visitDatetime || new Date().toISOString(),
+                    });
+
+                    // Clear uncontrolled inputs
+                    const probTitleEl = document.getElementById('newProbTitle') as HTMLInputElement;
+                    const probIcdEl = document.getElementById('newProbIcd') as HTMLInputElement;
+                    if (probTitleEl) probTitleEl.value = '';
+                    if (probIcdEl) probIcdEl.value = '';
+
+                    // Clear new medication states
+                    setNewMedName('');
+                    setNewMedDose('');
+                    setNewMedFormulation('');
+                    setNewMedQuantity('');
+                    setNewMedInstructions('');
                   }} 
-                  disabled={updateMutation.isPending || createMutation.isPending} 
+                  disabled={isDisabled}
+                  variant="outline" 
+                  size="xs"
+                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                  title="Revert"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                  <span className="btn-text">Revert</span>
+                </Button>
+              )}
+              {form.formState.isDirty && noteId && (
+                <Button 
+                  onClick={() => {
+                    updateMutation.mutate({ id: noteId, data: formValues }, {
+                      onSuccess: () => {
+                        setLastSaved(new Date());
+                        form.reset(formValues);
+                      }
+                    });
+                  }} 
+                  disabled={updateMutation.isPending} 
                   variant="outline" 
                   size="xs"
                   className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
                   title="Update Draft"
                 >
-                  {updateMutation.isPending || createMutation.isPending ? (
+                  {updateMutation.isPending ? (
                     <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5 shrink-0" />
                   ) : (
                     <Save className="w-3.5 h-3.5 shrink-0" />

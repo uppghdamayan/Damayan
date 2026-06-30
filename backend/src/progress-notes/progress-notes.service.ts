@@ -160,6 +160,9 @@ export class ProgressNotesService {
           status: NoteStatus.DRAFT,
         },
       });
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 
@@ -265,7 +268,7 @@ export class ProgressNotesService {
 
       const published = await tx.progressNote.update({
         where: { id },
-        data: { status: NoteStatus.PUBLISHED },
+        data: { status: NoteStatus.PUBLISHED, updatedAt: new Date() },
       });
 
       await tx.visit.update({
@@ -274,6 +277,9 @@ export class ProgressNotesService {
       });
 
       return published;
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
   }
 
@@ -299,6 +305,45 @@ export class ProgressNotesService {
         if (newerNote) {
           throw new BadRequestException('Only the latest progress note can be deleted');
         }
+
+        // Revert global lists to previous state
+        let prevSnapshotProblems: any[] = [];
+        let prevSnapshotMeds: any[] = [];
+        
+        const prevProgress = await tx.progressNote.findFirst({
+          where: { visit: { patientId }, status: NoteStatus.PUBLISHED, id: { not: id } },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        if (prevProgress) {
+          prevSnapshotProblems = prevProgress.problemListSnapshot as any[] || [];
+          prevSnapshotMeds = prevProgress.medicationSnapshot as any[] || [];
+        } else {
+          const initialNote = await tx.initialNote.findFirst({
+            where: { visit: { patientId } }
+          });
+          if (initialNote) {
+            prevSnapshotProblems = initialNote.assessment as any[] || [];
+            prevSnapshotMeds = initialNote.medicationSnapshot as any[] || [];
+          }
+        }
+
+        const validProblems = prevSnapshotProblems
+          .filter(p => p && p.title && String(p.title).trim() !== '')
+          .map(p => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+
+        const validMeds = prevSnapshotMeds
+          .filter(m => m && m.name && String(m.name).trim() !== '')
+          .map(m => ({
+            name: String(m.name).trim(),
+            dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
+            formulation: m.formulation,
+            quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
+            instructions: m.instructions,
+          }));
+
+        await this.problemsService.upsertFromAssessment(patientId, validProblems, userId, tx);
+        await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, tx);
       }
 
       await tx.progressNote.delete({ where: { id } });

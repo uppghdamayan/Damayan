@@ -73,6 +73,11 @@ export function useUpdateInitialNote(patientId: string) {
       }),
     onSuccess: (data) => {
       queryClient.setQueryData(['initial-note', patientId], data);
+      queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:initial`, JSON.stringify(variables.data));

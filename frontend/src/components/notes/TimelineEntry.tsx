@@ -98,6 +98,15 @@ export function TimelineEntry({
                   Not Author
                 </Badge>
               )}
+              {note.lastEditorName && note.lastEditedAt && note.status === 'PUBLISHED' && (
+                <>
+                  <span className="ml-1 text-[11px] text-[var(--text-muted)]">·</span>
+                  <Badge variant="outline" className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] uppercase border-[var(--text-muted)] text-[var(--text-secondary)] bg-surface-2 ml-1">
+                    <Edit className="w-2.5 h-2.5" />
+                    Edited by {note.lastEditorName} at {new Date(note.lastEditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Badge>
+                </>
+              )}
             </span>
           </div>
           

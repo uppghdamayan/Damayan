@@ -216,7 +216,13 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         onConfirm={() => {
           if (deleteDraftNoteId) {
             deleteProgressNoteMutation.mutate(deleteDraftNoteId, {
-              onSuccess: () => setDeleteDraftNoteId(null),
+              onSuccess: () => {
+                if (activeNoteEditor.noteId === deleteDraftNoteId) {
+                  useUiStore.getState().closeNoteEditor();
+                  useUiStore.getState().setDocumentationPanelOpen(false);
+                }
+                setDeleteDraftNoteId(null);
+              },
             });
           }
         }}

@@ -213,17 +213,32 @@ export class MedicationsService {
     const keptIds = new Set<string>();
 
     const existing = await client.medication.findMany({
-      where: { patientId, isActive: true },
+      where: { patientId },
     });
 
     for (const item of items) {
       const match = existing.find(
         (m) =>
           m.name.toLowerCase() === item.name.trim().toLowerCase() &&
-          String(m.dose).toLowerCase() === item.dose.trim().toLowerCase(),
+          String(m.dose ?? '').toLowerCase() === String(item.dose ?? '').trim().toLowerCase(),
       );
       if (match) {
         keptIds.add(match.id);
+        if (!match.isActive) {
+          await client.medication.update({
+            where: { id: match.id },
+            data: { isActive: true },
+          });
+          await client.medicationLog.create({
+            data: {
+              patientId,
+              medicationId: match.id,
+              action: 'Reactivated',
+              description: `Reactivated medication '${match.name}' from note`,
+              editorId: userId,
+            },
+          });
+        }
         continue;
       }
 
@@ -243,10 +258,19 @@ export class MedicationsService {
 
     // Deactivate missing items
     for (const ext of existing) {
-      if (!keptIds.has(ext.id)) {
+      if (!keptIds.has(ext.id) && ext.isActive) {
         await client.medication.update({
           where: { id: ext.id },
           data: { isActive: false },
+        });
+        await client.medicationLog.create({
+          data: {
+            patientId,
+            medicationId: ext.id,
+            action: 'Discontinued',
+            description: `Discontinued medication '${ext.name}' automatically (not in note)`,
+            editorId: userId,
+          },
         });
       }
     }

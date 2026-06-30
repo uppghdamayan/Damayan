@@ -12,6 +12,8 @@ export interface TimelineNoteView {
   authorName: string;
   authorRole?: string;
   isDisplayedUserAuthor: boolean;
+  lastEditorName?: string;
+  lastEditedAt?: string;
   previewText: string;       // first ~65 chars of chief complaint (initial) or subjective (progress)
   isLatest: boolean;
   sections: {
@@ -134,6 +136,8 @@ export function mapNoteToTimelineView(
 
     const author = initialNote.author;
     const lastEditor = (initialNote as any).lastEditor;
+    const lastEditorName = lastEditor ? `${lastEditor.firstName} ${lastEditor.lastName}` : undefined;
+    const lastEditedAt = (initialNote as any).lastEditedAt;
     
     let displayUser = author;
     let displayUserId = initialNote.authorId;
@@ -160,6 +164,8 @@ export function mapNoteToTimelineView(
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
       isDisplayedUserAuthor,
+      lastEditorName,
+      lastEditedAt,
       previewText: initialNote.chiefComplaint ? initialNote.chiefComplaint.slice(0, 65) + (initialNote.chiefComplaint.length > 65 ? '...' : '') : '',
       isLatest,
       sections: {
