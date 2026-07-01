@@ -10,13 +10,19 @@ export async function apiRequest<T = unknown>(
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  });
+
+  if (options.body instanceof FormData) {
+    headers.delete('Content-Type');
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {

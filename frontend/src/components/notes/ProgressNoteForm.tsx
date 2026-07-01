@@ -18,10 +18,12 @@ import {
 import { usePatient } from '@/hooks/usePatients';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useUploadAttachment } from '@/hooks/useAttachments';
 import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
+import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +90,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const [publishError, setPublishError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
+  const uploadAttachment = useUploadAttachment();
 
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
@@ -247,8 +251,28 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       });
     } else {
       createMutation.mutate(formValues, {
-        onSuccess: (newNote) => {
+        onSuccess: async (newNote) => {
           setLastSaved(new Date());
+          const newNoteId = (newNote as any)?.data?.id || (newNote as any)?.id;
+          
+          if (newNoteId && localAttachments.length > 0) {
+            for (const att of localAttachments) {
+              try {
+                await uploadAttachment.mutateAsync({
+                  patientId,
+                  noteType: 'PROGRESS_NOTE',
+                  noteId: newNoteId,
+                  tag: att.tag,
+                  textResult: att.textResult || undefined,
+                  file: att.file || undefined
+                });
+              } catch (e) {
+                console.error('Failed to upload attachment', e);
+              }
+            }
+            setLocalAttachments([]);
+          }
+
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');
@@ -274,7 +298,24 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       updateMutation.mutate({ id: noteId, data: formValues }, {
         onSuccess: () => {
           publishMutation.mutate(noteId, {
-            onSuccess: () => {
+            onSuccess: async () => {
+              if (localAttachments.length > 0) {
+                for (const att of localAttachments) {
+                  try {
+                    await uploadAttachment.mutateAsync({
+                      patientId,
+                      noteType: 'PROGRESS_NOTE',
+                      noteId: noteId,
+                      tag: att.tag,
+                      textResult: att.textResult || undefined,
+                      file: att.file || undefined
+                    });
+                  } catch (e) {
+                    console.error('Failed to upload attachment', e);
+                  }
+                }
+                setLocalAttachments([]);
+              }
               localStorage.removeItem(`damayan:draft:${patientId}:progress`);
               onClose();
               setDocumentationPanelOpen(false);
@@ -291,7 +332,25 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       });
     } else {
       createAndPublishMutation.mutate(formValues, {
-        onSuccess: () => {
+        onSuccess: async (newNote) => {
+          const newNoteId = (newNote as any)?.data?.id || (newNote as any)?.id;
+          if (newNoteId && localAttachments.length > 0) {
+            for (const att of localAttachments) {
+              try {
+                await uploadAttachment.mutateAsync({
+                  patientId,
+                  noteType: 'PROGRESS_NOTE',
+                  noteId: newNoteId,
+                  tag: att.tag,
+                  textResult: att.textResult || undefined,
+                  file: att.file || undefined
+                });
+              } catch (e) {
+                console.error('Failed to upload attachment', e);
+              }
+            }
+            setLocalAttachments([]);
+          }
           localStorage.removeItem(`damayan:draft:${patientId}:progress`);
           onClose();
           setDocumentationPanelOpen(false);
@@ -425,7 +484,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 )}
                 <span className="btn-text">{noteId ? 'Undraft' : 'Draft'}</span>
               </Button>
-              {form.formState.isDirty && !noteId && (
+              {(form.formState.isDirty || localAttachments.length > 0) && !noteId && (
                 <Button 
                   onClick={() => {
                     const defaultProblems = (copyForward?.activeProblems || []).map((p: any) => ({
@@ -463,6 +522,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                     setNewMedFormulation('');
                     setNewMedQuantity('');
                     setNewMedInstructions('');
+
+                    // Clear temporary attachments
+                    setLocalAttachments([]);
                   }} 
                   disabled={isDisabled}
                   variant="outline" 
@@ -474,11 +536,28 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   <span className="btn-text">Revert</span>
                 </Button>
               )}
-              {form.formState.isDirty && noteId && (
+              {(form.formState.isDirty || localAttachments.length > 0) && noteId && (
                 <Button 
                   onClick={() => {
                     updateMutation.mutate({ id: noteId, data: formValues }, {
-                      onSuccess: () => {
+                      onSuccess: async () => {
+                        if (localAttachments.length > 0) {
+                          for (const att of localAttachments) {
+                            try {
+                              await uploadAttachment.mutateAsync({
+                                patientId,
+                                noteType: 'PROGRESS_NOTE',
+                                noteId: noteId,
+                                tag: att.tag,
+                                textResult: att.textResult || undefined,
+                                file: att.file || undefined
+                              });
+                            } catch (e) {
+                              console.error('Failed to upload attachment', e);
+                            }
+                          }
+                          setLocalAttachments([]);
+                        }
                         setLastSaved(new Date());
                         form.reset(formValues);
                       }
@@ -575,21 +654,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* LABS & IMAGING */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🧪</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Results of Labs or Imaging</span>
-              </div>
-              <div className="p-[14px]">
-                <div className="text-[9px] font-bold uppercase tracking-[0.8px] text-accent-mid mb-1.5 pb-1 border-b border-border">New Results</div>
-                <textarea
-                  {...form.register('labs')}
-                  className="w-full min-h-[50px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Enter new lab/imaging results..."
-                  disabled={isDisabled}
-                />
-              </div>
-            </div>
+            <AttachmentsSection 
+              patientId={patientId} 
+              noteType="PROGRESS_NOTE" 
+              noteId={noteId} 
+              localAttachments={localAttachments}
+              onAddLocalAttachment={(att) => setLocalAttachments(prev => [...prev, att])}
+              onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
+            />
 
             {/* PROBLEM LIST */}
             <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">

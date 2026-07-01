@@ -13,6 +13,8 @@ import { VitalsModule } from './vitals/vitals.module';
 import { DocumentsModule } from './documents/documents.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { SupabaseModule } from './supabase/supabase.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     DocumentsModule,
     AttachmentsModule,
     AuditLogsModule,
+    SupabaseModule,
+    StorageModule,
   ],
 })
 export class AppModule {}

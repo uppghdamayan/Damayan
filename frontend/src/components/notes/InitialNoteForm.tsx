@@ -19,9 +19,10 @@ import { usePatient } from '@/hooks/usePatients';
 import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useUploadAttachment } from '@/hooks/useAttachments';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
-import { AttachmentUploader } from './AttachmentUploader';
+import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { NoteStatusBadge } from './NoteStatusBadge';
 import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -187,6 +188,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
+  const uploadAttachment = useUploadAttachment();
 
   const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
   const isPublished = note?.status === 'PUBLISHED';
@@ -355,7 +358,24 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const handleSave = (data: InitialNoteDraftValues) => {
     if (note) {
       updateMutation.mutate({ id: note.id, data }, {
-        onSuccess: () => {
+        onSuccess: async () => {
+          if (localAttachments.length > 0) {
+            for (const att of localAttachments) {
+              try {
+                await uploadAttachment.mutateAsync({
+                  patientId,
+                  noteType: 'INITIAL_NOTE',
+                  noteId: note.id,
+                  tag: att.tag,
+                  textResult: att.textResult || undefined,
+                  file: att.file || undefined
+                });
+              } catch (e) {
+                console.error('Failed to upload attachment', e);
+              }
+            }
+            setLocalAttachments([]);
+          }
           if (isPublished) {
             setIsEditing(false);
           } else {
@@ -365,7 +385,25 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       });
     } else {
       createMutation.mutate(data, {
-        onSuccess: () => {
+        onSuccess: async (newNote) => {
+          const noteIdToUpload = (newNote as any)?.data?.id || newNote?.id;
+          if (noteIdToUpload && localAttachments.length > 0) {
+            for (const att of localAttachments) {
+              try {
+                await uploadAttachment.mutateAsync({
+                  patientId,
+                  noteType: 'INITIAL_NOTE',
+                  noteId: noteIdToUpload,
+                  tag: att.tag,
+                  textResult: att.textResult || undefined,
+                  file: att.file || undefined
+                });
+              } catch (e) {
+                console.error('Failed to upload attachment', e);
+              }
+            }
+            setLocalAttachments([]);
+          }
           router.push(`/dashboard/${patientId}/notes`);
         }
       });
@@ -408,7 +446,24 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       updateMutation.mutate({ id: note.id, data: formValues }, {
         onSuccess: () => {
           publishMutation.mutate(note.id, {
-            onSuccess: () => {
+            onSuccess: async () => {
+              if (localAttachments.length > 0) {
+                for (const att of localAttachments) {
+                  try {
+                    await uploadAttachment.mutateAsync({
+                      patientId,
+                      noteType: 'INITIAL_NOTE',
+                      noteId: note.id,
+                      tag: att.tag,
+                      textResult: att.textResult || undefined,
+                      file: att.file || undefined
+                    });
+                  } catch (e) {
+                    console.error('Failed to upload attachment', e);
+                  }
+                }
+                setLocalAttachments([]);
+              }
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
@@ -435,7 +490,24 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             return;
           }
           publishMutation.mutate(noteIdToPublish, {
-            onSuccess: () => {
+            onSuccess: async () => {
+              if (localAttachments.length > 0) {
+                for (const att of localAttachments) {
+                  try {
+                    await uploadAttachment.mutateAsync({
+                      patientId,
+                      noteType: 'INITIAL_NOTE',
+                      noteId: noteIdToPublish,
+                      tag: att.tag,
+                      textResult: att.textResult || undefined,
+                      file: att.file || undefined
+                    });
+                  } catch (e) {
+                    console.error('Failed to upload attachment', e);
+                  }
+                }
+                setLocalAttachments([]);
+              }
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
               router.push(`/dashboard/${patientId}/notes`);
@@ -1226,9 +1298,14 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     )}
                   />
                   {canEditAll && (
-                    <div className="mt-2">
-                      <AttachmentUploader />
-                    </div>
+                    <AttachmentsSection 
+                      patientId={patientId} 
+                      noteType="INITIAL_NOTE" 
+                      noteId={note?.id} 
+                      localAttachments={localAttachments}
+                      onAddLocalAttachment={(att) => setLocalAttachments(prev => [...prev, att])}
+                      onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
+                    />
                   )}
                 </div>
               </div>

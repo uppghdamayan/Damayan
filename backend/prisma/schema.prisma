@@ -198,7 +198,6 @@ model InitialNote {
   visit       Visit        @relation(fields: [visitId], references: [id])
   author      User?        @relation("InitialNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("InitialNoteEditor", fields: [lastEditedBy], references: [id])
-  attachments Attachment[]
 
   @@map("initial_notes")
 }
@@ -228,7 +227,6 @@ model ProgressNote {
   visit       Visit        @relation(fields: [visitId], references: [id])
   author      User?        @relation("ProgressNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("ProgressNoteEditor", fields: [lastEditedBy], references: [id])
-  attachments Attachment[]
 
   @@map("progress_notes")
 }
@@ -344,7 +342,7 @@ model Attachment {
   noteType       NoteType @map("note_type")
   noteId         String   @map("note_id") @db.Uuid
   tag            String   @db.VarChar(100)
-  storageKey     String   @map("storage_key")
+  storageKey     String?  @map("storage_key")
   mimeType       String?  @map("mime_type") @db.VarChar(50)
   textResult     String?  @map("text_result")
   uploadedBy     String?  @map("uploaded_by") @db.Uuid
@@ -353,8 +351,6 @@ model Attachment {
   // Relations (polymorphic via noteType + noteId — no direct FK)
   patient        Patient      @relation(fields: [patientId], references: [id])
   uploadedByUser User?        @relation("AttachmentUploadedBy", fields: [uploadedBy], references: [id])
-  initialNote    InitialNote? @relation(fields: [noteId], references: [id], map: "attachment_initial_note_fk")
-  progressNote   ProgressNote? @relation(fields: [noteId], references: [id], map: "attachment_progress_note_fk")
 
   @@map("attachments")
 }
