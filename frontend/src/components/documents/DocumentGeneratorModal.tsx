@@ -74,13 +74,8 @@ export function DocumentGeneratorModal({ patientId, onClose }: DocumentGenerator
               <option value="MEDICAL_CERTIFICATE">Medical Certificate</option>
               <option value="LAB_REQUEST">Lab Request</option>
               <option value="PRESCRIPTION">Prescription</option>
-              {role !== 'DOCTOR' && (
-                <option value="CHARGE_SLIP">Charge Slip</option>
-              )}
+              <option value="CHARGE_SLIP">Charge Slip</option>
             </select>
-            {docType === 'CHARGE_SLIP' && role === 'DOCTOR' && (
-               <p className="text-red text-[11px] mt-1 font-medium">Doctors cannot generate charge slips.</p>
-            )}
           </div>
 
           <div className="text-[12px] text-text-secondary bg-surface-2 p-3 rounded-card border border-border leading-relaxed">
@@ -104,7 +99,7 @@ export function DocumentGeneratorModal({ patientId, onClose }: DocumentGenerator
           </Button>
           <Button 
             onClick={handleGenerate} 
-            disabled={generateDoc.isPending || (docType === 'CHARGE_SLIP' && role === 'DOCTOR')}
+            disabled={generateDoc.isPending}
             className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 cursor-pointer inline-flex items-center gap-[5px]"
           >
             {generateDoc.isPending ? (

@@ -18,9 +18,7 @@ export class DocumentsService {
   async generate(patientId: string, type: DocumentType, visitId: string | undefined, userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     
-    if (type === DocumentType.CHARGE_SLIP && user?.role === Role.DOCTOR) {
-      throw new ForbiddenException('Doctors are not allowed to generate charge slips');
-    }
+    // removed doctor restriction on charge slip
 
     const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new NotFoundException('Patient not found');

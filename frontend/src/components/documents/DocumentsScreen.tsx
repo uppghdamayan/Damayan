@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDocuments, useDocumentDownloadUrl, useDeleteDocument } from '@/hooks/useDocuments';
 import { usePriorLabs, useAttachmentDownloadUrl, useDeleteAttachment } from '@/hooks/useAttachments';
 import { Button } from '../ui/button';
+import { DeleteConfirmModal } from '../ui/DeleteConfirmModal';
 import { FileText, Download, Plus, Trash2, FileIcon } from 'lucide-react';
 import { DocumentGeneratorModal } from './DocumentGeneratorModal';
 import { useAuthStore } from '@/stores/authStore';
@@ -136,6 +137,8 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
   const { user } = useAuthStore();
   const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
 
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
   const handleDownload = async () => {
     try {
       const res = await refetch();
@@ -148,12 +151,12 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-      try {
-        await deleteMutation.mutateAsync(document.id);
-      } catch (e: any) {
-        alert(e.message || 'Failed to delete document');
-      }
+    try {
+      await deleteMutation.mutateAsync(document.id);
+      setIsDeleteModalOpen(false);
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete document');
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -191,7 +194,7 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
             variant="ghost"
             size="icon-xs"
             className="text-text-muted hover:text-red transition-colors cursor-pointer"
-            onClick={handleDelete}
+            onClick={() => setIsDeleteModalOpen(true)}
             disabled={deleteMutation.isPending}
             title="Delete Document"
           >
@@ -228,6 +231,15 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
           {isFetching ? 'Loading URL...' : 'Download PDF'}
         </Button>
       </div>
+
+      <DeleteConfirmModal
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Delete Document"
+        message={`Are you sure you want to delete this ${getDocTypeName(document.documentType)}? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }
@@ -237,6 +249,8 @@ function AttachmentCard({ attachment }: { attachment: any }) {
   const deleteMutation = useDeleteAttachment();
   const { user } = useAuthStore();
   const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const handleDownload = async () => {
     try {
@@ -250,12 +264,12 @@ function AttachmentCard({ attachment }: { attachment: any }) {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this attachment? This action cannot be undone.')) {
-      try {
-        await deleteMutation.mutateAsync({ id: attachment.id, noteType: attachment.noteType, noteId: attachment.noteId });
-      } catch (e: any) {
-        alert(e.message || 'Failed to delete attachment');
-      }
+    try {
+      await deleteMutation.mutateAsync({ id: attachment.id, noteType: attachment.noteType, noteId: attachment.noteId });
+      setIsDeleteModalOpen(false);
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete attachment');
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -273,7 +287,7 @@ function AttachmentCard({ attachment }: { attachment: any }) {
             variant="ghost"
             size="icon-xs"
             className="text-text-muted hover:text-red transition-colors cursor-pointer"
-            onClick={handleDelete}
+            onClick={() => setIsDeleteModalOpen(true)}
             disabled={deleteMutation.isPending}
             title="Delete Attachment"
           >
@@ -318,6 +332,15 @@ function AttachmentCard({ attachment }: { attachment: any }) {
           </Button>
         )}
       </div>
+
+      <DeleteConfirmModal
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Delete Attachment"
+        message="Are you sure you want to delete this attachment? This action cannot be undone."
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }

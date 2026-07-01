@@ -239,6 +239,6 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
         </div>
       </div>
     </div>
-  </div>
+    </div>
   );
 }
