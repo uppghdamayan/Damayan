@@ -35,7 +35,7 @@ export class AttachmentsService {
 
     if (file) {
       const timestamp = Date.now();
-      const path = `patients/${dto.patientId}/visits/${visitId}/${timestamp}-${file.originalname}`;
+      const path = `patients/${dto.patientId}/documents/${timestamp}-${file.originalname}`;
       storageKey = await this.storageService.upload(path, file.buffer, file.mimetype);
       mimeType = file.mimetype;
     }

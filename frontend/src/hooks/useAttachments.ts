@@ -34,6 +34,7 @@ export function usePriorLabs(patientId: string) {
   return useQuery({
     queryKey: ['attachments', 'patient', patientId],
     queryFn: () => apiRequest<any[]>(`/attachments?patientId=${patientId}`),
+    enabled: !!patientId,
   });
 }
 

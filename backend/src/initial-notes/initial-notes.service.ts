@@ -11,6 +11,7 @@ import { NoteStatus, VisitType, Prisma } from '@prisma/client';
 import { VisitsService } from '../visits/visits.service';
 import { ProblemsService } from '../problems/problems.service';
 import { MedicationsService } from '../medications/medications.service';
+import { StorageService } from '../storage/storage.service';
 import { diffByTitle, diffByNameDoseUnit } from '../progress-notes/progress-notes.utils';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class InitialNotesService {
     private visitsService: VisitsService,
     private problemsService: ProblemsService,
     private medicationsService: MedicationsService,
+    private storageService: StorageService,
   ) {}
 
   async findOne(patientId: string) {
@@ -313,6 +315,16 @@ export class InitialNotesService {
 
     return this.prisma.$transaction(async (tx) => {
       // Delete attachments first if there are any
+      const attachments = await tx.attachment.findMany({
+        where: { noteId: id },
+      });
+
+      for (const att of attachments) {
+        if (att.storageKey) {
+          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+        }
+      }
+
       await tx.attachment.deleteMany({
         where: { noteId: id },
       });

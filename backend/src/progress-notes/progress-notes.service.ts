@@ -14,6 +14,7 @@ import { ProblemsService } from '../problems/problems.service';
 import { MedicationsService } from '../medications/medications.service';
 import { VitalsService } from '../vitals/vitals.service';
 import { InitialNotesService } from '../initial-notes/initial-notes.service';
+import { StorageService } from '../storage/storage.service';
 import { diffByTitle, diffByNameDoseUnit } from './progress-notes.utils';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class ProgressNotesService {
     private medicationsService: MedicationsService,
     private vitalsService: VitalsService,
     private initialNotesService: InitialNotesService,
+    private storageService: StorageService,
   ) {}
 
   async findAllByPatient(patientId: string, page = 1, limit = 10) {
@@ -353,6 +355,20 @@ export class ProgressNotesService {
         await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, 'Progress Note', tx);
       }
 
+      const attachments = await tx.attachment.findMany({
+        where: { noteId: id },
+      });
+
+      for (const att of attachments) {
+        if (att.storageKey) {
+          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+        }
+      }
+
+      await tx.attachment.deleteMany({
+        where: { noteId: id },
+      });
+
       await tx.progressNote.delete({ where: { id } });
       await tx.visit.delete({ where: { id: note.visitId } });
 
@@ -377,6 +393,20 @@ export class ProgressNotesService {
 
       const noteIds = drafts.map(d => d.id);
       const visitIds = drafts.map(d => d.visitId);
+
+      const attachments = await tx.attachment.findMany({
+        where: { noteId: { in: noteIds } },
+      });
+
+      for (const att of attachments) {
+        if (att.storageKey) {
+          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+        }
+      }
+
+      await tx.attachment.deleteMany({
+        where: { noteId: { in: noteIds } },
+      });
 
       const count = await tx.progressNote.deleteMany({
         where: { id: { in: noteIds } },

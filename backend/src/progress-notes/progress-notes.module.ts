@@ -6,6 +6,7 @@ import { MedicationsModule } from '../medications/medications.module';
 import { VitalsModule } from '../vitals/vitals.module';
 import { VisitsModule } from '../visits/visits.module';
 import { InitialNotesModule } from '../initial-notes/initial-notes.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { InitialNotesModule } from '../initial-notes/initial-notes.module';
     VitalsModule,
     VisitsModule,
     InitialNotesModule,
+    StorageModule,
   ],
   controllers: [ProgressNotesController],
   providers: [ProgressNotesService],
