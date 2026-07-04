@@ -36,7 +36,7 @@ export function PatientBanner({ patient }: { patient: Patient }) {
   return (
     <div className="relative bg-surface border border-border rounded-card p-4 flex gap-5 items-stretch flex-wrap shadow-card">
       {/* Left Column: Avatar + Name (Section 7.1) */}
-      <div className="flex gap-3.5 items-center flex-[1.2] min-w-[250px] border-r border-border pr-5">
+      <div className="flex gap-3.5 items-center flex-[1.2] min-w-[250px] border-r border-border pr-5 max-[767px]:border-r-0 max-[767px]:border-b max-[767px]:pb-4 max-[767px]:pr-0">
         <div className="w-11 h-11 rounded-full bg-accent-light border-2 border-accent flex items-center justify-center text-[15px] font-bold text-accent-hover flex-shrink-0">
           {ini}
         </div>
@@ -54,7 +54,7 @@ export function PatientBanner({ patient }: { patient: Patient }) {
       </div>
 
       {/* Middle Column: Demographics */}
-      <div className="flex flex-col gap-1 flex-1 min-w-[220px] border-r border-border pr-5 text-[12px] text-text-secondary justify-center">
+      <div className="flex flex-col gap-1 flex-1 min-w-[220px] border-r border-border pr-5 text-[12px] text-text-secondary justify-center max-[767px]:border-r-0 max-[767px]:border-b max-[767px]:pb-4 max-[767px]:pr-0">
         <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] mb-1 block">Demographics</span>
         <div className="grid grid-cols-2 gap-x-2 gap-y-1">
           <div>Sex: <strong className="text-text-primary">{sexLabel}</strong></div>

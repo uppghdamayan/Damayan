@@ -14,9 +14,13 @@ import {
 } from '@/lib/vitals-utils';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { VitalsStripSkeleton } from './VitalsStripSkeleton';
+import { useUiStore } from '@/stores/uiStore';
+import { cn } from '@/lib/utils';
 
 export function VitalsCard({ patientId }: { patientId: string }) {
   const { data: latest, isLoading } = useLatestVitals(patientId);
+  const { sidebarCollapsed } = useUiStore();
+  const sidebarOpen = !sidebarCollapsed;
 
   if (isLoading) {
     return (
@@ -34,32 +38,60 @@ export function VitalsCard({ patientId }: { patientId: string }) {
 
   const noReadingToday = !latest || isStaleReading(latest.measuredAt);
   const isRecent = latest && isRecentlyUpdated(latest.measuredAt);
+  const isOlderThan24h = latest ? (Date.now() - new Date(latest.measuredAt).getTime() > 24 * 60 * 60 * 1000) : false;
 
-  const getColorClass = (severity: 'normal' | 'warn' | 'critical') => {
-    if (severity === 'critical') return 'text-red font-semibold';
-    if (severity === 'warn') return 'text-amber font-medium';
-    return 'text-text-primary font-bold';
+  const renderVitalCell = (
+    label: string, 
+    valueStr: string, 
+    unit: string, 
+    severity: 'normal' | 'warn' | 'critical', 
+    timeStr?: string
+  ) => {
+    const isCrit = severity === 'critical';
+    const isWrn = severity === 'warn';
+
+    return (
+      <div className={cn(
+        "border rounded-card p-[9px_11px] flex flex-col gap-0.5",
+        isCrit ? "bg-red-bg border-red-border" :
+        isWrn  ? "bg-amber-bg border-amber-border" :
+        "bg-surface-2 border-border"
+      )}>
+        <div className={cn(
+          "text-[9px] font-bold uppercase tracking-[0.6px] mb-0.5 max-[1439px]:text-[8px]",
+          isCrit ? "text-red" :
+          isWrn  ? "text-amber" :
+          "text-text-muted"
+        )}>
+          {label}
+        </div>
+        <div className={cn(
+          "font-mono text-[18px] font-medium leading-[1.1] max-[1439px]:text-[16px]",
+          isCrit ? "text-red" :
+          isWrn  ? "text-amber" :
+          "text-text-primary"
+        )}>
+          {valueStr}
+          {valueStr !== '—' && valueStr !== '—/—' && (
+            <span className="text-[10px] text-text-muted ml-[1px] font-sans">{unit}</span>
+          )}
+        </div>
+        {timeStr && (
+          <div className={cn("font-mono text-[9px] mt-0.5", isOlderThan24h ? "text-amber font-medium" : "text-text-muted")}>
+            {timeStr}
+          </div>
+        )}
+      </div>
+    );
   };
-
-  const renderVitalCell = (label: string, valueStr: string, unit: string, severity: 'normal' | 'warn' | 'critical', timeStr?: string) => (
-    <div className="bg-surface-2 border border-border rounded-lg px-3 py-2.5 flex flex-col gap-0.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-text-muted">{label}</span>
-      </div>
-      <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`font-mono text-[18px] ${getColorClass(severity)} leading-none`}>{valueStr}</span>
-        {valueStr !== '—' && valueStr !== '—/—' && <span className="text-[11px] text-text-muted">{unit}</span>}
-      </div>
-      <div className="text-[10px] text-text-muted font-mono mt-0.5">
-        {timeStr || '—'}
-      </div>
-    </div>
-  );
 
   const timeStr = latest ? new Date(latest.measuredAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
 
   return (
-    <div className={`bg-surface border border-border ${isRecent ? 'border-l-[3px] border-l-accent' : ''} rounded-card shadow-card overflow-hidden`}>
+    <div className={cn(
+      "bg-surface border border-border rounded-card shadow-card overflow-hidden",
+      isRecent ? "border-l-[3px] border-l-accent" : ""
+    )}>
       <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
         <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">❤️</div>
         <div className="flex-1 flex flex-col justify-center">
@@ -88,7 +120,11 @@ export function VitalsCard({ patientId }: { patientId: string }) {
       </div>
 
       <div className="p-2.5">
-        <div className="grid grid-cols-5 gap-2">
+        <div className={cn(
+          "grid gap-2",
+          sidebarOpen ? "grid-cols-5 max-[1439px]:grid-cols-3" : "grid-cols-5",
+          "max-[1279px]:grid-cols-3 max-[767px]:grid-cols-2"
+        )}>
           {renderVitalCell(
             'Blood Pressure',
             latest ? formatBloodPressure(latest.sbp, latest.dbp) : '—/—',

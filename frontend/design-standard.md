@@ -1,7 +1,8 @@
 # DAMAYAN EMR — Design Standards
 
-**Version 2.0 · Tailwind CSS + shadcn/ui + Next.js**  
-*Aligned with Wireframe3 · Problem-Oriented Dynamic Clinical Note Interface for Primary Care*
+**Version 2.1 · Tailwind CSS + shadcn/ui + Next.js**  
+*Aligned with Wireframe3 · Problem-Oriented Dynamic Clinical Note Interface for Primary Care*  
+*v2.1: extends minimum supported viewport from 1280px down to 768px (small tablets) — see §4.2–§4.4.*
 
 ---
 
@@ -11,7 +12,7 @@ DAMAYAN is used primarily by doctors and medical personnel in a clinical setting
 
 1. **Clarity over cleverness.** Every label, button, and section must be immediately understandable without prior training.
 2. **Reduce cognitive load.** The system organizes information by problem, not by visit. Users should never scroll through previous notes to understand the current state of a patient.
-3. **Large, readable text.** Minimum body font size of `text-[13px]`, with all critical values (vitals, problem names) at `text-[15px]` to `text-lg`. The interface must support browser zoom up to 150% without breaking layouts.
+3. **Large, readable text.** Minimum body font size of `text-[13px]`, with all critical values (vitals, problem names) at `text-[15px]` to `text-lg`. The interface must support browser zoom up to 150% without breaking layouts. **This floor never drops further at smaller breakpoints** — down to the minimum supported width of 768px, body text stays at `13px` and form inputs stay at `13px`/`h-[34px]` or larger. When space is tight, remove or icon-ify chrome (labels, wordmarks, secondary text) rather than shrinking readable content below these floors.
 4. **High contrast.** All text/background combinations must meet WCAG 2.2 AA (4.5:1 for body, 3:1 for large text).
 5. **Keyboard navigability.** All forms must be completable using only the keyboard. Tab order must match the visual reading flow.
 6. **Single-page, no multi-window.** Each patient's workspace is contained in one screen.
@@ -189,13 +190,36 @@ export default config;
     --timeline-w:                 260px;
   }
 
-  /* Minimum viewport breakpoint (1280px) */
+  /* Desktop / compact (1280px–1439px) */
   @media (max-width: 1439px) {
     :root {
       --sidebar-w:                 220px;
       --documentation-panel-width: 340px;
       --timeline-w:                200px;
       --topbar-h:                  52px;
+    }
+  }
+
+  /* Tablet landscape (1024px–1279px) — sidebar becomes an overlay drawer,
+     doc panel becomes a full overlay, topbar right-zone labels start
+     collapsing into icons */
+  @media (max-width: 1279px) {
+    :root {
+      --sidebar-w:                 240px;  /* overlay width, not in-flow */
+      --documentation-panel-width: 100%;   /* full overlay, see §4.4 */
+      --timeline-w:                180px;
+      --topbar-h:                  50px;
+    }
+  }
+
+  /* Small tablet / minimum supported viewport (768px–1023px) — header is
+     fully icon-driven, single-column layouts throughout */
+  @media (max-width: 1023px) {
+    :root {
+      --sidebar-w:                 260px;  /* overlay width */
+      --documentation-panel-width: 100%;
+      --timeline-w:                160px;
+      --topbar-h:                  48px;
     }
   }
 
@@ -276,7 +300,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <ScreenNav />
-          <main id="main" className="flex-1 overflow-y-auto p-5 max-[1439px]:p-[14px] flex flex-col gap-4">
+          <main id="main" className="flex-1 overflow-y-auto p-5 max-[1439px]:p-[14px] max-[1023px]:p-3 flex flex-col gap-4">
             {children}
           </main>
         </div>
@@ -289,27 +313,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 ### 4.2 Responsive Breakpoints
 
-DAMAYAN supports a **minimum viewport of 1280×800px**.
+DAMAYAN supports a **minimum viewport of 768×1024px** (small tablets, e.g. iPad Mini in portrait) up through desktop. Below 1280px the layout progressively converts persistent chrome — sidebar, doc panel, topbar labels — into overlays and icons rather than shrinking content. Readable text (body, inputs, clinical values) never drops below the floors set in §1.3, at any breakpoint.
 
 | Breakpoint | Width | Notes |
 |---|---|---|
-| `desktop-lg` | ≥ 1440px | Default layout |
-| `desktop` | 1280px–1439px | Reduced sidebar/panel widths, compact padding |
+| `desktop-lg` | ≥ 1440px | Default layout. Sidebar and doc panel are in-flow columns. |
+| `desktop` | 1280px–1439px | Reduced sidebar/panel widths, compact padding. Sidebar and doc panel still in-flow. |
+| `tablet-lg` | 1024px–1279px | Sidebar and doc panel become **overlay drawers** instead of in-flow columns. Topbar right-zone button labels start collapsing into icon-only + tooltip. |
+| `tablet` | 768px–1023px | Header is fully icon-driven (wordmark, button labels, doctor name all hidden behind icons/avatars). Dashboard grids collapse to a single column. Inputs grow to `h-[38px]` for touch targets. |
 
-Below 1280px, show a fullscreen notice:
+Below 768px, show a fullscreen notice (phones are not supported):
 
 ```tsx
 // components/narrow-screen-notice.tsx
 export function NarrowScreenNotice() {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg p-8 text-center hidden max-[1279px]:flex">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg p-8 text-center hidden max-[767px]:flex">
       <div className="max-w-sm">
         <p className="text-[15px] font-bold text-[var(--text-primary)] mb-2">
           Screen too narrow
         </p>
         <p className="text-[13px] text-[var(--text-muted)]">
-          DAMAYAN is designed for laptop or desktop screens.
-          Please use a device with a screen width of at least 1280px.
+          DAMAYAN is designed for tablet, laptop, or desktop screens.
+          Please use a device with a screen width of at least 768px.
         </p>
       </div>
     </div>
@@ -317,7 +343,7 @@ export function NarrowScreenNotice() {
 }
 ```
 
-#### Responsive Adaptations at 1280px
+#### Responsive Adaptations at 1280px (Desktop / Compact)
 
 **Sidebar (220px at 1280px):**
 - Patient name: `max-w-[130px] truncate`
@@ -347,29 +373,163 @@ export function NarrowScreenNotice() {
 
 **Modal at 1280px:** `max-w-[460px]` (default `max-w-[520px]`)
 
-#### Sidebar Collapse
+#### Responsive Adaptations at 1024px (Tablet Landscape)
+
+This tier introduces the first structural shift: **the sidebar and documentation panel stop taking up in-flow width** and become overlay drawers so the main content area keeps a usable minimum width.
+
+- **Sidebar** → overlay drawer (`fixed`, slides in from the left over a scrim), triggered by the topbar menu icon. Never pushes content; closes on scrim click, `Escape`, or patient selection.
+- **Documentation panel** → overlay drawer (`fixed`, slides in from the right, `w-full max-w-[420px]`), same dismiss behavior. See §4.4.
+- **Topbar right zone:** "New Note" button becomes icon-only (`+` icon, `w-9 h-9`) with a tooltip and `aria-label="New Note"`. Doctor name/role text block hides; only the avatar remains, revealing name/role in a dropdown on tap.
+- **Screen Nav Tabs:** icon + short label (`Timeline`, `Meds`, `Docs`) as at 1280px, still horizontally scrollable.
+- **Vitals Strip:** `grid-cols-3` regardless of sidebar state (sidebar no longer competes for width since it's an overlay).
+- **Dashboard Cards:** Medication + Problem List stay `grid-cols-2` down to this tier since the sidebar no longer takes width; drop to `grid-cols-1` only at 1023px.
+- **Modal:** `max-w-[420px]`.
+
+#### Responsive Adaptations at 768px (Small Tablet — icon-driven header)
+
+This is the minimum supported width. The header is fully icon-driven and every grid collapses to a single column so nothing gets cramped or illegible. See §4.3 for the icon-only header spec and §4.4 for overlay panel behavior.
+
+- **Topbar:** wordmark text ("DAMAYAN EMR") hides — only the logo mark icon remains. Active-patient chip shrinks to avatar + initials only (full name in a tap-to-expand popover). "New Note" stays icon-only. Doctor avatar only, no name/role text, no divider.
+- **Sidebar:** overlay drawer widens to `w-[260px]` (comfortable touch target list); patient row meta keeps ID visible since there's no competing width constraint.
+- **Screen Nav Tabs:** collapse to **icon-only** buttons (`w-9 h-9`) with `aria-label` + tooltip; active tab keeps its label visible (`icon + label`) so context is never fully hidden. See §4.3.
+- **Vitals Strip:** `grid-cols-2`; vital value stays at `text-[16px]` (does not shrink further — see §1.3 readability floor).
+- **Dashboard Cards:** all grids (`grid-cols-2` / `grid-cols-3`) collapse to `grid-cols-1`, including Medication + Problem List and any field-row layouts.
+- **Form fields:** `.field-row` and `.field-row-3` both collapse to `grid-cols-1`; inputs grow to `h-[38px]` (from `h-[34px]`) for touch accuracy while keeping `text-[13px]`.
+- **Modal:** `max-w-[92vw]`, capped at `380px`.
+- **Documentation panel:** full-screen overlay (`w-full`), not a fixed-width drawer.
+
+#### Sidebar Behavior Across Breakpoints
 
 ```tsx
-// Sidebar toggle — persisted to localStorage
-const [sidebarOpen, setSidebarOpen] = useState(() => {
-  if (typeof window === "undefined") return true;
-  const saved = localStorage.getItem("damayan-sidebar");
-  if (saved !== null) return saved === "open";
-  return window.innerWidth >= 1440; // default collapsed at 1280
-});
+// Sidebar mode — persisted to localStorage, recalculated on resize
+type SidebarMode = "inline-open" | "inline-collapsed" | "overlay";
+
+function useSidebarMode() {
+  const [width, setWidth] = useState(
+    typeof window === "undefined" ? 1440 : window.innerWidth
+  );
+
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // ≥1280px: in-flow column (open/collapsed, persisted preference)
+  // <1280px: overlay drawer, closed by default, never reflows content
+  const mode: SidebarMode =
+    width >= 1280
+      ? (localStorage.getItem("damayan-sidebar") === "closed" ? "inline-collapsed" : "inline-open")
+      : "overlay";
+
+  return mode;
+}
 ```
 
 ```tsx
+// ≥1280px — in-flow column
 <aside
   className={cn(
     "bg-surface border-r border-border flex-shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-300 ease-in-out",
+    "hidden min-[1280px]:block",
     sidebarOpen ? "w-[var(--sidebar-w)]" : "w-0 border-r-transparent"
   )}
 >
-  {/* inner content fixed at --sidebar-w so it doesn't reflow */}
-  <div className="w-[var(--sidebar-w)]">
+  <div className="w-[var(--sidebar-w)]">{/* sidebar content */}</div>
+</aside>
+
+// <1280px — overlay drawer
+<>
+  <div
+    onClick={closeSidebar}
+    className={cn(
+      "fixed inset-0 bg-black/40 z-[300] transition-opacity max-[1279px]:block hidden",
+      sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+    )}
+  />
+  <aside
+    className={cn(
+      "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto",
+      "w-[var(--sidebar-w)] transition-transform duration-200 ease-out",
+      sidebarOpen ? "translate-x-0" : "-translate-x-full"
+    )}
+  >
     {/* sidebar content */}
-  </div>
+  </aside>
+</>
+```
+
+### 4.3 Header Text → Icon Transition
+
+Below `1024px`, topbar and screen-nav labels progressively convert to icons rather than shrinking text. The rule of thumb: **anything with an unambiguous icon becomes icon-only + tooltip + `aria-label`; anything without one (patient name, page title) truncates instead of disappearing.**
+
+| Element | ≥1280px | 1024–1279px | 768–1023px |
+|---|---|---|---|
+| Logo wordmark | "DAMAYAN EMR" text | "DAMAYAN EMR" text | Logo mark icon only |
+| "New Note" button | Icon + "New Note" label | Icon only + tooltip | Icon only + tooltip |
+| Doctor name/role | Name + role text + avatar | Avatar only (tap for dropdown) | Avatar only (tap for dropdown) |
+| Active patient chip | Avatar + full name + meta | Avatar + full name + meta | Avatar + initials (tap to expand) |
+| Screen nav tab labels | Full label | Short label (`shortLabel`) | Icon only + tooltip (active tab keeps label) |
+| Sidebar toggle | Icon | Icon | Icon |
+
+```tsx
+// Generic icon-collapsing button used across the topbar
+function HeaderAction({
+  icon,
+  label,
+  compact,
+}: { icon: React.ReactNode; label: string; compact: boolean }) {
+  return (
+    <Button
+      variant="ghost"
+      size={compact ? "icon" : "default"}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "h-9",
+        compact ? "w-9 px-0 justify-center" : "px-3 gap-1.5"
+      )}
+    >
+      {icon}
+      {!compact && <span className="text-[12px] font-medium whitespace-nowrap">{label}</span>}
+    </Button>
+  );
+}
+
+// compact = viewport < 1024px, driven by a shared useBreakpoint() hook
+```
+
+Every icon-only control keeps its `aria-label` and a native `title` tooltip — icon-only is a visual simplification, not an accessibility reduction.
+
+### 4.4 Overlay Panels (Sidebar & Documentation Panel below 1280px)
+
+Below `1280px`, both the patient sidebar and the documentation panel switch from in-flow columns to `fixed` overlays so the main content column never gets squeezed below a usable width:
+
+- **1024–1279px:** doc panel overlay is `w-full max-w-[420px]`, anchored right, with the same scrim/`Escape`/focus-trap behavior as a modal.
+- **768–1023px:** doc panel overlay is `w-full` (true full-screen), since 420px would leave almost no room for the note fields on a small-tablet viewport.
+- Opening the sidebar overlay while the doc panel overlay is open (or vice versa) closes the other — only one overlay panel is shown at a time below 1280px.
+- Both overlays use `role="dialog"` semantics: focus trap while open, restore focus to the trigger on close, `Escape` closes.
+
+```tsx
+// Documentation panel — overlay variant used below 1280px
+<div
+  onClick={closePanel}
+  className={cn(
+    "fixed inset-0 bg-black/40 z-[400] max-[1279px]:block hidden",
+    panelOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+  )}
+/>
+<aside
+  role="dialog"
+  aria-modal="true"
+  className={cn(
+    "fixed top-0 right-0 bottom-0 z-[410] bg-surface flex flex-col",
+    "w-full max-[1023px]:max-w-none max-[1279px]:max-w-[420px]",
+    "transition-transform duration-200 ease-out",
+    panelOpen ? "translate-x-0" : "translate-x-full"
+  )}
+>
+  {/* same header + scrollable body as the in-flow variant in §7.5 */}
 </aside>
 ```
 
@@ -381,39 +541,55 @@ const [sidebarOpen, setSidebarOpen] = useState(() => {
 
 ```tsx
 // components/topbar.tsx
-<header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-[200]">
-  {/* Sidebar toggle */}
-  <Button variant="ghost" size="icon" onClick={toggleSidebar} className="w-6 h-6 -ml-1.5 mr-1">
+// Below 1280px the sidebar is an overlay, so the logo no longer needs to
+// match --sidebar-w; below 1024px the wordmark hides; below 768px the
+// patient chip shrinks to avatar-only and the doctor block loses its text.
+<header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 max-[1023px]:px-3 gap-3 flex-shrink-0 z-[200]">
+  {/* Sidebar toggle — always visible; opens overlay drawer below 1280px */}
+  <Button variant="ghost" size="icon" onClick={toggleSidebar} className="w-6 h-6 -ml-1.5 mr-1" aria-label="Toggle patient list">
     <MenuIcon className="w-[18px] h-[18px]" />
   </Button>
 
-  {/* Logo — fixed width matching sidebar */}
-  <div className="flex items-center gap-2 w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
+  {/* Logo — fixed width only ≥1280px (matches in-flow sidebar); auto width below that */}
+  <div className="flex items-center gap-2 min-[1280px]:w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
     <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
-      {/* logo mark SVG */}
+      {/* logo mark SVG — always visible, at every breakpoint */}
     </div>
-    <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap">
+    {/* wordmark hides below 1024px; icon mark alone is enough to identify the app */}
+    <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap max-[1023px]:hidden">
       DAMAYAN <small className="text-[9px] font-semibold text-[var(--text-muted)] tracking-[1px] uppercase mt-[3px]">EMR</small>
     </span>
   </div>
 
   {/* Active patient chip (centered) */}
-  <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 cursor-pointer shadow-sm">
-    {/* avatar + name + meta */}
+  <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 max-[767px]:px-1.5 max-[767px]:py-1 cursor-pointer shadow-sm">
+    {/* avatar always visible */}
+    <Avatar className="w-6 h-6 text-[10px]">MC</Avatar>
+    {/* full name + meta hide below 768px — tap the chip to expand a popover with the same info */}
+    <span className="text-[12px] font-semibold max-[767px]:hidden">Cruz, Maria Santos</span>
   </div>
 
   {/* Right zone */}
   <div className="ml-auto flex items-center gap-2">
-    <Button className="h-[34px] bg-accent hover:bg-accent-hover text-white border-accent-hover shadow-btn-primary text-[12px] font-medium">
-      ＋ New Note
+    {/* "New Note" — label hides below 1024px, icon + tooltip remains */}
+    <Button
+      aria-label="New Note"
+      title="New Note"
+      className="h-[34px] bg-accent hover:bg-accent-hover text-white border-accent-hover shadow-btn-primary text-[12px] font-medium max-[1023px]:w-9 max-[1023px]:px-0 max-[1023px]:justify-center"
+    >
+      <PlusIcon className="w-3.5 h-3.5" />
+      <span className="max-[1023px]:hidden">New Note</span>
     </Button>
-    {/* Doctor name + avatar */}
-    <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-      <div className="flex flex-col items-end leading-tight">
+    {/* Doctor name + avatar — text hides below 1024px, avatar opens a dropdown with name/role on tap */}
+    <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border max-[1023px]:pl-0 max-[1023px]:ml-0 max-[1023px]:border-l-0">
+      <div className="flex flex-col items-end leading-tight max-[1023px]:hidden">
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">Dr. Ana M. Reyes</span>
         <span className="text-[10px] text-[var(--text-muted)]">Attending Physician</span>
       </div>
-      <Avatar className="w-8 h-8 bg-accent-hover text-white text-[11px] font-bold border-2 border-border">
+      <Avatar
+        aria-label="Dr. Ana M. Reyes, Attending Physician"
+        className="w-8 h-8 bg-accent-hover text-white text-[11px] font-bold border-2 border-border"
+      >
         AR
       </Avatar>
     </div>
@@ -477,35 +653,57 @@ const [sidebarOpen, setSidebarOpen] = useState(() => {
 ### 5.3 Screen Navigation Tabs
 
 ```tsx
-<nav className="flex items-center gap-1.5 bg-surface border-b border-border px-4 h-[52px] flex-shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-  <span className="text-[11px] font-bold text-accent-mid uppercase tracking-[1px] mr-3.5 whitespace-nowrap flex-shrink-0">
+<nav className="flex items-center gap-1.5 bg-surface border-b border-border px-4 max-[1023px]:px-2.5 h-[52px] flex-shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  {/* patient name hides below 768px — already shown in the topbar chip */}
+  <span className="text-[11px] font-bold text-accent-mid uppercase tracking-[1px] mr-3.5 whitespace-nowrap flex-shrink-0 max-[767px]:hidden">
     {patientName}
   </span>
-  {tabs.map((tab) => (
-    <button
-      key={tab.id}
-      onClick={() => setActiveTab(tab.id)}
-      className={cn(
-        "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0",
-        activeTab === tab.id
-          ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
-          : "bg-surface-2 text-[var(--text-secondary)] border-border hover:bg-surface-3 hover:border-border-strong hover:text-[var(--text-primary)]"
-      )}
-    >
-      {tab.label}
-    </button>
-  ))}
+  {tabs.map((tab) => {
+    const isActive = activeTab === tab.id;
+    return (
+      <button
+        key={tab.id}
+        onClick={() => setActiveTab(tab.id)}
+        aria-label={tab.label}
+        title={tab.label}
+        className={cn(
+          "h-8 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0 inline-flex items-center gap-1.5",
+          // ≥1024px: label always shown (short label at 1024–1279px via shortLabel prop)
+          // <1024px: icon-only unless the tab is active, in which case the label stays for context
+          isActive || "min-[1024px]:px-3.5",
+          !isActive && "max-[1023px]:w-9 max-[1023px]:justify-center max-[1023px]:px-0",
+          isActive && "px-3.5",
+          isActive
+            ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
+            : "bg-surface-2 text-[var(--text-secondary)] border-border hover:bg-surface-3 hover:border-border-strong hover:text-[var(--text-primary)]"
+        )}
+      >
+        {tab.icon}
+        <span className={cn(isActive ? "inline" : "max-[1023px]:hidden")}>{tab.label}</span>
+      </button>
+    );
+  })}
   {/* Toggle doc panel button — far right */}
-  <button onClick={toggleDocPanel} className="ml-auto h-8 px-3 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 flex-shrink-0">
+  <button onClick={toggleDocPanel} aria-label="Close panel" className="ml-auto h-8 px-3 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 flex-shrink-0">
     <XIcon className="w-3.5 h-3.5" />
   </button>
 </nav>
 ```
 
-Tab label shortening at 1280px is handled with a `shortLabel` prop:
+Every tab needs an `icon` field so it degrades gracefully at small-tablet width — this is a **required** field on the tab config, not optional:
 ```tsx
-const label = isCompact ? tab.shortLabel : tab.label;
-// e.g. { label: "Note Timeline ★", shortLabel: "Timeline" }
+// { id, label, shortLabel, icon } — icon is required starting at this tier
+const tabs = [
+  { id: "timeline",   label: "Note Timeline ★", shortLabel: "Timeline", icon: <ClockIcon className="w-3.5 h-3.5" /> },
+  { id: "medications", label: "Medications",     shortLabel: "Meds",     icon: <PillIcon className="w-3.5 h-3.5" /> },
+  { id: "documents",   label: "Documents",       shortLabel: "Docs",     icon: <FileIcon className="w-3.5 h-3.5" /> },
+];
+
+// Label resolution by breakpoint:
+// ≥1280px → tab.label
+// 1024–1279px → tab.shortLabel
+// ≤1023px → icon only (active tab shows shortLabel alongside the icon)
+const label = width >= 1280 ? tab.label : tab.shortLabel;
 ```
 
 ---
@@ -637,9 +835,9 @@ const badgeVariants = cva(
     Chief Complaint <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
   </label>
 
-  {/* Text input */}
+  {/* Text input — height grows for touch below 1024px; text size never changes */}
   <input
-    className="w-full h-[34px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150
+    className="w-full h-[34px] max-[1023px]:h-[38px] px-2.5 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none transition-all duration-150
       focus:bg-surface focus:border-accent focus:shadow-accent-focus
       placeholder:text-[var(--text-muted)]"
     placeholder="e.g. Persistent headaches for 2 weeks"
@@ -659,8 +857,8 @@ const badgeVariants = cva(
 </div>
 
 // Field row layouts
-<div className="grid grid-cols-2 gap-3 max-[1439px]:gap-2">…</div>             // .field-row
-<div className="grid grid-cols-3 gap-3 max-[1439px]:grid-cols-2">…</div>        // .field-row-3 (compact at 1280px with sidebar open)
+<div className="grid grid-cols-2 gap-3 max-[1439px]:gap-2 max-[767px]:grid-cols-1">…</div>             // .field-row
+<div className="grid grid-cols-3 gap-3 max-[1439px]:grid-cols-2 max-[767px]:grid-cols-1">…</div>        // .field-row-3 (compact at 1280px with sidebar open; single column at 768px)
 ```
 
 **Shadcn/ui `Input` override** in `components/ui/input.tsx`:
@@ -724,7 +922,7 @@ Always pair color with a tooltip or text label. Never rely on color alone.
 // Overlay
 <div className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150">
   {/* Modal box */}
-  <div className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal">
+  <div className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-[1279px]:w-[420px] max-[767px]:w-[92vw] max-[767px]:max-w-[380px] max-h-[80vh] overflow-y-auto shadow-modal">
     {/* Header */}
     <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
       <h2 className="text-[15px] font-bold flex-1 text-[var(--text-primary)]">Modal Title</h2>
@@ -750,7 +948,7 @@ Closes on overlay click or `Escape`. Focus trapped within while open; restores t
 // Required section order:
 // 1. Patient Banner
 // 2. Vitals Strip
-// 3. grid-cols-2: Problem List | Medication List
+// 3. grid-cols-2: Problem List | Medication List (max-[767px]:grid-cols-1 — see §4.2)
 // 4. Non-pharmacologic Management (full width)
 // 5. Consultation History
 
@@ -786,9 +984,13 @@ Closes on overlay click or `Escape`. Focus trapped within while open; restores t
 ```tsx
 <div className={cn(
   "grid gap-2",
+  // ≥1280px: sidebar (in-flow) competes for width, so drop to 3 cols when open
+  // 1024–1279px: sidebar is an overlay, so 3 cols regardless of sidebarOpen
+  // ≤1023px: single column of cards is too sparse, 2 cols keeps it scannable
   sidebarOpen
     ? "grid-cols-5 max-[1439px]:grid-cols-3"
-    : "grid-cols-5"
+    : "grid-cols-5",
+  "max-[1279px]:grid-cols-3 max-[767px]:grid-cols-2"
 )}>
   {/* Vital card */}
   <div className={cn(
@@ -805,6 +1007,7 @@ Closes on overlay click or `Escape`. Focus trapped within while open; restores t
     )}>
       Blood Pressure
     </div>
+    {/* value floors at 16px per the §1.3 readability floor — never shrinks further at 768px */}
     <div className={cn(
       "font-mono text-[18px] font-medium leading-[1.1] max-[1439px]:text-[16px]",
       status === "critical" ? "text-red" :
@@ -889,10 +1092,12 @@ Keyboard: Arrow Up/Down to reorder; Enter to open edit dialog.
 
 ### 7.5 Documentation Panel
 
+This in-flow variant applies at `≥1280px` only. Below that, use the overlay variant from §4.4 (same header/body markup, `fixed` positioning instead of an in-flow column).
+
 ```tsx
 <aside
   className={cn(
-    "bg-surface border-l border-border flex flex-col flex-shrink-0 h-full overflow-hidden transition-[width] duration-300 ease-in-out relative",
+    "hidden min-[1280px]:flex bg-surface border-l border-border flex-col flex-shrink-0 h-full overflow-hidden transition-[width] duration-300 ease-in-out relative",
     panelOpen ? "w-[var(--documentation-panel-width)]" : "w-0 border-l-transparent"
   )}
 >
@@ -984,7 +1189,7 @@ Max 3 stacked toasts. Auto-dismiss after 5s. Include `×` close button.
 | Text input | `Input` | `h-[34px]`, `text-[13px]`, `border-border`, `rounded-btn`, focus ring → `--accent` |
 | Textarea | `Textarea` | `min-h-[80px]`, `resize-y`, match input border/focus |
 | Select / Combobox | `Select`, `Command + Popover` | Barangay lists, medication name search |
-| Modal | `Dialog` | `max-w-[520px]` (460 at 1280), overlay `bg-black/45 backdrop-blur-[4px]` |
+| Modal | `Dialog` | `max-w-[520px]` desktop → `460px` at 1280 → `420px` at 1024 → `92vw`/`380px` cap at 768, overlay `bg-black/45 backdrop-blur-[4px]` |
 | Badges | `Badge` | Custom variants per Section 6.3 |
 | Collapsible | `Collapsible` | Chevron rotate transition via `data-[state]` |
 | Date input | `Popover` + `Calendar` | DOB, visit datetime |
@@ -1116,6 +1321,6 @@ Physician fields auto-populated from the logged-in user's profile. Visit datetim
 
 ---
 
-*End of DAMAYAN Design Standards v2.0*  
+*End of DAMAYAN Design Standards v2.1*  
 *Prepared for DAMAYAN project at UP-PGH · Primary Care Clinical Note Interface*  
 *Tech stack: Next.js · Tailwind CSS · shadcn/ui · Prisma · PostgreSQL · Azure*

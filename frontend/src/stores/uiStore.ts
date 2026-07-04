@@ -44,17 +44,44 @@ export const useUiStore = create<UiState>()(
       documentationPanelOpen: false,
       activeScreen: 'dashboard',
       activeNoteEditor: { patientId: null, noteId: null, mode: null },
-      setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-      setDocumentationPanelOpen: (v) => set({ documentationPanelOpen: v }),
-      setActiveScreen: (s) => set({ activeScreen: s }),
-      openNewProgressNote: (patientId) => set({
-        activeNoteEditor: { patientId, noteId: null, mode: 'new' },
-        documentationPanelOpen: true,
+      setSidebarCollapsed: (v) => set((state) => {
+        const isMobileOrTablet = typeof window !== 'undefined' && window.innerWidth < 1280;
+        return {
+          sidebarCollapsed: v,
+          documentationPanelOpen: isMobileOrTablet && !v ? false : state.documentationPanelOpen,
+        };
       }),
-      openExistingProgressNote: (patientId, noteId) => set({
-        activeNoteEditor: { patientId, noteId, mode: 'edit' },
-        documentationPanelOpen: true,
+      toggleSidebar: () => set((state) => {
+        const nextCollapsed = !state.sidebarCollapsed;
+        const isMobileOrTablet = typeof window !== 'undefined' && window.innerWidth < 1280;
+        return {
+          sidebarCollapsed: nextCollapsed,
+          documentationPanelOpen: isMobileOrTablet && !nextCollapsed ? false : state.documentationPanelOpen,
+        };
+      }),
+      setDocumentationPanelOpen: (v) => set((state) => {
+        const isMobileOrTablet = typeof window !== 'undefined' && window.innerWidth < 1280;
+        return {
+          documentationPanelOpen: v,
+          sidebarCollapsed: isMobileOrTablet && v ? true : state.sidebarCollapsed,
+        };
+      }),
+      setActiveScreen: (s) => set({ activeScreen: s }),
+      openNewProgressNote: (patientId) => set((state) => {
+        const isMobileOrTablet = typeof window !== 'undefined' && window.innerWidth < 1280;
+        return {
+          activeNoteEditor: { patientId, noteId: null, mode: 'new' },
+          documentationPanelOpen: true,
+          sidebarCollapsed: isMobileOrTablet ? true : state.sidebarCollapsed,
+        };
+      }),
+      openExistingProgressNote: (patientId, noteId) => set((state) => {
+        const isMobileOrTablet = typeof window !== 'undefined' && window.innerWidth < 1280;
+        return {
+          activeNoteEditor: { patientId, noteId, mode: 'edit' },
+          documentationPanelOpen: true,
+          sidebarCollapsed: isMobileOrTablet ? true : state.sidebarCollapsed,
+        };
       }),
       closeNoteEditor: () => set({
         activeNoteEditor: { patientId: null, noteId: null, mode: null },

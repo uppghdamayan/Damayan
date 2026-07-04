@@ -13,6 +13,9 @@ import { MedicationListCard } from '@/components/medications/MedicationListCard'
 import { NonPharmacologicCard } from '@/components/patients/NonPharmacologicCard';
 import { VisitHistoryCard } from '@/components/visits/VisitHistoryCard';
 
+import { useUiStore } from '@/stores/uiStore';
+import { cn } from '@/lib/utils';
+
 // Suspense-wrapped data components
 function PatientBannerSection({ patientId }: { patientId: string }) {
   const { data: patient, isLoading, isError } = usePatient(patientId);
@@ -34,8 +37,16 @@ function VitalsSection({ patientId }: { patientId: string }) {
 }
 
 function ProblemsAndMedsSection({ patientId }: { patientId: string }) {
+  const { sidebarCollapsed } = useUiStore();
+  const sidebarOpen = !sidebarCollapsed;
+
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className={cn(
+      "grid gap-3",
+      sidebarOpen 
+        ? "grid-cols-2 max-[1439px]:grid-cols-1 min-[1280px]:grid-cols-1 min-[1024px]:grid-cols-2 max-[1023px]:grid-cols-1" 
+        : "grid-cols-2 max-[1023px]:grid-cols-1"
+    )}>
       <ProblemListCard patientId={patientId} />
       <MedicationListCard patientId={patientId} />
     </div>
