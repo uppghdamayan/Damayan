@@ -131,7 +131,7 @@ export default config;
 ### 2.2 CSS Custom Properties (`globals.css`)
 
 ```css
-/* app/globals.css */
+/* src/app/globals.css */
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap");
 
 @tailwind base;
@@ -267,22 +267,22 @@ Never use `text-muted` for mandatory fields or primary clinical data.
 ```
 
 ```tsx
-// app/layout-shell.tsx — structural skeleton
-export function AppShell({ children }: { children: React.ReactNode }) {
+// src/app/dashboard/layout.tsx — Next.js layout structure
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      <Topbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-          <ScreenNav />
-          <main id="main" className="flex-1 overflow-y-auto p-5 max-[1439px]:p-[14px] flex flex-col gap-4">
+    <AppStartupLoader>
+      <div id="shell" className="h-screen bg-bg font-sans flex flex-col overflow-hidden">
+        <Topbar />
+        <div id="body" className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <div id="middle-column" className="flex-1 flex flex-col overflow-hidden">
             {children}
-          </main>
+          </div>
+          <DocumentationPanel />
         </div>
-        <DocumentationPanel />
+        <NarrowScreenNotice />
       </div>
-    </div>
+    </AppStartupLoader>
   );
 }
 ```
@@ -299,7 +299,7 @@ DAMAYAN supports a **minimum viewport of 1280×800px**.
 Below 1280px, show a fullscreen notice:
 
 ```tsx
-// components/narrow-screen-notice.tsx
+// src/components/layout/NarrowScreenNotice.tsx
 export function NarrowScreenNotice() {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg p-8 text-center hidden max-[1279px]:flex">
@@ -380,8 +380,8 @@ const [sidebarOpen, setSidebarOpen] = useState(() => {
 ### 5.1 Topbar
 
 ```tsx
-// components/topbar.tsx
-<header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-[200]">
+// src/components/layout/Topbar.tsx
+<header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-[200] sticky top-0 shrink-0">
   {/* Sidebar toggle */}
   <Button variant="ghost" size="icon" onClick={toggleSidebar} className="w-6 h-6 -ml-1.5 mr-1">
     <MenuIcon className="w-[18px] h-[18px]" />
@@ -431,8 +431,8 @@ const [sidebarOpen, setSidebarOpen] = useState(() => {
 ### 5.2 Patient Sidebar
 
 ```tsx
-// components/sidebar.tsx
-<div className="sticky top-0 z-10 flex flex-col gap-2 p-3 border-b border-border bg-surface">
+// src/components/layout/Sidebar.tsx
+<div className="sticky top-0 z-10 flex flex-col gap-2 p-3 border-b border-border bg-surface shrink-0">
   <div className="flex items-center gap-2 h-[34px] bg-surface-2 border border-border rounded-btn px-3">
     <SearchIcon className="w-4 h-4 text-[var(--text-muted)]" />
     <input
@@ -477,27 +477,32 @@ const [sidebarOpen, setSidebarOpen] = useState(() => {
 ### 5.3 Screen Navigation Tabs
 
 ```tsx
+// src/components/layout/ScreenNav.tsx
 <nav className="flex items-center gap-1.5 bg-surface border-b border-border px-4 h-[52px] flex-shrink-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-  <span className="text-[11px] font-bold text-accent-mid uppercase tracking-[1px] mr-3.5 whitespace-nowrap flex-shrink-0">
-    {patientName}
-  </span>
-  {tabs.map((tab) => (
-    <button
-      key={tab.id}
-      onClick={() => setActiveTab(tab.id)}
-      className={cn(
-        "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0",
-        activeTab === tab.id
-          ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
-          : "bg-surface-2 text-[var(--text-secondary)] border-border hover:bg-surface-3 hover:border-border-strong hover:text-[var(--text-primary)]"
-      )}
-    >
-      {tab.label}
-    </button>
-  ))}
+  {tabs.map((tab) => {
+    const active = isActive(tab);
+    return (
+      <Link
+        key={tab.id}
+        href={`${basePath}${tab.path}`}
+        onClick={() => setOptimisticPath(`${basePath}${tab.path}`)}
+        className={cn(
+          "h-8 px-3.5 text-[12px] font-medium rounded-btn border whitespace-nowrap transition-all duration-150 flex-shrink-0 cursor-pointer flex items-center justify-center",
+          active
+            ? "bg-accent text-white border-accent shadow-[0_4px_12px_rgba(10,110,95,0.25)]"
+            : "bg-surface-2 text-text-secondary border-border hover:bg-surface-3 hover:border-border-strong hover:text-text-primary"
+        )}
+      >
+        {tab.label}
+      </Link>
+    );
+  })}
   {/* Toggle doc panel button — far right */}
-  <button onClick={toggleDocPanel} className="ml-auto h-8 px-3 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 flex-shrink-0">
-    <XIcon className="w-3.5 h-3.5" />
+  <button
+    onClick={() => setDocumentationPanelOpen(!documentationPanelOpen)}
+    className="ml-auto h-8 px-3 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 flex-shrink-0 flex items-center justify-center cursor-pointer"
+  >
+    {documentationPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
   </button>
 </nav>
 ```
@@ -604,7 +609,7 @@ const variants = {
 <span className={cn(badgeBase, variants.draft)}>Draft</span>
 ```
 
-With shadcn/ui `Badge`, override variants in `components/ui/badge.tsx`:
+With shadcn/ui `Badge`, override variants in `src/components/ui/badge.tsx`:
 
 ```tsx
 const badgeVariants = cva(
@@ -663,7 +668,7 @@ const badgeVariants = cva(
 <div className="grid grid-cols-3 gap-3 max-[1439px]:grid-cols-2">…</div>        // .field-row-3 (compact at 1280px with sidebar open)
 ```
 
-**Shadcn/ui `Input` override** in `components/ui/input.tsx`:
+**Shadcn/ui `Input` override** in `src/components/ui/input.tsx`:
 ```tsx
 // Replace className defaults to match above field-input styles
 ```
@@ -887,9 +892,7 @@ Required fields block **publishing** but not auto-save as draft.
 
 Keyboard: Arrow Up/Down to reorder; Enter to open edit dialog.
 
-### 7.5 Documentation Panel
-
-```tsx
+// src/components/layout/DocumentationPanel.tsx
 <aside
   className={cn(
     "bg-surface border-l border-border flex flex-col flex-shrink-0 h-full overflow-hidden transition-[width] duration-300 ease-in-out relative",
@@ -993,7 +996,7 @@ Max 3 stacked toasts. Auto-dismiss after 5s. Include `×` close button.
 | Tabs (screen nav) | Custom `<button>` | Do **not** use shadcn Tabs — screen nav needs horizontal scroll + custom styling |
 | Drag handles | Native HTML5 drag or `@dnd-kit/core` | Problem list reordering |
 
-Override shadcn defaults in `components/ui/` files. Never touch the CSS variables shadcn uses internally — use `[var(--token)]` references in Tailwind classes instead so both systems coexist.
+Override shadcn defaults in `src/components/ui/` files. Never touch the CSS variables shadcn uses internally — use `[var(--token)]` references in Tailwind classes instead so both systems coexist.
 
 ---
 
@@ -1119,3 +1122,68 @@ Physician fields auto-populated from the logged-in user's profile. Visit datetim
 *End of DAMAYAN Design Standards v2.0*  
 *Prepared for DAMAYAN project at UP-PGH · Primary Care Clinical Note Interface*  
 *Tech stack: Next.js · Tailwind CSS · shadcn/ui · Prisma · PostgreSQL · Azure*
+
+---
+
+## 15. Component Directory Architecture
+
+To maintain modularity and domain separation, the component directory is structured into domain-specific modules alongside layout, provider, and design-system primitives:
+
+```
+src/components/
+├── attachments/          # File upload and attachment sections (e.g. upload progress, lab results sections)
+├── documents/            # PDF/doc generation interfaces (e.g. certificates, document screen)
+├── layout/               # Global shell layouts (Sidebar, Topbar, ScreenNav, DocPanel, Loader, Screen Notice)
+├── medications/          # Medication list displays, logs, entry forms, and medications sub-screens
+├── notes/                # Note timeline entries, SOAP form inputs, collapsible note sections, uploader widgets
+├── patients/             # Patient demographics, banners, and creation/editing modals
+├── problems/             # Active and resolved problem lists, edit modals, and logging tables
+├── providers/            # React-Query or global context providers
+├── ui/                   # Reusable atomic UI components (shadcn/ui customized overrides & custom alerts/modals)
+├── visits/               # Patient historical visit cards and skeletons
+└── vitals/               # Vitals card, vital forms, vitals history log tables, and vitals screen layout
+```
+
+### Module Descriptions & Files
+
+- **`attachments/`**
+  - [AttachmentsSection.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/attachments/AttachmentsSection.tsx) - Layout displaying patient-uploaded files and lab results.
+  - [LabResultsSectionSkeleton.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/attachments/LabResultsSectionSkeleton.tsx) - Loading skeleton state for lab uploads.
+  - [UploadProgressBar.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/attachments/UploadProgressBar.tsx) - Visual progress indicator for uploads in progress.
+- **`documents/`**
+  - [DocumentGeneratorModal.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/documents/DocumentGeneratorModal.tsx) - Modal interface for generating charge slips, certificates, or prescriptions.
+  - [DocumentsScreen.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/documents/DocumentsScreen.tsx) - Parent layout for the Documents tab view.
+- **`layout/`**
+  - [AppStartupLoader.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/AppStartupLoader.tsx) - Fullscreen application loading screen during initial authentication.
+  - [Topbar.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/Topbar.tsx) - Navigation bar with logo, active patient chip, role pill, user details, and "New Note" trigger.
+  - [Sidebar.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/Sidebar.tsx) / [SidebarSkeleton.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/SidebarSkeleton.tsx) - Collapsible patient search list.
+  - [ScreenNav.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/ScreenNav.tsx) - Horizontal sub-tab bar routing across patient subsections.
+  - [DocumentationPanel.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/DocumentationPanel.tsx) - Collapsible, draggable sidebar panel hosting the active SOAP note editors.
+  - [NarrowScreenNotice.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/layout/NarrowScreenNotice.tsx) - Fullscreen cover forcing layout to >= 1280px viewports.
+- **`medications/`**
+  - [MedicationEntry.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationEntry.tsx) / [MedicationForm.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationForm.tsx) - Form states for prescribing or modifying meds.
+  - [MedicationListCard.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationListCard.tsx) / [MedicationListCardEmpty.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationListCardEmpty.tsx) - Card summaries of currently active drugs.
+  - [MedicationsScreen.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationsScreen.tsx) / [MedicationLogTable.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/medications/MedicationLogTable.tsx) - Tab view and logs table showing records of past prescriptions.
+- **`notes/`**
+  - [InitialNoteForm.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/InitialNoteForm.tsx) / [ProgressNoteForm.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/ProgressNoteForm.tsx) - SOAP structure documentation templates.
+  - [NoteTimeline.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/NoteTimeline.tsx) / [TimelineEntry.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/TimelineEntry.tsx) - Timeline records of historical patient consultations.
+  - [MedicationListEditor.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/MedicationListEditor.tsx) / [TagInputField.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/TagInputField.tsx) / [AttachmentUploader.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/notes/AttachmentUploader.tsx) - Complex custom form components inside SOAP editing.
+- **`patients/`**
+  - [PatientBanner.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/patients/PatientBanner.tsx) / [PatientBannerSkeleton.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/patients/PatientBannerSkeleton.tsx) - Primary summary details of active patient.
+  - [NewPatientModal.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/patients/NewPatientModal.tsx) / [EditPatientModal.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/patients/EditPatientModal.tsx) - Modals containing verified fields for user registration and editing.
+  - [NonPharmacologicCard.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/patients/NonPharmacologicCard.tsx) - Panel displaying non-drug management directives.
+- **`problems/`**
+  - [ActiveProblemTable.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ActiveProblemTable.tsx) / [ResolvedProblemTable.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ResolvedProblemTable.tsx) - Interactive problem lists with custom states.
+  - [ProblemListCard.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ProblemListCard.tsx) / [ProblemListScreen.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ProblemListScreen.tsx) / [ProblemLogTable.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ProblemLogTable.tsx) - Overview cards and logs table.
+  - [ProblemEditModal.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/problems/ProblemEditModal.tsx) - Dialog for modifying diagnostic descriptions.
+- **`providers/`**
+  - [QueryProvider.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/providers/QueryProvider.tsx) - Setup wrapper for `@tanstack/react-query` hooks.
+- **`ui/`**
+  - Atomic shadcn overrides: `badge.tsx`, `button.tsx`, `calendar.tsx`, `card.tsx`, `collapsible.tsx`, `dialog.tsx`, `input.tsx`, `label.tsx`, `popover.tsx`, `select.tsx`, `sheet.tsx`, `skeleton.tsx`, `sonner.tsx`, `table.tsx`, `tabs.tsx`, `textarea.tsx`.
+  - Custom UI elements: `ComboboxInput.tsx` (for barangay/city lists), `date-range-picker.tsx`, `DeleteConfirmModal.tsx`, `spinner.tsx`.
+- **`visits/`**
+  - [VisitHistoryCard.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/visits/VisitHistoryCard.tsx) / [VisitHistoryCardSkeleton.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/visits/VisitHistoryCardSkeleton.tsx) - Visual summaries of clinical consult visits.
+- **`vitals/`**
+  - [VitalsCard.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/vitals/VitalsCard.tsx) - Displays single vital measurements with status coloring indicators.
+  - [VitalsForm.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/vitals/VitalsForm.tsx) - Modal form validating physiological vitals thresholds (blood pressure, heart rate, temp, O₂).
+  - [VitalsScreen.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/vitals/VitalsScreen.tsx) / [VitalsHistoryTable.tsx](file:///d:/Documents/Coding/Damayan/frontend/src/components/vitals/VitalsHistoryTable.tsx) - Displays vital trends and historical logs.
