@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function VitalsStripSkeleton() {
   return (
-    <div className="grid grid-cols-5 gap-3">
+    <div className="grid grid-cols-5 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2 gap-3">
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}

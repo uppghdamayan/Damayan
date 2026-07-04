@@ -118,7 +118,7 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
           )}
 
           {/* Name row */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-2.5">
             <Field label="Last Name" required error={errors.lastName?.message}>
               <input className={`${inputClassName} ${errors.lastName ? 'border-red-border' : 'border-border'}`}
                 {...register('lastName')} maxLength={30} />
@@ -129,7 +129,7 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
             </Field>
           </div>
 
-          <div className="grid grid-cols-[1fr_80px] gap-2.5">
+          <div className="grid grid-cols-[1fr_80px] max-[1023px]:grid-cols-1 gap-2.5">
             <Field label="Middle Name" error={errors.middleName?.message}>
               <input className={`${inputClassName} border-border`} {...register('middleName')} maxLength={30} placeholder="Optional" />
             </Field>
@@ -138,7 +138,7 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-2.5">
             <Field label="Date of Birth" required error={errors.dateOfBirth?.message}>
               <input type="date" className={`${inputClassName} ${errors.dateOfBirth ? 'border-red-border' : 'border-border'}`}
                 {...register('dateOfBirth')} max={new Date().toISOString().split('T')[0]} />
@@ -163,7 +163,7 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
             <input className={`${inputClassName} border-border`} {...register('addressStreet')} placeholder="House No., Street" />
           </Field>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-2.5">
             <Field label="Barangay">
               <input className={`${inputClassName} border-border`} {...register('addressBarangay')} maxLength={100} />
             </Field>
@@ -172,7 +172,7 @@ export function NewPatientModal({ open, onClose, onCreated }: NewPatientModalPro
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-2.5">
             <Field label="Region">
               <input className={`${inputClassName} border-border`} {...register('addressRegion')} maxLength={100} />
             </Field>

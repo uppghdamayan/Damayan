@@ -641,7 +641,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             <div className="p-3.5">
               {latestVitals ? (
                 <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-5 gap-2.5 max-[1439px]:grid-cols-3">
+                  <div className="grid grid-cols-5 gap-2.5 max-[1439px]:grid-cols-3 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2">
                     {renderVitalCell(
                       'Blood Pressure',
                       latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
@@ -705,7 +705,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 Subjective
               </span>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-start">
               {/* Left Column */}
               <div className="flex flex-col gap-4">
                 <div>
@@ -803,7 +803,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
 
           {/* OBJECTIVE & ASSESSMENT GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          <div className="grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-stretch">
             {/* OBJECTIVE CARD */}
             <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
@@ -891,7 +891,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 Plan / Management
               </span>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-start">
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1 flex items-center gap-1.5">
@@ -1001,7 +1001,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 </button>
               </div>
               {/* Vitals grid — horizontal, compact */}
-              <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50">
+              <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50 max-[1439px]:grid-cols-3 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2">
                 <VitalMiniCell 
                   label="BP" 
                   value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'} 
@@ -1132,7 +1132,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   theme="amber"
                   icon={<ClipboardList className="w-3.5 h-3.5" />}
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 min-[1024px]:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Comorbidities
@@ -1430,7 +1430,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 )}
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
-              <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-surface">
+              <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 bg-surface">
                 {/* Left: Non-Pharmacologic */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">

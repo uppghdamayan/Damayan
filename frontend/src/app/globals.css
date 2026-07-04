@@ -202,6 +202,15 @@
   }
 }
 
+@media (max-width: 1023px) {
+  :root {
+    --sidebar-w:                 260px;  /* overlay drawer width */
+    --documentation-panel-width: 100%;   /* full-screen documentation panel overlay */
+    --timeline-w:                160px;
+    --topbar-h:                  48px;
+  }
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -287,6 +296,16 @@
   }
   .field-input::placeholder {
     color: var(--border-strong);
+  }
+
+  @media (max-width: 1023px) {
+    .field-input {
+      height: 38px !important;
+    }
+    textarea.field-input {
+      height: auto !important;
+      min-height: 38px !important;
+    }
   }
 
   /* Collapsible Section height transitions */

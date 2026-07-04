@@ -7,7 +7,7 @@ import { usePatientStore } from '@/stores/patientStore';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { initials } from '@/lib/patient-utils';
 import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
-import { PanelRightOpen, PanelRightClose, Menu, PlusCircle } from 'lucide-react';
+import { PanelRightOpen, PanelRightClose, Menu, PlusCircle, Plus } from 'lucide-react';
 
 export function Topbar() {
   const { user, clear } = useAuthStore();
@@ -26,7 +26,7 @@ export function Topbar() {
   const userInitials = user ? initials(user.firstName, user.lastName) : '??';
 
   return (
-    <header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 gap-3 sticky top-0 z-[200] shrink-0">
+    <header className="h-[var(--topbar-h)] bg-surface border-b border-border flex items-center px-4 max-[1023px]:px-3 gap-3 sticky top-0 z-[200] shrink-0">
       {/* Sidebar toggle */}
       <button
         onClick={toggleSidebar}
@@ -38,11 +38,11 @@ export function Topbar() {
       </button>
 
       {/* Logo */}
-      <div className="flex items-center gap-2 w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
+      <div className="flex items-center gap-2 min-[1024px]:w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
         <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
           <PlusCircle size={12} color="white" strokeWidth={3} />
         </div>
-        <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap text-text-primary">
+        <span className="text-[16px] font-bold tracking-[0.5px] whitespace-nowrap text-text-primary max-[1023px]:hidden">
           DAMAYAN <small className="text-[9px] font-semibold text-text-muted tracking-[1px] uppercase mt-[3px]">EMR</small>
         </span>
       </div>
@@ -51,15 +51,15 @@ export function Topbar() {
       {activePatient && (
         <div
           onClick={() => router.push(`/dashboard/${activePatient.id}`)}
-          className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 cursor-pointer shadow-sm z-10"
+          className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-2 border border-accent rounded-full px-3.5 py-1 max-[767px]:px-1.5 max-[767px]:py-1 cursor-pointer shadow-sm z-10"
         >
           <div className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center text-[9px] font-bold">
             {initials(activePatient.firstName, activePatient.lastName)}
           </div>
-          <span className="text-[11px] font-semibold text-text-primary">
+          <span className="text-[11px] font-semibold text-text-primary max-[767px]:hidden">
             {activePatient.lastName}, {activePatient.firstName}
           </span>
-          <span className="font-mono text-[9px] text-text-muted">
+          <span className="font-mono text-[9px] text-text-muted max-[767px]:hidden">
             {activePatient.patientCode}
           </span>
         </div>
@@ -73,17 +73,20 @@ export function Topbar() {
         <button
           onClick={() => triggerNewNote()}
           disabled={!activePatient}
-          className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50"
+          aria-label="New Note"
+          title="New Note"
+          className="h-[34px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center justify-center gap-[5px] whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50 max-[1023px]:w-9 max-[1023px]:px-0 max-[1023px]:gap-0"
         >
-          ＋ New Note
+          <Plus className="w-3.5 h-3.5" />
+          <span className="max-[1023px]:hidden">New Note</span>
         </button>
 
         {/* Documentation panel toggle */}
 
 
         {/* User name + avatar */}
-        <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border shrink-0">
-          <div className="flex flex-col items-center leading-tight justify-center">
+        <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border shrink-0 max-[1023px]:pl-0 max-[1023px]:ml-0 max-[1023px]:border-l-0">
+          <div className="flex flex-col items-center leading-tight justify-center max-[1023px]:hidden">
             <span className="text-[12px] font-semibold text-text-primary mb-1">
               {user ? `${user.firstName} ${user.lastName}` : ''}
             </span>

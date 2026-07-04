@@ -169,7 +169,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
         )}
 
         <form onSubmit={handleSubmit} className="p-[18px] flex flex-col gap-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-4">
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Date <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <input

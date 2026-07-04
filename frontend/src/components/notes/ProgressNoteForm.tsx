@@ -24,7 +24,7 @@ import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -441,7 +441,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10 shrink-0 bg-accent-light/40 border-b border-accent-mid/40">
         <div className="flex flex-col">
           <span className="text-[13px] font-bold flex items-center gap-2 text-accent-hover">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <button
+              onClick={() => setDocumentationPanelOpen(false)}
+              className="p-1 -ml-1.5 hover:bg-accent/10 rounded-md transition-colors cursor-pointer text-text-secondary hover:text-accent-hover shrink-0"
+              title="Close panel"
+            >
+              <PanelRightClose className="w-4 h-4" />
+            </button>
             <span className="title-text shrink-0">Progress Note</span>
           </span>
         </div>

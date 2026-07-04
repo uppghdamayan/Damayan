@@ -35,7 +35,7 @@ function VitalsSection({ patientId }: { patientId: string }) {
 
 function ProblemsAndMedsSection({ patientId }: { patientId: string }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3">
       <ProblemListCard patientId={patientId} />
       <MedicationListCard patientId={patientId} />
     </div>
