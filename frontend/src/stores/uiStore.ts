@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+const UI_SCALE_MIN = 80;
+const UI_SCALE_MAX = 150;
+const UI_SCALE_STEP = 10;
+const UI_SCALE_DEFAULT = 100;
+
 type ActiveScreen =
   | 'dashboard'
   | 'vitals'
@@ -29,6 +34,10 @@ interface UiState {
   openNewProgressNote: (patientId: string) => void;
   openExistingProgressNote: (patientId: string, noteId: string) => void;
   closeNoteEditor: () => void;
+  uiScale: number;
+  increaseUiScale: () => void;
+  decreaseUiScale: () => void;
+  resetUiScale: () => void;
 }
 
 // Viewport-aware default: collapse on screens < 1440px
@@ -44,15 +53,39 @@ export const useUiStore = create<UiState>()(
       documentationPanelOpen: false,
       activeScreen: 'dashboard',
       activeNoteEditor: { patientId: null, noteId: null, mode: null },
+      uiScale: UI_SCALE_DEFAULT,
+      increaseUiScale: () => set((state) => {
+        const nextScale = Math.min(UI_SCALE_MAX, state.uiScale + UI_SCALE_STEP);
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (nextScale / 100)) <= 1100;
+        return {
+          uiScale: nextScale,
+          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
+        };
+      }),
+      decreaseUiScale: () => set((state) => {
+        const nextScale = Math.max(UI_SCALE_MIN, state.uiScale - UI_SCALE_STEP);
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (nextScale / 100)) <= 1100;
+        return {
+          uiScale: nextScale,
+          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
+        };
+      }),
+      resetUiScale: () => set((state) => {
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (UI_SCALE_DEFAULT / 100)) <= 1100;
+        return {
+          uiScale: UI_SCALE_DEFAULT,
+          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
+        };
+      }),
       setSidebarCollapsed: (v) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && window.innerWidth <= 1100;
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
           sidebarCollapsed: v,
           documentationPanelOpen: isSmallScreen && !v ? false : state.documentationPanelOpen,
         };
       }),
       toggleSidebar: () => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && window.innerWidth <= 1100;
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         const newCollapsed = !state.sidebarCollapsed;
         return {
           sidebarCollapsed: newCollapsed,
@@ -60,7 +93,7 @@ export const useUiStore = create<UiState>()(
         };
       }),
       setDocumentationPanelOpen: (v) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && window.innerWidth <= 1100;
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
           documentationPanelOpen: v,
           sidebarCollapsed: isSmallScreen && v ? true : state.sidebarCollapsed,
@@ -68,7 +101,7 @@ export const useUiStore = create<UiState>()(
       }),
       setActiveScreen: (s) => set({ activeScreen: s }),
       openNewProgressNote: (patientId) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && window.innerWidth <= 1100;
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
           activeNoteEditor: { patientId, noteId: null, mode: 'new' },
           documentationPanelOpen: true,
@@ -76,7 +109,7 @@ export const useUiStore = create<UiState>()(
         };
       }),
       openExistingProgressNote: (patientId, noteId) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && window.innerWidth <= 1100;
+        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
           activeNoteEditor: { patientId, noteId, mode: 'edit' },
           documentationPanelOpen: true,
@@ -89,7 +122,10 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'damayan-ui-sidebar',
-      partialize: (state) => ({ sidebarCollapsed: state.sidebarCollapsed }),
+      partialize: (state) => ({ 
+        sidebarCollapsed: state.sidebarCollapsed,
+        uiScale: state.uiScale 
+      }),
     },
   ),
 );

@@ -88,7 +88,7 @@ export function VitalsCard({ patientId }: { patientId: string }) {
       </div>
 
       <div className="p-2.5">
-        <div className="grid grid-cols-5 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2 gap-2">
+        <div className="grid grid-cols-5 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2 gap-2">
           {renderVitalCell(
             'Blood Pressure',
             latest ? formatBloodPressure(latest.sbp, latest.dbp) : '—/—',
@@ -129,3 +129,4 @@ export function VitalsCard({ patientId }: { patientId: string }) {
     </div>
   );
 }
+

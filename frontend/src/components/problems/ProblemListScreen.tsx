@@ -548,7 +548,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+          <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
             {/* Left side */}
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -630,7 +630,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+          <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
             <div className="flex items-center gap-2">
               <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0 shadow-sm border border-border">
                 ✅
@@ -656,7 +656,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         <div 
           className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]"
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+          <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
             <div className="flex items-center gap-2">
               <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0 shadow-sm border border-border">
                 📝

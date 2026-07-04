@@ -43,7 +43,7 @@ export function DocumentGeneratorModal({ patientId, onClose }: DocumentGenerator
       }}
     >
       <div 
-        className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[85vh] overflow-y-auto shadow-modal flex flex-col"
+        className="bg-surface border border-border rounded-[10px] w-[500px] @max-[1439px]:w-[460px] max-h-[85vh] overflow-y-auto shadow-modal flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -116,3 +116,4 @@ export function DocumentGeneratorModal({ patientId, onClose }: DocumentGenerator
     </div>
   );
 }
+

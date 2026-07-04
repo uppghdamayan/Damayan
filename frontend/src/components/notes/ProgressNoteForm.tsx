@@ -868,7 +868,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-12 flex flex-col gap-1">
+                            <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
                               <input 
                                 type="text" 
@@ -878,7 +878,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                            <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
                               <input 
                                 value={newMedFormulation}
@@ -888,7 +888,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                 className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
                             </div>
-                            <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                            <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
                               <input 
                                 type="number"

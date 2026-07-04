@@ -52,7 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AppStartupLoader>
       <div
         id="shell"
-        className="h-screen bg-bg font-sans flex flex-col overflow-hidden"
+        className="h-full bg-bg font-sans flex flex-col overflow-hidden"
       >
         <Topbar />
         <div

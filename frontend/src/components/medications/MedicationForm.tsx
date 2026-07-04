@@ -136,7 +136,7 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             {errors.name && <p className="text-[12px] text-red mt-1">{errors.name}</p>}
           </div>
 
-          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3 mb-3.5">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3 mb-3.5">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
                 Dose <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
@@ -202,3 +202,4 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     </div>
   );
 }
+

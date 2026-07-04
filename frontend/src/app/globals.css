@@ -193,8 +193,8 @@
   --timeline-w:                 260px;
 }
 
-@media (max-width: 1439px) {
-  :root {
+@container (max-width: 1439px) {
+  #shell {
     --sidebar-w:                 220px;
     --documentation-panel-width: 340px;
     --timeline-w:                200px;
@@ -202,8 +202,8 @@
   }
 }
 
-@media (max-width: 1023px) {
-  :root {
+@container (max-width: 1023px) {
+  #shell {
     --sidebar-w:                 260px;  /* overlay drawer width */
     --documentation-panel-width: 100%;   /* full-screen documentation panel overlay */
     --timeline-w:                160px;
@@ -257,7 +257,7 @@
 
   body {
     @apply font-sans text-[13px] leading-[1.5] bg-bg text-[var(--text-primary)] overflow-hidden;
-    height: 100vh;
+    height: 100%;
   }
 
   /* WCAG 2.2 AA focus ring */

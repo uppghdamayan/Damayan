@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'AD';
   return (
-    <div className="min-h-screen bg-bg font-sans">
+    <div className="min-h-full bg-bg font-sans">
       {/* Topbar */}
       <header className="h-[56px] bg-surface border-b border-border flex items-center px-4 gap-3 sticky top-0 z-[200]">
         {/* Logo */}

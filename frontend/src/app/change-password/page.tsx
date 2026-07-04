@@ -95,7 +95,7 @@ export default function ChangePasswordPage() {
   const inputClassName = "h-[34px] w-full px-2.5 pr-9 bg-white border border-[#D1D5E0] rounded-md text-[13px] text-[#0D1117] outline-none box-border focus:border-[#0A6E5F] focus:ring-[3px] focus:ring-[#0A6E5F]/12 transition-all font-sans disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50";
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center font-sans">
+    <div className="min-h-full bg-[#F0F2F5] flex items-center justify-center font-sans">
       <div className="flex flex-col items-center gap-4">
         {/* Card */}
         <div className="bg-white border border-[#D1D5E0] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] px-9 py-10 w-full max-w-[400px]">

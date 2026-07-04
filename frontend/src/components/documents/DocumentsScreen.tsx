@@ -43,7 +43,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
         </div>
 
         {docsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-4">
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
@@ -55,7 +55,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
             <p className="text-[12px] mt-1 mb-4 text-text-muted">Generate prescriptions, medical certificates, or lab requests.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-4">
             {documents.map((doc: any) => (
               <DocumentCard key={doc.id} document={doc} patientId={patientId} />
             ))}
@@ -77,7 +77,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
         </div>
 
         {labsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-4">
             <CardSkeleton />
             <CardSkeleton />
             <CardSkeleton />
@@ -89,7 +89,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
             <p className="text-[12px] mt-1 text-text-muted">Attachments uploaded in progress notes will appear here.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-4">
             {attachments.map((att: any) => (
               <AttachmentCard key={att.id} attachment={att} />
             ))}

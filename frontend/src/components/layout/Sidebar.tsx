@@ -185,7 +185,7 @@ export function Sidebar() {
       <aside
         suppressHydrationWarning
         className={cn(
-          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border hidden md:flex",
+          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border hidden @md:flex",
           sidebarCollapsed ? "w-0 border-r-transparent" : "w-[var(--sidebar-w)]"
         )}
       >
@@ -196,13 +196,13 @@ export function Sidebar() {
       <div
         onClick={() => setSidebarCollapsed(true)}
         className={cn(
-          "fixed inset-0 bg-transparent z-[300] transition-opacity md:hidden",
+          "fixed inset-0 bg-transparent z-[300] transition-opacity @md:hidden",
           sidebarCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
         )}
       />
       <aside
         className={cn(
-          "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto md:hidden",
+          "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto @md:hidden",
           "w-[var(--sidebar-w)] transition-transform duration-200 ease-out flex flex-col",
           sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
         )}

@@ -165,7 +165,7 @@ function CreateAccountModal({
       className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150"
     >
       <div
-        className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal"
+        className="bg-surface border border-border rounded-[10px] w-[500px] @max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal"
       >
         {/* Modal header */}
         <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
@@ -539,3 +539,4 @@ export default function AccountsPage() {
     </>
   );
 }
+

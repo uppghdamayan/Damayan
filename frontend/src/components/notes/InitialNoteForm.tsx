@@ -641,7 +641,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             <div className="p-3.5">
               {latestVitals ? (
                 <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-5 gap-2.5 max-[1439px]:grid-cols-3 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2">
+                  <div className="grid grid-cols-5 gap-2.5 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
                     {renderVitalCell(
                       'Blood Pressure',
                       latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
@@ -705,7 +705,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 Subjective
               </span>
             </div>
-            <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-start">
               {/* Left Column */}
               <div className="flex flex-col gap-4">
                 <div>
@@ -750,7 +750,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               </div>
 
               {/* Right Column */}
-              <div className="flex flex-col gap-4 border-l border-border pl-6 max-md:border-l-0 max-md:pl-0">
+              <div className="flex flex-col gap-4 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-2 flex items-center gap-1.5">
                     <span>🏥</span> Past Medical History
@@ -803,7 +803,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           </div>
 
           {/* OBJECTIVE & ASSESSMENT GRID */}
-          <div className="grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-stretch">
+          <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-stretch">
             {/* OBJECTIVE CARD */}
             <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
@@ -891,7 +891,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 Plan / Management
               </span>
             </div>
-            <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 items-start">
+            <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-start">
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1 flex items-center gap-1.5">
@@ -903,7 +903,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 border-l border-border pl-6 max-md:border-l-0 max-md:pl-0">
+              <div className="flex flex-col gap-3 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center gap-1.5">
                     <span>💊</span> Medications Prescribed
@@ -1001,7 +1001,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 </button>
               </div>
               {/* Vitals grid — horizontal, compact */}
-              <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50 max-[1439px]:grid-cols-3 max-[1023px]:grid-cols-3 max-[767px]:grid-cols-2">
+              <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
                 <VitalMiniCell 
                   label="BP" 
                   value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'} 
@@ -1132,7 +1132,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   theme="amber"
                   icon={<ClipboardList className="w-3.5 h-3.5" />}
                 >
-                  <div className="grid grid-cols-1 min-[1024px]:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Comorbidities
@@ -1361,11 +1361,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         ))}
                         {canEditAll && (
                           <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                            <div className="col-span-12 md:col-span-8 flex flex-col gap-1">
+                            <div className="col-span-12 @md:col-span-8 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
                               <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
                             </div>
-                            <div className="col-span-12 md:col-span-4 flex flex-col gap-1">
+                            <div className="col-span-12 @md:col-span-4 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
                               <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
                             </div>
@@ -1430,7 +1430,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 )}
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
-              <div className="p-4 grid grid-cols-1 min-[1024px]:grid-cols-2 gap-6 bg-surface">
+              <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 bg-surface">
                 {/* Left: Non-Pharmacologic */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
@@ -1501,7 +1501,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
                                 />
                               </div>
-                              <div className="col-span-12 md:col-span-12 flex flex-col gap-1">
+                              <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
                               <input 
                                 type="text" 
@@ -1511,7 +1511,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
                               />
                             </div>
-                              <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
                                 <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
                                 <input 
                                   value={newMedFormulation}
@@ -1520,7 +1520,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
                                 />
                               </div>
-                              <div className="col-span-12 md:col-span-6 flex flex-col gap-1">
+                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
                                 <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
                                 <input 
                                   type="number"
@@ -1705,3 +1705,4 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     </div>
   );
 }
+

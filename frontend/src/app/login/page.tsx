@@ -79,7 +79,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center font-sans overflow-hidden">
+    <div className="min-h-full bg-bg flex items-center justify-center font-sans overflow-hidden">
       <div className="bg-surface border border-border rounded-card shadow-card px-9 py-10 w-full max-w-[400px]">
         {/* Logo + App name */}
         <div className="flex items-center gap-2 mb-7">

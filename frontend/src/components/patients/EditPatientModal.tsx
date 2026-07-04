@@ -105,7 +105,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
       className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center"
     >
-      <div className="bg-surface border border-border rounded-[10px] w-[520px] max-[1439px]:w-[460px] max-h-[85vh] flex flex-col shadow-modal">
+      <div className="bg-surface border border-border rounded-[10px] w-[520px] @max-[1439px]:w-[460px] max-h-[85vh] flex flex-col shadow-modal">
         {/* Header */}
         <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border shrink-0">
           <h2 className="text-[15px] font-bold flex-1 text-text-primary">Edit Patient Record</h2>
@@ -123,7 +123,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
               {(errors as any).root.submit.message}
             </div>
           )}
-          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3">
             <Field label="First Name" required error={errors.firstName?.message}>
               <input className={inputCn(!!errors.firstName)} {...register('firstName')} maxLength={30} />
             </Field>
@@ -131,7 +131,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
               <input className={inputCn(!!errors.lastName)} {...register('lastName')} maxLength={30} />
             </Field>
           </div>
-          <div className="grid grid-cols-[1fr_80px] max-[1023px]:grid-cols-1 gap-3">
+          <div className="grid grid-cols-[1fr_80px] @max-[1023px]:grid-cols-1 gap-3">
             <Field label="Middle Name" error={errors.middleName?.message}>
               <input className={inputCn(!!errors.middleName)} {...register('middleName')} maxLength={30} placeholder="Optional" />
             </Field>
@@ -139,7 +139,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
               <input className={inputCn(!!errors.extension)} {...register('extension')} maxLength={3} placeholder="Jr." />
             </Field>
           </div>
-          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3">
             <Field label="Date of Birth" required error={errors.dateOfBirth?.message}>
               <input type="date" className={inputCn(!!errors.dateOfBirth)} {...register('dateOfBirth')}
                 max={new Date().toISOString().split('T')[0]} />
@@ -156,7 +156,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
           <Field label="Street">
             <input className={inputCn()} {...register('addressStreet')} placeholder="House No., Street" />
           </Field>
-          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3">
             <Field label="Barangay">
               <input className={inputCn()} {...register('addressBarangay')} maxLength={100} />
             </Field>
@@ -164,7 +164,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
               <input className={inputCn()} {...register('addressCity')} maxLength={100} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 max-[1023px]:grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3">
             <Field label="Region">
               <input className={inputCn()} {...register('addressRegion')} maxLength={100} />
             </Field>
@@ -198,3 +198,4 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
     </div>
   );
 }
+

@@ -126,11 +126,11 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
   return (
     <div className="flex flex-col w-full bg-surface rounded-b-lg relative">
       {/* SaaS Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-3 bg-surface border-b border-border/60">
+      <div className="flex flex-col @sm:flex-row gap-3 items-stretch @sm:items-center justify-between p-3 bg-surface border-b border-border/60">
         {/* Left Side: Search and Filter Group */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-col @sm:flex-row items-stretch @sm:items-center gap-2 w-full @sm:w-auto">
           {/* Search Input Container */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full @sm:w-64">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
             <input
               type="text"
@@ -152,12 +152,12 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
           </div>
 
           {/* Action Dropdown */}
-          <div className="relative w-full sm:w-auto" ref={dropdownRef}>
+          <div className="relative w-full @sm:w-auto" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               className={cn(
-                "flex items-center justify-between gap-2 h-[34px] w-full sm:w-auto px-3 bg-surface border border-border rounded-btn text-[13px] font-medium text-text-secondary hover:bg-surface-2 hover:text-text-primary cursor-pointer transition-all duration-150 outline-none focus:border-accent focus:shadow-accent-focus select-none",
+                "flex items-center justify-between gap-2 h-[34px] w-full @sm:w-auto px-3 bg-surface border border-border rounded-btn text-[13px] font-medium text-text-secondary hover:bg-surface-2 hover:text-text-primary cursor-pointer transition-all duration-150 outline-none focus:border-accent focus:shadow-accent-focus select-none",
                 selectedAction !== 'All' && "border-accent text-accent bg-accent-light/10 hover:bg-accent-light/20 hover:text-accent"
               )}
             >

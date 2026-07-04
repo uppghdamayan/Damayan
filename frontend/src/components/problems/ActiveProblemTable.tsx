@@ -299,11 +299,11 @@ export function ActiveProblemTable({
               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
             </span>
             <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber-700">Editing Order</span>
-            <span className="text-[10px] text-amber-600/80 hidden md:inline">
+            <span className="text-[10px] text-amber-600/80 hidden @md:inline">
               — Changes are local and not yet visible to other doctors.
             </span>
             {lastAutoSaved && (
-              <span className="text-[9px] text-amber-500/70 hidden lg:inline flex-shrink-0">
+              <span className="text-[9px] text-amber-500/70 hidden @lg:inline flex-shrink-0">
                 Auto-saved {lastAutoSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}

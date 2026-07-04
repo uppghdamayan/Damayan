@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { UiScaleEffect } from "@/components/providers/UiScaleEffect";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
@@ -25,8 +26,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={cn("h-full antialiased", ibmPlexSans.variable, ibmPlexMono.variable)}>
-      <body className="min-h-full flex flex-col font-sans">
+      <body className="@container min-h-full flex flex-col font-sans">
         <QueryProvider>
+          <UiScaleEffect />
           {children}
         </QueryProvider>
         <Toaster position="bottom-right" />
