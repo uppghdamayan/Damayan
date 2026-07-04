@@ -123,7 +123,7 @@ export function Sidebar() {
                   onClick={() => {
                     handleSelect(p);
                     // Close sidebar overlay on selection for smaller screens
-                    if (window.innerWidth < 1024) {
+                    if (window.innerWidth < 768) {
                       setSidebarCollapsed(true);
                     }
                   }}
@@ -185,7 +185,7 @@ export function Sidebar() {
       <aside
         suppressHydrationWarning
         className={cn(
-          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border hidden min-[1024px]:flex",
+          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border hidden md:flex",
           sidebarCollapsed ? "w-0 border-r-transparent" : "w-[var(--sidebar-w)]"
         )}
       >
@@ -196,13 +196,13 @@ export function Sidebar() {
       <div
         onClick={() => setSidebarCollapsed(true)}
         className={cn(
-          "fixed inset-0 bg-black/40 z-[300] transition-opacity min-[1024px]:hidden",
+          "fixed inset-0 bg-transparent z-[300] transition-opacity md:hidden",
           sidebarCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
         )}
       />
       <aside
         className={cn(
-          "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto min-[1024px]:hidden",
+          "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto md:hidden",
           "w-[var(--sidebar-w)] transition-transform duration-200 ease-out flex flex-col",
           sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
         )}

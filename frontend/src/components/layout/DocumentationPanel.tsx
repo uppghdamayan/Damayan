@@ -75,7 +75,7 @@ export function DocumentationPanel() {
           noteId={activeNoteEditor.noteId ?? dbDraft?.id ?? undefined} 
           onClose={() => {
             closeNoteEditor();
-            if (window.innerWidth < 1024) {
+            if (window.innerWidth < 768) {
               setDocumentationPanelOpen(false);
             }
           }} 
@@ -150,7 +150,7 @@ export function DocumentationPanel() {
           noteId={dbDraft?.id}
           onClose={() => {
             closeNoteEditor();
-            if (window.innerWidth < 1024) {
+            if (window.innerWidth < 768) {
               setDocumentationPanelOpen(false);
             }
           }} 
@@ -168,7 +168,7 @@ export function DocumentationPanel() {
           width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0,
         }}
         className={cn(
-          "bg-surface flex flex-col shrink-0 relative overflow-hidden h-full hidden min-[1024px]:flex",
+          "bg-surface flex flex-col shrink-0 relative overflow-hidden h-full hidden md:flex",
           documentationPanelOpen ? "border-l border-border" : "border-l border-transparent",
           isResizing ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         )}
@@ -190,7 +190,7 @@ export function DocumentationPanel() {
       <div
         onClick={() => setDocumentationPanelOpen(false)}
         className={cn(
-          "fixed inset-0 bg-black/40 z-[400] transition-opacity min-[1024px]:hidden",
+          "fixed inset-0 bg-transparent z-[400] transition-opacity md:hidden",
           documentationPanelOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       />
@@ -198,7 +198,7 @@ export function DocumentationPanel() {
         role="dialog"
         aria-modal="true"
         className={cn(
-          "fixed top-0 right-0 bottom-0 z-[410] bg-surface flex flex-col min-[1024px]:hidden",
+          "fixed top-0 right-0 bottom-0 z-[410] bg-surface flex flex-col md:hidden",
           "w-full transition-transform duration-200 ease-out",
           documentationPanelOpen ? "translate-x-0" : "translate-x-full"
         )}

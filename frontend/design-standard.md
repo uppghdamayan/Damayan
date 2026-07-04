@@ -326,14 +326,14 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
 
 ### 4.2 Responsive Breakpoints
 
-DAMAYAN supports a **minimum viewport of 768×1024px** (small tablets, e.g. iPad Mini in portrait) up through desktop. Below 1280px the layout progressively converts persistent chrome — sidebar, doc panel, topbar labels — into overlays and icons rather than shrinking content. Readable text (body, inputs, clinical values) never drops below the floors set in §1.3, at any breakpoint.
+DAMAYAN supports a **minimum viewport of 768×1024px** (small tablets, e.g. iPad Mini in portrait) up through desktop. The layout progressively converts persistent chrome — sidebar, doc panel, navigation labels — into space-saving states rather than shrinking content. Readable text (body, inputs, clinical values) never drops below the floors set in §1.3, at any breakpoint.
 
 | Breakpoint | Width | Notes |
 |---|---|---|
-| `desktop-lg` | ≥ 1440px | Default layout. Sidebar and doc panel are in-flow columns. |
-| `desktop` | 1280px–1439px | Reduced sidebar/panel widths, compact padding. Sidebar and doc panel still in-flow. |
-| `tablet-lg` | 1024px–1279px | Sidebar and doc panel become **overlay drawers** instead of in-flow columns. Topbar right-zone button labels start collapsing into icon-only + tooltip. |
-| `tablet` | 768px–1023px | Header is fully icon-driven (wordmark, button labels, doctor name all hidden behind icons/avatars). Dashboard grids collapse to a single column. Inputs grow to `h-[38px]` for touch targets. |
+| `desktop-lg` | ≥ 1440px | Default layout. Sidebar and doc panel are in-flow columns. Both can be open simultaneously. |
+| `desktop` | 1101px–1439px | Reduced sidebar/panel widths, compact padding. Sidebar and doc panel still in-flow and can both be open. |
+| `tablet-lg` | 768px–1100px | Sidebar and doc panel remain **in-flow columns** (inline) and push the content rather than overlaying the navbar/dashboard. To prevent screen crowding, **they are mutually exclusive** (opening one automatically closes the other). ScreenNav tabs collapse into icons when any panel is open (with fluid hover expansion). |
+| `mobile` | < 768px | Fullscreen overlay drawers are used for side panels on phones (or fullscreen notice). |
 
 Below 768px, show a fullscreen notice (phones are not supported):
 
