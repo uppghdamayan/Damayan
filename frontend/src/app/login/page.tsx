@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -15,8 +15,38 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const supabase = createSupabaseClient();
+
+  // Guard: if already authenticated, redirect away from login
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const storeUser = useAuthStore.getState().user;
+          if (storeUser) {
+            if (storeUser.requiresPasswordChange) {
+              router.replace('/change-password');
+            } else if (storeUser.role === 'ADMIN') {
+              router.replace('/admin/accounts');
+            } else {
+              router.replace('/dashboard');
+            }
+            return;
+          }
+          // Session exists but store was cleared (e.g., after logout)
+          // Sign out from Supabase to fully clear the session
+          await supabase.auth.signOut();
+        }
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+    checkExistingSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -77,6 +107,8 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) return null;
 
   return (
     <div className="min-h-full bg-bg flex items-center justify-center font-sans overflow-hidden">

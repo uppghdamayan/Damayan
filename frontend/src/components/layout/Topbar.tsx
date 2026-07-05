@@ -29,7 +29,9 @@ export function Topbar() {
     const supabase = createSupabaseClient();
     await supabase.auth.signOut();
     clear();
-    window.location.href = '/login';
+    // Use replace() so the dashboard is removed from history —
+    // the browser Back button won't return to the dashboard after sign-out.
+    window.location.replace('/login');
   };
 
   const userInitials = user ? initials(user.firstName, user.lastName) : '??';
