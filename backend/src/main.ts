@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { AuditLogsService } from './audit-logs/audit-logs.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -72,6 +74,9 @@ async function bootstrap() {
   // ─────────────────────────────────────────────
   // START SERVER
   // ─────────────────────────────────────────────
+  const auditLogsService = app.get(AuditLogsService);
+  app.useGlobalInterceptors(new AuditLogInterceptor(auditLogsService));
+
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
 

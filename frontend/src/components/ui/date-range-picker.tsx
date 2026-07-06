@@ -16,12 +16,14 @@ interface DatePickerWithRangeProps {
   className?: string
   date: DateRange | undefined
   setDate: (date: DateRange | undefined) => void
+  size?: 'sm' | 'default'
 }
 
 export function DatePickerWithRange({
   className,
   date,
   setDate,
+  size = 'default',
 }: DatePickerWithRangeProps) {
   return (
     <div className={cn("grid gap-2", className)}>
@@ -31,11 +33,14 @@ export function DatePickerWithRange({
             id="date"
             variant="outline"
             className={cn(
-              "w-[240px] justify-start text-left font-normal h-[34px] text-[13px] border-border rounded-btn bg-surface hover:bg-surface-2 text-text-secondary hover:text-text-primary cursor-pointer transition-all duration-150 outline-none focus:border-accent focus:shadow-accent-focus",
+              size === 'sm'
+                ? "h-8 text-[11px] w-[220px] px-3 gap-1.5"
+                : "h-[34px] text-[13px] w-[240px] px-4",
+              "justify-start text-left font-normal border-border rounded-btn bg-surface hover:bg-surface-2 text-text-secondary hover:text-text-primary cursor-pointer transition-all duration-150 outline-none focus:border-accent focus:shadow-accent-focus",
               !date && "text-text-muted"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 text-text-muted" />
+            <CalendarIcon className={cn(size === 'sm' ? "h-3.5 w-3.5" : "mr-2 h-4 w-4", "text-text-muted")} />
             {date?.from ? (
               date.to ? (
                 <span className="text-text-primary">

@@ -1,5 +1,0 @@
-- [ ] Update `src/stores/uiStore.ts` to include `uiScale` state and actions
-- [ ] Create `UiScaleEffect` component and add it to `src/app/layout.tsx` or similar root layout provider
-- [ ] Add Zoom controls to `src/components/layout/Topbar.tsx`
-- [ ] Audit `vh` vs `100%` height constraints to prevent clipping when zoomed
-- [ ] Verify functionality (scaling and breakpoints)
