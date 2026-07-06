@@ -70,19 +70,23 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
   const { data: patient, isLoading } = usePatient(patientId);
   const { setActivePatient } = usePatientStore();
 
+  const patientName = patient ? `${patient.lastName}, ${patient.firstName}` : '';
+  const { title, subtitle } = getHeaderInfo(pathname, patientId);
+
   // Sync patient data into store when loaded (handles direct URL navigation)
   useEffect(() => {
     if (patient) setActivePatient(patient);
   }, [patient, setActivePatient]);
-
-  const patientName = patient ? `${patient.lastName}, ${patient.firstName}` : '';
-  const { title, subtitle } = getHeaderInfo(pathname, patientId);
 
   // Dashboard route gets its own inline header — skip the standalone title block
   const isDashboard = useMemo(() => {
     const cleanPath = pathname.replace(`/dashboard/${patientId}`, '').toLowerCase();
     return cleanPath === '' || cleanPath === '/';
   }, [pathname, patientId]);
+
+  const displaySubtitle = pathname.includes('/logs')
+    ? `Track changes, updates, and events${patientName ? ` · ${patientName}` : ''}`
+    : subtitle;
 
   return (
     <PatientProvider value={{ patient, isLoading }}>
@@ -97,7 +101,7 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
                     {title}
                   </h1>
                   <span className="text-[11px] text-text-muted font-medium mt-0.5">
-                    {subtitle}
+                    {displaySubtitle}
                   </span>
                 </div>
               </div>
