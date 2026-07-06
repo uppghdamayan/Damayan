@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW' | 'GENERATE';
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW' | 'GENERATE' | 'DRAFT';
 
 export interface AuditLogEntry {
   id: string;
@@ -43,8 +43,7 @@ export function useAuditLogs(filters: AuditLogFilters) {
       });
       return apiRequest<AuditLogsResponse>(`/audit-logs?${params.toString()}`);
     },
-    staleTime: 0,            // always treat data as stale
-    refetchOnMount: 'always', // refetch every time the component mounts (tab opened)
+    staleTime: 30_000, // logs are append-only; 30s is fine
     refetchOnWindowFocus: true, // also refresh when user re-focuses the browser tab
   });
 }

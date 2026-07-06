@@ -56,6 +56,7 @@ export function useCreateInitialNote(patientId: string) {
       }),
     onSuccess: (data) => {
       queryClient.setQueryData(['initial-note', patientId], data);
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:initial`, JSON.stringify(variables));
@@ -78,6 +79,7 @@ export function useUpdateInitialNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:initial`, JSON.stringify(variables.data));
@@ -98,6 +100,7 @@ export function usePublishInitialNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
 }
@@ -115,6 +118,7 @@ export function useDeleteInitialNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
 }

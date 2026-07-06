@@ -334,7 +334,7 @@ export class InitialNotesService {
       // Delete the visit since an Initial Note is 1:1 with its visit
       await tx.visit.delete({ where: { id: note.visitId } });
 
-      return { success: true };
+      return { success: true, ...note };
     });
   }
 }

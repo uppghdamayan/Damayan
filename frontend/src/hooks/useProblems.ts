@@ -40,6 +40,7 @@ function invalidateProblems(qc: ReturnType<typeof useQueryClient>, patientId: st
   qc.invalidateQueries({ queryKey: ['problems', patientId] });
   qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes Patient._count.problems
+  qc.invalidateQueries({ queryKey: ['audit-logs'] });
 }
 
 export function useCreateProblem(patientId: string) {

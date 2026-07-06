@@ -45,6 +45,9 @@ export function useCreatePatient() {
   return useMutation({
     mutationFn: (dto: unknown) =>
       apiRequest<Patient>('/patients', { method: 'POST', body: JSON.stringify(dto) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patients'] });
+      qc.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
   });
 }

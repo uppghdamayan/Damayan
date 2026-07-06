@@ -35,6 +35,7 @@ function invalidateMedications(qc: ReturnType<typeof useQueryClient>, patientId:
   qc.invalidateQueries({ queryKey: ['medications', patientId] });
   qc.invalidateQueries({ queryKey: ['medication-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes any banner-level counts
+  qc.invalidateQueries({ queryKey: ['audit-logs'] });
 }
 
 export function useCreateMedication(patientId: string) {

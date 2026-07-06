@@ -75,6 +75,7 @@ export function useCreateProgressNote(patientId: string) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables));
@@ -96,6 +97,7 @@ export function useCreateAndPublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables));
@@ -114,6 +116,7 @@ export function useUpdateProgressNote(patientId: string) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
       localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables.data));
@@ -135,6 +138,7 @@ export function usePublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
 }
@@ -152,6 +156,7 @@ export function useDeleteAllDraftProgressNotes(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
 }
@@ -169,6 +174,7 @@ export function useDeleteProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
 }

@@ -17,7 +17,10 @@ export function useGenerateDocument(patientId: string) {
         method: 'POST',
         body: JSON.stringify(params),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', patientId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
   });
 }
 
@@ -36,6 +39,9 @@ export function useDeleteDocument(patientId: string) {
       apiRequest<any>(`/patients/${patientId}/documents/${documentId}`, {
         method: 'DELETE',
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents', patientId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
   });
 }

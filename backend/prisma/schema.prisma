@@ -53,6 +53,7 @@ enum AuditAction {
   DELETE
   VIEW
   GENERATE
+  DRAFT
 }
 
 enum NoteType {

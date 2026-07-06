@@ -22,6 +22,7 @@ export function useLatestVitals(patientId: string | null) {
 
 function invalidateVitals(qc: ReturnType<typeof useQueryClient>, patientId: string) {
   qc.invalidateQueries({ queryKey: ['vitals', patientId] });
+  qc.invalidateQueries({ queryKey: ['audit-logs'] });
 }
 
 export function useCreateVitals(patientId: string) {

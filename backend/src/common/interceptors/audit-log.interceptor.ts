@@ -38,16 +38,18 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (path.match(/^\/patients\/[^/]+\/visits\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'visits' };
 
     // Initial Notes
-    if (path.match(/^\/patients\/[^/]+\/initial-note$/) && method === 'POST') return { action: 'CREATE', tableName: 'initial_notes' };
+    if (path.match(/^\/patients\/[^/]+\/initial-note$/) && method === 'POST') return { action: 'DRAFT', tableName: 'initial_notes' };
     if (path.match(/^\/patients\/[^/]+\/initial-note\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'initial_notes' };
-    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'initial_notes' };
+    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'PATCH') return { action: 'DRAFT', tableName: 'initial_notes' };
     if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'initial_notes' };
+    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'initial_notes' };
 
     // Progress Notes
-    if (path.match(/^\/patients\/[^/]+\/progress-notes$/) && method === 'POST') return { action: 'CREATE', tableName: 'progress_notes' };
+    if (path.match(/^\/patients\/[^/]+\/progress-notes$/) && method === 'POST') return { action: 'DRAFT', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'progress_notes' };
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'progress_notes' };
+    if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'PATCH') return { action: 'DRAFT', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'progress_notes' };
+    if (path.match(/^\/patients\/[^/]+\/progress-notes\/drafts$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };
 
     // Problems
@@ -115,7 +117,9 @@ export class AuditLogInterceptor implements NestInterceptor {
         if (!resolved || !user?.id) return;
 
         const recordId = responseBody?.id ?? responseBody?.user?.id;
-        const patientId = responseBody?.patientId ?? responseBody?.patient?.id;
+        
+        const patientIdMatch = path.match(/^\/patients\/([^/]+)/);
+        const patientId = responseBody?.patientId ?? responseBody?.patient?.id ?? (patientIdMatch ? patientIdMatch[1] : undefined);
 
         // Merge: request body fields (what the caller sent) + record context
         // (name/title/status from the saved record) + optional publish flag.
@@ -133,6 +137,13 @@ export class AuditLogInterceptor implements NestInterceptor {
         // Tag reorder routes
         if (path.match(/\/reorder$/) && method === 'POST') {
           changes._isReorder = true;
+        }
+
+        // Tag bulk draft delete routes and skip if none deleted
+        if (path.match(/\/drafts$/) && method === 'DELETE') {
+          if (responseBody?.count === 0) return;
+          changes._isDraftsDelete = true;
+          changes.count = responseBody?.count;
         }
 
         this.auditLogsService.create({

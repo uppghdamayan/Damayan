@@ -372,7 +372,7 @@ export class ProgressNotesService {
       await tx.progressNote.delete({ where: { id } });
       await tx.visit.delete({ where: { id: note.visitId } });
 
-      return { success: true };
+      return { success: true, ...note };
     });
   }
 

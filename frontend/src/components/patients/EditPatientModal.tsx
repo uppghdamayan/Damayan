@@ -56,7 +56,7 @@ function Field({ label, required, error, children }: {
 export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPatientModalProps) {
   const qc = useQueryClient();
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting, dirtyFields }, setError } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       lastName:        patient.lastName,
@@ -74,21 +74,34 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
 
   const onSubmit = async (data: FormData) => {
     try {
+      const payload: Partial<FormData> = {};
+      const keys = Object.keys(dirtyFields) as Array<keyof FormData>;
+
+      if (keys.length === 0) {
+        onClose(); // No changes made
+        return;
+      }
+
+      for (const key of keys) {
+        if (dirtyFields[key]) {
+          // @ts-expect-error: TS union indexing limitation
+          payload[key] = data[key];
+        }
+      }
+
+      if (Object.keys(payload).length === 0) {
+        onClose(); // No actual changes
+        return;
+      }
+
       const updated = await apiRequest<Patient>(`/patients/${patient.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          ...data,
-          middleName:      data.middleName  || undefined,
-          extension:       data.extension   || undefined,
-          addressStreet:   data.addressStreet   || undefined,
-          addressBarangay: data.addressBarangay || undefined,
-          addressCity:     data.addressCity     || undefined,
-          addressRegion:   data.addressRegion   || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       toast.success('Patient record updated.');
       qc.invalidateQueries({ queryKey: ['patients'] });
       qc.invalidateQueries({ queryKey: ['patient', patient.id] });
+      qc.invalidateQueries({ queryKey: ['audit-logs'] });
       onUpdated(updated);
       onClose();
     } catch (err: unknown) {
