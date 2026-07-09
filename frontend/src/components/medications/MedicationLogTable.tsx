@@ -284,8 +284,8 @@ export function MedicationLogTable({ logs, isLoading }: MedicationLogTableProps)
                   {log.editor.role === 'DOCTOR' ? `Dr. ${log.editor.lastName}` : log.editor.role === 'NURSE' ? `Nurse ${log.editor.lastName}` : `${log.editor.firstName} ${log.editor.lastName}`}
                 </div>
                 
-                <div className="text-[12px] text-text-primary truncate" title={log.description}>
-                  {log.description}
+                <div className="text-[12px] text-text-primary truncate" title={log.description.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note')}>
+                  {log.description.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note')}
                 </div>
 
                 <div className="flex justify-center">

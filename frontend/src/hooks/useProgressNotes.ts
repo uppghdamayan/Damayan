@@ -52,16 +52,18 @@ export function useProgressNote(noteId: string | null) {
 export function useCopyForwardData(patientId: string | null) {
   const { data: problemsData, isLoading: problemsLoading } = useProblems(patientId);
   const { data: medicationsData, isLoading: medicationsLoading } = useMedications(patientId);
+  const { data: notesData, isLoading: notesLoading } = useProgressNotes(patientId, 1, 1);
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
     const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
-    return { activeProblems, activeMedications };
-  }, [problemsData, medicationsData]);
+    const latestDiagnostics = notesData?.data?.[0]?.diagnostics || [];
+    return { activeProblems, activeMedications, latestDiagnostics };
+  }, [problemsData, medicationsData, notesData]);
 
   return {
     data,
-    isLoading: problemsLoading || medicationsLoading,
+    isLoading: problemsLoading || medicationsLoading || notesLoading,
   };
 }
 

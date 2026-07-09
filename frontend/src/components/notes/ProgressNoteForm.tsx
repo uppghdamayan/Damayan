@@ -180,6 +180,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             parsed.medicationSnapshot = validMeds;
           }
           
+          if (parsed.diagnostics === undefined || parsed.diagnostics === null) {
+            parsed.diagnostics = copyForward?.latestDiagnostics || [];
+          }
+          
           form.reset(parsed);
           return;
         } catch (e) {}
@@ -189,7 +193,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         objective: '',
         labs: '',
         mgmtNonpharm: '',
-        diagnostics: [],
+        diagnostics: copyForward?.latestDiagnostics || [],
         problemListSnapshot: (copyForward?.activeProblems || []).map((p: any) => ({
           title: p.title,
           icdCode: p.icdCode || undefined
@@ -661,11 +665,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
             {/* LABS & IMAGING */}
             <AttachmentsSection 
-              patientId={patientId} 
-              noteType="PROGRESS_NOTE" 
-              noteId={noteId} 
+              patientId={patientId}
+              noteType="PROGRESS_NOTE"
+              noteId={noteId}
               localAttachments={localAttachments}
-              onAddLocalAttachment={(att) => setLocalAttachments(prev => [...prev, att])}
+              onAddLocalAttachment={(att) => {
+                setLocalAttachments(prev => [...prev, att]);
+                const currentTags = form.getValues('diagnostics') || [];
+                if (att.tag && !currentTags.includes(att.tag)) {
+                  form.setValue('diagnostics', [...currentTags, att.tag], { shouldDirty: true });
+                }
+              }}
               onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
             />
 
