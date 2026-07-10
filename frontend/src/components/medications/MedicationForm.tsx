@@ -20,7 +20,7 @@ interface MedicationFormModalProps {
   editing: Medication | null;
   suggestions: Medication[];
   saving: boolean;
-  onSave: (values: { name: string; dose: string; formulation?: string; instructions?: string; quantity?: number }) => void;
+  onSave: (values: { name: string; dose: string; formulation: string; instructions: string; quantity: number }) => void;
 }
 
 const FORMULATION_OPTIONS = [
@@ -64,9 +64,14 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     if (!values.dose.trim()) e.dose = 'Dose is required.';
     else if (values.dose.length > 255) e.dose = 'Max 255 characters.';
 
-    if (values.instructions && values.instructions.length > 50) e.instructions = 'Max 50 characters.';
+    if (!values.instructions.trim()) e.instructions = 'Instructions are required.';
+    else if (values.instructions.length > 50) e.instructions = 'Max 50 characters.';
 
-    if (values.quantity) {
+    if (!values.formulation.trim()) e.formulation = 'Formulation is required.';
+
+    if (!values.quantity) {
+      e.quantity = 'Quantity is required.';
+    } else {
       const qtyNum = parseInt(values.quantity, 10);
       if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
     }
@@ -80,9 +85,9 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     onSave({
       name: values.name.trim(),
       dose: values.dose.trim(),
-      formulation: values.formulation.trim() || undefined,
-      instructions: values.instructions.trim() || undefined,
-      quantity: values.quantity ? parseInt(values.quantity, 10) : undefined,
+      formulation: values.formulation.trim(),
+      instructions: values.instructions.trim(),
+      quantity: parseInt(values.quantity, 10),
     });
   };
 
@@ -118,15 +123,8 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             <ComboboxInput
               value={values.name}
               onChange={(val) => { 
-                setValues(v => {
-                  const newState = { ...v, name: val };
-                  const dictEntry = MEDICATION_DICTIONARY.find(d => d.Molecule.toLowerCase() === val.toLowerCase());
-                  if (dictEntry) {
-                    newState.formulation = dictEntry.Route;
-                  }
-                  return newState;
-                }); 
-                setErrors(er => ({ ...er, name: '' })); 
+                setValues(v => ({ ...v, name: val })); 
+                setErrors(er => ({ ...er, name: !val.trim() ? 'Medication name is required.' : val.length > 255 ? 'Max 255 characters.' : '' })); 
               }}
               options={nameOptions}
               placeholder="e.g. Losartan"
@@ -144,7 +142,11 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
               <input
                 type="text"
                 value={values.dose}
-                onChange={(e) => { setValues((v) => ({ ...v, dose: e.target.value })); setErrors((er) => ({ ...er, dose: '' })); }}
+                onChange={(e) => { 
+                  const val = e.target.value;
+                  setValues((v) => ({ ...v, dose: val })); 
+                  setErrors((er) => ({ ...er, dose: !val.trim() ? 'Dose is required.' : val.length > 255 ? 'Max 255 characters.' : '' })); 
+                }}
                 placeholder="e.g. 500 mg, 1 tablet"
                 maxLength={255}
                 className={inputCn(!!errors.dose)}
@@ -152,22 +154,35 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
               {errors.dose && <p className="text-[12px] text-red mt-1">{errors.dose}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">Formulation</label>
+              <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
+                Formulation <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+              </label>
               <ComboboxInput
                 value={values.formulation}
-                onChange={(val) => { setValues(v => ({ ...v, formulation: val })); }}
+                onChange={(val) => { 
+                  setValues(v => ({ ...v, formulation: val })); 
+                  setErrors(er => ({ ...er, formulation: !val.trim() ? 'Formulation is required.' : '' })); 
+                }}
                 options={FORMULATION_OPTIONS}
                 placeholder="e.g. Tablet"
+                hasError={!!errors.formulation}
                 maxLength={50}
               />
+              {errors.formulation && <p className="text-[12px] text-red mt-1">{errors.formulation}</p>}
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5 mb-3.5">
-            <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">Instructions</label>
+            <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
+              Instructions <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+            </label>
             <input
               value={values.instructions}
-              onChange={(e) => { setValues((v) => ({ ...v, instructions: e.target.value })); setErrors((er) => ({ ...er, instructions: '' })); }}
+              onChange={(e) => { 
+                const val = e.target.value;
+                setValues((v) => ({ ...v, instructions: val })); 
+                setErrors((er) => ({ ...er, instructions: !val.trim() ? 'Instructions are required.' : val.length > 50 ? 'Max 50 characters.' : '' })); 
+              }}
               placeholder="e.g. Once daily with food"
               maxLength={50}
               className={inputCn(!!errors.instructions)}
@@ -176,11 +191,24 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">Quantity</label>
+            <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
+              Quantity <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+            </label>
             <input
               type="number" step="1" min="1"
               value={values.quantity}
-              onChange={(e) => { setValues((v) => ({ ...v, quantity: e.target.value })); setErrors((er) => ({ ...er, quantity: '' })); }}
+              onChange={(e) => { 
+                const val = e.target.value;
+                setValues((v) => ({ ...v, quantity: val })); 
+                let err = '';
+                if (!val) {
+                  err = 'Quantity is required.';
+                } else {
+                  const qtyNum = parseInt(val, 10);
+                  if (isNaN(qtyNum) || qtyNum <= 0) err = 'Quantity must be a whole number greater than 0.';
+                }
+                setErrors((er) => ({ ...er, quantity: err })); 
+              }}
               placeholder="e.g. 30"
               className={inputCn(!!errors.quantity)}
             />

@@ -25,7 +25,10 @@ export class MedicationsService {
     return this.prisma.medication.findMany({
       where: { patientId, ...(includeInactive ? {} : { isActive: true }) },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
+      include: { 
+        addedByUser: { select: { firstName: true, lastName: true, role: true } },
+        updatedByUser: { select: { firstName: true, lastName: true, role: true } }
+      },
     });
   }
 
@@ -42,7 +45,10 @@ export class MedicationsService {
     return client.medication.findMany({
       where: { patientId, isActive: true },
       orderBy: { createdAt: 'asc' },
-      include: { addedByUser: { select: { firstName: true, lastName: true, role: true } } },
+      include: { 
+        addedByUser: { select: { firstName: true, lastName: true, role: true } },
+        updatedByUser: { select: { firstName: true, lastName: true, role: true } }
+      },
     });
   }
 
@@ -113,6 +119,8 @@ export class MedicationsService {
       data.instructions = dto.instructions?.trim() || null;
     if (dto.quantity !== undefined) data.quantity = dto.quantity ?? null;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
+
+    data.updatedBy = userId;
 
     let action = 'Updated';
     let description = `Updated medication: ${existing.name}`;

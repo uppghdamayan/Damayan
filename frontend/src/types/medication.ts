@@ -10,7 +10,13 @@ export interface Medication {
   addedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  updatedBy: string | null;
   addedByUser?: {
+    firstName: string;
+    lastName: string;
+    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  } | null;
+  updatedByUser?: {
     firstName: string;
     lastName: string;
     role: 'DOCTOR' | 'NURSE' | 'ADMIN';

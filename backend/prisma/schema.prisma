@@ -90,6 +90,7 @@ model User {
   problems        Problem[]    @relation("ProblemAddedBy")
   problemsUpdated Problem[]    @relation("ProblemUpdatedBy")
   medications     Medication[] @relation("MedicationAddedBy")
+  medicationsUpdated Medication[] @relation("MedicationUpdatedBy")
   documents       Document[]   @relation("DocumentGeneratedBy")
   attachments     Attachment[] @relation("AttachmentUploadedBy")
   auditLogs       AuditLog[]   @relation("AuditLogUser")
@@ -274,12 +275,14 @@ model Medication {
   quantity     Int?
   isActive     Boolean  @default(true) @map("is_active")
   addedBy      String?  @map("added_by") @db.Uuid
+  updatedBy    String?  @map("updated_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt      @map("updated_at")
 
   // Relations
   patient     Patient @relation(fields: [patientId], references: [id])
   addedByUser User?   @relation("MedicationAddedBy", fields: [addedBy], references: [id])
+  updatedByUser User? @relation("MedicationUpdatedBy", fields: [updatedBy], references: [id])
 
   @@index([patientId, isActive])
   @@map("medications")
