@@ -110,7 +110,7 @@ export class MedicationsService {
   ): Promise<Medication> {
     const existing = await this.findOne(patientId, id); // throws if not found / not owned by patient
 
-    const data: Prisma.MedicationUpdateInput = {};
+    const data: Prisma.MedicationUncheckedUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.dose !== undefined) data.dose = dto.dose.trim();
     if (dto.formulation !== undefined)
