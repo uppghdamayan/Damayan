@@ -13,6 +13,7 @@ interface TagInputFieldProps {
   placeholder?: string;
   isObjectFormat?: boolean; // If true, outputs { title: string }, otherwise outputs string
   disabled?: boolean;
+  onInputChange?: (val: string) => void;
 }
 
 export function TagInputField({ 
@@ -20,7 +21,8 @@ export function TagInputField({
   onChange, 
   placeholder = 'Type and press Enter...', 
   isObjectFormat = false,
-  disabled = false
+  disabled = false,
+  onInputChange
 }: TagInputFieldProps) {
   const [inputValue, setInputValue] = useState('');
 
@@ -34,6 +36,7 @@ export function TagInputField({
         onChange([...value, val]);
       }
       setInputValue('');
+      if (onInputChange) onInputChange('');
     }
   };
 
@@ -80,7 +83,11 @@ export function TagInputField({
             className="flex-1 h-[34px] px-2.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/70"
             placeholder={placeholder}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setInputValue(val);
+              if (onInputChange) onInputChange(val);
+            }}
             onKeyDown={handleKeyDown}
           />
           <button

@@ -24,7 +24,7 @@ import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -95,9 +95,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
-    const [newMedFormulation, setNewMedFormulation] = useState('');
+  const [newMedFormulation, setNewMedFormulation] = useState('');
   const [newMedInstructions, setNewMedInstructions] = useState('');
   const [newMedQuantity, setNewMedQuantity] = useState('');
+
+  const [newProbTitle, setNewProbTitle] = useState('');
+  const [newProbIcd, setNewProbIcd] = useState('');
+  const [diagnosticsInput, setDiagnosticsInput] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<{ hasFile: boolean; tag: string; textResult: string; fileName?: string } | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   const { data: patientMedicationsResponse } = useMedications(patientId);
   const patientMedications = patientMedicationsResponse?.data || [];
@@ -244,8 +250,64 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   }, [copyForward, copyLoading, form]);
 
   const formValues = form.watch();
+  const getUnaddedSections = () => {
+    const list: string[] = [];
+    if (newProbTitle.trim()) {
+      list.push('Problem List');
+    }
+    if (newMedName.trim()) {
+      list.push('Medications');
+    }
+    if (diagnosticsInput.trim()) {
+      list.push('Diagnostics');
+    }
+    if (pendingAttachment && (pendingAttachment.hasFile || pendingAttachment.tag.trim() || pendingAttachment.textResult.trim())) {
+      list.push('Labs & Imaging');
+    }
+    return list;
+  };
 
-  const handleDraftToggle = () => {
+  const handleGoBack = () => {
+    const unadded = getUnaddedSections();
+    setPendingAction(null);
+    
+    if (unadded.length > 0) {
+      const sectionElements: { [key: string]: string } = {
+        'Problem List': 'problem-list-section',
+        'Medications': 'medications-section',
+        'Diagnostics': 'diagnostics-section',
+        'Labs & Imaging': 'labs-imaging-section'
+      };
+
+      const firstUnadded = unadded[0];
+      const elId = sectionElements[firstUnadded];
+      if (elId) {
+        const el = document.getElementById(elId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Wait for smooth scroll to finish, then focus the input field
+          setTimeout(() => {
+            if (firstUnadded === 'Problem List') {
+              const input = document.getElementById('newProbTitle');
+              input?.focus();
+            } else if (firstUnadded === 'Medications') {
+              const input = el.querySelector('input');
+              input?.focus();
+            } else if (firstUnadded === 'Diagnostics') {
+              const input = el.querySelector('input');
+              input?.focus();
+            } else if (firstUnadded === 'Labs & Imaging') {
+              const input = el.querySelector('input');
+              input?.focus();
+            }
+          }, 350);
+        }
+      }
+    }
+  };
+
+  const executeDraftToggle = () => {
     if (noteId) {
       deleteMutation.mutate(noteId, {
         onSuccess: () => {
@@ -285,19 +347,55 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     }
   };
 
-  useAutoSave(formValues, (data) => {
-    localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(data));
-    setLastSaved(new Date());
-  }, `damayan:draft:${patientId}:progress`, 5000);
-
-  const handlePublish = async () => {
-    setPublishError(null);
-    const publishCheck = progressNotePublishSchema.safeParse(formValues);
-    if (!publishCheck.success) {
-      setPublishError("Please fill out Subjective and Objective fields.");
-      return;
+  const handleDraftToggle = () => {
+    if (!noteId) {
+      const unadded = getUnaddedSections();
+      if (unadded.length > 0) {
+        setPendingAction(() => executeDraftToggle);
+        return;
+      }
     }
+    executeDraftToggle();
+  };
 
+  const executeUpdateDraft = () => {
+    if (!noteId) return;
+    const safeNoteId = noteId;
+    updateMutation.mutate({ id: safeNoteId, data: formValues }, {
+      onSuccess: async () => {
+        if (localAttachments.length > 0) {
+          for (const att of localAttachments) {
+            try {
+              await uploadAttachment.mutateAsync({
+                patientId,
+                noteType: 'PROGRESS_NOTE',
+                noteId: safeNoteId,
+                tag: att.tag,
+                textResult: att.textResult || undefined,
+                file: att.file || undefined
+              });
+            } catch (e) {
+              console.error('Failed to upload attachment', e);
+            }
+          }
+          setLocalAttachments([]);
+        }
+        setLastSaved(new Date());
+        form.reset(formValues);
+      }
+    });
+  };
+
+  const handleUpdateDraft = () => {
+    const unadded = getUnaddedSections();
+    if (unadded.length > 0) {
+      setPendingAction(() => executeUpdateDraft);
+    } else {
+      executeUpdateDraft();
+    }
+  };
+
+  const executePublish = () => {
     if (noteId) {
       updateMutation.mutate({ id: noteId, data: formValues }, {
         onSuccess: () => {
@@ -366,6 +464,32 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       });
     }
   };
+
+  const handlePublish = async () => {
+    const unadded = getUnaddedSections();
+    
+    const proceedWithPublish = () => {
+      setPublishError(null);
+      const publishCheck = progressNotePublishSchema.safeParse(formValues);
+      if (!publishCheck.success) {
+        setPublishError("Please fill out Subjective and Objective fields.");
+        return;
+      }
+      executePublish();
+    };
+
+    if (unadded.length > 0) {
+      setPendingAction(() => proceedWithPublish);
+      return;
+    }
+
+    proceedWithPublish();
+  };
+
+  useAutoSave(formValues, (data) => {
+    localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(data));
+    setLastSaved(new Date());
+  }, `damayan:draft:${patientId}:progress`, 5000);
 
   if ((noteId && noteLoading) || (!noteId && copyLoading)) {
     return (
@@ -444,9 +568,19 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       {/* Sticky header */}
       <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10 shrink-0 bg-accent-light/40 border-b border-accent-mid/40">
         <div className="flex flex-col">
-          <span className="text-[13px] font-bold flex items-center gap-2 text-accent-hover">
-            <button
-              onClick={() => setDocumentationPanelOpen(false)}
+          <span className="text-[13px] font-bold flex items-center gap-2 text-accent-hover">            <button
+              onClick={() => {
+                const unadded = getUnaddedSections();
+                if (unadded.length > 0) {
+                  setPendingAction(() => () => {
+                    setDocumentationPanelOpen(false);
+                    onClose();
+                  });
+                } else {
+                  setDocumentationPanelOpen(false);
+                  onClose();
+                }
+              }}
               className="p-1 -ml-1.5 hover:bg-accent/10 rounded-md transition-colors cursor-pointer text-text-secondary hover:text-accent-hover shrink-0"
               title="Close panel"
             >
@@ -520,11 +654,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       visitDatetime: formValues.visitDatetime || new Date().toISOString(),
                     });
 
-                    // Clear uncontrolled inputs
-                    const probTitleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                    const probIcdEl = document.getElementById('newProbIcd') as HTMLInputElement;
-                    if (probTitleEl) probTitleEl.value = '';
-                    if (probIcdEl) probIcdEl.value = '';
+                    // Clear controlled inputs
+                    setNewProbTitle('');
+                    setNewProbIcd('');
+                    setDiagnosticsInput('');
 
                     // Clear new medication states
                     setNewMedName('');
@@ -548,31 +681,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               )}
               {(form.formState.isDirty || localAttachments.length > 0) && noteId && (
                 <Button 
-                  onClick={() => {
-                    updateMutation.mutate({ id: noteId, data: formValues }, {
-                      onSuccess: async () => {
-                        if (localAttachments.length > 0) {
-                          for (const att of localAttachments) {
-                            try {
-                              await uploadAttachment.mutateAsync({
-                                patientId,
-                                noteType: 'PROGRESS_NOTE',
-                                noteId: noteId,
-                                tag: att.tag,
-                                textResult: att.textResult || undefined,
-                                file: att.file || undefined
-                              });
-                            } catch (e) {
-                              console.error('Failed to upload attachment', e);
-                            }
-                          }
-                          setLocalAttachments([]);
-                        }
-                        setLastSaved(new Date());
-                        form.reset(formValues);
-                      }
-                    });
-                  }} 
+                  onClick={handleUpdateDraft} 
                   disabled={updateMutation.isPending} 
                   variant="outline" 
                   size="xs"
@@ -664,23 +773,26 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* LABS & IMAGING */}
-            <AttachmentsSection 
-              patientId={patientId}
-              noteType="PROGRESS_NOTE"
-              noteId={noteId}
-              localAttachments={localAttachments}
-              onAddLocalAttachment={(att) => {
-                setLocalAttachments(prev => [...prev, att]);
-                const currentTags = form.getValues('diagnostics') || [];
-                if (att.tag && !currentTags.includes(att.tag)) {
-                  form.setValue('diagnostics', [...currentTags, att.tag], { shouldDirty: true });
-                }
-              }}
-              onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
-            />
+            <div id="labs-imaging-section">
+              <AttachmentsSection 
+                patientId={patientId}
+                noteType="PROGRESS_NOTE"
+                noteId={noteId}
+                localAttachments={localAttachments}
+                onAddLocalAttachment={(att) => {
+                  setLocalAttachments(prev => [...prev, att]);
+                  const currentTags = form.getValues('diagnostics') || [];
+                  if (att.tag && !currentTags.includes(att.tag)) {
+                    form.setValue('diagnostics', [...currentTags, att.tag], { shouldDirty: true });
+                  }
+                }}
+                onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
+                onPendingChange={setPendingAttachment}
+              />
+            </div>
 
             {/* PROBLEM LIST */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div id="problem-list-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">📊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Assessment / Problem List</span>
@@ -705,9 +817,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const newProbs = [...(field.value || [])];
-                                  newProbs.splice(idx, 1);
-                                  field.onChange(newProbs);
+                                    const newProbs = [...(field.value || [])];
+                                    newProbs.splice(idx, 1);
+                                    field.onChange(newProbs);
                                 }}
                                 disabled={isDisabled}
                                 className="text-text-muted hover:text-red transition-colors ml-1 disabled:opacity-50 flex items-center justify-center"
@@ -725,6 +837,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                         <div className="flex items-center gap-2 mt-1">
                           <input 
                             id="newProbTitle" 
+                            value={newProbTitle}
+                            onChange={(e) => setNewProbTitle(e.target.value)}
                             disabled={isDisabled} 
                             placeholder="Problem Title (e.g. Hypertension)" 
                             className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent flex-1 bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
@@ -737,6 +851,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                           />
                           <input 
                             id="newProbIcd" 
+                            value={newProbIcd}
+                            onChange={(e) => setNewProbIcd(e.target.value)}
                             disabled={isDisabled} 
                             placeholder="ICD-10 (Optional)" 
                             className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent w-[120px] bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
@@ -753,13 +869,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                             variant="secondary"
                             disabled={isDisabled}
                             onClick={() => {
-                              const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                              const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
-                              if (titleEl.value.trim()) {
-                                const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined, isNew: true }];
+                              if (newProbTitle.trim()) {
+                                const newProbs = [...(field.value || []), { title: newProbTitle.trim(), icdCode: newProbIcd.trim() || undefined, isNew: true }];
                                 field.onChange(newProbs);
-                                titleEl.value = '';
-                                icdEl.value = '';
+                                setNewProbTitle('');
+                                setNewProbIcd('');
                               }
                             }}
                             className="h-[32px] px-3 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded-[6px] font-medium text-[11px] flex items-center gap-1 transition-all"
@@ -791,7 +905,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* DIAGNOSTICS */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden" style={{ overflow: 'visible' }}>
+            <div id="diagnostics-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden" style={{ overflow: 'visible' }}>
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🔍</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Diagnostics</span>
@@ -807,6 +921,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       placeholder="Type test name and press Enter"
                       isObjectFormat={false}
                       disabled={isDisabled}
+                      onInputChange={setDiagnosticsInput}
                     />
                   )}
                 />
@@ -814,7 +929,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* MEDICATIONS */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
+            <div id="medications-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Current Medication List</span>
@@ -957,6 +1072,97 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
           </div>
+        </div>
+      </div>
+      <UnaddedChangesConfirmModal
+        open={pendingAction !== null}
+        onClose={handleGoBack}
+        onConfirm={() => {
+          if (pendingAction) {
+            pendingAction();
+          }
+          setPendingAction(null);
+        }}
+        unaddedItems={getUnaddedSections()}
+      />
+    </div>
+  );
+}
+
+function UnaddedChangesConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  unaddedItems
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  unaddedItems: string[];
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    // Overlay
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150">
+      {/* Modal box */}
+      <div className="bg-surface border border-border rounded-[10px] w-[500px] max-[1439px]:w-[460px] max-[1279px]:w-[420px] max-[767px]:w-[92vw] max-[767px]:max-w-[380px] max-h-[80vh] overflow-y-auto shadow-modal flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
+          <h2 className="text-[15px] font-bold flex-1 text-text-primary flex items-center gap-1.5">
+            <span className="text-[16px]">⚠️</span> Unsaved Changes
+          </h2>
+          <button 
+            onClick={onClose} 
+            aria-label="Close modal"
+            className="w-6 h-6 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        
+        {/* Body */}
+        <div className="px-[18px] py-[18px] text-[13px] text-text-secondary leading-relaxed flex flex-col gap-3">
+          <p className="text-text-primary">
+            You have entered/selected information in the following section(s) but haven't clicked "+ Add" or "Add Result" to attach them to the note:
+          </p>
+          <ul className="flex flex-col gap-2 bg-surface-2 border border-border p-3 rounded-card">
+            {unaddedItems.map((name, idx) => (
+              <li key={idx} className="flex items-center gap-2 text-[13px] font-semibold text-accent">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-mid" />
+                {name}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[12px] text-text-muted mt-1">
+            They will be discarded if you proceed. Click "Go Back" to scroll to the section and add them, or "Discard & Proceed" to save/close without them.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-[18px] py-3 border-t border-border bg-surface-2/30">
+          <button
+            onClick={onClose}
+            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap cursor-pointer"
+          >
+            Go Back
+          </button>
+          <button
+            onClick={onConfirm}
+            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red/15 hover:border-red/80 transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap cursor-pointer shadow-sm"
+          >
+            Discard & Proceed
+          </button>
         </div>
       </div>
     </div>

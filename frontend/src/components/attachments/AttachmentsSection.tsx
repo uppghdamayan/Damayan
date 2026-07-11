@@ -33,6 +33,7 @@ interface AttachmentsSectionProps {
   localAttachments?: any[];
   onAddLocalAttachment?: (attachment: { tag: string, textResult: string, file: File | null }) => void;
   onRemoveLocalAttachment?: (index: number) => void;
+  onPendingChange?: (pending: { hasFile: boolean; tag: string; textResult: string; fileName?: string }) => void;
 }
 
 function AttachmentViewButton({ attachmentId, filename }: { attachmentId: string, filename: string }) {
@@ -65,7 +66,15 @@ function AttachmentViewButton({ attachmentId, filename }: { attachmentId: string
   );
 }
 
-export function AttachmentsSection({ patientId, noteType, noteId, localAttachments = [], onAddLocalAttachment, onRemoveLocalAttachment }: AttachmentsSectionProps) {
+export function AttachmentsSection({ 
+  patientId, 
+  noteType, 
+  noteId, 
+  localAttachments = [], 
+  onAddLocalAttachment, 
+  onRemoveLocalAttachment,
+  onPendingChange
+}: AttachmentsSectionProps) {
   const { data: attachments, isLoading } = useAttachmentsByNote(noteType, noteId);
   // useUploadAttachment is moved to ProgressNoteForm
   const deleteAttachment = useDeleteAttachment();
@@ -80,6 +89,17 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
   const [uploadPercent, setUploadPercent] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (onPendingChange) {
+      onPendingChange({
+        hasFile: !!pendingFile,
+        tag,
+        textResult,
+        fileName: pendingFile?.name
+      });
+    }
+  }, [pendingFile, tag, textResult, onPendingChange]);
 
   if (isLoading && noteId) {
     return <LabResultsSectionSkeleton />;
