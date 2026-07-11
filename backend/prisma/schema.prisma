@@ -245,6 +245,7 @@ model Problem {
   parentId  String?       @map("parent_id") @db.Uuid
   title     String
   icdCode   String?       @map("icd_code") @db.VarChar(10)
+  diagnosisDate DateTime? @map("diagnosis_date")
   status    ProblemStatus @default(ACTIVE)
   sortOrder Int           @map("sort_order")
   addedBy   String?       @map("added_by") @db.Uuid

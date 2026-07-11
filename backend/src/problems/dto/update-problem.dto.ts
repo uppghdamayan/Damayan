@@ -22,6 +22,11 @@ export class UpdateProblemDto {
   @MaxLength(10)
   icdCode?: string | null;
 
+  @ApiPropertyOptional({ example: '2023-01-01' })
+  @IsOptional()
+  @IsString()
+  diagnosisDate?: string | null;
+
   @ApiPropertyOptional({ enum: ProblemStatus })
   @IsOptional()
   @IsEnum(ProblemStatus)

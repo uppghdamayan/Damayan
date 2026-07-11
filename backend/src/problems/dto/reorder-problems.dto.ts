@@ -6,6 +6,7 @@ import {
   IsInt,
   Min,
   IsOptional,
+  IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -24,6 +25,19 @@ class ReorderItemDto {
   @IsUUID()
   @IsOptional()
   parentId?: string | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  title?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  icdCode?: string | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  diagnosisDate?: string | null;
 }
 
 export class ReorderProblemsDto {

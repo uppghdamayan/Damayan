@@ -20,6 +20,11 @@ export class CreateProblemDto {
   @MaxLength(10)
   icdCode?: string;
 
+  @ApiPropertyOptional({ example: '2023-01-01' })
+  @IsOptional()
+  @IsString()
+  diagnosisDate?: string | null;
+
   @ApiPropertyOptional({
     description:
       'Root-level problem ID to nest this new problem under. Omit for a root-level problem.',

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { isDescendant } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 120px';
+const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 150px';
 
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
@@ -136,9 +136,9 @@ export function ActiveProblemRow({
         )}
       </div>
 
-      {/* Column 4: Date Added */}
+      {/* Column 4: Date of Diagnosis */}
       <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-left">
-        {new Date(problem.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+        {problem.diagnosisDate ? new Date(problem.diagnosisDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '--'}
       </div>
 
       {/* Column 5: Added By */}
@@ -182,14 +182,14 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 8: Actions */}
-      <div className="flex items-center justify-start gap-1.5">
+      <div className="flex items-center justify-end pr-4 gap-1.5">
         {canManage && (
           <>
             <button
               onClick={onEdit}
               className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer"
             >
-              Rename
+              Edit
             </button>
             <button
               onClick={onDelete}
@@ -349,11 +349,11 @@ export function ActiveProblemTable({
             <div className="w-[22px]" />
             <div className="w-[14px]" />
             <div className="text-left">Problem</div>
-            <div className="whitespace-nowrap text-left">Date Added</div>
+            <div className="whitespace-nowrap text-left">Date of Diagnosis</div>
             <div className="text-left">Added By</div>
             <div className="text-left">Status</div>
             <div className="text-left">Nest Under</div>
-            <div className="text-left">Actions</div>
+            <div className="text-right pr-4">Actions</div>
           </div>
           <div className="flex flex-col relative min-h-[100px]">
             {isSaving && (

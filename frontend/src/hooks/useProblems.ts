@@ -24,6 +24,7 @@ interface CreateProblemInput {
   title: string;
   icdCode?: string | null;
   parentId?: string;
+  diagnosisDate?: string | null;
 }
 interface UpdateProblemInput {
   id: string;
@@ -31,9 +32,17 @@ interface UpdateProblemInput {
   icdCode?: string | null;
   status?: ProblemStatusValue;
   parentId?: string | null;
+  diagnosisDate?: string | null;
 }
 interface ReorderInput {
-  items: { id: string; sortOrder: number }[];
+  items: { 
+    id: string; 
+    sortOrder: number;
+    parentId?: string | null;
+    title?: string;
+    icdCode?: string | null;
+    diagnosisDate?: string | null;
+  }[];
 }
 
 function invalidateProblems(qc: ReturnType<typeof useQueryClient>, patientId: string) {

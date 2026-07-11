@@ -70,6 +70,7 @@ export class ProblemsService {
         parentId: dto.parentId ?? null,
         title: dto.title.trim(),
         icdCode: dto.icdCode?.trim() || null,
+        diagnosisDate: dto.diagnosisDate ? new Date(dto.diagnosisDate) : null,
         status: ProblemStatus.ACTIVE,
         sortOrder,
         addedBy: userId,
@@ -118,6 +119,17 @@ export class ProblemsService {
       if (dto.title !== undefined) data.title = dto.title.trim();
       if (dto.icdCode !== undefined)
         data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
+        
+      if (dto.diagnosisDate !== undefined) {
+        data.diagnosisDate = dto.diagnosisDate ? new Date(dto.diagnosisDate) : null;
+        
+        const oldDateStr = existing.diagnosisDate ? existing.diagnosisDate.toISOString().split('T')[0] : '--';
+        const newDateStr = data.diagnosisDate ? data.diagnosisDate.toISOString().split('T')[0] : '--';
+        if (oldDateStr !== newDateStr) {
+          await this.logAction(patientId, userId, 'Updated', `Changed Date of Diagnosis for '${existing.title}' from '${oldDateStr}' to '${newDateStr}'`, tx, id);
+        }
+      }
+
       if (dto.parentId !== undefined) {
         data.parent = dto.parentId
           ? { connect: { id: dto.parentId } }
@@ -184,27 +196,70 @@ export class ProblemsService {
     userId: string,
   ): Promise<{ updated: number }> {
     const ids = dto.items.map((i) => i.id);
-    const owned = await this.prisma.problem.count({
-      where: { id: { in: ids }, patientId },
+    
+    // 1. Fetch existing problems for validation and diffing
+    const allPatientProblems = await this.prisma.problem.findMany({
+      where: { patientId },
     });
-    if (owned !== ids.length) {
-      throw new ForbiddenException(
-        'One or more problems do not belong to this patient.',
-      );
+    const existingMap = new Map(allPatientProblems.map(p => [p.id, p]));
+
+    const missingId = ids.find(id => !existingMap.has(id));
+    if (missingId) {
+      throw new ForbiddenException('One or more problems do not belong to this patient.');
     }
+
+    // 2. Track changes for the log
+    const changes: string[] = [];
+
+    // 3. Execute updates
     await this.prisma.$transaction(
-      dto.items.map((item) =>
-        this.prisma.problem.update({
+      dto.items.map((item) => {
+        const existing = existingMap.get(item.id)!;
+        const currentTitle = existing.title;
+
+        // Diff Parent
+        if (item.parentId !== undefined && item.parentId !== existing.parentId) {
+          if (item.parentId === null) {
+            changes.push(`Unnested '${currentTitle}'`);
+          } else {
+            const parentTitle = existingMap.get(item.parentId)?.title || 'Unknown';
+            changes.push(`Nested '${currentTitle}' under '${parentTitle}'`);
+          }
+        }
+
+        // Diff Title
+        if (item.title !== undefined && item.title.trim() !== currentTitle) {
+          changes.push(`Renamed '${currentTitle}' to '${item.title.trim()}'`);
+        }
+
+        // Diff Diagnosis Date
+        if (item.diagnosisDate !== undefined) {
+          const oldDateStr = existing.diagnosisDate ? existing.diagnosisDate.toISOString().split('T')[0] : '--';
+          const newDateStr = item.diagnosisDate ? new Date(item.diagnosisDate).toISOString().split('T')[0] : '--';
+          if (oldDateStr !== newDateStr) {
+            changes.push(`Set Date of Diagnosis for '${currentTitle}' to '${newDateStr}'`);
+          }
+        }
+
+        return this.prisma.problem.update({
           where: { id: item.id },
           data: {
             sortOrder: item.sortOrder,
             ...(item.parentId !== undefined && { parentId: item.parentId }),
+            ...(item.title !== undefined && { title: item.title.trim() }),
+            ...(item.icdCode !== undefined && { icdCode: item.icdCode ? item.icdCode.trim() : null }),
+            ...(item.diagnosisDate !== undefined && { diagnosisDate: item.diagnosisDate ? new Date(item.diagnosisDate) : null }),
             updatedBy: userId,
           },
-        }),
-      ),
+        });
+      }),
     );
-    await this.logAction(patientId, userId, 'Published', `Published new problem list order and nesting`, this.prisma);
+
+    const logMessage = changes.length > 0 
+      ? changes.join(', ')
+      : 'Published new problem list order and nesting';
+
+    await this.logAction(patientId, userId, 'Published', logMessage, this.prisma);
     return { updated: dto.items.length };
   }
 

@@ -7,7 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import type { Problem } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 3fr 1.8fr 2.2fr 1.5fr';
+const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 150px';
 
 interface ResolvedProblemTableProps {
   problems: Problem[];
@@ -31,6 +31,27 @@ export function ResolvedRow({
   dragHandleProps?: { attributes: any; listeners: any },
   isDragging?: boolean
 }) {
+  const creator = problem.addedByUser;
+  const addedAt = problem.createdAt;
+
+  const getCreatorName = (user: typeof problem.addedByUser) => {
+    if (!user) return 'System';
+    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
+    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
+    return `${user.firstName} ${user.lastName}`;
+  };
+  const creatorName = getCreatorName(creator);
+
+  const formattedAddedDateTime = new Date(addedAt).toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }) + ' · ' + new Date(addedAt).toLocaleTimeString('en-PH', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
   const style = {
     gridTemplateColumns: COLUMN_LAYOUT,
   };
@@ -58,25 +79,44 @@ export function ResolvedRow({
         ) : null}
       </div>
 
-      <div className="text-[13px] font-bold text-text-muted line-through truncate">
-        {problem.title}
+      {/* Column 2: Status dot */}
+      <div className="flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full flex-shrink-0 bg-text-muted/40" title="Resolved" />
+      </div>
+
+      {/* Column 3: Problem name */}
+      <div className="flex items-center gap-2 truncate text-text-muted line-through">
+        <span className="text-[13px] font-semibold truncate">{problem.title}</span>
       </div>
       
-      <div className="font-mono text-[11px] text-text-muted text-center">
-        {problem.icdCode ? (
-          <span className="bg-surface-2 px-1.5 py-0.5 rounded border border-border">
-            {problem.icdCode}
-          </span>
-        ) : (
-          '—'
-        )}
+      {/* Column 4: Date of Diagnosis */}
+      <div className="text-[12px] font-mono text-text-muted whitespace-nowrap text-left opacity-80">
+        {problem.diagnosisDate ? new Date(problem.diagnosisDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '--'}
       </div>
 
-      <div className="text-[12px] font-mono text-text-muted whitespace-nowrap text-center">
-        {new Date(problem.updatedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+      {/* Column 5: Added By */}
+      <div className="flex flex-col text-[11px] leading-tight text-text-muted text-left min-w-0 opacity-75">
+        <span className="font-semibold truncate" title={creatorName}>
+          {creatorName}
+        </span>
+        <span className="text-[10px] font-mono whitespace-nowrap mt-0.5">
+          {formattedAddedDateTime}
+        </span>
       </div>
 
-      <div className="flex items-center justify-center gap-1.5">
+      {/* Column 6: Status */}
+      <div className="flex justify-start opacity-70">
+        <select
+          disabled
+          value="RESOLVED"
+          className="h-6 w-full max-w-[90px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-muted outline-none cursor-not-allowed"
+        >
+          <option value="RESOLVED">Resolved</option>
+        </select>
+      </div>
+
+      {/* Column 7: Actions */}
+      <div className="flex items-center justify-end pr-4 gap-1.5">
         {canManage && (
           <>
             <button
@@ -151,10 +191,12 @@ export function ResolvedProblemTable({ problems, canManage, onReactivate, onDele
             style={{ gridTemplateColumns: COLUMN_LAYOUT }}
           >
             <div className="w-[22px]" />
-            <div className="text-left">Problem / Diagnosis</div>
-            <div className="text-center">ICD-10 Code</div>
-            <div className="text-center">Date Resolved</div>
-            <div className="text-center">Actions</div>
+            <div className="w-[14px]" />
+            <div className="text-left">Problem</div>
+            <div className="whitespace-nowrap text-left">Date of Diagnosis</div>
+            <div className="text-left">Added By</div>
+            <div className="text-left">Status</div>
+            <div className="text-right pr-4">Actions</div>
           </div>
           <div className="flex flex-col">
             <SortableContext items={ids} strategy={verticalListSortingStrategy}>

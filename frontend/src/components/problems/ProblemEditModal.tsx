@@ -12,13 +12,14 @@ interface ProblemEditModalProps {
   editing: Problem | null;
   allOptions: Problem[];
   saving: boolean;
-  onSave: (values: { title: string; icdCode?: string | null; parentId?: string | null }) => void;
+  onSave: (values: { title: string; icdCode?: string | null; parentId?: string | null; diagnosisDate?: string | null }) => void;
 }
 
 export function ProblemEditModal({ open, onClose, editing, allOptions, saving, onSave }: ProblemEditModalProps) {
   const [title, setTitle] = useState('');
   const [icdCode, setIcdCode] = useState('');
   const [parentId, setParentId] = useState('');
+  const [diagnosisDate, setDiagnosisDate] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
       setTitle(editing?.title ?? '');
       setIcdCode(editing?.icdCode ?? '');
       setParentId(editing?.parentId ?? '');
+      setDiagnosisDate(editing?.diagnosisDate ? new Date(editing.diagnosisDate).toISOString().split('T')[0] : '');
       setError('');
     }
   }, [open, editing]);
@@ -47,7 +49,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
       setError('Problem title is required.');
       return;
     }
-    onSave({ title: title.trim(), icdCode: icdCode.trim() || null, parentId: parentId || null });
+    onSave({ title: title.trim(), icdCode: icdCode.trim() || null, parentId: parentId || null, diagnosisDate: diagnosisDate || null });
   };
 
   return (
@@ -97,13 +99,13 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
 
           <div className="flex flex-col gap-1.5 mb-3.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              ICD-10 Code (optional)
+              Date of Diagnosis (optional)
             </label>
             <input
-              value={icdCode}
+              type="date"
+              value={diagnosisDate}
               disabled={saving}
-              onChange={(e) => setIcdCode(e.target.value)}
-              placeholder="e.g. I10"
+              onChange={(e) => setDiagnosisDate(e.target.value)}
               className="h-[34px] w-full px-2.5 bg-surface border border-border rounded-btn text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed"
             />
           </div>

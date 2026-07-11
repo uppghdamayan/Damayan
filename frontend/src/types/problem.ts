@@ -9,6 +9,7 @@ export interface Problem {
   status: ProblemStatusValue;
   sortOrder: number;
   addedBy: string | null;
+  diagnosisDate?: string | null;
   createdAt: string;
   updatedAt: string;
   addedByUser?: {
