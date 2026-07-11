@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import type { Medication } from '@/types/medication';
 
-export const MED_COLUMN_LAYOUT = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 110px 160px';
+export const MED_COLUMN_LAYOUT = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 160px 160px';
 export const MED_COLUMN_LAYOUT_DISCONTINUES = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 160px';
 
 interface MedicationEntryProps {
@@ -35,18 +35,17 @@ export function MedicationEntry({
 
     return (
       <span className={cn(
-        "ml-1.5 px-1 rounded border inline-flex items-center py-0.5",
-        isDraftChange ? "text-amber-700 bg-amber-500/10 border-amber-400/25 animate-pill-pulse" : "animate-highlight-pill text-green-700 bg-green-500/10 border-green-400/25"
+        "ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px]",
+        isDraftChange ? "text-amber bg-amber-bg border-amber-border" : "text-green bg-green-bg border-green-border"
       )}>
-        <span className={cn(
-          "text-[9px] font-bold uppercase tracking-[0.3px] inline-flex items-center",
-          !isDraftChange && "animate-pill-pulse"
-        )}>
-          updated!
-        </span>
+        updated!
       </span>
     );
   };
+
+  const isDraftNew = draftChangedFields?.includes('_isNew') || medication.id.startsWith('temp-');
+  const isPublishedNew = recentlyPublishedFields?.includes('_isNew');
+  const isNewItem = isDraftNew || isPublishedNew;
 
   return (
     <div 
@@ -57,7 +56,13 @@ export function MedicationEntry({
     >
       <div className={cn("text-[13px] font-bold truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-primary" : "text-text-muted line-through")}>
         <span className="truncate">{medication.name}</span>
-        {renderUpdateTag('name')}
+        {isNewItem ? (
+          <span className="ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px] text-green bg-green-bg border-green-border">
+            new
+          </span>
+        ) : (
+          renderUpdateTag('name')
+        )}
       </div>
 
       <div className={cn("text-[12px] font-medium truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>

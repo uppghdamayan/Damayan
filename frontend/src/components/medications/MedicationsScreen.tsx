@@ -257,12 +257,15 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         await updateMedication.mutateAsync({ id, ...updates });
       }
       for (const create of pendingChanges.creates) {
-        await createMedication.mutateAsync({
+        const res = await createMedication.mutateAsync({
           ...create,
           formulation: create.formulation ?? undefined,
           instructions: create.instructions ?? undefined,
           quantity: create.quantity ?? undefined,
         });
+        if (res && res.id) {
+          publishedChanges[res.id] = ['_isNew'];
+        }
       }
       setPendingChanges({ creates: [], updates: {}, deletes: [] });
       setLastAutoSaved(null);
@@ -284,7 +287,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
   const getDraftChanges = (m: Medication) => {
     if (m.id.startsWith('temp-')) {
-      return ['name', 'formulation', 'dose', 'instructions', 'quantity', 'isActive'];
+      return ['_isNew'];
     }
     const updates = pendingChanges.updates[m.id];
     const original = rawData.find((r) => r.id === m.id);

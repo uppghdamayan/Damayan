@@ -10,6 +10,23 @@ import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 const COLUMN_LAYOUT = '1.2fr 1.5fr 3fr 1fr';
 const ITEMS_PER_PAGE = 10;
 
+const FormattedLogText = ({ text }: { text: string }) => {
+  const processed = text.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note');
+  const pattern = /\b(renamed|dose|formulation|instructions|quantity|status|unnested|nested|set date of diagnosis)\b/gi;
+  const parts = processed.split(pattern);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (i % 2 === 1) {
+          return <span key={i} className="font-semibold text-text-primary">{part}</span>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+};
+
 const ACTIONS = [
   'All',
   'Created',
@@ -287,8 +304,8 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
                   {log.editor.role === 'DOCTOR' ? `Dr. ${log.editor.lastName}` : log.editor.role === 'NURSE' ? `Nurse ${log.editor.lastName}` : `${log.editor.firstName} ${log.editor.lastName}`}
                 </div>
                 
-                <div className="text-[12px] text-text-primary truncate" title={log.description.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note')}>
-                  {log.description.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note')}
+                <div className="text-[12px] text-text-primary pr-2 leading-relaxed" title={log.description.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note')}>
+                  <FormattedLogText text={log.description} />
                 </div>
 
                 <div className="flex justify-center">

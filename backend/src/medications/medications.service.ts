@@ -123,15 +123,42 @@ export class MedicationsService {
     data.updatedBy = userId;
 
     let action = 'Updated';
-    let description = `Updated medication: ${existing.name}`;
+    let description = `Updated medication '${existing.name}'`;
 
     if (dto.isActive !== undefined && dto.isActive !== existing.isActive) {
       if (dto.isActive) {
         action = 'Reactivated';
-        description = `Reactivated medication: ${existing.name}`;
+        description = `Reactivated medication '${existing.name}'`;
       } else {
         action = 'Discontinued';
-        description = `Discontinued medication: ${existing.name}`;
+        description = `Discontinued medication '${existing.name}'`;
+      }
+    } else {
+      const changes: string[] = [];
+      if (dto.name !== undefined && dto.name.trim() !== existing.name) {
+        changes.push(`renamed to '${dto.name.trim()}'`);
+      }
+      if (dto.dose !== undefined && dto.dose.trim() !== existing.dose) {
+        changes.push(`dose changed to '${dto.dose.trim()}'`);
+      }
+      
+      const newFormulation = dto.formulation?.trim() || null;
+      if (dto.formulation !== undefined && newFormulation !== existing.formulation) {
+        changes.push(`formulation changed to '${newFormulation || 'none'}'`);
+      }
+      
+      const newInstructions = dto.instructions?.trim() || null;
+      if (dto.instructions !== undefined && newInstructions !== existing.instructions) {
+        changes.push(`instructions changed to '${newInstructions || 'none'}'`);
+      }
+      
+      const newQuantity = dto.quantity ?? null;
+      if (dto.quantity !== undefined && newQuantity !== existing.quantity) {
+        changes.push(`quantity changed to '${newQuantity || 'none'}'`);
+      }
+
+      if (changes.length > 0) {
+        description = `Updated '${existing.name}': ${changes.join(', ')}`;
       }
     }
 
