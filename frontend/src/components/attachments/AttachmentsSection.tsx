@@ -3,7 +3,7 @@ import { useAttachmentsByNote, useDeleteAttachment, useUploadAttachment, useAtta
 import { LabResultsSectionSkeleton } from './LabResultsSectionSkeleton';
 import { UploadProgressBar } from './UploadProgressBar';
 import { Button } from '../ui/button';
-import { Trash2, FileText, UploadCloud, X, Download } from 'lucide-react';
+import { Trash2, FileText, UploadCloud, X, Download, Eye } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { PriorLabsTable } from '../notes/PriorLabsTable';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -35,6 +35,36 @@ interface AttachmentsSectionProps {
   onRemoveLocalAttachment?: (index: number) => void;
 }
 
+function AttachmentViewButton({ attachmentId, filename }: { attachmentId: string, filename: string }) {
+  const { refetch, isFetching } = useAttachmentDownloadUrl(attachmentId);
+
+  const handleView = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const res = await refetch();
+      if (res.data) {
+        window.open(res.data, '_blank');
+      }
+    } catch (err) {
+      alert('Failed to view file');
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="xs"
+      onClick={handleView}
+      disabled={isFetching}
+      className="h-6.5 text-[11px] font-semibold border-accent/20 hover:border-accent/50 hover:bg-accent-light/20 hover:text-accent transition-all duration-150 flex items-center gap-1 mt-1.5 w-fit"
+    >
+      <Eye size={12} />
+      {isFetching ? 'Loading...' : `View File`}
+    </Button>
+  );
+}
+
 export function AttachmentsSection({ patientId, noteType, noteId, localAttachments = [], onAddLocalAttachment, onRemoveLocalAttachment }: AttachmentsSectionProps) {
   const { data: attachments, isLoading } = useAttachmentsByNote(noteType, noteId);
   // useUploadAttachment is moved to ProgressNoteForm
@@ -46,6 +76,7 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
   const [textResult, setTextResult] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadPercent, setUploadPercent] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,18 +95,40 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
     }
   };
 
+  const handleFileChange = (file: File) => {
+    setPendingFile(file);
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const handleRemovePendingFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPendingFile(null);
+    setPreviewUrl(null);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setPendingFile(e.dataTransfer.files[0]);
+      handleFileChange(e.dataTransfer.files[0]);
     }
   };
 
   const handleUpload = async () => {
     if (!tag.trim()) {
       alert('Please provide a tag (e.g., CBC, X-Ray) for this result.');
+      return;
+    }
+    if (!pendingFile) {
+      alert('Please select a file.');
       return;
     }
     
@@ -85,7 +138,9 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
         textResult: textResult.trim(),
         file: pendingFile
       });
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPendingFile(null);
+      setPreviewUrl(null);
       setTag('');
       setTextResult('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -126,19 +181,7 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
                     <div className="flex flex-col">
                       <span className="text-[12px] font-semibold text-[var(--text-primary)]">{att.tag}</span>
                       {att.storageKey && (
-                        <div className="flex items-center gap-1.5 text-accent mt-1.5">
-                          <FileText className="w-3.5 h-3.5" /> 
-                          <a 
-                            href="#" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              alert('Will fetch signed URL and open...');
-                            }}
-                            className="text-[12px] font-medium hover:underline"
-                          >
-                            {att.storageKey.split('/').pop()}
-                          </a>
-                        </div>
+                        <AttachmentViewButton attachmentId={att.id} filename={att.storageKey.split('/').pop() || ''} />
                       )}
                       {att.textResult && (
                         <p className="mt-1.5 text-[12px] text-[var(--text-secondary)] italic">"{att.textResult}"</p>
@@ -189,7 +232,7 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
           </div>
 
           <div className="flex flex-col gap-1.5 mb-1">
-            <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">File (Optional)</label>
+            <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">File (Required) <span className="text-red font-bold">*</span></label>
             {!pendingFile ? (
               <div 
                 className={`flex flex-col items-center justify-center py-[22px] px-4 border border-dashed rounded-btn transition-colors duration-150 ${dragActive ? 'border-accent bg-accent-light/30' : 'border-border-strong/60 bg-surface hover:bg-surface-2'}`}
@@ -205,7 +248,7 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
                   className="hidden" 
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
-                      setPendingFile(e.target.files[0]);
+                      handleFileChange(e.target.files[0]);
                     }
                   }} 
                 />
@@ -215,21 +258,45 @@ export function AttachmentsSection({ patientId, noteType, noteId, localAttachmen
                 </p>
               </div>
             ) : (
-              <div className="flex items-center justify-between p-2.5 border border-border rounded-btn bg-surface-2">
-                <span className="text-[12px] font-medium text-[var(--text-primary)] truncate max-w-[80%]">{pendingFile.name}</span>
-                <button 
-                  className="h-[24px] px-2 rounded-[4px] bg-transparent border-transparent hover:bg-surface-3 hover:text-[var(--text-primary)] text-[var(--text-muted)] transition-all duration-150 flex items-center justify-center" 
-                  onClick={() => setPendingFile(null)}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              <div className="flex flex-col gap-2 p-3 border border-border rounded-btn bg-surface-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 truncate max-w-[85%]">
+                    <FileText className="w-4 h-4 text-accent shrink-0" />
+                    <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{pendingFile.name}</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">({(pendingFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                  </div>
+                  <button 
+                    type="button"
+                    className="h-6 w-6 rounded-full hover:bg-surface-3 hover:text-red text-[var(--text-muted)] transition-all flex items-center justify-center cursor-pointer" 
+                    onClick={handleRemovePendingFile}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {/* File preview thumbnail if image */}
+                {pendingFile.type.startsWith('image/') && previewUrl && (
+                  <div className="relative w-full max-h-36 rounded-md overflow-hidden border border-border bg-black/5 flex items-center justify-center mt-1">
+                    <img 
+                      src={previewUrl} 
+                      alt="Preview" 
+                      className="max-h-36 object-contain"
+                    />
+                  </div>
+                )}
+                {/* PDF preview indicator */}
+                {pendingFile.type === 'application/pdf' && (
+                  <div className="flex items-center gap-2 p-2 bg-surface/50 border border-border rounded text-[11px] text-[var(--text-secondary)] mt-1">
+                    <span className="w-2 h-2 rounded-full bg-red shrink-0" />
+                    <span>PDF Document selected. Click 'Add Result' to attach.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex justify-end mt-1">
             <button 
-              disabled={!tag.trim() || (!pendingFile && !textResult.trim())}
+              disabled={!tag.trim() || !pendingFile}
               onClick={handleUpload}
               className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap min-w-[80px] justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >

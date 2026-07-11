@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePriorLabs, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, Trash2, Eye } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface PriorLabsTableProps {
@@ -13,7 +13,7 @@ export function PriorLabsTable({ patientId, localAttachments = [], onRemoveLocal
   const { data: groupedLabs, isLoading } = usePriorLabs(patientId);
 
   if (isLoading) {
-    return <div className="p-4 text-12px text-text-muted">Loading prior labs...</div>;
+    return <div className="p-4 text-[12px] text-text-muted">Loading prior labs...</div>;
   }
 
   if (!groupedLabs || (groupedLabs.length === 0 && localAttachments.length === 0)) {
@@ -52,16 +52,32 @@ export function PriorLabsTable({ patientId, localAttachments = [], onRemoveLocal
                 ) : null}
               </td>
               <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-top border-b border-border">
-                {onRemoveLocalAttachment && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon-xs" 
-                    onClick={() => onRemoveLocalAttachment(idx)}
-                    className="h-7 w-7 text-text-muted hover:text-red transition-all duration-150 p-0 flex items-center justify-center rounded-[4px]"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {att.file && (
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => {
+                        const url = URL.createObjectURL(att.file);
+                        window.open(url, '_blank');
+                      }}
+                      className="h-6.5 text-[11px] font-semibold border-accent/20 hover:border-accent/50 hover:bg-accent-light/20 hover:text-accent transition-all duration-150 flex items-center gap-1"
+                    >
+                      <Eye size={12} />
+                      View
+                    </Button>
+                  )}
+                  {onRemoveLocalAttachment && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon-xs" 
+                      onClick={() => onRemoveLocalAttachment(idx)}
+                      className="h-7 w-7 text-text-muted hover:text-red transition-all duration-150 p-0 flex items-center justify-center rounded-[4px]"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -116,13 +132,13 @@ function DownloadButton({ attachmentId, storageKey }: { attachmentId: string, st
   return (
     <Button 
       variant="outline" 
-      size="sm" 
+      size="xs" 
       onClick={handleDownload}
       disabled={isFetching}
-      className="h-7 text-11px"
+      className="h-6.5 text-[11px] font-semibold border-accent/20 hover:border-accent/50 hover:bg-accent-light/20 hover:text-accent transition-all duration-150 flex items-center gap-1"
     >
-      <Download size={12} className="mr-1" />
-      {isFetching ? '...' : 'View'}
+      <Eye size={12} />
+      {isFetching ? 'Loading...' : 'View'}
     </Button>
   );
 }

@@ -30,7 +30,7 @@ function NoteAttachmentItem({ att }: { att: any }) {
   };
 
   return (
-    <div className="flex items-center justify-between py-1.5 px-2 bg-surface-2 border border-border rounded-[4px]">
+    <div className="flex items-center justify-between py-1.5 px-2.5 bg-surface-2 border border-border rounded-[4px] w-fit min-w-[200px] max-w-sm gap-4">
       <div className="flex items-center gap-2">
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">{att.tag}</span>
         {att.textResult && (
@@ -39,8 +39,9 @@ function NoteAttachmentItem({ att }: { att: any }) {
       </div>
       {att.storageKey && (
         <button
+          type="button"
           onClick={handleDownload}
-          className="text-[var(--text-muted)] hover:text-accent transition-colors"
+          className="text-[var(--text-muted)] hover:text-accent transition-colors flex items-center justify-center cursor-pointer shrink-0"
           title="Download File"
         >
           <Download className="w-3.5 h-3.5" />
@@ -62,7 +63,7 @@ function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
         <Paperclip className="w-3.5 h-3.5" />
         <span className="text-[11.5px] uppercase tracking-[0.6px]">Attachments & Labs</span>
       </div>
-      <div className="flex flex-col gap-1.5 mt-1 pl-2">
+      <div className="flex flex-wrap gap-2 mt-1 pl-2">
         {attachments.map((att) => (
           <NoteAttachmentItem key={att.id} att={att} />
         ))}
@@ -156,7 +157,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                     {item.text}
                   </span>
                   {item.status === 'removed' && (
-                    <Badge variant="removed" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
+                    <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">Resolved</Badge>
                   )}
                   {item.status === 'added' && (
                     <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
