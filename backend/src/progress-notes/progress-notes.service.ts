@@ -83,7 +83,7 @@ export class ProgressNotesService {
     tx: Prisma.TransactionClient,
   ): Promise<string | null> {
     const latestProgress = await tx.progressNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED },
+      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
       orderBy: { visit: { visitDatetime: 'desc' } },
       select: {
         mgmtNonpharm: true,
@@ -92,7 +92,7 @@ export class ProgressNotesService {
     });
 
     const initial = await tx.initialNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED },
+      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
       select: {
         mgmtNonpharm: true,
         visit: { select: { visitDatetime: true } },
@@ -218,26 +218,14 @@ export class ProgressNotesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const beforeProblems = await this.problemsService.findActiveForPatient(
-        patientId,
-        tx,
-      );
-      const beforeMeds = await this.medicationsService.findActiveForPatient(
-        patientId,
-        tx,
-      );
+      const [beforeProblems, beforeMeds] = await Promise.all([
+        this.problemsService.findActiveForPatient(patientId, tx),
+        this.medicationsService.findActiveForPatient(patientId, tx),
+      ]);
 
       const snapshotItems = (note.problemListSnapshot as any[] || [])
         .filter(p => p && p.title && String(p.title).trim() !== '')
         .map(p => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
-
-      await this.problemsService.upsertFromAssessment(
-        patientId,
-        snapshotItems,
-        userId,
-        'Progress Note',
-        tx,
-      );
 
       const snapshotMeds = (note.medicationSnapshot as any[] || [])
         .filter(m => m && m.name && String(m.name).trim() !== '')
@@ -248,22 +236,28 @@ export class ProgressNotesService {
           quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
           instructions: m.instructions,
         }));
-      await this.medicationsService.upsertFromNoteMedications(
-        patientId,
-        snapshotMeds,
-        userId,
-        'Progress Note',
-        tx,
-      );
 
-      const afterProblems = await this.problemsService.findActiveForPatient(
-        patientId,
-        tx,
-      );
-      const afterMeds = await this.medicationsService.findActiveForPatient(
-        patientId,
-        tx,
-      );
+      await Promise.all([
+        this.problemsService.upsertFromAssessment(
+          patientId,
+          snapshotItems,
+          userId,
+          'Progress Note',
+          tx,
+        ),
+        this.medicationsService.upsertFromNoteMedications(
+          patientId,
+          snapshotMeds,
+          userId,
+          'Progress Note',
+          tx,
+        ),
+      ]);
+
+      const [afterProblems, afterMeds] = await Promise.all([
+        this.problemsService.findActiveForPatient(patientId, tx),
+        this.medicationsService.findActiveForPatient(patientId, tx),
+      ]);
 
       const problemChanges = diffByTitle(beforeProblems, afterProblems);
       const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
@@ -309,6 +303,7 @@ export class ProgressNotesService {
           where: {
             visit: { patientId },
             createdAt: { gt: note.createdAt },
+            isDeleted: false,
           },
         });
         if (newerNote) {
@@ -320,7 +315,7 @@ export class ProgressNotesService {
         let prevSnapshotMeds: any[] = [];
         
         const prevProgress = await tx.progressNote.findFirst({
-          where: { visit: { patientId }, status: NoteStatus.PUBLISHED, id: { not: id } },
+          where: { visit: { patientId }, status: NoteStatus.PUBLISHED, id: { not: id }, isDeleted: false },
           orderBy: { createdAt: 'desc' }
         });
         
@@ -329,7 +324,7 @@ export class ProgressNotesService {
           prevSnapshotMeds = prevProgress.medicationSnapshot as any[] || [];
         } else {
           const initialNote = await tx.initialNote.findFirst({
-            where: { visit: { patientId } }
+            where: { visit: { patientId }, isDeleted: false }
           });
           if (initialNote) {
             prevSnapshotProblems = initialNote.assessment as any[] || [];
@@ -353,8 +348,12 @@ export class ProgressNotesService {
 
         await this.problemsService.upsertFromAssessment(patientId, validProblems, userId, 'Progress Note', tx);
         await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, 'Progress Note', tx);
+
+        await tx.progressNote.update({ where: { id }, data: { isDeleted: true } });
+        return { success: true, ...note, isDeleted: true };
       }
 
+      // Hard delete for DRAFT
       const attachments = await tx.attachment.findMany({
         where: { noteId: id },
       });

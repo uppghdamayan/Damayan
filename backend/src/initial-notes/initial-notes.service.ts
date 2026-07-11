@@ -26,7 +26,7 @@ export class InitialNotesService {
 
   async findOne(patientId: string) {
     const note = await this.prisma.initialNote.findFirst({
-      where: { visit: { patientId } },
+      where: { visit: { patientId }, isDeleted: false },
       include: { author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
     });
     if (!note) {
@@ -35,9 +35,17 @@ export class InitialNotesService {
     return note;
   }
 
+  async findAll(patientId: string) {
+    return this.prisma.initialNote.findMany({
+      where: { visit: { patientId } },
+      include: { author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async create(patientId: string, dto: CreateInitialNoteDto, userId: string) {
     const existing = await this.prisma.initialNote.findFirst({
-      where: { visit: { patientId } },
+      where: { visit: { patientId }, isDeleted: false },
     });
     if (existing) {
       throw new ConflictException('Patient already has an Initial Note.');
@@ -227,13 +235,14 @@ export class InitialNotesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const published = await tx.initialNote.update({
-        where: { id },
-        data: { status: NoteStatus.PUBLISHED },
-      });
-
-      const beforeProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-      const beforeMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+      const [published, beforeProblems, beforeMeds] = await Promise.all([
+        tx.initialNote.update({
+          where: { id },
+          data: { status: NoteStatus.PUBLISHED },
+        }),
+        this.problemsService.findActiveForPatient(patientId, tx),
+        this.medicationsService.findActiveForPatient(patientId, tx),
+      ]);
 
       const assessmentItems = (note.assessment as any[] || [])
         .filter(a => a && a.title && String(a.title).trim() !== '')
@@ -241,15 +250,6 @@ export class InitialNotesService {
           title: String(a.title).trim(),
           icdCode: a.icdCode,
         }));
-      
-      await this.problemsService.upsertFromAssessment(
-        patientId,
-        assessmentItems,
-        userId,
-        'Initial Note',
-        tx,
-      );
-
       const medicationItems = (note.medicationSnapshot as any[] || [])
         .filter(m => m && m.name && String(m.name).trim() !== '')
         .map((m) => ({
@@ -259,16 +259,28 @@ export class InitialNotesService {
           quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
           instructions: m.instructions,
         }));
-      await this.medicationsService.upsertFromNoteMedications(
-        patientId,
-        medicationItems,
-        userId,
-        'Initial Note',
-        tx,
-      );
 
-      const afterProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-      const afterMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
+      await Promise.all([
+        this.problemsService.upsertFromAssessment(
+          patientId,
+          assessmentItems,
+          userId,
+          'Initial Note',
+          tx,
+        ),
+        this.medicationsService.upsertFromNoteMedications(
+          patientId,
+          medicationItems,
+          userId,
+          'Initial Note',
+          tx,
+        )
+      ]);
+
+      const [afterProblems, afterMeds] = await Promise.all([
+        this.problemsService.findActiveForPatient(patientId, tx),
+        this.medicationsService.findActiveForPatient(patientId, tx)
+      ]);
 
       const problemChanges = diffByTitle(beforeProblems, afterProblems);
       const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
@@ -314,6 +326,15 @@ export class InitialNotesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      if (note.status === NoteStatus.PUBLISHED) {
+        await tx.initialNote.update({
+          where: { id },
+          data: { isDeleted: true },
+        });
+        return { success: true, ...note, isDeleted: true };
+      }
+
+      // Hard delete for DRAFT
       // Delete attachments first if there are any
       const attachments = await tx.attachment.findMany({
         where: { noteId: id },

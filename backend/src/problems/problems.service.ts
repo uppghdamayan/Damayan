@@ -252,6 +252,9 @@ export class ProblemsService {
       }
     }
 
+    let currentSortOrder = await this.getNextSortOrder(patientId, client);
+    const promises: Promise<any>[] = [];
+
     for (const [key, item] of uniqueItems.entries()) {
       const match = existing.find((p) => p.title.toLowerCase() === key);
 
@@ -262,53 +265,57 @@ export class ProblemsService {
 
       if (match && match.status === ProblemStatus.RESOLVED) {
         keptIds.add(match.id);
-        const sortOrder = await this.getNextSortOrder(patientId, client);
-        await client.problem.update({
-          where: { id: match.id },
-          data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
-        });
-        await this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from ${sourceNote}`, client, match.id);
+        const sortOrder = currentSortOrder++;
+        promises.push(
+          client.problem.update({
+            where: { id: match.id },
+            data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
+          }).then(() => this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from ${sourceNote}`, client, match.id))
+        );
         continue;
       }
 
       if (match && match.status === ProblemStatus.REMOVED) {
         keptIds.add(match.id);
-        const sortOrder = await this.getNextSortOrder(patientId, client);
-        await client.problem.update({
-          where: { id: match.id },
-          data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
-        });
-        await this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from ${sourceNote}`, client, match.id);
+        const sortOrder = currentSortOrder++;
+        promises.push(
+          client.problem.update({
+            where: { id: match.id },
+            data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
+          }).then(() => this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from ${sourceNote}`, client, match.id))
+        );
         continue;
       }
 
-      const sortOrder = await this.getNextSortOrder(patientId, client);
-      const newProb = await client.problem.create({
-        data: {
-          patientId,
-          title: item.title,
-          icdCode: item.icdCode,
-          status: ProblemStatus.ACTIVE,
-          sortOrder,
-          addedBy: userId,
-        },
-      });
-      await this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from ${sourceNote}`, client, newProb.id);
+      const sortOrder = currentSortOrder++;
+      promises.push(
+        client.problem.create({
+          data: {
+            patientId,
+            title: item.title,
+            icdCode: item.icdCode,
+            status: ProblemStatus.ACTIVE,
+            sortOrder,
+            addedBy: userId,
+          },
+        }).then(newProb => this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from ${sourceNote}`, client, newProb.id))
+      );
     }
 
     // Mark missing items as RESOLVED
     for (const ext of existing) {
-      // We only auto-resolve ACTIVE problems that were dropped from the snapshot.
-      // We don't touch already RESOLVED problems that are not mentioned.
       if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
-        const sortOrder = await this.getNextSortOrder(patientId, client);
-        await client.problem.update({
-          where: { id: ext.id },
-          data: { status: ProblemStatus.RESOLVED, sortOrder, updatedByUser: { connect: { id: userId } } },
-        });
-        await this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`, client, ext.id);
+        const sortOrder = currentSortOrder++;
+        promises.push(
+          client.problem.update({
+            where: { id: ext.id },
+            data: { status: ProblemStatus.RESOLVED, sortOrder, updatedByUser: { connect: { id: userId } } },
+          }).then(() => this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`, client, ext.id))
+        );
       }
     }
+
+    await Promise.all(promises);
   }
 
   // ─────────────────────────────────────────────

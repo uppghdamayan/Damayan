@@ -193,8 +193,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
   const isPublished = note?.status === 'PUBLISHED';
-  const canEditAll = !isPublished || !hasProgressNotes;
-  const isHistoryEditableOnly = isPublished && hasProgressNotes;
+  const canEditAll = !isPublished;
+  const isHistoryEditableOnly = false;
 
   const historyInputClass = cn(
     "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
@@ -613,13 +613,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               </div>
             </div>
             <div className="flex flex-col items-end gap-1.5">
-              <button 
-                type="button" 
-                onClick={() => setIsEditing(true)} 
-                className="sec-btn primary shrink-0"
-              >
-                Edit Note
-              </button>
               {note.lastEditor && (
                 <div className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] text-[var(--text-muted)]">
                   <Edit className="w-2.5 h-2.5" />

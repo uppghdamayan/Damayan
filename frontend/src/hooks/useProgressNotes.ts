@@ -31,6 +31,7 @@ export interface ProgressNote {
     lastName: string;
     role: 'DOCTOR' | 'NURSE' | 'ADMIN';
   } | null;
+  isDeleted: boolean;
 }
 
 export function useProgressNotes(patientId: string | null, page = 1, limit = 10) {
@@ -133,6 +134,25 @@ export function usePublishProgressNote(patientId: string) {
       apiRequest<ProgressNote>(`/patients/${patientId}/progress-notes/${id}/publish`, {
         method: 'POST',
       }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['progress-notes', patientId] });
+      const previousNotes = queryClient.getQueryData<{ data: ProgressNote[] }>(['progress-notes', patientId]);
+      
+      if (previousNotes?.data) {
+        queryClient.setQueryData(['progress-notes', patientId], {
+          ...previousNotes,
+          data: previousNotes.data.map((n) => 
+            n.id === id ? { ...n, status: 'PUBLISHED' } : n
+          )
+        });
+      }
+      return { previousNotes };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousNotes) {
+        queryClient.setQueryData(['progress-notes', patientId], context.previousNotes);
+      }
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);

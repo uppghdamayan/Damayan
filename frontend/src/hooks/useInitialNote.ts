@@ -35,6 +35,7 @@ export interface InitialNote {
     lastName: string;
     role: 'DOCTOR' | 'NURSE' | 'ADMIN';
   } | null;
+  isDeleted: boolean;
 }
 
 export function useInitialNote(patientId: string | null) {
@@ -43,6 +44,14 @@ export function useInitialNote(patientId: string | null) {
     queryFn: () => apiRequest<InitialNote>(`/patients/${patientId}/initial-note`),
     enabled: !!patientId,
     retry: false, // 404 = no note yet; don't retry-storm
+  });
+}
+
+export function useInitialNotes(patientId: string | null) {
+  return useQuery({
+    queryKey: ['initial-notes-all', patientId],
+    queryFn: () => apiRequest<InitialNote[]>(`/patients/${patientId}/initial-note/all`),
+    enabled: !!patientId,
   });
 }
 
@@ -94,8 +103,35 @@ export function usePublishInitialNote(patientId: string) {
       apiRequest<InitialNote>(`/patients/${patientId}/initial-note/${id}/publish`, {
         method: 'POST',
       }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['initial-note', patientId] });
+      await queryClient.cancelQueries({ queryKey: ['initial-notes-all', patientId] });
+      
+      const previousNote = queryClient.getQueryData<InitialNote>(['initial-note', patientId]);
+      const previousAllNotes = queryClient.getQueryData<InitialNote[]>(['initial-notes-all', patientId]);
+
+      if (previousNote?.id === id) {
+        queryClient.setQueryData(['initial-note', patientId], { ...previousNote, status: 'PUBLISHED' });
+      }
+      
+      if (previousAllNotes) {
+        queryClient.setQueryData(['initial-notes-all', patientId], 
+          previousAllNotes.map(n => n.id === id ? { ...n, status: 'PUBLISHED' } : n)
+        );
+      }
+      return { previousNote, previousAllNotes };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousNote !== undefined) {
+        queryClient.setQueryData(['initial-note', patientId], context.previousNote);
+      }
+      if (context?.previousAllNotes !== undefined) {
+        queryClient.setQueryData(['initial-notes-all', patientId], context.previousAllNotes);
+      }
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(['initial-note', patientId], data);
+      queryClient.invalidateQueries({ queryKey: ['initial-notes-all', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
@@ -114,6 +150,7 @@ export function useDeleteInitialNote(patientId: string) {
       }),
     onSuccess: () => {
       queryClient.setQueryData(['initial-note', patientId], null);
+      queryClient.invalidateQueries({ queryKey: ['initial-notes-all', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });

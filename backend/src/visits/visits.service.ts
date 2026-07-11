@@ -9,9 +9,17 @@ export class VisitsService {
 
   async findAllByPatient(patientId: string, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
+    const whereClause: Prisma.VisitWhereInput = {
+      patientId,
+      OR: [
+        { initialNote: { is: { isDeleted: false } } },
+        { progressNote: { is: { isDeleted: false } } },
+      ],
+    };
+
     const [data, total] = await Promise.all([
       this.prisma.visit.findMany({
-        where: { patientId },
+        where: whereClause,
         skip,
         take: limit,
         orderBy: { visitDatetime: 'desc' },
@@ -19,11 +27,11 @@ export class VisitsService {
           physician: {
             select: { firstName: true, lastName: true, middleName: true },
           },
-          initialNote: { select: { status: true, chiefComplaint: true } },
-          progressNote: { select: { status: true, subjective: true } },
+          initialNote: { select: { status: true, chiefComplaint: true, isDeleted: true } },
+          progressNote: { select: { status: true, subjective: true, isDeleted: true } },
         },
       }),
-      this.prisma.visit.count({ where: { patientId } }),
+      this.prisma.visit.count({ where: whereClause }),
     ]);
     return {
       data,

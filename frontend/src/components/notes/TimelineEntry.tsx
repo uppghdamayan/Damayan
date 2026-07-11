@@ -42,14 +42,23 @@ export function TimelineEntry({
     hour: '2-digit',
     minute: '2-digit',
   });
-
-  const showEditActions = isInitial || note.status === 'DRAFT';
+  const showEditActions = note.status === 'DRAFT';
 
   return (
     <div 
       className={cn(
-        "nt-entry transition-all duration-200 border border-border rounded-card bg-surface overflow-hidden shadow-sm hover:shadow-card",
-        isOpen ? "border-l-[3px] border-l-accent bg-accent-light/10" : ""
+        "nt-entry transition-all duration-200 border rounded-card bg-surface overflow-hidden shadow-sm hover:shadow-card",
+        // Soft deleted styles
+        note.isDeleted && "opacity-60 grayscale border-border",
+        // Active styles
+        !note.isDeleted && (
+          note.status === 'DRAFT' 
+            ? "border-dashed border-[var(--amber-border)]/50 bg-[var(--amber-bg)]/[0.04] border-l-[4px] border-l-[var(--amber-border)]"
+            : (isInitial 
+                ? "border-border border-l-[4px] border-l-[var(--purple-border)] bg-[var(--purple-bg)]/[0.02]"
+                : "border-border border-l-[4px] border-l-[var(--accent)] bg-[var(--accent-light)]/[0.02]")
+        ),
+        isOpen && "shadow-md ring-1 ring-inset ring-accent/10 bg-accent-light/5"
       )}
     >
       <div 
@@ -90,13 +99,18 @@ export function TimelineEntry({
             {/* Status & Trait Badges */}
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                {note.isDeleted && (
+                  <Badge variant="resolved" className="bg-red-50 text-red border border-red-200">
+                    Deleted
+                  </Badge>
+                )}
                 <Badge variant={note.status === 'PUBLISHED' ? 'published' : 'draft'}>
                   {note.status}
                 </Badge>
-                {note.isLatest && (
+                {note.isLatest && !note.isDeleted && (
                   <Badge variant="active">Latest Note</Badge>
                 )}
-                {isInitial && note.status === 'PUBLISHED' && (
+                {isInitial && note.status === 'PUBLISHED' && !note.isDeleted && (
                   // Inherited badge condition: only show if the Initial Note is published.
                   <Badge variant="published" className="flex items-center gap-1 normal-case font-medium">
                     <Pin className="w-2.5 h-2.5 shrink-0" />
@@ -148,7 +162,9 @@ export function TimelineEntry({
       {/* Expanded SOAP contents using shadcn Collapsible */}
       <Collapsible open={isOpen} onOpenChange={onToggle}>
         <CollapsibleContent className="border-t border-border bg-surface p-4">
-          <NoteFormattedSections note={note} previousNote={previousNote} />
+          <div className={note.isDeleted ? "line-through opacity-70" : ""}>
+            <NoteFormattedSections note={note} previousNote={previousNote} />
+          </div>
           
           {/* Action button inside the panel */}
           <div className="flex justify-between items-center mt-4 pt-3 border-t border-border">

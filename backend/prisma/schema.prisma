@@ -191,6 +191,7 @@ model InitialNote {
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
   diagnostics          Json?
   status               NoteStatus @default(DRAFT)
+  isDeleted            Boolean    @default(false) @map("is_deleted")
   lastEditedBy         String?    @map("last_edited_by") @db.Uuid
   lastEditedAt         DateTime?  @map("last_edited_at")
   createdAt            DateTime   @default(now()) @map("created_at")
@@ -220,6 +221,7 @@ model ProgressNote {
   problemListSnapshot  Json?      @map("problem_list_snapshot")
   medicationSnapshot   Json?      @map("medication_snapshot")
   status               NoteStatus @default(DRAFT)
+  isDeleted            Boolean    @default(false) @map("is_deleted")
   lastEditedBy         String?    @map("last_edited_by") @db.Uuid
   lastEditedAt         DateTime?  @map("last_edited_at")
   createdAt            DateTime   @default(now()) @map("created_at")

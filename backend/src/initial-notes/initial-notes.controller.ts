@@ -45,6 +45,19 @@ export class InitialNotesController {
     return note;
   }
 
+  @Get('all')
+  async findAll(@Param('patientId') patientId: string, @Request() req) {
+    const notes = await this.initialNotesService.findAll(patientId);
+
+    // Filter out drafts that the user shouldn't see
+    return notes.filter((note) => {
+      if (note.status === NoteStatus.PUBLISHED) return true;
+      if (req.user.role === Role.ADMIN) return true;
+      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId) return true;
+      return false;
+    });
+  }
+
   @Post()
   @Roles(Role.DOCTOR, Role.ADMIN)
   create(

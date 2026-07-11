@@ -25,6 +25,7 @@ export interface TimelineNoteView {
     diagnostics?: string[];
     medications?: string[];
   };
+  isDeleted: boolean;
 }
 
 /**
@@ -170,6 +171,7 @@ export function mapNoteToTimelineView(
       lastEditedAt,
       previewText: initialNote.chiefComplaint ? initialNote.chiefComplaint.slice(0, 65) + (initialNote.chiefComplaint.length > 65 ? '...' : '') : '',
       isLatest,
+      isDeleted: initialNote.isDeleted || false,
       sections: {
         subjective: subjectiveSections,
         objective: initialNote.physicalExam || undefined,
@@ -245,6 +247,7 @@ export function mapNoteToTimelineView(
       lastEditedAt,
       previewText: progressNote.subjective ? progressNote.subjective.slice(0, 65) + (progressNote.subjective.length > 65 ? '...' : '') : '',
       isLatest,
+      isDeleted: progressNote.isDeleted || false,
       sections: {
         subjective: subjectiveSections,
         objective: progressNote.objective || undefined,

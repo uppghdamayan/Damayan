@@ -1,5 +1,5 @@
 import { useProgressNotes } from '@/hooks/useProgressNotes';
-import { useInitialNote, useDeleteInitialNote } from '@/hooks/useInitialNote';
+import { useInitialNote, useInitialNotes, useDeleteInitialNote } from '@/hooks/useInitialNote';
 import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import { ClipboardList, ArrowRight } from 'lucide-react';
 import { useDeleteProgressNote } from '@/hooks/useProgressNotes';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
 
 
 interface NoteTimelineProps {
@@ -19,11 +20,13 @@ interface NoteTimelineProps {
 
 export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const router = useRouter();
-  const { data: initialNote, isLoading: initialLoading } = useInitialNote(patientId);
+  const { data: initialNotes, isLoading: initialLoading } = useInitialNotes(patientId);
+  const { data: activeInitialNote } = useInitialNote(patientId);
   const { data: progressNotesResponse, isLoading: progressLoading } = useProgressNotes(patientId);
   const { openExistingProgressNote, activeNoteEditor } = useUiStore();
   const { triggerNewNote, isLoading: actionLoading } = useNewProgressNoteAction(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
+  const { user } = useAuthStore();
 
   // Set to track expanded notes (intentional: multiple notes can be open at once)
   // Decided per fix.md §6.4.
@@ -52,30 +55,31 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   
   // Combine and sort
   const allNotesRaw = [...progressNotes];
-  if (initialNote) {
-    allNotesRaw.push(initialNote as any);
+  if (initialNotes && initialNotes.length > 0) {
+    allNotesRaw.push(...initialNotes as any[]);
   }
 
   const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
 
-  // Sort chronologically (newest first)
-  allNotesRaw.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
   // Map to TimelineNoteView and identify latest
   const mappedNotes = useMemo(() => {
-    const initialNoteAuthorId = initialNote?.authorId;
-    return allNotesRaw.map((note, index) => {
+    const initialNoteAuthorId = activeInitialNote?.authorId;
+    return allNotesRaw.sort((a, b) => {
+      const aTime = new Date((a as any).visitDatetime || a.createdAt).getTime();
+      const bTime = new Date((b as any).visitDatetime || b.createdAt).getTime();
+      return bTime - aTime;
+    }).map((note, index) => {
       // The latest note is the first one in the sorted list (since newest first)
       const isLatest = index === 0;
       return mapNoteToTimelineView(note, isLatest, initialNoteAuthorId);
     });
-  }, [allNotesRaw, initialNote]);
+  }, [allNotesRaw, activeInitialNote]);
 
   // Only show skeleton on initial load when there's no data yet.
   // This prevents brief loading flashes when queries are invalidated after mutations.
-  const isInitialLoading = initialLoading && initialNote === undefined;
+  const isInitialLoading = initialLoading && initialNotes === undefined;
   const isProgressLoading = progressLoading && progressNotesResponse === undefined;
-  const isActionLoading = actionLoading && initialNote === undefined;
+  const isActionLoading = actionLoading && activeInitialNote === undefined;
 
   if (isInitialLoading || isProgressLoading || isActionLoading) {
     return (
@@ -91,6 +95,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   };
 
   const firstProgressNoteId = mappedNotes.find(n => n.kind === 'progress')?.id;
+  const hasActiveProgressNotes = mappedNotes.some(n => n.kind === 'progress' && !n.isDeleted);
 
   return (
     <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
@@ -110,7 +115,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         </div>
         <div className="flex items-center gap-2">
 
-          {initialNote?.status === 'PUBLISHED' && !hasDrafts && (
+          {activeInitialNote?.status === 'PUBLISHED' && !hasDrafts && (
             <button 
               onClick={handleNewNote}
               className="h-[24px] px-3 bg-accent hover:bg-accent-hover text-white rounded text-[10px] font-bold cursor-pointer transition-all"
@@ -158,20 +163,45 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                   />
                 )}
                 {/* Modern timeline dot */}
-                <div 
-                  className={cn(
-                    "absolute w-3.5 h-3.5 rounded-full bg-surface border-2 flex items-center justify-center z-10 transition-all duration-200",
-                    isOpenNote 
-                      ? "border-accent shadow-[0_0_0_5px_rgba(10,110,95,0.2)] scale-110"
-                      : (note.status === 'PUBLISHED' ? "border-accent shadow-[0_0_0_3px_rgba(10,110,95,0.08)]" : "border-yellow-border shadow-[0_0_0_3px_rgba(217,119,6,0.08)]")
-                  )}
-                  style={{ left: '9px', top: '22px' }}
-                >
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full transition-all duration-200",
-                    isOpenNote ? "scale-125 bg-accent" : (note.status === 'PUBLISHED' ? "bg-accent" : "bg-yellow-border")
-                  )} />
-                </div>
+                {(() => {
+                  const isInitial = note.kind === 'initial';
+                  const isDraft = note.status === 'DRAFT';
+                  
+                  let borderClass = "";
+                  let shadowClass = "";
+                  let bgClass = "";
+
+                  if (isDraft) {
+                    borderClass = "border-[var(--amber-border)]";
+                    shadowClass = isOpenNote ? "shadow-[0_0_0_5px_rgba(245,158,11,0.2)] scale-110" : "shadow-[0_0_0_3px_rgba(245,158,11,0.08)]";
+                    bgClass = "bg-[var(--amber-border)]";
+                  } else if (isInitial) {
+                    borderClass = "border-[var(--purple-border)]";
+                    shadowClass = isOpenNote ? "shadow-[0_0_0_5px_rgba(139,92,246,0.2)] scale-110" : "shadow-[0_0_0_3px_rgba(139,92,246,0.08)]";
+                    bgClass = "bg-[var(--purple-border)]";
+                  } else {
+                    borderClass = "border-accent";
+                    shadowClass = isOpenNote ? "shadow-[0_0_0_5px_rgba(10,110,95,0.2)] scale-110" : "shadow-[0_0_0_3px_rgba(10,110,95,0.08)]";
+                    bgClass = "bg-accent";
+                  }
+
+                  return (
+                    <div 
+                      className={cn(
+                        "absolute w-3.5 h-3.5 rounded-full bg-surface border-2 flex items-center justify-center z-10 transition-all duration-200",
+                        borderClass,
+                        shadowClass
+                      )}
+                      style={{ left: '9px', top: '22px' }}
+                    >
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full transition-all duration-200",
+                        isOpenNote ? "scale-125" : "",
+                        bgClass
+                      )} />
+                    </div>
+                  );
+                })()}
                 <TimelineEntry 
                   note={note}
                   previousNote={previousNote}
@@ -186,9 +216,9 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                     }
                   }} 
                   onDelete={
-                    (note.kind === 'initial' && mappedNotes.length === 1 && note.status !== 'DRAFT')
+                    !note.isDeleted && note.authorId === user?.id && note.kind === 'initial' && !hasActiveProgressNotes
                       ? () => setDeleteNoteId(note.id)
-                      : (note.kind === 'progress' && (note.status === 'DRAFT' || note.id === firstProgressNoteId))
+                      : !note.isDeleted && note.authorId === user?.id && note.kind === 'progress'
                         ? () => setDeleteDraftNoteId(note.id)
                         : undefined
                   }

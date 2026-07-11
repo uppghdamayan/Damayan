@@ -225,6 +225,8 @@ export class MedicationsService {
       where: { patientId },
     });
 
+    const promises: Promise<any>[] = [];
+
     for (const item of items) {
       const match = existing.find(
         (m) =>
@@ -234,54 +236,60 @@ export class MedicationsService {
       if (match) {
         keptIds.add(match.id);
         if (!match.isActive) {
-          await client.medication.update({
-            where: { id: match.id },
-            data: { isActive: true },
-          });
-          await client.medicationLog.create({
-            data: {
-              patientId,
-              medicationId: match.id,
-              action: 'Reactivated',
-              description: `Reactivated medication '${match.name}' from ${sourceNote}`,
-              editorId: userId,
-            },
-          });
+          promises.push(
+            client.medication.update({
+              where: { id: match.id },
+              data: { isActive: true },
+            }).then(() => client.medicationLog.create({
+              data: {
+                patientId,
+                medicationId: match.id,
+                action: 'Reactivated',
+                description: `Reactivated medication '${match.name}' from ${sourceNote}`,
+                editorId: userId,
+              },
+            }))
+          );
         }
         continue;
       }
 
-      await client.medication.create({
-        data: {
-          patientId,
-          name: item.name.trim(),
-          dose: item.dose.trim(),
-          formulation: item.formulation?.trim() || null,
-          instructions: item.instructions?.trim() || null,
-          quantity: item.quantity ?? null,
-          isActive: true,
-          addedBy: userId,
-        },
-      });
+      promises.push(
+        client.medication.create({
+          data: {
+            patientId,
+            name: item.name.trim(),
+            dose: item.dose.trim(),
+            formulation: item.formulation?.trim() || null,
+            instructions: item.instructions?.trim() || null,
+            quantity: item.quantity ?? null,
+            isActive: true,
+            addedBy: userId,
+          },
+        })
+      );
     }
 
     // Deactivate missing items
     for (const ext of existing) {
       if (!keptIds.has(ext.id) && ext.isActive) {
-        await client.medication.update({
-          where: { id: ext.id },
-          data: { isActive: false },
-        });
-        await client.medicationLog.create({
-          data: {
-            patientId,
-            medicationId: ext.id,
-            action: 'Discontinued',
-            description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
-            editorId: userId,
-          },
-        });
+        promises.push(
+          client.medication.update({
+            where: { id: ext.id },
+            data: { isActive: false },
+          }).then(() => client.medicationLog.create({
+            data: {
+              patientId,
+              medicationId: ext.id,
+              action: 'Discontinued',
+              description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
+              editorId: userId,
+            },
+          }))
+        );
       }
     }
+
+    await Promise.all(promises);
   }
 }
