@@ -38,16 +38,12 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (path.match(/^\/patients\/[^/]+\/visits\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'visits' };
 
     // Initial Notes
-    if (path.match(/^\/patients\/[^/]+\/initial-note$/) && method === 'POST') return { action: 'DRAFT', tableName: 'initial_notes' };
     if (path.match(/^\/patients\/[^/]+\/initial-note\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'initial_notes' };
-    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'PATCH') return { action: 'DRAFT', tableName: 'initial_notes' };
     if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'initial_notes' };
     if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'initial_notes' };
 
     // Progress Notes
-    if (path.match(/^\/patients\/[^/]+\/progress-notes$/) && method === 'POST') return { action: 'DRAFT', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'progress_notes' };
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'PATCH') return { action: 'DRAFT', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/drafts$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };
     if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };

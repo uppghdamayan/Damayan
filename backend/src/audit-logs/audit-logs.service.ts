@@ -23,7 +23,7 @@ export class AuditLogsService {
     const { userId, patientId, action, tableName, from, to, page = 1, limit = 50 } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { action: { not: 'DRAFT' } };
     if (userId) where.userId = userId;
     if (patientId) where.patientId = patientId;
     if (action) where.action = action;
