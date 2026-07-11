@@ -6,10 +6,70 @@ import {
   ClipboardList, 
   Stethoscope, 
   Search, 
-  Pill 
+  Pill,
+  Paperclip,
+  Download
 } from 'lucide-react';
 import { TimelineNoteView, diffListItems } from '@/lib/notes-utils';
 import { Badge } from '@/components/ui/badge';
+import { useAttachmentsByNote, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
+
+function NoteAttachmentItem({ att }: { att: any }) {
+  const { refetch: getDownloadUrl } = useAttachmentDownloadUrl(att.id);
+
+  const handleDownload = async () => {
+    if (!att.storageKey) return;
+    try {
+      const { data: url } = await getDownloadUrl();
+      if (url) {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to get download URL', err);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between py-1.5 px-2 bg-surface-2 border border-border rounded-[4px]">
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] font-semibold text-[var(--text-primary)]">{att.tag}</span>
+        {att.textResult && (
+          <span className="text-[11px] text-[var(--text-secondary)] italic">"{att.textResult}"</span>
+        )}
+      </div>
+      {att.storageKey && (
+        <button
+          onClick={handleDownload}
+          className="text-[var(--text-muted)] hover:text-accent transition-colors"
+          title="Download File"
+        >
+          <Download className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
+  const noteType = note.kind === 'initial' ? 'INITIAL_NOTE' : 'PROGRESS_NOTE';
+  const { data: attachments, isLoading } = useAttachmentsByNote(noteType, note.id);
+
+  if (isLoading || !attachments || attachments.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--border-strong)] pb-1 w-full text-[var(--text-secondary)] font-bold">
+        <Paperclip className="w-3.5 h-3.5" />
+        <span className="text-[11.5px] uppercase tracking-[0.6px]">Attachments & Labs</span>
+      </div>
+      <div className="flex flex-col gap-1.5 mt-1 pl-2">
+        {attachments.map((att) => (
+          <NoteAttachmentItem key={att.id} att={att} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface NoteFormattedSectionsProps {
   note: TimelineNoteView;
@@ -180,6 +240,9 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
           </div>
         </div>
       )}
+
+      {/* Attachments Section */}
+      <NoteAttachmentsSection note={note} />
     </div>
   );
 }

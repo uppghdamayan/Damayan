@@ -75,6 +75,11 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
     });
   }, [allNotesRaw, activeInitialNote]);
 
+  const inheritedSourceId = useMemo(() => {
+    const latestPublished = mappedNotes.find(n => n.status === 'PUBLISHED' && !n.isDeleted);
+    return latestPublished?.id;
+  }, [mappedNotes]);
+
   // Only show skeleton on initial load when there's no data yet.
   // This prevents brief loading flashes when queries are invalidated after mutations.
   const isInitialLoading = initialLoading && initialNotes === undefined;
@@ -222,6 +227,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                         ? () => setDeleteDraftNoteId(note.id)
                         : undefined
                   }
+                  isInheritedSource={note.id === inheritedSourceId}
                 />
               </div>
             );

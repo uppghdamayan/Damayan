@@ -20,6 +20,7 @@ interface TimelineEntryProps {
   onToggle: () => void;
   onClickEdit: () => void;
   onDelete?: () => void;
+  isInheritedSource?: boolean;
 }
 
 export function TimelineEntry({
@@ -29,6 +30,7 @@ export function TimelineEntry({
   onToggle,
   onClickEdit,
   onDelete,
+  isInheritedSource,
 }: TimelineEntryProps) {
   const { user } = useAuthStore();
   const isDisplayedUserAuthor = note.isDisplayedUserAuthor;
@@ -110,8 +112,7 @@ export function TimelineEntry({
                 {note.isLatest && !note.isDeleted && (
                   <Badge variant="active">Latest Note</Badge>
                 )}
-                {isInitial && note.status === 'PUBLISHED' && !note.isDeleted && (
-                  // Inherited badge condition: only show if the Initial Note is published.
+                {isInheritedSource && !note.isDeleted && (
                   <Badge variant="published" className="flex items-center gap-1 normal-case font-medium">
                     <Pin className="w-2.5 h-2.5 shrink-0" />
                     <span>Inherited by today's note</span>
