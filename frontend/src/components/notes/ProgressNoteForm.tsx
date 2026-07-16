@@ -267,6 +267,26 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return list;
   };
 
+  const cleanFormValues = (values: any) => {
+    return {
+      ...values,
+      problemListSnapshot: values.problemListSnapshot?.map((p: any) => {
+        if (typeof p === 'object' && p !== null) {
+          const { isNew, ...rest } = p;
+          return rest;
+        }
+        return p;
+      }),
+      medicationSnapshot: values.medicationSnapshot?.map((m: any) => {
+        if (typeof m === 'object' && m !== null) {
+          const { isNew, ...rest } = m;
+          return rest;
+        }
+        return m;
+      }),
+    };
+  };
+
   const handleGoBack = () => {
     const unadded = getUnaddedSections();
     setPendingAction(null);
@@ -316,7 +336,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         }
       });
     } else {
-      createMutation.mutate(formValues, {
+      createMutation.mutate(cleanFormValues(formValues), {
         onSuccess: async (newNote) => {
           setLastSaved(new Date());
           const newNoteId = (newNote as any)?.data?.id || (newNote as any)?.id;
@@ -361,7 +381,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const executeUpdateDraft = () => {
     if (!noteId) return;
     const safeNoteId = noteId;
-    updateMutation.mutate({ id: safeNoteId, data: formValues }, {
+    updateMutation.mutate({ id: safeNoteId, data: cleanFormValues(formValues) }, {
       onSuccess: async () => {
         if (localAttachments.length > 0) {
           for (const att of localAttachments) {
@@ -397,7 +417,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const executePublish = () => {
     if (noteId) {
-      updateMutation.mutate({ id: noteId, data: formValues }, {
+      updateMutation.mutate({ id: noteId, data: cleanFormValues(formValues) }, {
         onSuccess: () => {
           publishMutation.mutate(noteId, {
             onSuccess: async () => {
@@ -433,7 +453,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         }
       });
     } else {
-      createAndPublishMutation.mutate(formValues, {
+      createAndPublishMutation.mutate(cleanFormValues(formValues), {
         onSuccess: async (newNote) => {
           const newNoteId = (newNote as any)?.data?.id || (newNote as any)?.id;
           if (newNoteId && localAttachments.length > 0) {

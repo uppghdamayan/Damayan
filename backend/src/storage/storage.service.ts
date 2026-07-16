@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
@@ -11,7 +11,10 @@ export class StorageService {
     const { error } = await this.supabase.storage
       .from(this.bucket)
       .upload(path, buffer, { contentType, upsert: false });
-    if (error) throw error;
+    if (error) {
+      const status = error.status ? parseInt(error.status as any, 10) : HttpStatus.INTERNAL_SERVER_ERROR;
+      throw new HttpException(error.message || 'Storage upload error', isNaN(status) ? HttpStatus.INTERNAL_SERVER_ERROR : status);
+    }
     return path;
   }
 
@@ -19,12 +22,18 @@ export class StorageService {
     const { data, error } = await this.supabase.storage
       .from(this.bucket)
       .createSignedUrl(storageKey, expiresInSeconds);
-    if (error) throw error;
+    if (error) {
+      const status = error.status ? parseInt(error.status as any, 10) : HttpStatus.INTERNAL_SERVER_ERROR;
+      throw new HttpException(error.message || 'Storage getUrl error', isNaN(status) ? HttpStatus.INTERNAL_SERVER_ERROR : status);
+    }
     return data.signedUrl;
   }
 
   async delete(storageKey: string): Promise<void> {
     const { error } = await this.supabase.storage.from(this.bucket).remove([storageKey]);
-    if (error) throw error;
+    if (error) {
+      const status = error.status ? parseInt(error.status as any, 10) : HttpStatus.INTERNAL_SERVER_ERROR;
+      throw new HttpException(error.message || 'Storage delete error', isNaN(status) ? HttpStatus.INTERNAL_SERVER_ERROR : status);
+    }
   }
 }
