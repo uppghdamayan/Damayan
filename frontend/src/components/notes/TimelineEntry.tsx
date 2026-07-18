@@ -77,7 +77,11 @@ export function TimelineEntry({
         {/* Header line */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <span className="text-[13px] font-bold text-[var(--text-primary)]">
+            <span className={cn(
+              "text-[13px] text-[var(--text-primary)]",
+              note.status === 'DRAFT' ? "font-normal" : "font-bold",
+              note.isDeleted && "line-through"
+            )}>
               {isInitial ? 'Initial Consultation Note' : 'Progress Note'}
             </span>
             <div className="text-[11px] text-[var(--text-muted)] font-medium flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -154,7 +158,10 @@ export function TimelineEntry({
 
         {/* 1-line italic preview of subjective complaint */}
         {!isOpen && note.previewText && (
-          <p className="text-[12px] text-[var(--text-secondary)] italic line-clamp-1 mt-0.5 pl-2 border-l-2 border-border-strong">
+          <p className={cn(
+            "text-[12px] text-[var(--text-secondary)] italic line-clamp-1 mt-0.5 pl-2 border-l-2 border-border-strong",
+            note.isDeleted && "line-through"
+          )}>
             {note.previewText}
           </p>
         )}

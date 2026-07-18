@@ -195,7 +195,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                       className={cn(
                         "absolute w-3.5 h-3.5 rounded-full bg-surface border-2 flex items-center justify-center z-10 transition-all duration-200",
                         borderClass,
-                        shadowClass
+                        shadowClass,
+                        note.isDeleted && "opacity-40"
                       )}
                       style={{ left: '9px', top: '22px' }}
                     >
