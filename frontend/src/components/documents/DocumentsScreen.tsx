@@ -48,6 +48,13 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
     setPreviewUrl(null);
   };
 
+  const handleFileDeleted = (fileId: string) => {
+    if (selectedFile?.id === fileId) {
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 select-none font-sans">
       {/* Title & Action Header */}
@@ -124,6 +131,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
                             selectedFileId={selectedFile?.id}
                             onSelectFile={handleSelectFile}
                             onStartLoadingPreview={handleStartLoadingPreview}
+                            onFileDeleted={handleFileDeleted}
                           />
                         );
                       })}
@@ -193,6 +201,7 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
                             selectedFileId={selectedFile?.id}
                             onSelectFile={handleSelectFile}
                             onStartLoadingPreview={handleStartLoadingPreview}
+                            onFileDeleted={handleFileDeleted}
                           />
                         );
                       })}
@@ -312,9 +321,10 @@ interface DocumentRowProps {
   selectedFileId?: string;
   onSelectFile: (file: FileItem, url: string) => void;
   onStartLoadingPreview: (file: FileItem) => void;
+  onFileDeleted: (fileId: string) => void;
 }
 
-function DocumentRow({ file, patientId, selectedFileId, onSelectFile, onStartLoadingPreview }: DocumentRowProps) {
+function DocumentRow({ file, patientId, selectedFileId, onSelectFile, onStartLoadingPreview, onFileDeleted }: DocumentRowProps) {
   const { refetch, isFetching } = useDocumentDownloadUrl(patientId, file.id);
   const deleteMutation = useDeleteDocument(patientId);
   const { user } = useAuthStore();
@@ -351,6 +361,7 @@ function DocumentRow({ file, patientId, selectedFileId, onSelectFile, onStartLoa
     try {
       await deleteMutation.mutateAsync(file.id);
       setIsDeleteModalOpen(false);
+      onFileDeleted(file.id);
     } catch (e: any) {
       alert(e.message || 'Failed to delete document');
       setIsDeleteModalOpen(false);
@@ -436,9 +447,10 @@ interface AttachmentRowProps {
   selectedFileId?: string;
   onSelectFile: (file: FileItem, url: string) => void;
   onStartLoadingPreview: (file: FileItem) => void;
+  onFileDeleted: (fileId: string) => void;
 }
 
-function AttachmentRow({ file, selectedFileId, onSelectFile, onStartLoadingPreview }: AttachmentRowProps) {
+function AttachmentRow({ file, selectedFileId, onSelectFile, onStartLoadingPreview, onFileDeleted }: AttachmentRowProps) {
   const { refetch, isFetching } = useAttachmentDownloadUrl(file.id);
   const deleteMutation = useDeleteAttachment();
   const { user } = useAuthStore();
@@ -475,6 +487,7 @@ function AttachmentRow({ file, selectedFileId, onSelectFile, onStartLoadingPrevi
     try {
       await deleteMutation.mutateAsync({ id: file.id, noteType: file.raw.noteType, noteId: file.raw.noteId });
       setIsDeleteModalOpen(false);
+      onFileDeleted(file.id);
     } catch (e: any) {
       alert(e.message || 'Failed to delete attachment');
       setIsDeleteModalOpen(false);

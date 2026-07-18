@@ -29,8 +29,8 @@ export function useUploadAttachment() {
         body: formData,
       });
     },
-    onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['attachments', vars.noteType, vars.noteId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
@@ -59,8 +59,8 @@ export function useDeleteAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: { id: string, noteType: string, noteId: string }) => apiRequest<any>(`/attachments/${params.id}`, { method: 'DELETE' }),
-    onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['attachments', vars.noteType, vars.noteId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
