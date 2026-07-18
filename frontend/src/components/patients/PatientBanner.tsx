@@ -54,13 +54,24 @@ export function PatientBanner({ patient }: { patient: Patient }) {
       </div>
 
       {/* Middle Column: Demographics */}
-      <div className="flex flex-col gap-1 flex-1 min-w-[220px] border-r border-border pr-5 text-[12px] text-text-secondary justify-center">
-        <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] mb-1 block">Demographics</span>
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-          <div>Sex: <strong className="text-text-primary">{sexLabel}</strong></div>
-          <div>Age: <strong className="text-text-primary">{age} yrs</strong></div>
-          <div className="col-span-2 truncate" title={dob}>DOB: <strong className="text-text-primary">{dob}</strong></div>
-          <div className="col-span-2 truncate text-text-muted" title={addressStr}>Address: <span className="text-text-secondary">{addressStr}</span></div>
+      <div className="flex flex-col gap-2 flex-1 min-w-[280px] border-r border-border pr-5 justify-center">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+          <div>
+            <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Sex</span>
+            <strong className="text-text-primary text-[12px]">{sexLabel}</strong>
+          </div>
+          <div>
+            <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Age</span>
+            <strong className="text-text-primary text-[12px]">{age} yrs</strong>
+          </div>
+          <div>
+            <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Birthdate</span>
+            <strong className="text-text-primary text-[12px]" title={dob}>{dob}</strong>
+          </div>
+          <div className="col-span-3">
+            <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Address</span>
+            <span className="text-text-secondary text-[12px] truncate block" title={addressStr}>{addressStr}</span>
+          </div>
         </div>
       </div>
 

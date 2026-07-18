@@ -112,7 +112,7 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
                     {p.title}
                   </div>
                   <div className={cn("font-mono text-[10px] text-text-muted mt-0.5 truncate", item.depth > 0 && "ml-[18px]")}>
-                    {p.icdCode ? `${p.icdCode} · ` : ''}Since {new Date(p.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {p.icdCode ? `${p.icdCode} · ` : ''}Since {new Date(p.diagnosisDate || p.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                 </div>
                 <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] flex-shrink-0 bg-accent-light text-accent-hover border border-accent">
@@ -144,7 +144,7 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
                           {p.title}
                         </div>
                         <div className={cn("font-mono text-[10px] text-text-muted mt-0.5 truncate", item.depth > 0 && "ml-[18px]")}>
-                          {p.icdCode ? `${p.icdCode} · ` : ''}Since {new Date(p.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {p.icdCode ? `${p.icdCode} · ` : ''}Since {new Date(p.diagnosisDate || p.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </div>
                       </div>
                       <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] flex-shrink-0 bg-accent-light text-accent-hover border border-accent">
