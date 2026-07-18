@@ -46,6 +46,48 @@ export function useCreateMedication(patientId: string) {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ['medications', patientId, false] });
+      await qc.cancelQueries({ queryKey: ['medications', patientId, true] });
+
+      const previousFalse = qc.getQueryData<MedicationsResponse>(['medications', patientId, false]);
+      const previousTrue = qc.getQueryData<MedicationsResponse>(['medications', patientId, true]);
+
+      const optimisticId = `optimistic-${crypto.randomUUID()}`;
+      const optimisticMedication: Medication = {
+        id: optimisticId,
+        patientId,
+        name: input.name,
+        dose: input.dose,
+        formulation: input.formulation ?? null,
+        instructions: input.instructions ?? null,
+        quantity: input.quantity ?? null,
+        isActive: true,
+        addedBy: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: null,
+      };
+
+      if (previousFalse) {
+        qc.setQueryData<MedicationsResponse>(['medications', patientId, false], {
+          ...previousFalse,
+          data: [...previousFalse.data, optimisticMedication],
+        });
+      }
+      if (previousTrue) {
+        qc.setQueryData<MedicationsResponse>(['medications', patientId, true], {
+          ...previousTrue,
+          data: [...previousTrue.data, optimisticMedication],
+        });
+      }
+
+      return { previousFalse, previousTrue, optimisticId };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previousFalse) qc.setQueryData(['medications', patientId, false], context.previousFalse);
+      if (context?.previousTrue) qc.setQueryData(['medications', patientId, true], context.previousTrue);
+    },
     onSuccess: () => invalidateMedications(qc, patientId),
   });
 }

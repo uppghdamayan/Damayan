@@ -1,7 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/api';
 import { usePatient } from '@/hooks/usePatients';
 import { useAuthStore } from '@/stores/authStore';
 import { PatientBanner } from '@/components/patients/PatientBanner';
@@ -50,7 +52,21 @@ export default function PatientDashboardPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const router = useRouter();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const canCreateNote = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  useEffect(() => {
+    // Eagerly prefetch other tabs' data in the background so they are ready if the user navigates.
+    // Note: Vitals, Problems, Medications, and Visits are already fetched by the dashboard cards above.
+    queryClient.prefetchQuery({
+      queryKey: ['documents', patientId],
+      queryFn: () => apiRequest<any[]>(`/patients/${patientId}/documents`),
+    });
+    queryClient.prefetchQuery({
+      queryKey: ['audit-logs', { patientId, page: 1, limit: 10 }],
+      queryFn: () => apiRequest<any>(`/audit-logs?patientId=${patientId}&page=1&limit=10`),
+    });
+  }, [patientId, queryClient]);
 
   return (
     <>

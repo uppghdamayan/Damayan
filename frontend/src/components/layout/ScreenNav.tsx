@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { usePatientStore } from '@/stores/patientStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -34,6 +36,7 @@ const ALL_TABS = [
 export function ScreenNav({ patientId }: { patientId: string }) {
   const pathname = usePathname();
   const [optimisticPath, setOptimisticPath] = useState(pathname);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setOptimisticPath(pathname);
@@ -58,6 +61,29 @@ export function ScreenNav({ patientId }: { patientId: string }) {
     return optimisticPath.startsWith(`${basePath}${tab.path}`);
   };
 
+  // Prefetch tab data on hover so first-visit latency is eliminated
+  const handleTabHover = useCallback((tabId: string) => {
+    const prefetchHandlers: Record<string, () => void> = {
+      documents: () => queryClient.prefetchQuery({
+        queryKey: ['documents', patientId],
+        queryFn: () => apiRequest<any[]>(`/patients/${patientId}/documents`),
+      }),
+      problems: () => queryClient.prefetchQuery({
+        queryKey: ['problems', patientId],
+        queryFn: () => apiRequest<any>(`/patients/${patientId}/problems`),
+      }),
+      medications: () => queryClient.prefetchQuery({
+        queryKey: ['medications', patientId, false],
+        queryFn: () => apiRequest<any>(`/patients/${patientId}/medications`),
+      }),
+      vitals: () => queryClient.prefetchQuery({
+        queryKey: ['vitals', patientId],
+        queryFn: () => apiRequest<any>(`/patients/${patientId}/vitals`),
+      }),
+    };
+    prefetchHandlers[tabId]?.();
+  }, [queryClient, patientId]);
+
   const patientName = activePatient ? `${activePatient.lastName}, ${activePatient.firstName}` : '';
 
   return (
@@ -72,6 +98,7 @@ export function ScreenNav({ patientId }: { patientId: string }) {
             href={`${basePath}${tab.path}`}
             prefetch={true}
             onClick={() => setOptimisticPath(`${basePath}${tab.path}`)}
+            onMouseEnter={() => handleTabHover(tab.id)}
             aria-label={tab.label}
             title={tab.label}
             className={cn(

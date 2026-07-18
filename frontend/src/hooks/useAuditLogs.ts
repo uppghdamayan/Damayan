@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW' | 'GENERATE' | 'DRAFT';
@@ -45,5 +45,6 @@ export function useAuditLogs(filters: AuditLogFilters) {
     },
     staleTime: 30_000, // logs are append-only; 30s is fine
     refetchOnWindowFocus: true, // also refresh when user re-focuses the browser tab
+    placeholderData: keepPreviousData, // keep current page/filter results visible while the next combination loads
   });
 }

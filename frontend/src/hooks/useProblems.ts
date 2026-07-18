@@ -60,6 +60,36 @@ export function useCreateProblem(patientId: string) {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ['problems', patientId] });
+      const previous = qc.getQueryData<ProblemsResponse>(['problems', patientId]);
+
+      const optimisticId = `optimistic-${crypto.randomUUID()}`;
+      const optimisticProblem: Problem = {
+        id: optimisticId,
+        patientId,
+        parentId: input.parentId ?? null,
+        title: input.title,
+        icdCode: input.icdCode ?? null,
+        status: 'ACTIVE',
+        sortOrder: (previous?.data.length ?? 0) + 1,
+        addedBy: null,
+        diagnosisDate: input.diagnosisDate ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (previous) {
+        qc.setQueryData<ProblemsResponse>(['problems', patientId], {
+          data: [...previous.data, optimisticProblem],
+        });
+      }
+
+      return { previous, optimisticId };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) qc.setQueryData(['problems', patientId], context.previous);
+    },
     onSuccess: () => invalidateProblems(qc, patientId),
   });
 }

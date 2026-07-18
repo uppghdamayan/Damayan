@@ -77,15 +77,20 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
         <div className="flex flex-col">
           {active.slice(0, 4).map((m, index) => {
             const isLast = active.length <= 4 && index === active.length - 1;
+            const isOptimistic = m.id.startsWith('optimistic-');
             return (
               <div 
                 key={m.id} 
                 className={cn(
                   "grid grid-cols-[1.2fr_1fr_1fr_1.2fr] px-3.5 py-1.5 border-border hover:bg-surface-3 transition-colors items-center",
-                  !isLast && "border-b"
+                  !isLast && "border-b",
+                  isOptimistic && "opacity-50 pointer-events-none"
                 )}
               >
-                <div className="text-[12px] text-text-primary font-medium truncate pr-2">{m.name}</div>
+                <div className="text-[12px] text-text-primary font-medium truncate pr-2 flex items-center gap-1.5">
+                  {m.name}
+                  {isOptimistic && <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0" />}
+                </div>
                 <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
                 <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
                 <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>
@@ -102,15 +107,20 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
               <div className="overflow-hidden">
                 {active.slice(4).map((m, index) => {
                   const isLast = index === active.length - 5;
+                  const isOptimistic = m.id.startsWith('optimistic-');
                   return (
                     <div 
                       key={m.id} 
                       className={cn(
                         "grid grid-cols-[1.2fr_1fr_1fr_1.2fr] px-3.5 py-1.5 border-border hover:bg-surface-3 transition-colors items-center",
-                        !isLast && "border-b"
+                        !isLast && "border-b",
+                        isOptimistic && "opacity-50 pointer-events-none"
                       )}
                     >
-                      <div className="text-[12px] text-text-primary font-medium truncate pr-2">{m.name}</div>
+                      <div className="text-[12px] text-text-primary font-medium truncate pr-2 flex items-center gap-1.5">
+                        {m.name}
+                        {isOptimistic && <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0" />}
+                      </div>
                       <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
                       <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
                       <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>

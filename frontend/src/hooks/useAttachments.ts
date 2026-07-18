@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 
 export function useAttachmentsByNote(noteType: 'INITIAL_NOTE' | 'PROGRESS_NOTE', noteId: string | undefined) {
@@ -6,6 +6,9 @@ export function useAttachmentsByNote(noteType: 'INITIAL_NOTE' | 'PROGRESS_NOTE',
     queryKey: ['attachments', noteType, noteId],
     queryFn: () => apiRequest<any[]>(`/attachments?noteType=${noteType}&noteId=${noteId}`),
     enabled: !!noteId,
+    staleTime: 1000 * 20,
+    gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -38,6 +41,9 @@ export function usePriorLabs(patientId: string) {
     queryKey: ['attachments', 'patient', patientId],
     queryFn: () => apiRequest<any[]>(`/attachments?patientId=${patientId}`),
     enabled: !!patientId,
+    staleTime: 1000 * 20,
+    gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 

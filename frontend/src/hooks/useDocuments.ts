@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 
 export function useDocuments(patientId: string) {
@@ -6,6 +6,9 @@ export function useDocuments(patientId: string) {
     queryKey: ['documents', patientId],
     queryFn: () => apiRequest<any[]>(`/patients/${patientId}/documents`),
     enabled: !!patientId,
+    staleTime: 1000 * 20,
+    gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 

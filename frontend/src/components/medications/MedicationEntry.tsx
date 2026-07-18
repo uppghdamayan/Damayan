@@ -27,6 +27,7 @@ export function MedicationEntry({
   onStatusChange,
   hideStatus,
 }: MedicationEntryProps) {
+  const isOptimistic = medication.id.startsWith('optimistic-');
   const isDraftNew = draftChangedFields?.includes('_isNew') || medication.id.startsWith('temp-');
   const isPublishedNew = recentlyPublishedFields?.includes('_isNew');
   const isNewItem = isDraftNew || isPublishedNew;
@@ -71,11 +72,15 @@ export function MedicationEntry({
     <div 
       className={cn(
         'relative grid items-center gap-4 pl-[14px] pr-[28px] py-2.5 bg-surface transition-all duration-150 animate-row-entry after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[""] last:after:hidden hover:bg-surface-2/50',
+        isOptimistic && 'opacity-50 pointer-events-none'
       )}
       style={{ gridTemplateColumns: hideStatus ? MED_COLUMN_LAYOUT_DISCONTINUES : MED_COLUMN_LAYOUT }}
     >
       <div className={cn("text-[13px] font-bold truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-primary" : "text-text-muted line-through")}>
         <span className={cn("truncate", getHighlightClass('name'))}>{medication.name}</span>
+        {isOptimistic && (
+          <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0 ml-1.5" />
+        )}
         {(!medication.isActive && (isNewItem || isUpdatedItem)) ? (
           <span className={cn(
             "ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px]",

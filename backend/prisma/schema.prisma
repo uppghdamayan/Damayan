@@ -287,7 +287,7 @@ model Medication {
   addedByUser User?   @relation("MedicationAddedBy", fields: [addedBy], references: [id])
   updatedByUser User? @relation("MedicationUpdatedBy", fields: [updatedBy], references: [id])
 
-  @@index([patientId, isActive])
+  @@index([patientId, isActive, createdAt(sort: Desc)])  // replaces [patientId, isActive] — covers sort tiebreaker
   @@map("medications")
 }
 
@@ -336,6 +336,7 @@ model Document {
   visit           Visit?  @relation(fields: [visitId], references: [id])
   generatedByUser User?   @relation("DocumentGeneratedBy", fields: [generatedBy], references: [id])
 
+  @@index([patientId, generatedAt(sort: Desc)])  // DocumentsService.findByPatient()
   @@map("documents")
 }
 
@@ -359,6 +360,8 @@ model Attachment {
   patient        Patient      @relation(fields: [patientId], references: [id])
   uploadedByUser User?        @relation("AttachmentUploadedBy", fields: [uploadedBy], references: [id])
 
+  @@index([noteType, noteId])              // AttachmentsService.findByNote()
+  @@index([patientId, uploadedAt(sort: Desc)]) // AttachmentsService.findByPatient()
   @@map("attachments")
 }
 
@@ -384,6 +387,9 @@ model AuditLog {
 
   @@index([patientId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])     // action filter without patient/user
+  @@index([tableName, createdAt(sort: Desc)])  // tableName filter without patient/user
+  @@index([createdAt(sort: Desc)])             // date-range-only browsing
   @@map("audit_logs")
 }
 

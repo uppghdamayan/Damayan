@@ -90,16 +90,19 @@ export function ActiveProblemRow({
     hour12: true,
   });
 
+  const isOptimistic = problem.id.startsWith('optimistic-');
+
   return (
     <div
       {...(canManage ? dragHandleProps?.attributes : {})}
       {...(canManage ? dragHandleProps?.listeners : {})}
       className={cn(
         'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry',
-        canManage && 'cursor-grab active:cursor-grabbing',
+        canManage && !isOptimistic && 'cursor-grab active:cursor-grabbing',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
-        isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative'
+        isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative',
+        isOptimistic && 'opacity-50 pointer-events-none'
       )}
       style={{ gridTemplateColumns: COLUMN_LAYOUT }}
     >
@@ -129,6 +132,9 @@ export function ActiveProblemRow({
           <span className="font-mono text-text-muted mr-1 select-none">↳</span>
         )}
         <span className="text-[13px] font-semibold truncate">{problem.title}</span>
+        {isOptimistic && (
+          <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0 ml-1" />
+        )}
         {problem.icdCode && (
           <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
             {problem.icdCode}
