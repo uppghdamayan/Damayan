@@ -40,7 +40,9 @@ export class ProgressNotesService {
         include: {
           visit: true,
           author: { select: { firstName: true, lastName: true, role: true } },
-          lastEditor: { select: { firstName: true, lastName: true, role: true } },
+          lastEditor: {
+            select: { firstName: true, lastName: true, role: true },
+          },
         },
       }),
       this.prisma.progressNote.count({ where: { visit: { patientId } } }),
@@ -54,7 +56,11 @@ export class ProgressNotesService {
   async findOne(id: string) {
     const note = await this.prisma.progressNote.findUnique({
       where: { id },
-      include: { visit: true, author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
+      include: {
+        visit: true,
+        author: { select: { firstName: true, lastName: true, role: true } },
+        lastEditor: { select: { firstName: true, lastName: true, role: true } },
+      },
     });
     if (!note) throw new NotFoundException('Progress Note not found');
     return note;
@@ -83,7 +89,11 @@ export class ProgressNotesService {
     tx: Prisma.TransactionClient,
   ): Promise<string | null> {
     const latestProgress = await tx.progressNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      where: {
+        visit: { patientId },
+        status: NoteStatus.PUBLISHED,
+        isDeleted: false,
+      },
       orderBy: { visit: { visitDatetime: 'desc' } },
       select: {
         mgmtNonpharm: true,
@@ -92,7 +102,11 @@ export class ProgressNotesService {
     });
 
     const initial = await tx.initialNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      where: {
+        visit: { patientId },
+        status: NoteStatus.PUBLISHED,
+        isDeleted: false,
+      },
       select: {
         mgmtNonpharm: true,
         visit: { select: { visitDatetime: true } },
@@ -124,51 +138,63 @@ export class ProgressNotesService {
     });
 
     if (existingDraft) {
-      throw new ConflictException('You already have an active progress note draft for this patient.');
+      throw new ConflictException(
+        'You already have an active progress note draft for this patient.',
+      );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const [activeProblems, activeMedications, latestVitals] =
-        await Promise.all([
-          this.problemsService.findActiveForPatient(patientId, tx),
-          this.medicationsService.findActiveForPatient(patientId, tx),
-          this.vitalsService.findLatestForPatient(patientId, tx),
-        ]);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [activeProblems, activeMedications, latestVitals] =
+          await Promise.all([
+            this.problemsService.findActiveForPatient(patientId, tx),
+            this.medicationsService.findActiveForPatient(patientId, tx),
+            this.vitalsService.findLatestForPatient(patientId, tx),
+          ]);
 
-      const priorMgmtNonpharm = await this.getLatestNonpharmMgmt(patientId, tx);
+        const priorMgmtNonpharm = await this.getLatestNonpharmMgmt(
+          patientId,
+          tx,
+        );
 
-      const visit = await this.visitsService.createForNote(
-        patientId,
-        userId,
-        VisitType.PROGRESS,
-        new Date(dto.visitDatetime),
-        tx,
-      );
+        const visit = await this.visitsService.createForNote(
+          patientId,
+          userId,
+          VisitType.PROGRESS,
+          new Date(dto.visitDatetime),
+          tx,
+        );
 
-      return tx.progressNote.create({
-        data: {
-          visitId: visit.id,
-          authorId: userId,
-          subjective: dto.subjective ?? '',
-          objective: dto.objective ?? '',
-          mgmtNonpharm: dto.mgmtNonpharm ?? priorMgmtNonpharm ?? '',
-          diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
-          problemListSnapshot: dto.problemListSnapshot
-            ? (dto.problemListSnapshot as any)
-            : (activeProblems as any),
-          medicationSnapshot: dto.medicationSnapshot
-            ? (dto.medicationSnapshot as any)
-            : (activeMedications as any),
-          status: NoteStatus.DRAFT,
-        },
-      });
-    }, {
-      timeout: 20000,
-      maxWait: 10000,
-    });
+        return tx.progressNote.create({
+          data: {
+            visitId: visit.id,
+            authorId: userId,
+            subjective: dto.subjective ?? '',
+            objective: dto.objective ?? '',
+            mgmtNonpharm: dto.mgmtNonpharm ?? priorMgmtNonpharm ?? '',
+            diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
+            problemListSnapshot: dto.problemListSnapshot
+              ? (dto.problemListSnapshot as any)
+              : (activeProblems as any),
+            medicationSnapshot: dto.medicationSnapshot
+              ? (dto.medicationSnapshot as any)
+              : (activeMedications as any),
+            status: NoteStatus.DRAFT,
+          },
+        });
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
-  async createAndPublish(patientId: string, dto: CreateProgressNoteDto, userId: string) {
+  async createAndPublish(
+    patientId: string,
+    dto: CreateProgressNoteDto,
+    userId: string,
+  ) {
     const note = await this.create(patientId, dto, userId);
     return this.publish(patientId, note.id, userId);
   }
@@ -217,73 +243,82 @@ export class ProgressNotesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const [beforeProblems, beforeMeds] = await Promise.all([
-        this.problemsService.findActiveForPatient(patientId, tx),
-        this.medicationsService.findActiveForPatient(patientId, tx),
-      ]);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [beforeProblems, beforeMeds] = await Promise.all([
+          this.problemsService.findActiveForPatient(patientId, tx),
+          this.medicationsService.findActiveForPatient(patientId, tx),
+        ]);
 
-      const snapshotItems = (note.problemListSnapshot as any[] || [])
-        .filter(p => p && p.title && String(p.title).trim() !== '')
-        .map(p => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+        const snapshotItems = ((note.problemListSnapshot as any[]) || [])
+          .filter((p) => p && p.title && String(p.title).trim() !== '')
+          .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
 
-      const snapshotMeds = (note.medicationSnapshot as any[] || [])
-        .filter(m => m && m.name && String(m.name).trim() !== '')
-        .map((m) => ({
-          name: String(m.name).trim(),
-          dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
-          formulation: m.formulation,
-          quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
-          instructions: m.instructions,
-        }));
+        const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
+          .filter((m) => m && m.name && String(m.name).trim() !== '')
+          .map((m) => ({
+            name: String(m.name).trim(),
+            dose:
+              m.dose !== undefined && m.dose !== null
+                ? String(m.dose).trim()
+                : '',
+            formulation: m.formulation,
+            quantity:
+              m.quantity !== undefined && m.quantity !== null
+                ? Number(m.quantity)
+                : undefined,
+            instructions: m.instructions,
+          }));
 
-      await Promise.all([
-        this.problemsService.upsertFromAssessment(
-          patientId,
-          snapshotItems,
-          userId,
-          'Progress Note',
+        await Promise.all([
+          this.problemsService.upsertFromAssessment(
+            patientId,
+            snapshotItems,
+            userId,
+            'Progress Note',
+            tx,
+          ),
+          this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            snapshotMeds,
+            userId,
+            'Progress Note',
+            tx,
+          ),
+        ]);
+
+        const [afterProblems, afterMeds] = await Promise.all([
+          this.problemsService.findActiveForPatient(patientId, tx),
+          this.medicationsService.findActiveForPatient(patientId, tx),
+        ]);
+
+        const problemChanges = diffByTitle(beforeProblems, afterProblems);
+        const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+
+        await this.visitsService.updateChangeSummary(
+          note.visitId,
+          problemChanges,
+          medicationChanges,
           tx,
-        ),
-        this.medicationsService.upsertFromNoteMedications(
-          patientId,
-          snapshotMeds,
-          userId,
-          'Progress Note',
-          tx,
-        ),
-      ]);
+        );
 
-      const [afterProblems, afterMeds] = await Promise.all([
-        this.problemsService.findActiveForPatient(patientId, tx),
-        this.medicationsService.findActiveForPatient(patientId, tx),
-      ]);
+        const published = await tx.progressNote.update({
+          where: { id },
+          data: { status: NoteStatus.PUBLISHED, updatedAt: new Date() },
+        });
 
-      const problemChanges = diffByTitle(beforeProblems, afterProblems);
-      const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+        await tx.visit.update({
+          where: { id: note.visitId },
+          data: { status: NoteStatus.PUBLISHED },
+        });
 
-      await this.visitsService.updateChangeSummary(
-        note.visitId,
-        problemChanges,
-        medicationChanges,
-        tx,
-      );
-
-      const published = await tx.progressNote.update({
-        where: { id },
-        data: { status: NoteStatus.PUBLISHED, updatedAt: new Date() },
-      });
-
-      await tx.visit.update({
-        where: { id: note.visitId },
-        data: { status: NoteStatus.PUBLISHED },
-      });
-
-      return published;
-    }, {
-      timeout: 20000,
-      maxWait: 10000,
-    });
+        return published;
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
   async deleteDraft(patientId: string, id: string, userId: string) {
@@ -294,8 +329,10 @@ export class ProgressNotesService {
       });
 
       if (!note) throw new NotFoundException('Note not found');
-      if (note.authorId !== userId && userId !== 'admin') throw new ForbiddenException('Not authorized to delete this note');
-      if (note.visit.patientId !== patientId) throw new BadRequestException('Note does not belong to this patient');
+      if (note.authorId !== userId && userId !== 'admin')
+        throw new ForbiddenException('Not authorized to delete this note');
+      if (note.visit.patientId !== patientId)
+        throw new BadRequestException('Note does not belong to this patient');
 
       if (note.status !== NoteStatus.DRAFT) {
         // Ensure there are no newer progress notes
@@ -307,49 +344,78 @@ export class ProgressNotesService {
           },
         });
         if (newerNote) {
-          throw new BadRequestException('Only the latest progress note can be deleted');
+          throw new BadRequestException(
+            'Only the latest progress note can be deleted',
+          );
         }
 
         // Revert global lists to previous state
         let prevSnapshotProblems: any[] = [];
         let prevSnapshotMeds: any[] = [];
-        
+
         const prevProgress = await tx.progressNote.findFirst({
-          where: { visit: { patientId }, status: NoteStatus.PUBLISHED, id: { not: id }, isDeleted: false },
-          orderBy: { createdAt: 'desc' }
+          where: {
+            visit: { patientId },
+            status: NoteStatus.PUBLISHED,
+            id: { not: id },
+            isDeleted: false,
+          },
+          orderBy: { createdAt: 'desc' },
         });
-        
+
         if (prevProgress) {
-          prevSnapshotProblems = prevProgress.problemListSnapshot as any[] || [];
-          prevSnapshotMeds = prevProgress.medicationSnapshot as any[] || [];
+          prevSnapshotProblems =
+            (prevProgress.problemListSnapshot as any[]) || [];
+          prevSnapshotMeds = (prevProgress.medicationSnapshot as any[]) || [];
         } else {
           const initialNote = await tx.initialNote.findFirst({
-            where: { visit: { patientId }, isDeleted: false }
+            where: { visit: { patientId }, isDeleted: false },
           });
           if (initialNote) {
-            prevSnapshotProblems = initialNote.assessment as any[] || [];
-            prevSnapshotMeds = initialNote.medicationSnapshot as any[] || [];
+            prevSnapshotProblems = (initialNote.assessment as any[]) || [];
+            prevSnapshotMeds = (initialNote.medicationSnapshot as any[]) || [];
           }
         }
 
         const validProblems = prevSnapshotProblems
-          .filter(p => p && p.title && String(p.title).trim() !== '')
-          .map(p => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+          .filter((p) => p && p.title && String(p.title).trim() !== '')
+          .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
 
         const validMeds = prevSnapshotMeds
-          .filter(m => m && m.name && String(m.name).trim() !== '')
-          .map(m => ({
+          .filter((m) => m && m.name && String(m.name).trim() !== '')
+          .map((m) => ({
             name: String(m.name).trim(),
-            dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
+            dose:
+              m.dose !== undefined && m.dose !== null
+                ? String(m.dose).trim()
+                : '',
             formulation: m.formulation,
-            quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
+            quantity:
+              m.quantity !== undefined && m.quantity !== null
+                ? Number(m.quantity)
+                : undefined,
             instructions: m.instructions,
           }));
 
-        await this.problemsService.upsertFromAssessment(patientId, validProblems, userId, 'Progress Note', tx);
-        await this.medicationsService.upsertFromNoteMedications(patientId, validMeds, userId, 'Progress Note', tx);
+        await this.problemsService.upsertFromAssessment(
+          patientId,
+          validProblems,
+          userId,
+          'Progress Note',
+          tx,
+        );
+        await this.medicationsService.upsertFromNoteMedications(
+          patientId,
+          validMeds,
+          userId,
+          'Progress Note',
+          tx,
+        );
 
-        await tx.progressNote.update({ where: { id }, data: { isDeleted: true } });
+        await tx.progressNote.update({
+          where: { id },
+          data: { isDeleted: true },
+        });
         return { success: true, ...note, isDeleted: true };
       }
 
@@ -360,7 +426,11 @@ export class ProgressNotesService {
 
       for (const att of attachments) {
         if (att.storageKey) {
-          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+          await this.storageService
+            .delete(att.storageKey)
+            .catch((e) =>
+              console.error('Failed to delete attachment from storage', e),
+            );
         }
       }
 
@@ -390,8 +460,8 @@ export class ProgressNotesService {
 
       if (drafts.length === 0) return { count: 0 };
 
-      const noteIds = drafts.map(d => d.id);
-      const visitIds = drafts.map(d => d.visitId);
+      const noteIds = drafts.map((d) => d.id);
+      const visitIds = drafts.map((d) => d.visitId);
 
       const attachments = await tx.attachment.findMany({
         where: { noteId: { in: noteIds } },
@@ -399,7 +469,11 @@ export class ProgressNotesService {
 
       for (const att of attachments) {
         if (att.storageKey) {
-          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+          await this.storageService
+            .delete(att.storageKey)
+            .catch((e) =>
+              console.error('Failed to delete attachment from storage', e),
+            );
         }
       }
 

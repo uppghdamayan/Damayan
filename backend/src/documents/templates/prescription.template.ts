@@ -1,35 +1,30 @@
 import PDFDocument from 'pdfkit';
+import {
+  drawLetterhead,
+  drawGenerationDate,
+  drawSignatureBlock,
+  drawMedicationList,
+  drawPatientBlock,
+} from './layout.helper';
 
 export const renderPrescription = async (data: any): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 50 });
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
-    doc.fontSize(20).text('Prescription', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Patient Name: ${data.patient.firstName} ${data.patient.lastName}`);
-    doc.text(`Date of Birth: ${new Date(data.patient.dateOfBirth).toLocaleDateString()}`);
-    doc.text(`Sex: ${data.patient.sex}`);
-    
-    doc.moveDown();
-    doc.text('Medications:', { underline: true });
-    if (data.medications && data.medications.length > 0) {
-      data.medications.forEach((med: any) => {
-        doc.text(`- ${med.name} ${med.dose} ${med.formulation || ''}`);
-        doc.text(`  Sig: ${med.instructions || ''}`);
-        doc.text(`  Qty: ${med.quantity || ''}`);
-      });
-    } else {
-      doc.text('No active medications.');
-    }
-
+    drawLetterhead(doc, 'PRESCRIPTION');
+    drawGenerationDate(doc);
+    drawPatientBlock(doc, data.patient);
     doc.moveDown(2);
-    doc.text('Issued by: DAMAYAN EMR');
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`);
-    
+    doc.fontSize(36).font('Helvetica-Bold').text('Rx');
+    doc.fontSize(10).font('Helvetica');
+    doc.moveDown(1);
+    drawMedicationList(doc, data.medications);
+
+    drawSignatureBlock(doc, data.physician, 'Signed By:', false);
     doc.end();
   });
 };

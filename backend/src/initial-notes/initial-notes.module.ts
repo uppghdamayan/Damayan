@@ -8,7 +8,13 @@ import { VisitsModule } from '../visits/visits.module';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [ProblemsModule, MedicationsModule, VitalsModule, VisitsModule, StorageModule],
+  imports: [
+    ProblemsModule,
+    MedicationsModule,
+    VitalsModule,
+    VisitsModule,
+    StorageModule,
+  ],
   controllers: [InitialNotesController],
   providers: [InitialNotesService],
   exports: [InitialNotesService],

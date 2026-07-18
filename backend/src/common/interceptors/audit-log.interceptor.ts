@@ -13,56 +13,131 @@ import { AuditAction } from '@prisma/client';
 export class AuditLogInterceptor implements NestInterceptor {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
-  private resolveAudit(method: string, path: string): { action: AuditAction; tableName: string } | null {
+  private resolveAudit(
+    method: string,
+    path: string,
+  ): { action: AuditAction; tableName: string } | null {
     if (method === 'GET') return null;
 
     // Accounts
-    if (path === '/accounts' && method === 'POST') return { action: 'CREATE', tableName: 'users' };
-    if (path.match(/^\/accounts\/[^/]+\/reset-password$/) && method === 'POST') return { action: 'UPDATE', tableName: 'users' };
-    if (path.match(/^\/accounts\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'users' };
-    if (path.match(/^\/accounts\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'users' };
+    if (path === '/accounts' && method === 'POST')
+      return { action: 'CREATE', tableName: 'users' };
+    if (path.match(/^\/accounts\/[^/]+\/reset-password$/) && method === 'POST')
+      return { action: 'UPDATE', tableName: 'users' };
+    if (path.match(/^\/accounts\/[^/]+$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'users' };
+    if (path.match(/^\/accounts\/[^/]+$/) && method === 'DELETE')
+      return { action: 'DELETE', tableName: 'users' };
 
     // Patients
-    if (path === '/patients' && method === 'POST') return { action: 'CREATE', tableName: 'patients' };
-    if (path.match(/^\/patients\/[^/]+\/deactivate$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'patients' };
-    if (path.match(/^\/patients\/[^/]+\/reactivate$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'patients' };
-    if (path.match(/^\/patients\/[^/]+\/documents\/generate$/) && method === 'POST') return { action: 'GENERATE', tableName: 'documents' };
-    if (path.match(/^\/patients\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'patients' };
+    if (path === '/patients' && method === 'POST')
+      return { action: 'CREATE', tableName: 'patients' };
+    if (path.match(/^\/patients\/[^/]+\/deactivate$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'patients' };
+    if (path.match(/^\/patients\/[^/]+\/reactivate$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'patients' };
+    if (
+      path.match(/^\/patients\/[^/]+\/documents\/generate$/) &&
+      method === 'POST'
+    )
+      return { action: 'GENERATE', tableName: 'documents' };
+    if (path.match(/^\/patients\/[^/]+$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'patients' };
 
     // Vitals
-    if (path.match(/^\/patients\/[^/]+\/vitals$/) && method === 'POST') return { action: 'CREATE', tableName: 'vitals' };
-    if (path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'vitals' };
+    if (path.match(/^\/patients\/[^/]+\/vitals$/) && method === 'POST')
+      return { action: 'CREATE', tableName: 'vitals' };
+    if (path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'vitals' };
 
     // Visits
-    if (path.match(/^\/patients\/[^/]+\/visits$/) && method === 'POST') return { action: 'CREATE', tableName: 'visits' };
-    if (path.match(/^\/patients\/[^/]+\/visits\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'visits' };
+    if (path.match(/^\/patients\/[^/]+\/visits$/) && method === 'POST')
+      return { action: 'CREATE', tableName: 'visits' };
+    if (path.match(/^\/patients\/[^/]+\/visits\/[^/]+$/) && method === 'PATCH')
+      return { action: 'UPDATE', tableName: 'visits' };
 
     // Initial Notes
-    if (path.match(/^\/patients\/[^/]+\/initial-note\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'initial_notes' };
-    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'initial_notes' };
-    if (path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'initial_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/initial-note\/create-and-publish$/) &&
+      method === 'POST'
+    )
+      return { action: 'CREATE', tableName: 'initial_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+\/publish$/) &&
+      method === 'POST'
+    )
+      return { action: 'UPDATE', tableName: 'initial_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'initial_notes' };
 
     // Progress Notes
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/create-and-publish$/) && method === 'POST') return { action: 'CREATE', tableName: 'progress_notes' };
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+\/publish$/) && method === 'POST') return { action: 'UPDATE', tableName: 'progress_notes' };
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/drafts$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };
-    if (path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'progress_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/progress-notes\/create-and-publish$/) &&
+      method === 'POST'
+    )
+      return { action: 'CREATE', tableName: 'progress_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+\/publish$/) &&
+      method === 'POST'
+    )
+      return { action: 'UPDATE', tableName: 'progress_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/progress-notes\/drafts$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'progress_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/progress-notes\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'progress_notes' };
 
     // Problems
-    if (path.match(/^\/patients\/[^/]+\/problems$/) && method === 'POST') return { action: 'CREATE', tableName: 'problems' };
-    if (path.match(/^\/patients\/[^/]+\/problems\/reorder$/) && method === 'POST') return { action: 'UPDATE', tableName: 'problems' };
-    if (path.match(/^\/patients\/[^/]+\/problems\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'problems' };
-    if (path.match(/^\/patients\/[^/]+\/problems\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'problems' };
+    if (path.match(/^\/patients\/[^/]+\/problems$/) && method === 'POST')
+      return { action: 'CREATE', tableName: 'problems' };
+    if (
+      path.match(/^\/patients\/[^/]+\/problems\/reorder$/) &&
+      method === 'POST'
+    )
+      return { action: 'UPDATE', tableName: 'problems' };
+    if (
+      path.match(/^\/patients\/[^/]+\/problems\/[^/]+$/) &&
+      method === 'PATCH'
+    )
+      return { action: 'UPDATE', tableName: 'problems' };
+    if (
+      path.match(/^\/patients\/[^/]+\/problems\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'problems' };
 
     // Medications
-    if (path.match(/^\/patients\/[^/]+\/medications$/) && method === 'POST') return { action: 'CREATE', tableName: 'medications' };
-    if (path.match(/^\/patients\/[^/]+\/medications\/reorder$/) && method === 'POST') return { action: 'UPDATE', tableName: 'medications' };
-    if (path.match(/^\/patients\/[^/]+\/medications\/[^/]+$/) && method === 'PATCH') return { action: 'UPDATE', tableName: 'medications' };
-    if (path.match(/^\/patients\/[^/]+\/medications\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'medications' };
+    if (path.match(/^\/patients\/[^/]+\/medications$/) && method === 'POST')
+      return { action: 'CREATE', tableName: 'medications' };
+    if (
+      path.match(/^\/patients\/[^/]+\/medications\/reorder$/) &&
+      method === 'POST'
+    )
+      return { action: 'UPDATE', tableName: 'medications' };
+    if (
+      path.match(/^\/patients\/[^/]+\/medications\/[^/]+$/) &&
+      method === 'PATCH'
+    )
+      return { action: 'UPDATE', tableName: 'medications' };
+    if (
+      path.match(/^\/patients\/[^/]+\/medications\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'medications' };
 
     // Attachments
-    if (path === '/attachments/upload' && method === 'POST') return { action: 'CREATE', tableName: 'attachments' };
-    if (path.match(/^\/attachments\/[^/]+$/) && method === 'DELETE') return { action: 'DELETE', tableName: 'attachments' };
+    if (path === '/attachments/upload' && method === 'POST')
+      return { action: 'CREATE', tableName: 'attachments' };
+    if (path.match(/^\/attachments\/[^/]+$/) && method === 'DELETE')
+      return { action: 'DELETE', tableName: 'attachments' };
 
     return null;
   }
@@ -84,11 +159,15 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (responseBody.status != null) ctx.status = responseBody.status;
     if (responseBody.isActive != null) ctx.isActive = responseBody.isActive;
     // Patient nested object
-    if (responseBody.patient?.firstName != null) ctx.firstName = responseBody.patient.firstName;
-    if (responseBody.patient?.lastName != null) ctx.lastName = responseBody.patient.lastName;
+    if (responseBody.patient?.firstName != null)
+      ctx.firstName = responseBody.patient.firstName;
+    if (responseBody.patient?.lastName != null)
+      ctx.lastName = responseBody.patient.lastName;
     // User nested object (accounts endpoint returns { user: {...} })
-    if (responseBody.user?.firstName != null) ctx.firstName = responseBody.user.firstName;
-    if (responseBody.user?.lastName != null) ctx.lastName = responseBody.user.lastName;
+    if (responseBody.user?.firstName != null)
+      ctx.firstName = responseBody.user.firstName;
+    if (responseBody.user?.lastName != null)
+      ctx.lastName = responseBody.user.lastName;
     return ctx;
   }
 
@@ -113,9 +192,12 @@ export class AuditLogInterceptor implements NestInterceptor {
         if (!resolved || !user?.id) return;
 
         const recordId = responseBody?.id ?? responseBody?.user?.id;
-        
+
         const patientIdMatch = path.match(/^\/patients\/([^/]+)/);
-        const patientId = responseBody?.patientId ?? responseBody?.patient?.id ?? (patientIdMatch ? patientIdMatch[1] : undefined);
+        const patientId =
+          responseBody?.patientId ??
+          responseBody?.patient?.id ??
+          (patientIdMatch ? patientIdMatch[1] : undefined);
 
         // Merge: request body fields (what the caller sent) + record context
         // (name/title/status from the saved record) + optional publish flag.

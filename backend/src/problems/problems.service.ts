@@ -25,8 +25,12 @@ export class ProblemsService {
       where: { patientId },
       orderBy: { sortOrder: 'asc' },
       include: {
-        addedByUser: { select: { firstName: true, lastName: true, role: true } },
-        updatedByUser: { select: { firstName: true, lastName: true, role: true } },
+        addedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+        updatedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
       },
     });
   }
@@ -45,8 +49,12 @@ export class ProblemsService {
       where: { patientId, status: ProblemStatus.ACTIVE },
       orderBy: { sortOrder: 'asc' },
       include: {
-        addedByUser: { select: { firstName: true, lastName: true, role: true } },
-        updatedByUser: { select: { firstName: true, lastName: true, role: true } },
+        addedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+        updatedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
       },
     });
   }
@@ -77,7 +85,14 @@ export class ProblemsService {
       },
     });
 
-    await this.logAction(patientId, userId, 'Created', `Created problem '${problem.title}'`, this.prisma, problem.id);
+    await this.logAction(
+      patientId,
+      userId,
+      'Created',
+      `Created problem '${problem.title}'`,
+      this.prisma,
+      problem.id,
+    );
     return problem;
   }
 
@@ -113,20 +128,40 @@ export class ProblemsService {
       const data: Prisma.ProblemUpdateInput = {};
       data.updatedByUser = { connect: { id: userId } };
       if (dto.title !== undefined && dto.title.trim() !== existing.title) {
-        await this.logAction(patientId, userId, 'Renamed', `Renamed problem from '${existing.title}' to '${dto.title.trim()}'`, tx, id);
+        await this.logAction(
+          patientId,
+          userId,
+          'Renamed',
+          `Renamed problem from '${existing.title}' to '${dto.title.trim()}'`,
+          tx,
+          id,
+        );
       }
 
       if (dto.title !== undefined) data.title = dto.title.trim();
       if (dto.icdCode !== undefined)
         data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
-        
+
       if (dto.diagnosisDate !== undefined) {
-        data.diagnosisDate = dto.diagnosisDate ? new Date(dto.diagnosisDate) : null;
-        
-        const oldDateStr = existing.diagnosisDate ? existing.diagnosisDate.toISOString().split('T')[0] : '--';
-        const newDateStr = data.diagnosisDate ? data.diagnosisDate.toISOString().split('T')[0] : '--';
+        data.diagnosisDate = dto.diagnosisDate
+          ? new Date(dto.diagnosisDate)
+          : null;
+
+        const oldDateStr = existing.diagnosisDate
+          ? existing.diagnosisDate.toISOString().split('T')[0]
+          : '--';
+        const newDateStr = data.diagnosisDate
+          ? data.diagnosisDate.toISOString().split('T')[0]
+          : '--';
         if (oldDateStr !== newDateStr) {
-          await this.logAction(patientId, userId, 'Updated', `Changed Date of Diagnosis for '${existing.title}' from '${oldDateStr}' to '${newDateStr}'`, tx, id);
+          await this.logAction(
+            patientId,
+            userId,
+            'Updated',
+            `Changed Date of Diagnosis for '${existing.title}' from '${oldDateStr}' to '${newDateStr}'`,
+            tx,
+            id,
+          );
         }
       }
 
@@ -182,8 +217,17 @@ export class ProblemsService {
   // SOFT DELETE
   // ─────────────────────────────────────────────
 
-  async remove(patientId: string, id: string, userId: string): Promise<Problem> {
-    return this.update(patientId, id, { status: ProblemStatus.REMOVED }, userId);
+  async remove(
+    patientId: string,
+    id: string,
+    userId: string,
+  ): Promise<Problem> {
+    return this.update(
+      patientId,
+      id,
+      { status: ProblemStatus.REMOVED },
+      userId,
+    );
   }
 
   // ─────────────────────────────────────────────
@@ -196,16 +240,18 @@ export class ProblemsService {
     userId: string,
   ): Promise<{ updated: number }> {
     const ids = dto.items.map((i) => i.id);
-    
+
     // 1. Fetch existing problems for validation and diffing
     const allPatientProblems = await this.prisma.problem.findMany({
       where: { patientId },
     });
-    const existingMap = new Map(allPatientProblems.map(p => [p.id, p]));
+    const existingMap = new Map(allPatientProblems.map((p) => [p.id, p]));
 
-    const missingId = ids.find(id => !existingMap.has(id));
+    const missingId = ids.find((id) => !existingMap.has(id));
     if (missingId) {
-      throw new ForbiddenException('One or more problems do not belong to this patient.');
+      throw new ForbiddenException(
+        'One or more problems do not belong to this patient.',
+      );
     }
 
     // 2. Track changes for the log
@@ -218,11 +264,15 @@ export class ProblemsService {
         const currentTitle = existing.title;
 
         // Diff Parent
-        if (item.parentId !== undefined && item.parentId !== existing.parentId) {
+        if (
+          item.parentId !== undefined &&
+          item.parentId !== existing.parentId
+        ) {
           if (item.parentId === null) {
             changes.push(`Unnested '${currentTitle}'`);
           } else {
-            const parentTitle = existingMap.get(item.parentId)?.title || 'Unknown';
+            const parentTitle =
+              existingMap.get(item.parentId)?.title || 'Unknown';
             changes.push(`Nested '${currentTitle}' under '${parentTitle}'`);
           }
         }
@@ -234,10 +284,16 @@ export class ProblemsService {
 
         // Diff Diagnosis Date
         if (item.diagnosisDate !== undefined) {
-          const oldDateStr = existing.diagnosisDate ? existing.diagnosisDate.toISOString().split('T')[0] : '--';
-          const newDateStr = item.diagnosisDate ? new Date(item.diagnosisDate).toISOString().split('T')[0] : '--';
+          const oldDateStr = existing.diagnosisDate
+            ? existing.diagnosisDate.toISOString().split('T')[0]
+            : '--';
+          const newDateStr = item.diagnosisDate
+            ? new Date(item.diagnosisDate).toISOString().split('T')[0]
+            : '--';
           if (oldDateStr !== newDateStr) {
-            changes.push(`Set Date of Diagnosis for '${currentTitle}' to '${newDateStr}'`);
+            changes.push(
+              `Set Date of Diagnosis for '${currentTitle}' to '${newDateStr}'`,
+            );
           }
         }
 
@@ -247,19 +303,32 @@ export class ProblemsService {
             sortOrder: item.sortOrder,
             ...(item.parentId !== undefined && { parentId: item.parentId }),
             ...(item.title !== undefined && { title: item.title.trim() }),
-            ...(item.icdCode !== undefined && { icdCode: item.icdCode ? item.icdCode.trim() : null }),
-            ...(item.diagnosisDate !== undefined && { diagnosisDate: item.diagnosisDate ? new Date(item.diagnosisDate) : null }),
+            ...(item.icdCode !== undefined && {
+              icdCode: item.icdCode ? item.icdCode.trim() : null,
+            }),
+            ...(item.diagnosisDate !== undefined && {
+              diagnosisDate: item.diagnosisDate
+                ? new Date(item.diagnosisDate)
+                : null,
+            }),
             updatedBy: userId,
           },
         });
       }),
     );
 
-    const logMessage = changes.length > 0 
-      ? changes.join(', ')
-      : 'Published new problem list order and nesting';
+    const logMessage =
+      changes.length > 0
+        ? changes.join(', ')
+        : 'Published new problem list order and nesting';
 
-    await this.logAction(patientId, userId, 'Published', logMessage, this.prisma);
+    await this.logAction(
+      patientId,
+      userId,
+      'Published',
+      logMessage,
+      this.prisma,
+    );
     return { updated: dto.items.length };
   }
 
@@ -291,7 +360,13 @@ export class ProblemsService {
     const existing = await client.problem.findMany({
       where: {
         patientId,
-        status: { in: [ProblemStatus.ACTIVE, ProblemStatus.RESOLVED, ProblemStatus.REMOVED] },
+        status: {
+          in: [
+            ProblemStatus.ACTIVE,
+            ProblemStatus.RESOLVED,
+            ProblemStatus.REMOVED,
+          ],
+        },
       },
     });
 
@@ -322,10 +397,25 @@ export class ProblemsService {
         keptIds.add(match.id);
         const sortOrder = currentSortOrder++;
         promises.push(
-          client.problem.update({
-            where: { id: match.id },
-            data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
-          }).then(() => this.logAction(patientId, userId, 'Reactivated', `Reactivated problem '${match.title}' from ${sourceNote}`, client, match.id))
+          client.problem
+            .update({
+              where: { id: match.id },
+              data: {
+                status: ProblemStatus.ACTIVE,
+                sortOrder,
+                updatedByUser: { connect: { id: userId } },
+              },
+            })
+            .then(() =>
+              this.logAction(
+                patientId,
+                userId,
+                'Reactivated',
+                `Reactivated problem '${match.title}' from ${sourceNote}`,
+                client,
+                match.id,
+              ),
+            ),
         );
         continue;
       }
@@ -334,26 +424,52 @@ export class ProblemsService {
         keptIds.add(match.id);
         const sortOrder = currentSortOrder++;
         promises.push(
-          client.problem.update({
-            where: { id: match.id },
-            data: { status: ProblemStatus.ACTIVE, sortOrder, updatedByUser: { connect: { id: userId } } },
-          }).then(() => this.logAction(patientId, userId, 'Restored', `Restored removed problem '${match.title}' from ${sourceNote}`, client, match.id))
+          client.problem
+            .update({
+              where: { id: match.id },
+              data: {
+                status: ProblemStatus.ACTIVE,
+                sortOrder,
+                updatedByUser: { connect: { id: userId } },
+              },
+            })
+            .then(() =>
+              this.logAction(
+                patientId,
+                userId,
+                'Restored',
+                `Restored removed problem '${match.title}' from ${sourceNote}`,
+                client,
+                match.id,
+              ),
+            ),
         );
         continue;
       }
 
       const sortOrder = currentSortOrder++;
       promises.push(
-        client.problem.create({
-          data: {
-            patientId,
-            title: item.title,
-            icdCode: item.icdCode,
-            status: ProblemStatus.ACTIVE,
-            sortOrder,
-            addedBy: userId,
-          },
-        }).then(newProb => this.logAction(patientId, userId, 'Created', `Added problem '${newProb.title}' from ${sourceNote}`, client, newProb.id))
+        client.problem
+          .create({
+            data: {
+              patientId,
+              title: item.title,
+              icdCode: item.icdCode,
+              status: ProblemStatus.ACTIVE,
+              sortOrder,
+              addedBy: userId,
+            },
+          })
+          .then((newProb) =>
+            this.logAction(
+              patientId,
+              userId,
+              'Created',
+              `Added problem '${newProb.title}' from ${sourceNote}`,
+              client,
+              newProb.id,
+            ),
+          ),
       );
     }
 
@@ -362,10 +478,25 @@ export class ProblemsService {
       if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
         const sortOrder = currentSortOrder++;
         promises.push(
-          client.problem.update({
-            where: { id: ext.id },
-            data: { status: ProblemStatus.RESOLVED, sortOrder, updatedByUser: { connect: { id: userId } } },
-          }).then(() => this.logAction(patientId, userId, 'Resolved', `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`, client, ext.id))
+          client.problem
+            .update({
+              where: { id: ext.id },
+              data: {
+                status: ProblemStatus.RESOLVED,
+                sortOrder,
+                updatedByUser: { connect: { id: userId } },
+              },
+            })
+            .then(() =>
+              this.logAction(
+                patientId,
+                userId,
+                'Resolved',
+                `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`,
+                client,
+                ext.id,
+              ),
+            ),
         );
       }
     }

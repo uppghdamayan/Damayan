@@ -10,7 +10,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const supabaseUrl = configService.get<string>('SUPABASE_URL');
-        const supabaseKey = configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+        const supabaseKey = configService.get<string>(
+          'SUPABASE_SERVICE_ROLE_KEY',
+        );
 
         if (!supabaseUrl || !supabaseKey) {
           throw new Error('Supabase URL or Key not defined in environment');

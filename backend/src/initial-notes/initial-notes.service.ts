@@ -12,7 +12,10 @@ import { VisitsService } from '../visits/visits.service';
 import { ProblemsService } from '../problems/problems.service';
 import { MedicationsService } from '../medications/medications.service';
 import { StorageService } from '../storage/storage.service';
-import { diffByTitle, diffByNameDoseUnit } from '../progress-notes/progress-notes.utils';
+import {
+  diffByTitle,
+  diffByNameDoseUnit,
+} from '../progress-notes/progress-notes.utils';
 
 @Injectable()
 export class InitialNotesService {
@@ -27,7 +30,10 @@ export class InitialNotesService {
   async findOne(patientId: string) {
     const note = await this.prisma.initialNote.findFirst({
       where: { visit: { patientId }, isDeleted: false },
-      include: { author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
+      include: {
+        author: { select: { firstName: true, lastName: true, role: true } },
+        lastEditor: { select: { firstName: true, lastName: true, role: true } },
+      },
     });
     if (!note) {
       throw new NotFoundException('Initial note not found for this patient.');
@@ -38,7 +44,10 @@ export class InitialNotesService {
   async findAll(patientId: string) {
     return this.prisma.initialNote.findMany({
       where: { visit: { patientId } },
-      include: { author: { select: { firstName: true, lastName: true, role: true } }, lastEditor: { select: { firstName: true, lastName: true, role: true } } },
+      include: {
+        author: { select: { firstName: true, lastName: true, role: true } },
+        lastEditor: { select: { firstName: true, lastName: true, role: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -78,7 +87,9 @@ export class InitialNotesService {
           psychosocialHistory: dto.psychosocialHistory,
           mgmtNonpharm: dto.mgmtNonpharm,
           diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
-          medicationSnapshot: dto.medicationSnapshot ? (dto.medicationSnapshot as any) : [],
+          medicationSnapshot: dto.medicationSnapshot
+            ? (dto.medicationSnapshot as any)
+            : [],
           status: NoteStatus.DRAFT,
         },
       });
@@ -153,64 +164,88 @@ export class InitialNotesService {
       data.lastEditor = { connect: { id: userId } };
       data.lastEditedAt = new Date();
 
-      return this.prisma.$transaction(async (tx) => {
-        const updatedNote = await tx.initialNote.update({ where: { id }, data });
+      return this.prisma.$transaction(
+        async (tx) => {
+          const updatedNote = await tx.initialNote.update({
+            where: { id },
+            data,
+          });
 
-        const beforeProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-        const beforeMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
-
-        if (updateData.assessment) {
-          const assessmentItems = (updateData.assessment as any[] || [])
-            .filter(a => a && a.title && String(a.title).trim() !== '')
-            .map((a) => ({
-              title: String(a.title).trim(),
-              icdCode: a.icdCode,
-            }));
-          await this.problemsService.upsertFromAssessment(
+          const beforeProblems =
+            await this.problemsService.findActiveForPatient(patientId, tx);
+          const beforeMeds = await this.medicationsService.findActiveForPatient(
             patientId,
-            assessmentItems,
-            userId,
-            'Initial Note',
             tx,
           );
-        }
 
-        if (updateData.medicationSnapshot) {
-          const medicationItems = (updateData.medicationSnapshot as any[] || [])
-            .filter(m => m && m.name && String(m.name).trim() !== '')
-            .map((m) => ({
-              name: String(m.name).trim(),
-              dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
-              formulation: m.formulation,
-              quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
-              instructions: m.instructions,
-            }));
-          await this.medicationsService.upsertFromNoteMedications(
+          if (updateData.assessment) {
+            const assessmentItems = ((updateData.assessment as any[]) || [])
+              .filter((a) => a && a.title && String(a.title).trim() !== '')
+              .map((a) => ({
+                title: String(a.title).trim(),
+                icdCode: a.icdCode,
+              }));
+            await this.problemsService.upsertFromAssessment(
+              patientId,
+              assessmentItems,
+              userId,
+              'Initial Note',
+              tx,
+            );
+          }
+
+          if (updateData.medicationSnapshot) {
+            const medicationItems = (
+              (updateData.medicationSnapshot as any[]) || []
+            )
+              .filter((m) => m && m.name && String(m.name).trim() !== '')
+              .map((m) => ({
+                name: String(m.name).trim(),
+                dose:
+                  m.dose !== undefined && m.dose !== null
+                    ? String(m.dose).trim()
+                    : '',
+                formulation: m.formulation,
+                quantity:
+                  m.quantity !== undefined && m.quantity !== null
+                    ? Number(m.quantity)
+                    : undefined,
+                instructions: m.instructions,
+              }));
+            await this.medicationsService.upsertFromNoteMedications(
+              patientId,
+              medicationItems,
+              userId,
+              'Initial Note',
+              tx,
+            );
+          }
+
+          const afterProblems = await this.problemsService.findActiveForPatient(
             patientId,
-            medicationItems,
-            userId,
-            'Initial Note',
             tx,
           );
-        }
+          const afterMeds = await this.medicationsService.findActiveForPatient(
+            patientId,
+            tx,
+          );
+          const problemChanges = diffByTitle(beforeProblems, afterProblems);
+          const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
 
-        const afterProblems = await this.problemsService.findActiveForPatient(patientId, tx);
-        const afterMeds = await this.medicationsService.findActiveForPatient(patientId, tx);
-        const problemChanges = diffByTitle(beforeProblems, afterProblems);
-        const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+          await this.visitsService.updateChangeSummary(
+            note.visitId,
+            problemChanges,
+            medicationChanges,
+            tx,
+          );
 
-        await this.visitsService.updateChangeSummary(
-          note.visitId,
-          problemChanges,
-          medicationChanges,
-          tx,
-        );
-
-        return updatedNote;
-      }, {
-        timeout: 20000,
-        maxWait: 10000,
-      });
+          return updatedNote;
+        },
+        {
+          timeout: 20000,
+          maxWait: 10000,
+        },
+      );
     }
 
     return this.prisma.initialNote.update({ where: { id }, data });
@@ -234,74 +269,83 @@ export class InitialNotesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const [published, beforeProblems, beforeMeds] = await Promise.all([
-        tx.initialNote.update({
-          where: { id },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [published, beforeProblems, beforeMeds] = await Promise.all([
+          tx.initialNote.update({
+            where: { id },
+            data: { status: NoteStatus.PUBLISHED },
+          }),
+          this.problemsService.findActiveForPatient(patientId, tx),
+          this.medicationsService.findActiveForPatient(patientId, tx),
+        ]);
+
+        const assessmentItems = ((note.assessment as any[]) || [])
+          .filter((a) => a && a.title && String(a.title).trim() !== '')
+          .map((a) => ({
+            title: String(a.title).trim(),
+            icdCode: a.icdCode,
+          }));
+        const medicationItems = ((note.medicationSnapshot as any[]) || [])
+          .filter((m) => m && m.name && String(m.name).trim() !== '')
+          .map((m) => ({
+            name: String(m.name).trim(),
+            dose:
+              m.dose !== undefined && m.dose !== null
+                ? String(m.dose).trim()
+                : '',
+            formulation: m.formulation,
+            quantity:
+              m.quantity !== undefined && m.quantity !== null
+                ? Number(m.quantity)
+                : undefined,
+            instructions: m.instructions,
+          }));
+
+        await Promise.all([
+          this.problemsService.upsertFromAssessment(
+            patientId,
+            assessmentItems,
+            userId,
+            'Initial Note',
+            tx,
+          ),
+          this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            medicationItems,
+            userId,
+            'Initial Note',
+            tx,
+          ),
+        ]);
+
+        const [afterProblems, afterMeds] = await Promise.all([
+          this.problemsService.findActiveForPatient(patientId, tx),
+          this.medicationsService.findActiveForPatient(patientId, tx),
+        ]);
+
+        const problemChanges = diffByTitle(beforeProblems, afterProblems);
+        const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+
+        await this.visitsService.updateChangeSummary(
+          note.visitId,
+          problemChanges,
+          medicationChanges,
+          tx,
+        );
+
+        await tx.visit.update({
+          where: { id: note.visitId },
           data: { status: NoteStatus.PUBLISHED },
-        }),
-        this.problemsService.findActiveForPatient(patientId, tx),
-        this.medicationsService.findActiveForPatient(patientId, tx),
-      ]);
+        });
 
-      const assessmentItems = (note.assessment as any[] || [])
-        .filter(a => a && a.title && String(a.title).trim() !== '')
-        .map((a) => ({
-          title: String(a.title).trim(),
-          icdCode: a.icdCode,
-        }));
-      const medicationItems = (note.medicationSnapshot as any[] || [])
-        .filter(m => m && m.name && String(m.name).trim() !== '')
-        .map((m) => ({
-          name: String(m.name).trim(),
-          dose: m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '',
-          formulation: m.formulation,
-          quantity: m.quantity !== undefined && m.quantity !== null ? Number(m.quantity) : undefined,
-          instructions: m.instructions,
-        }));
-
-      await Promise.all([
-        this.problemsService.upsertFromAssessment(
-          patientId,
-          assessmentItems,
-          userId,
-          'Initial Note',
-          tx,
-        ),
-        this.medicationsService.upsertFromNoteMedications(
-          patientId,
-          medicationItems,
-          userId,
-          'Initial Note',
-          tx,
-        )
-      ]);
-
-      const [afterProblems, afterMeds] = await Promise.all([
-        this.problemsService.findActiveForPatient(patientId, tx),
-        this.medicationsService.findActiveForPatient(patientId, tx)
-      ]);
-
-      const problemChanges = diffByTitle(beforeProblems, afterProblems);
-      const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
-
-      await this.visitsService.updateChangeSummary(
-        note.visitId,
-        problemChanges,
-        medicationChanges,
-        tx,
-      );
-
-      await tx.visit.update({
-        where: { id: note.visitId },
-        data: { status: NoteStatus.PUBLISHED },
-      });
-
-      return published;
-    }, {
-      timeout: 20000,
-      maxWait: 10000,
-    });
+        return published;
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
   async remove(patientId: string, id: string, userId: string) {
@@ -342,7 +386,11 @@ export class InitialNotesService {
 
       for (const att of attachments) {
         if (att.storageKey) {
-          await this.storageService.delete(att.storageKey).catch(e => console.error('Failed to delete attachment from storage', e));
+          await this.storageService
+            .delete(att.storageKey)
+            .catch((e) =>
+              console.error('Failed to delete attachment from storage', e),
+            );
         }
       }
 

@@ -33,7 +33,12 @@ export class PatientsService {
 
   // ── List / search ──────────────────────────────────────────────────────────
 
-  async findAll(filters: { search?: string; page?: number; limit?: number; includeInactive?: boolean }) {
+  async findAll(filters: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    includeInactive?: boolean;
+  }) {
     const { search, page = 1, limit = 50, includeInactive = false } = filters;
     const skip = (page - 1) * limit;
 

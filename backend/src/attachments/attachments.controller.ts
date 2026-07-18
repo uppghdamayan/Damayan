@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AttachmentsService } from './attachments.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
@@ -20,7 +32,11 @@ export class AttachmentsController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: any,
   ) {
-    return this.attachmentsService.upload(createAttachmentDto, file, req.user.id);
+    return this.attachmentsService.upload(
+      createAttachmentDto,
+      file,
+      req.user.id,
+    );
   }
 
   @Get()

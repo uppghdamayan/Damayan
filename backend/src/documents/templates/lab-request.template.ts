@@ -1,31 +1,38 @@
 import PDFDocument from 'pdfkit';
+import {
+  drawLetterhead,
+  drawGenerationDate,
+  drawSignatureBlock,
+  drawAssessmentList,
+  drawPatientBlock,
+} from './layout.helper';
 
 export const renderLabRequest = async (data: any): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 50 });
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
-    doc.fontSize(20).text('Lab Request', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Patient Name: ${data.patient.firstName} ${data.patient.lastName}`);
-    doc.text(`Date of Birth: ${new Date(data.patient.dateOfBirth).toLocaleDateString()}`);
-    doc.text(`Sex: ${data.patient.sex}`);
-    
-    doc.moveDown();
-    doc.text('Diagnostics Requested:', { underline: true });
-    if (data.diagnostics) {
-      doc.text(JSON.stringify(data.diagnostics, null, 2));
+    drawLetterhead(doc, 'DIAGNOSTICS REQUEST');
+    drawGenerationDate(doc);
+    drawPatientBlock(doc, data.patient);
+    doc.moveDown(0.5);
+
+    drawAssessmentList(doc, data.assessment);
+
+    doc.font('Helvetica-Bold').fontSize(10).text('DIAGNOSTIC TESTS REQUESTED:');
+    doc.font('Helvetica');
+    if (data.diagnostics && data.diagnostics.length > 0) {
+      data.diagnostics.forEach((d: string) =>
+        doc.text(`•  ${d}`, { indent: 20 }),
+      );
     } else {
-      doc.text('No diagnostics recorded.');
+      doc.text('•  No tests requested.', { indent: 20 });
     }
 
-    doc.moveDown(2);
-    doc.text('Issued by: DAMAYAN EMR');
-    doc.text(`Date Issued: ${new Date().toLocaleDateString()}`);
-    
+    drawSignatureBlock(doc, data.physician, 'Requested By:');
     doc.end();
   });
 };

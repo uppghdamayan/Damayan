@@ -33,4 +33,22 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsEnum(AccountRole)
   role?: AccountRole;
+
+  @ApiPropertyOptional({ example: '1234567' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  licenseNumber?: string;
+
+  @ApiPropertyOptional({ example: 'PTR-1234' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  ptrNumber?: string;
+
+  @ApiPropertyOptional({ example: 'S2-1234' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  s2Number?: string;
 }

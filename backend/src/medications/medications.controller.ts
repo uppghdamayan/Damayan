@@ -92,7 +92,11 @@ export class MedicationsController {
   @ApiOperation({
     summary: 'Hard-delete medication (Doctor, Admin)',
   })
-  async remove(@Param('patientId') patientId: string, @Param('id') id: string, @CurrentUser() user: User) {
+  async remove(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
     return this.medicationsService.remove(patientId, id, user.id);
   }
 }

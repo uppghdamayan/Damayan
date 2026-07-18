@@ -125,10 +125,7 @@ export class ProgressNotesController {
 
   @Delete('drafts')
   @Roles(Role.DOCTOR, Role.ADMIN)
-  removeAllDrafts(
-    @Param('patientId') patientId: string,
-    @Request() req,
-  ) {
+  removeAllDrafts(@Param('patientId') patientId: string, @Request() req) {
     return this.progressNotesService.deleteAllDrafts(patientId, req.user.id);
   }
 

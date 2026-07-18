@@ -44,11 +44,11 @@ export class PatientsController {
     @CurrentUser() user?: User,
   ) {
     const isAdmin = user?.role === Role.ADMIN;
-    return this.patientsService.findAll({ 
-      search, 
-      page, 
-      limit, 
-      includeInactive: includeInactive === 'true' && isAdmin 
+    return this.patientsService.findAll({
+      search,
+      page,
+      limit,
+      includeInactive: includeInactive === 'true' && isAdmin,
     });
   }
 

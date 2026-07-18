@@ -1,502 +1,740 @@
-# DAMAYAN — Database Index Optimization
+# DAMAYAN — Clinical Document Generation (Medical Certificate, Referral Letter, Diagnostic Request, Prescription)
 
-**Repo:** `uppghdamayan/Damayan` (backend: `backend/`, NestJS + Prisma + Supabase Postgres)
-**Based on:** current `main` as of this guide — `backend/prisma/schema.prisma`, migrations `20260612131311_init_full_schema` and `20260613034747_add_requires_password_change`, and the actual service files under `backend/src/**`.
-**Goal:** the data in DAMAYAN is small — this isn't about shaving milliseconds off a query plan for its own sake, it's about making fetches feel instant. That means three things have to happen together: (1) close every unindexed hot-path query so Postgres never falls back to a sequential scan, (2) stop the frontend from treating every navigation as a mandatory loading state when the data is already cached, and (3) stop the Next.js route system from forcing a full-page skeleton on every single tab click regardless of cache. On top of that, adding a Problem or Medication needs an optimistic placeholder so the new item appears the instant it's submitted instead of waiting on the round trip. §1–5 cover the indexing. §6 covers the query-cache side. §7 covers the actual root cause of "every tab always loads up" — a Next.js route-level Suspense boundary that fires on every navigation independent of cache. §8 covers the add-item placeholders.
+**Target repo:** `uppghdamayan/Damayan`
+**Modules touched:** `backend/src/documents/*`, `backend/prisma/schema.prisma`, `frontend/src/components/documents/*`, `frontend/src/hooks/useDocuments.ts`
 
-This version supersedes any earlier draft. Two corrections versus the earlier general pass:
+## 0. Why this doc exists
 
-1. **The `attachments` dual-FK bug does not exist in this codebase.** `schema.prisma` already models `Attachment` as polymorphic-by-convention (`noteType` + `noteId` plain columns, no `@relation` to `InitialNote`/`ProgressNote`), and `AttachmentsService.upload()` (`backend/src/attachments/attachments.service.ts`) already validates `noteId` exists against the correct table before insert, and also checks that `note.visit.patientId === dto.patientId`. No fix needed here — skip straight to indexing.
-2. **`Problem.parentId` and `VitalSign.visitId` are not queried directly** anywhere in `backend/src/problems/problems.service.ts` or `backend/src/vitals/vitals.service.ts`. The problem tree is built in-memory from a single `WHERE patientId = ?` fetch, not per-node `WHERE parentId = ?` calls, and vitals never filters by `visitId`. Indexing those columns speculatively would just be write overhead with zero read benefit today — dropped from this guide unless that access pattern changes later.
+The current `documents` module (`documents.service.ts` + `templates/*.template.ts`) generates placeholder PDFs — no letterhead, no physician sign-off block, JSON dumped raw with `JSON.stringify()`. Four reference documents (real clinic output, attached separately as `.docx`) define the actual target layout and data requirements:
+
+1. **Medical Certificate**
+2. **Referral Letter** ← does not exist yet as a `DocumentType`, must be added
+3. **Diagnostic Request** ← maps to the existing `DocumentType.LAB_REQUEST`
+4. **Prescription**
+
+This spec tells the implementing agent exactly what schema, backend, and frontend changes are needed so the generated PDFs match the reference layout and the two documents that require free-text clinical input (Medical Certificate, Referral Letter) get a proper "preview → fill in → generate" modal flow. `CHARGE_SLIP` is untouched — out of scope.
+
+Read this whole document before writing code. Sections are ordered as an implementation sequence (schema → config → backend → frontend). Follow existing repo conventions (NestJS module/service/controller pattern, `@map()` snake_case columns, `class-validator` DTOs, PDFKit for rendering, TanStack Query hooks, Tailwind + shadcn/ui + existing modal class conventions in `DocumentGeneratorModal.tsx`).
 
 ---
 
-## 1. What the real queries need
+## 1. Field mapping (source of truth for every template)
 
-Grounded directly in the service files, here's what's actually unindexed or index-misaligned:
+Derived from the four reference `.docx` files. `*` = requires free-text operator input at generation time (no existing DB field holds it).
 
-| File | Query | Current index coverage | Gap |
-|---|---|---|---|
-| `attachments.service.ts` → `findByNote()` | `WHERE noteType, noteId` | **none** | needs `[noteType, noteId]` |
-| `attachments.service.ts` → `findByPatient()` | `WHERE patientId ORDER BY uploadedAt desc` | **none** | needs `[patientId, uploadedAt(desc)]` |
-| `documents.service.ts` → `findByPatient()` | `WHERE patientId ORDER BY generatedAt desc` | **none** | needs `[patientId, generatedAt(desc)]` |
-| `audit-logs.service.ts` → `findAll()` | `WHERE action?, tableName?, userId?, patientId?, createdAt range?` (any combination, offset pagination) | `[patientId, createdAt]`, `[userId, createdAt]` | needs coverage for the unscoped/action/tableName filter paths — see §2.3 |
-| `medications.service.ts` → `findByPatient()` | `WHERE patientId, isActive? ORDER BY isActive desc, createdAt desc` | `[patientId, isActive]` | index doesn't cover the `createdAt` sort tiebreaker — see §2.4 |
-| `problems.service.ts`, `vitals.service.ts` | `WHERE patientId ORDER BY sortOrder/measuredAt` | already covered | no change needed |
+### 1.1 Medical Certificate
+| Field | Source |
+|---|---|
+| Date of Generation | `new Date()` at generation time |
+| Name of Patient | `Patient.firstName/middleName/lastName/extension` |
+| Patient Age | computed from `Patient.dateOfBirth` |
+| Patient Sex | `Patient.sex` |
+| Patient Address | `Patient.addressStreet/Barangay/City/Region/Country` joined |
+| Clinic Address | clinic config (see §3) |
+| Date of Latest Visit | latest `Visit.visitDatetime` for the patient |
+| **Chief Complaint\*** | free text, modal input, pre-filled from latest `InitialNote.chiefComplaint` as an editable default |
+| Latest Problem List | latest `InitialNote.assessment` (JSON `{title, icdCode}[]`), fallback to active `Problem[]` if no published note |
+| Latest Medication List | active `Medication[]` for the patient |
+| **Recommendation\*** | free text, modal input, no default |
+| Name of Physician | see §3.3 (physician resolution) |
+
+### 1.2 Referral Letter
+| Field | Source |
+|---|---|
+| Date of Generation | `new Date()` |
+| **Referral Recipient\*** | free text, modal input (e.g. `"Dr. Timoteo Gonzales (Infectious Disease)"`) |
+| Name of Patient / Age / Sex | `Patient` |
+| Latest Problem List | same as §1.1 |
+| **Salient Points\*** | free text, modal input |
+| **Reason for Referral\*** | free text, modal input |
+| Latest Medication List | active `Medication[]` |
+| Name of Physician | §3.3 |
+
+### 1.3 Diagnostic Request (`DocumentType.LAB_REQUEST`)
+| Field | Source |
+|---|---|
+| Date of Generation | `new Date()` |
+| Name of Patient / Age / Sex / Address | `Patient` |
+| Problem List (Assessment) | latest `InitialNote.assessment` |
+| List of Labs Requested | latest `InitialNote.diagnostics` (`string[]`) |
+| Name of Physician | §3.3 |
+
+No free text required — no modal beyond the existing "Generate" confirmation.
+
+### 1.4 Prescription
+| Field | Source |
+|---|---|
+| Date of Generation | `new Date()` |
+| Name of Patient / Age / Sex / Address | `Patient` |
+| List of Medications (name, dose, instructions, quantity) | active `Medication[]`, one row per record |
+| Name of Physician | §3.3 |
+
+No free text required.
 
 ---
 
 ## 2. Schema changes
 
-Open `backend/prisma/schema.prisma` and apply these.
-
-### 2.1 `Attachment` — currently zero indexes, two distinct access patterns
+### 2.1 Add `REFERRAL_LETTER` to `DocumentType`
 
 ```prisma
-model Attachment {
-  // ...existing fields...
-
-  @@index([noteType, noteId])              // AttachmentsService.findByNote()
-  @@index([patientId, uploadedAt(sort: Desc)]) // AttachmentsService.findByPatient()
-  @@map("attachments")
+enum DocumentType {
+  MEDICAL_CERTIFICATE
+  LAB_REQUEST
+  PRESCRIPTION
+  CHARGE_SLIP
+  REFERRAL_LETTER
 }
 ```
 
-### 2.2 `Document` — `findByPatient()` sorts by `generatedAt`, no index exists
+### 2.2 Add license fields to `User`
+
+The reference documents sign off with `Lic. No.`, `PTR No.`, and `S2 No.` — none of these exist on `User` today. Add them as nullable strings (nullable because not every role needs them, and `S2 No.` is commonly `"N/A"`):
 
 ```prisma
-model Document {
+model User {
   // ...existing fields...
-
-  @@index([patientId, generatedAt(sort: Desc)])  // DocumentsService.findByPatient()
-  @@map("documents")
+  licenseNumber String? @map("license_number") @db.VarChar(30)
+  ptrNumber     String? @map("ptr_number")     @db.VarChar(30)
+  s2Number      String? @map("s2_number")      @db.VarChar(30)
+  // ...existing relations...
 }
 ```
 
-`visitId` is read via `findUnique({ where: { id: visitId } })` in `generate()` (charge slip path) — that's a PK lookup on `Visit`, already covered, no separate index needed on `documents.visit_id` for current code.
+These should be editable via the existing account-management screens (`accounts` module) for `DOCTOR` users — add them to `accounts` create/update DTOs and the account edit form as optional fields. This is a small, mechanical addition; follow the existing pattern for `firstName`/`lastName` in that module.
 
-### 2.3 `AuditLog` — the admin query filters on almost anything, independently
-
-`QueryAuditLogsDto` (`backend/src/audit-logs/dto/query-audit-logs.dto.ts`) allows `userId`, `patientId`, `action`, `tableName`, and a `from`/`to` date range — all optional and independently combinable, confirmed in `AuditLogsService.findAll()`. This means the admin page can legitimately query by `action` alone, `tableName` alone, or nothing but a date range, none of which the existing two composite indexes cover.
-
-```prisma
-model AuditLog {
-  // ...existing fields...
-
-  @@index([patientId, createdAt(sort: Desc)])  // existing — keep
-  @@index([userId, createdAt(sort: Desc)])     // existing — keep
-  @@index([action, createdAt(sort: Desc)])     // NEW — action filter without patient/user
-  @@index([tableName, createdAt(sort: Desc)])  // NEW — tableName filter without patient/user
-  @@index([createdAt(sort: Desc)])             // NEW — date-range-only browsing
-  @@map("audit_logs")
-}
-```
-
-Note: `findAll()` always adds `action: { not: 'DRAFT' }` as a baseline filter even when no `action` param is passed — this is a negative filter (`!=`) which indexes handle poorly regardless (Postgres will still need to scan every non-DRAFT row matching other conditions). The `[action, createdAt]` index still helps once a *specific* action is selected in the UI; it won't help the default "all actions except DRAFT" case. If that default view becomes a bottleneck, consider excluding DRAFT at write time into a separate table, or accept the `[createdAt]` fallback index for that case.
-
-Also worth flagging separately from indexing: `findAll()` uses `skip`/`take` offset pagination (`backend/src/audit-logs/audit-logs.service.ts` lines with `skip = (page - 1) * limit`). Offset pagination gets progressively slower on later pages regardless of indexing, because Postgres still has to walk and discard `skip` rows before returning results. Not something to fix in this pass, but worth knowing if page 40+ of the audit log ever feels slow even after these indexes land — that's a pagination-strategy problem (cursor-based), not an index problem.
-
-### 2.4 `Medication` — sort order isn't fully covered by the existing index
-
-`findByPatient()` in `medications.service.ts` does:
-
-```typescript
-orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }]
-```
-
-The existing `@@index([patientId, isActive])` covers the `WHERE patientId, isActive` filter but Postgres still has to sort the matched rows by `createdAt` separately since it's not part of the index. Extend it:
-
-```prisma
-model Medication {
-  // ...existing fields...
-
-  @@index([patientId, isActive, createdAt(sort: Desc)])  // replaces [patientId, isActive]
-  @@map("medications")
-}
-```
-
-This new composite index still serves the plain `WHERE patientId, isActive` case (leading columns), so you can safely replace rather than add alongside.
-
-### 2.5 What NOT to add right now
-
-- `Problem.parentId` — not queried directly (tree built in-memory from one `patientId` fetch). Skip.
-- `VitalSign.visitId` — not queried directly anywhere in `vitals.service.ts`. Skip.
-- `InitialNote.authorId`, `ProgressNote.authorId`, `Problem.addedBy`/`updatedBy`, `Medication.addedBy`/`updatedBy` — none of these appear as a `WHERE` filter in the current services; they're only ever included/selected via relation. Skip until a "notes by this author" or similar direct-filter feature exists.
-
----
-
-## 3. Generate and apply the migration
+### 2.3 Migration
 
 ```bash
 cd backend
-npx prisma migrate dev --name add_missing_query_indexes
+npx prisma migrate dev --name add_referral_letter_and_physician_credentials
 ```
 
-Review the generated SQL in `backend/prisma/migrations/<timestamp>_add_missing_query_indexes/migration.sql` — it should contain only `CREATE INDEX` statements (plus one `DROP INDEX` for the `medications_patient_id_is_active_idx` being replaced in §2.4). Confirm no unrelated `ALTER TABLE` shows up before applying.
-
-For Supabase production, don't run `migrate dev` directly against it:
-
-```bash
-npx prisma migrate deploy
-```
-
-If any of these tables already carry meaningful row counts in production (most likely for `audit_logs`, given it's write-heavy via the interceptor), a plain `CREATE INDEX` takes a table lock for its duration. Edit the migration SQL to use `CONCURRENTLY` if that's a concern:
-
-```sql
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "audit_logs_action_created_at_idx" ON "audit_logs"("action", "created_at" DESC);
-```
-
-`CONCURRENTLY` can't run inside a transaction, so `prisma migrate deploy` (which wraps migrations transactionally) won't apply it correctly — run that specific statement via `psql` or the Supabase SQL editor directly instead, and mark the migration as applied afterward with `npx prisma migrate resolve --applied <migration_name>`.
+Do **not** add a JSON snapshot column to `Document` — the generated PDF in Supabase Storage remains the single source of truth for what was on a given document. Free-text inputs (chief complaint, recommendation, referral fields) are baked into the PDF and are not separately persisted in Postgres. Note this as a deliberate decision if asked — it matches the existing pattern where `Document` only stores `storageKey` + minimal metadata.
 
 ---
 
-## 4. Verify with `EXPLAIN ANALYZE`
+## 3. Backend — shared building blocks
 
-Run these against Supabase (SQL editor or `psql`) with real UUIDs from your data, before and after applying, ideally on a staging branch first.
+### 3.1 Clinic configuration
 
-```sql
--- Attachments by note (AttachmentsService.findByNote)
-EXPLAIN ANALYZE
-SELECT * FROM attachments
-WHERE note_type = 'INITIAL_NOTE' AND note_id = '<uuid>'
-ORDER BY uploaded_at ASC;
+Create `backend/src/config/clinic.config.ts`:
 
--- Attachments by patient (AttachmentsService.findByPatient)
-EXPLAIN ANALYZE
-SELECT * FROM attachments
-WHERE patient_id = '<uuid>'
-ORDER BY uploaded_at DESC;
-
--- Documents by patient (DocumentsService.findByPatient)
-EXPLAIN ANALYZE
-SELECT * FROM documents
-WHERE patient_id = '<uuid>'
-ORDER BY generated_at DESC;
-
--- Audit logs filtered by action only, no patient/user (AuditLogsService.findAll)
-EXPLAIN ANALYZE
-SELECT * FROM audit_logs
-WHERE action = 'UPDATE' AND action != 'DRAFT'
-ORDER BY created_at DESC
-LIMIT 50;
-
--- Medications by patient, active-first then newest (MedicationsService.findByPatient)
-EXPLAIN ANALYZE
-SELECT * FROM medications
-WHERE patient_id = '<uuid>' AND is_active = true
-ORDER BY is_active DESC, created_at DESC;
-```
-
-You're looking for `Index Scan` (or `Index Only Scan`) in the plan, not `Seq Scan`. On small tables (a few hundred rows) Postgres may still choose a sequential scan even with the index present — that's the planner correctly deciding the index isn't worth it yet, not a failure. Re-check once tables have realistic production volume.
-
----
-
-## 6. The index alone won't make it *feel* instant — the frontend caching layer has to stop forcing a loading state too
-
-The indexes in §2 fix the actual query cost — on a dataset this size, once they're in place, the database round-trip for any of these lookups drops to low single-digit milliseconds. But "instant" is a perceived-latency problem, not just a query-plan problem, and right now the frontend throws away that speed by treating every navigation as a **mandatory** full loading state, even when the data either hasn't changed or was already fetched seconds ago.
-
-Concretely, checked against `frontend/src/hooks/*.ts`:
-
-| Hook | Has `staleTime`/`gcTime` tuned | Has `placeholderData: keepPreviousData` | Effect |
-|---|---|---|---|
-| `usePatients.ts` | yes (30s / 5min) | **yes** | sidebar search doesn't blank while typing |
-| `useVisits.ts` | yes (30s / 3min) | **yes** | expanding visit list (5→20) doesn't flash |
-| `useAttachmentsByNote` / `usePriorLabs` (`useAttachments.ts`) | **no** — falls back to the 20s/10min global default | **no** | switching notes/tabs always shows `LabResultsSectionSkeleton`, even for a note you already viewed this session |
-| `useDocuments` (`useDocuments.ts`) | **no** | **no** | opening the Documents tab always shows three `CardSkeleton`s, even if you were just there |
-| `useAuditLogs` (`useAuditLogs.ts`) | yes (30s) | **no** | changing a filter or page always blanks the table while the new page loads, because `filters` is part of the query key and each new filter combination looks like a brand-new, never-fetched query |
-
-The pattern already exists correctly in `usePatients.ts` and `useVisits.ts` — `placeholderData: keepPreviousData` tells TanStack Query to keep rendering the last successful result while a new query key resolves in the background, instead of dropping straight to `isLoading: true` and swapping in a skeleton. The other three hooks just never got the same treatment. This is the actual fix for "loading is mandatory" — it makes the loading state conditional on *actually not having anything to show yet*, which after the first visit in a session is rarely true for data this size.
-
-### 6.1 `useAttachments.ts` — apply the same pattern as `useVisits.ts`
-
-```typescript
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api';
-
-export function useAttachmentsByNote(noteType: 'INITIAL_NOTE' | 'PROGRESS_NOTE', noteId: string | undefined) {
-  return useQuery({
-    queryKey: ['attachments', noteType, noteId],
-    queryFn: () => apiRequest<any[]>(`/attachments?noteType=${noteType}&noteId=${noteId}`),
-    enabled: !!noteId,
-    staleTime: 1000 * 20,
-    gcTime: 5 * 60_000,
-    placeholderData: keepPreviousData, // keep showing the previous note's attachments while the new noteId resolves
-  });
-}
-
-export function usePriorLabs(patientId: string) {
-  return useQuery({
-    queryKey: ['attachments', 'patient', patientId],
-    queryFn: () => apiRequest<any[]>(`/attachments?patientId=${patientId}`),
-    enabled: !!patientId,
-    staleTime: 1000 * 20,
-    gcTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
-  });
-}
-```
-
-One thing to watch: `placeholderData: keepPreviousData` on `useAttachmentsByNote` means that for a fraction of a second after switching notes, the UI can show the *previous* note's attachments labeled under the new note's context before the real data swaps in. For most UIs this tradeoff is worth it (no flash beats a technically-more-correct blank state), but since this is clinical attachment/lab data, pair it with an `isFetching` indicator (not `isLoading`) so the person can tell a refresh is in flight even though old data is still on screen:
-
-```typescript
-const { data: attachments, isLoading, isFetching } = useAttachmentsByNote(noteType, noteId);
-// isLoading: true only on a genuinely first, uncached fetch — show the skeleton
-// isFetching && !isLoading: true while placeholder data is showing and the real fetch is in flight — show a subtle inline indicator instead of a full skeleton
-```
-
-### 6.2 `useDocuments.ts` — same treatment
-
-```typescript
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api';
-
-export function useDocuments(patientId: string) {
-  return useQuery({
-    queryKey: ['documents', patientId],
-    queryFn: () => apiRequest<any[]>(`/patients/${patientId}/documents`),
-    enabled: !!patientId,
-    staleTime: 1000 * 20,
-    gcTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
-  });
-}
-```
-
-### 6.3 `useAuditLogs.ts` — needed most here, since filters/page are part of the query key
-
-Every filter change or page click currently produces a brand-new query key with no cached entry, so `isLoading` goes true and the table blanks. Add `keepPreviousData` so the previous page's rows stay visible while the next page loads:
-
-```typescript
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api';
-
-export function useAuditLogs(filters: AuditLogFilters) {
-  return useQuery({
-    queryKey: ['audit-logs', filters],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') params.set(key, String(value));
-      });
-      return apiRequest<AuditLogsResponse>(`/audit-logs?${params.toString()}`);
-    },
-    staleTime: 30_000,
-    refetchOnWindowFocus: true,
-    placeholderData: keepPreviousData, // keep current page/filter results visible while the next combination loads
-  });
-}
-```
-
-### 6.4 Component-side: gate the skeleton on `isLoading`, not `isFetching`
-
-Confirmed `AttachmentsSection.tsx` and `DocumentsScreen.tsx` already do this correctly (`if (isLoading && noteId) return <LabResultsSectionSkeleton />`) — `isLoading` is only `true` when there is no data at all yet, whereas `isFetching` is `true` on every background refetch too, including the silent ones. Don't change this gating; just confirm any new loading UI you add elsewhere follows the same rule (`isLoading` for skeletons, `isFetching` for inline "refreshing…" hints). Once §6.1–6.3 land, `isLoading` will only be `true` on a person's genuinely first visit to a given note/patient/filter combination in that session — everything after that is served from cache instantly while any actual staleness is fetched quietly in the background.
-
-### 6.5 Optional stretch: prefetch on tab hover
-
-`ScreenNav.tsx` renders the tab list (Vitals, Documents, Problem List, etc.) with plain `Link`s. Since the indexed queries will be cheap, you can prefetch a tab's data on hover so that by the time the click registers and the route changes, the query is already resolved and `isLoading` never fires at all:
-
-```typescript
-import { useQueryClient } from '@tanstack/react-query';
-
-// inside ScreenNav, per-tab:
-const queryClient = useQueryClient();
-
-const prefetchHandlers: Record<string, () => void> = {
-  documents: () => queryClient.prefetchQuery({
-    queryKey: ['documents', patientId],
-    queryFn: () => apiRequest<any[]>(`/patients/${patientId}/documents`),
-  }),
-  // add one per tab whose data is cheap to prefetch
+```ts
+export const clinicConfig = {
+  name: process.env.CLINIC_NAME ?? 'Metro Health Clinic & Diagnostic Center',
+  addressLine1: process.env.CLINIC_ADDRESS_LINE1 ?? 'Unit 405, Medical Arts Building, St. Jude General Hospital',
+  addressLine2: process.env.CLINIC_ADDRESS_LINE2 ?? '456 Taft Avenue, Ermita, Manila, Philippines',
+  tel: process.env.CLINIC_TEL ?? '(02) 8123-4567',
+  email: process.env.CLINIC_EMAIL ?? 'contact@metrohealthclinic.ph',
 };
-
-// on the <Link>:
-<Link href={...} onMouseEnter={() => prefetchHandlers[tab.id]?.()}>
 ```
 
-This is genuinely optional — §6.1–6.3 already remove the *mandatory* loading state for repeat visits within a session. Prefetch-on-hover additionally removes it for the *first* visit to a tab, at the cost of firing more requests than the person may end up using. Given the dataset size here, that tradeoff is cheap; add it only if first-visit latency still feels noticeable after the indexes and `keepPreviousData` changes land.
-
----
-
-## 7. Why every tab still "loads up" even after §6 — the route-level `loading.tsx` files
-
-§6 fixes the client-side query cache, but there's a second, independent cause behind "every time I open Vital Signs / Problem List / etc. it always loads." Every tab is its own Next.js App Router route segment, and every one of them ships its own `loading.tsx`:
+Add matching keys to `backend/.env.example`:
 
 ```
-[patientId]/loading.tsx           → TabContentSkeleton   (Dashboard)
-[patientId]/vitals/loading.tsx    → TabContentSkeleton
-[patientId]/notes/loading.tsx     → NoteTimelineSkeleton
-[patientId]/initial-note/loading.tsx → NoteFormSkeleton
-[patientId]/problems/loading.tsx  → ProblemListSkeleton
-[patientId]/medications/loading.tsx → MedicationListSkeleton
-[patientId]/documents/loading.tsx → TabContentSkeleton
+CLINIC_NAME=Metro Health Clinic & Diagnostic Center
+CLINIC_ADDRESS_LINE1=Unit 405, Medical Arts Building, St. Jude General Hospital
+CLINIC_ADDRESS_LINE2=456 Taft Avenue, Ermita, Manila, Philippines
+CLINIC_TEL=(02) 8123-4567
+CLINIC_EMAIL=contact@metrohealthclinic.ph
 ```
 
-In the App Router, a route segment's `loading.tsx` wraps that segment in a `<Suspense>` boundary that Next.js re-triggers **on every navigation to that segment** — this is independent of whether the underlying page needs to fetch anything. All eight tab pages (`vitals/page.tsx`, `problems/page.tsx`, etc.) are `'use client'` components that render a screen component (`VitalsScreen`, `ProblemListScreen`, …) which fetches its own data via TanStack Query. There's no server-side data fetching in these routes to justify a Suspense fallback — but Next shows the `loading.tsx` fallback anyway, purely because it's a route transition, every single time, even though `ScreenNav.tsx`'s tabs already use `prefetch={true}` and the destination JS is already loaded.
+Single-tenant assumption: DAMAYAN serves one clinic per deployment, so this is env config, not a DB table. Do not build a "clinics" model for this.
 
-The result: even with a fully warmed TanStack Query cache (after §6), clicking between tabs still flashes the *route-level* skeleton (`ProblemListSkeleton`, `TabContentSkeleton`, etc.) on every click, layered on top of — and independent from — whatever the component's own `isLoading` state would show. This is the actual mechanism behind "always loads up."
+### 3.2 Shared PDF layout helpers
 
-### 7.1 Fix — remove the per-tab `loading.tsx` files
+Create `backend/src/documents/templates/layout.helper.ts` — every template imports from here instead of hand-rolling headers. This removes the duplicated boilerplate currently copy-pasted across the four template files.
 
-Since none of these routes do server-side data fetching (everything happens client-side via the hooks from §6), the route-level Suspense boundary isn't buying anything except a guaranteed flash on every navigation. Delete these seven files:
+```ts
+import PDFDocument from 'pdfkit';
+import { clinicConfig } from '../../config/clinic.config';
 
-```bash
-rm "frontend/src/app/dashboard/[patientId]/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/vitals/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/notes/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/initial-note/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/problems/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/medications/loading.tsx"
-rm "frontend/src/app/dashboard/[patientId]/documents/loading.tsx"
-```
+export function drawLetterhead(doc: PDFKit.PDFDocument, title: string) {
+  doc.fontSize(14).font('Helvetica-Bold').text(clinicConfig.name, { align: 'center' });
+  doc.fontSize(9).font('Helvetica').text(clinicConfig.addressLine1, { align: 'center' });
+  doc.text(clinicConfig.addressLine2, { align: 'center' });
+  doc.text(`Tel No.: ${clinicConfig.tel} | Email: ${clinicConfig.email}`, { align: 'center' });
+  doc.moveDown(0.5);
+  doc.moveTo(doc.page.margins.left, doc.y)
+     .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+     .strokeColor('#999999').stroke();
+  doc.moveDown(0.5);
+  doc.fontSize(16).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.moveDown();
+}
 
-With these gone, navigating to a tab just swaps in the client component directly. The skeleton logic already inside each screen component (`if (isLoading) return <ProblemListSkeleton />;` in `ProblemListScreen.tsx`, same pattern in `MedicationsScreen.tsx`, `VitalsScreen.tsx`, etc.) takes over completely — and per §6, `isLoading` will only be `true` on a genuinely first, uncached visit. Every repeat visit within a session renders instantly with no skeleton at all, because there's no longer a route-level Suspense boundary forcing one regardless of cache state.
+export function drawGenerationDate(doc: PDFKit.PDFDocument, date: Date = new Date()) {
+  doc.fontSize(10).font('Helvetica').text(
+    `Date of Generation: ${date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`
+  );
+  doc.moveDown(0.5);
+}
 
-### 7.2 The tradeoff, and when to keep a `loading.tsx`
+export function drawSignatureBlock(
+  doc: PDFKit.PDFDocument,
+  physician: { firstName: string; lastName: string; middleName?: string | null; licenseNumber?: string | null; ptrNumber?: string | null; s2Number?: string | null },
+  label = 'Requested By:',
+) {
+  doc.moveDown(2);
+  doc.fontSize(10).font('Helvetica').text(label);
+  doc.moveDown(1.5);
+  doc.font('Helvetica-Bold').text(formatPhysicianName(physician));
+  doc.font('Helvetica').fontSize(9);
+  doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
+  doc.text(`PTR No.: ${physician.ptrNumber ?? 'N/A'}`);
+  doc.text(`S2 No.: ${physician.s2Number ?? 'N/A'}`);
+}
 
-Removing `loading.tsx` means there's no fallback while Next.js loads the route's JS chunk, if it somehow wasn't prefetched (e.g. a person pastes a tab URL directly instead of clicking through `ScreenNav`). In this app that's a non-issue in practice — the tabs are always reached by clicking through `ScreenNav`, which already prefetches on render (`prefetch={true}` is Next's default-on behavior for in-viewport links, and it's set explicitly here too) — so the chunk is essentially always already cached by the time someone clicks. If you ever add a tab that *does* need real server-side data fetching in the route itself (not client-side via a hook), keep a `loading.tsx` for that one specific route — the fix here is "don't use route Suspense for client-only screens," not "never use `loading.tsx` at all."
+export function formatPhysicianName(p: { firstName: string; lastName: string; middleName?: string | null }): string {
+  const mid = p.middleName ? ` ${p.middleName.charAt(0)}.` : '';
+  return `Dr. ${p.firstName}${mid} ${p.lastName}, MD`;
+}
 
----
+export function formatPatientName(p: { firstName: string; lastName: string; middleName?: string | null; extension?: string | null }): string {
+  const mid = p.middleName ? ` ${p.middleName.charAt(0)}.` : '';
+  const ext = p.extension ? ` ${p.extension}` : '';
+  return `${p.firstName}${mid} ${p.lastName}${ext}`;
+}
 
-## 8. Optimistic placeholders for adding a Problem or Medication
+export function computeAge(dateOfBirth: Date, asOf: Date = new Date()): number {
+  let age = asOf.getFullYear() - dateOfBirth.getFullYear();
+  const m = asOf.getMonth() - dateOfBirth.getMonth();
+  if (m < 0 || (m === 0 && asOf.getDate() < dateOfBirth.getDate())) age--;
+  return age;
+}
 
-Confirmed in `useProblems.ts` and `useMedications.ts`: `useUpdateProblem`, `useReorderProblems`, and `useUpdateMedication` all already do optimistic updates correctly — each has an `onMutate` that writes the change into the TanStack Query cache immediately, with `onError` rolling back to the previous snapshot. `useCreateProblem` and `useCreateMedication` are the two exceptions — both only have `onSuccess: () => invalidate(...)`, so after submitting the "Add Problem" or "Add Medication" form, nothing appears in `ActiveProblemTable` / `MedicationListCard` until the full request round-trip finishes and the list refetches. That gap is what needs a placeholder.
+export function formatPatientAddress(p: {
+  addressStreet?: string | null; addressBarangay?: string | null;
+  addressCity?: string | null; addressRegion?: string | null; addressCountry: string;
+}): string {
+  return [
+    p.addressStreet,
+    p.addressBarangay ? `Barangay ${p.addressBarangay}` : null,
+    p.addressCity,
+    p.addressRegion,
+    p.addressCountry,
+  ].filter(Boolean).join(', ');
+}
 
-### 8.1 `useCreateProblem` — insert an optimistic row, then reconcile
+export function drawPatientBlock(doc: PDFKit.PDFDocument, patient: any, includeAddress = true) {
+  doc.fontSize(10).font('Helvetica-Bold').text('Name of Patient: ', { continued: true })
+     .font('Helvetica').text(formatPatientName(patient));
+  doc.font('Helvetica-Bold').text('Age: ', { continued: true })
+     .font('Helvetica').text(`${computeAge(patient.dateOfBirth)} years old   `, { continued: true })
+     .font('Helvetica-Bold').text('Sex: ', { continued: true })
+     .font('Helvetica').text(patient.sex === 'MALE' ? 'Male' : 'Female');
+  if (includeAddress) {
+    doc.font('Helvetica-Bold').text('Patient Address: ', { continued: true })
+       .font('Helvetica').text(formatPatientAddress(patient));
+  }
+  doc.moveDown(0.5);
+}
 
-```typescript
-export function useCreateProblem(patientId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateProblemInput) =>
-      apiRequest<Problem>(`/patients/${patientId}/problems`, {
-        method: 'POST',
-        body: JSON.stringify(input),
-      }),
-    onMutate: async (input) => {
-      await qc.cancelQueries({ queryKey: ['problems', patientId] });
-      const previous = qc.getQueryData<ProblemsResponse>(['problems', patientId]);
+export function drawAssessmentList(doc: PDFKit.PDFDocument, assessment: { title: string; icdCode?: string | null }[] | null) {
+  doc.font('Helvetica-Bold').fontSize(10).text('Assessment:');
+  doc.font('Helvetica');
+  if (assessment && assessment.length > 0) {
+    assessment.forEach(a => doc.text(`•  ${a.title}${a.icdCode ? ` (${a.icdCode})` : ''}`));
+  } else {
+    doc.text('•  No assessment on record.');
+  }
+  doc.moveDown(0.5);
+}
 
-      const optimisticId = `optimistic-${crypto.randomUUID()}`;
-      const optimisticProblem: Problem = {
-        id: optimisticId,
-        patientId,
-        parentId: input.parentId ?? null,
-        title: input.title,
-        icdCode: input.icdCode ?? null,
-        status: 'ACTIVE',
-        sortOrder: (previous?.data.length ?? 0) + 1,
-        addedBy: null,
-        diagnosisDate: input.diagnosisDate ?? null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (previous) {
-        qc.setQueryData<ProblemsResponse>(['problems', patientId], {
-          data: [...previous.data, optimisticProblem],
-        });
-      }
-
-      return { previous, optimisticId };
-    },
-    onError: (_err, _input, context) => {
-      if (context?.previous) qc.setQueryData(['problems', patientId], context.previous);
-    },
-    onSuccess: () => invalidateProblems(qc, patientId),
+export function drawMedicationList(doc: PDFKit.PDFDocument, medications: any[]) {
+  if (!medications || medications.length === 0) {
+    doc.font('Helvetica').text('No active medications on record.');
+    return;
+  }
+  medications.forEach(med => {
+    doc.font('Helvetica-Bold').text(med.name, { continued: true })
+       .font('Helvetica').text(` ${med.dose}${med.formulation ? ` ${med.formulation}` : ''}${med.quantity ? `    #${med.quantity}` : ''}`);
+    if (med.instructions) doc.fontSize(9).text(`Sig: ${med.instructions}`).fontSize(10);
+    doc.moveDown(0.3);
   });
 }
 ```
 
-`crypto.randomUUID()` is available in all modern browsers without a polyfill — no new dependency needed.
+This mirrors the visual structure of all four reference `.docx` files: centered clinic letterhead → underlined section title → patient block → body → signature block with Lic./PTR/S2 numbers. Adjust exact spacing/fonts by eyeballing the rendered PDF against the reference `.docx`, but the section order above is fixed.
 
-### 8.2 `useCreateMedication` — same pattern
+### 3.3 Physician resolution rule
 
-```typescript
-export function useCreateMedication(patientId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateMedicationInput) =>
-      apiRequest<Medication>(`/patients/${patientId}/medications`, {
-        method: 'POST',
-        body: JSON.stringify(input),
-      }),
-    onMutate: async (input) => {
-      await qc.cancelQueries({ queryKey: ['medications', patientId, false] });
-      await qc.cancelQueries({ queryKey: ['medications', patientId, true] });
+All four documents need "Name of Physician." Resolution order, implemented in `DocumentsService`:
 
-      const previousFalse = qc.getQueryData<MedicationsResponse>(['medications', patientId, false]);
-      const previousTrue = qc.getQueryData<MedicationsResponse>(['medications', patientId, true]);
+1. If the request includes `physicianId` (only sent by non-doctor roles, see §5.2), use that user — must have `role === DOCTOR`, else `400`.
+2. Else if the requesting user (`req.user`) has `role === DOCTOR`, use them.
+3. Else if `visitId` is provided, fall back to `Visit.physician`.
+4. Else throw `BadRequestException('A physician must be specified for this document')`.
 
-      const optimisticId = `optimistic-${crypto.randomUUID()}`;
-      const optimisticMedication: Medication = {
-        id: optimisticId,
-        patientId,
-        name: input.name,
-        dose: input.dose,
-        formulation: input.formulation ?? null,
-        instructions: input.instructions ?? null,
-        quantity: input.quantity ?? null,
-        isActive: true,
-        addedBy: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: null,
-      };
+This keeps the common case (a doctor generating their own patient's document) a single click, while letting nurses/admins generate on a doctor's behalf by picking from a dropdown.
 
-      if (previousFalse) {
-        qc.setQueryData<MedicationsResponse>(['medications', patientId, false], {
-          ...previousFalse,
-          data: [...previousFalse.data, optimisticMedication],
-        });
+---
+
+## 4. Backend — DTOs
+
+### 4.1 `backend/src/documents/dto/generate-document.dto.ts`
+
+```ts
+import { IsEnum, IsOptional, IsUUID, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { DocumentType } from '@prisma/client';
+
+export class GenerateDocumentDto {
+  @IsEnum(DocumentType)
+  type: DocumentType;
+
+  @IsOptional()
+  @IsUUID()
+  visitId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  physicianId?: string;
+
+  // Medical Certificate
+  @ValidateIf(o => o.type === DocumentType.MEDICAL_CERTIFICATE)
+  @IsString()
+  @MaxLength(300)
+  chiefComplaint?: string;
+
+  @ValidateIf(o => o.type === DocumentType.MEDICAL_CERTIFICATE)
+  @IsString()
+  @MaxLength(1000)
+  recommendation?: string;
+
+  // Referral Letter
+  @ValidateIf(o => o.type === DocumentType.REFERRAL_LETTER)
+  @IsString()
+  @MaxLength(150)
+  referralRecipient?: string;
+
+  @ValidateIf(o => o.type === DocumentType.REFERRAL_LETTER)
+  @IsString()
+  @MaxLength(500)
+  salientPoints?: string;
+
+  @ValidateIf(o => o.type === DocumentType.REFERRAL_LETTER)
+  @IsString()
+  @MaxLength(500)
+  referralReason?: string;
+}
+```
+
+### 4.2 New `backend/src/documents/dto/document-draft-query.dto.ts`
+
+Backs the new draft-preview endpoint (§5.1):
+
+```ts
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { DocumentType } from '@prisma/client';
+
+export class DocumentDraftQueryDto {
+  @IsEnum(DocumentType)
+  type: DocumentType;
+
+  @IsOptional()
+  @IsUUID()
+  visitId?: string;
+}
+```
+
+---
+
+## 5. Backend — service and controller
+
+### 5.1 New draft-preview endpoint
+
+`MEDICAL_CERTIFICATE` and `REFERRAL_LETTER` need a "view draft before generating" step. Add:
+
+```ts
+// documents.controller.ts
+@Get('draft')
+@Roles(Role.DOCTOR, Role.NURSE, Role.ADMIN)
+async draft(
+  @Param('patientId') patientId: string,
+  @Query() query: DocumentDraftQueryDto,
+) {
+  return this.documentsService.buildDraft(patientId, query.type, query.visitId);
+}
+```
+
+`DocumentsService.buildDraft()` returns **only the auto-populated, non-editable data** — patient info, formatted address, computed age, latest problem list, latest medication list, latest visit date, resolved physician (or `null` + list of candidate doctors if ambiguous — see §5.3). It deliberately excludes the free-text fields; the frontend renders those as empty/editable inputs next to this data. Route this through the same data-gathering logic that `generate()` already uses so the two never drift — extract a shared private method.
+
+### 5.2 Rewritten `documents.service.ts`
+
+Restructure so data-gathering is shared between `buildDraft()` and `generate()`:
+
+```ts
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { DocumentType, Role } from '@prisma/client';
+import { renderMedicalCertificate } from './templates/medical-certificate.template';
+import { renderLabRequest } from './templates/lab-request.template';
+import { renderPrescription } from './templates/prescription.template';
+import { renderChargeSlip } from './templates/charge-slip.template';
+import { renderReferralLetter } from './templates/referral-letter.template';
+import { randomUUID } from 'crypto';
+import { GenerateDocumentDto } from './dto/generate-document.dto';
+
+@Injectable()
+export class DocumentsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
+
+  private async resolvePhysician(userId: string, physicianId: string | undefined, visitId: string | undefined) {
+    if (physicianId) {
+      const p = await this.prisma.user.findUnique({ where: { id: physicianId } });
+      if (!p || p.role !== Role.DOCTOR) throw new BadRequestException('physicianId must reference a doctor');
+      return p;
+    }
+    const requester = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (requester?.role === Role.DOCTOR) return requester;
+    if (visitId) {
+      const visit = await this.prisma.visit.findUnique({ where: { id: visitId }, include: { physician: true } });
+      if (visit) return visit.physician;
+    }
+    return null; // caller decides whether this is fatal
+  }
+
+  private async gatherData(patientId: string, type: DocumentType, visitId: string | undefined, userId: string) {
+    const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new NotFoundException('Patient not found');
+
+    const physician = await this.resolvePhysician(userId, undefined, visitId);
+
+    const data: any = { patient, physician };
+
+    if (type === DocumentType.MEDICAL_CERTIFICATE || type === DocumentType.REFERRAL_LETTER || type === DocumentType.LAB_REQUEST) {
+      const latestNote = await this.prisma.initialNote.findFirst({
+        where: { visit: { patientId }, status: 'PUBLISHED' },
+        orderBy: { createdAt: 'desc' },
+      });
+      data.assessment = latestNote?.assessment ?? null;
+      data.diagnostics = latestNote?.diagnostics ?? null;
+      data.chiefComplaintDefault = latestNote?.chiefComplaint ?? '';
+    }
+
+    if (type === DocumentType.MEDICAL_CERTIFICATE || type === DocumentType.REFERRAL_LETTER || type === DocumentType.PRESCRIPTION) {
+      data.medications = await this.prisma.medication.findMany({
+        where: { patientId, isActive: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (type === DocumentType.MEDICAL_CERTIFICATE) {
+      const latestVisit = await this.prisma.visit.findFirst({
+        where: { patientId },
+        orderBy: { visitDatetime: 'desc' },
+      });
+      data.latestVisitDate = latestVisit?.visitDatetime ?? null;
+    }
+
+    if (type === DocumentType.CHARGE_SLIP) {
+      if (visitId) data.visit = await this.prisma.visit.findUnique({ where: { id: visitId } });
+      data.problems = await this.prisma.problem.findMany({ where: { patientId } });
+    }
+
+    return data;
+  }
+
+  async buildDraft(patientId: string, type: DocumentType, visitId: string | undefined) {
+    // draft is generated with a system-level "viewer" — physician resolution here is best-effort;
+    // pass patientId's most recent visit physician if no authenticated-doctor context is meaningful in a GET.
+    const data = await this.gatherData(patientId, type, visitId, '');
+    const candidateDoctors = data.physician
+      ? []
+      : await this.prisma.user.findMany({ where: { role: Role.DOCTOR, isActive: true }, select: { id: true, firstName: true, lastName: true } });
+    return { ...data, candidateDoctors };
+  }
+
+  async generate(patientId: string, dto: GenerateDocumentDto, userId: string) {
+    const { type, visitId, physicianId } = dto;
+    const data = await this.gatherData(patientId, type, visitId, userId);
+
+    if (physicianId) {
+      data.physician = await this.resolvePhysician(userId, physicianId, visitId);
+    }
+    if (!data.physician && [DocumentType.MEDICAL_CERTIFICATE, DocumentType.REFERRAL_LETTER, DocumentType.LAB_REQUEST, DocumentType.PRESCRIPTION].includes(type)) {
+      throw new BadRequestException('A physician must be specified for this document');
+    }
+
+    if (type === DocumentType.MEDICAL_CERTIFICATE) {
+      if (!dto.chiefComplaint || !dto.recommendation) {
+        throw new BadRequestException('chiefComplaint and recommendation are required for a Medical Certificate');
       }
-      if (previousTrue) {
-        qc.setQueryData<MedicationsResponse>(['medications', patientId, true], {
-          ...previousTrue,
-          data: [...previousTrue.data, optimisticMedication],
-        });
-      }
+      data.chiefComplaint = dto.chiefComplaint;
+      data.recommendation = dto.recommendation;
+    }
 
-      return { previousFalse, previousTrue, optimisticId };
-    },
-    onError: (_err, _input, context) => {
-      if (context?.previousFalse) qc.setQueryData(['medications', patientId, false], context.previousFalse);
-      if (context?.previousTrue) qc.setQueryData(['medications', patientId, true], context.previousTrue);
-    },
-    onSuccess: () => invalidateMedications(qc, patientId),
+    if (type === DocumentType.REFERRAL_LETTER) {
+      if (!dto.referralRecipient || !dto.salientPoints || !dto.referralReason) {
+        throw new BadRequestException('referralRecipient, salientPoints, and referralReason are required for a Referral Letter');
+      }
+      data.referralRecipient = dto.referralRecipient;
+      data.salientPoints = dto.salientPoints;
+      data.referralReason = dto.referralReason;
+    }
+
+    let buffer: Buffer;
+    switch (type) {
+      case DocumentType.MEDICAL_CERTIFICATE: buffer = await renderMedicalCertificate(data); break;
+      case DocumentType.LAB_REQUEST:         buffer = await renderLabRequest(data); break;
+      case DocumentType.PRESCRIPTION:        buffer = await renderPrescription(data); break;
+      case DocumentType.CHARGE_SLIP:         buffer = await renderChargeSlip(data); break;
+      case DocumentType.REFERRAL_LETTER:     buffer = await renderReferralLetter(data); break;
+      default: throw new BadRequestException('Unknown document type');
+    }
+
+    const uuid = randomUUID();
+    const path = `patients/${patientId}/documents/${uuid}.pdf`;
+    const storageKey = await this.storageService.upload(path, buffer, 'application/pdf');
+
+    return this.prisma.document.create({
+      data: { patientId, visitId, documentType: type, storageKey, generatedBy: userId },
+    });
+  }
+
+  async findByPatient(patientId: string) {
+    return this.prisma.document.findMany({
+      where: { patientId },
+      orderBy: { generatedAt: 'desc' },
+      include: { generatedByUser: { select: { id: true, firstName: true, lastName: true, role: true } } },
+    });
+  }
+
+  async getDownloadUrl(id: string) {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document?.storageKey) throw new NotFoundException('Document or storage file not found');
+    return { url: await this.storageService.getSignedUrl(document.storageKey) };
+  }
+
+  async remove(id: string) {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) throw new NotFoundException('Document not found');
+    if (document.storageKey) await this.storageService.delete(document.storageKey);
+    await this.prisma.document.delete({ where: { id } });
+    return { success: true };
+  }
+}
+```
+
+Note the controller's `generate()` handler signature changes from `(patientId, dto.type, dto.visitId, userId)` to `(patientId, dto, userId)` — update the controller call site accordingly.
+
+### 5.3 Controller diff summary
+
+- Add `import { Query } from '@nestjs/common'` and `DocumentDraftQueryDto`.
+- Add the `GET .../documents/draft` route from §5.1 **above** the existing `GET .../documents/:id/download` route (avoid `draft` being swallowed by a `:id` param route — actually here it's fine since `draft` isn't under `:id`, but keep it above `generate` for readability).
+- Change the `POST .../documents/generate` handler to pass the whole `dto` into `documentsService.generate(patientId, dto, req.user.id)`.
+
+---
+
+## 6. Backend — templates
+
+Rewrite all four using the `layout.helper.ts` primitives from §3.2. Each should visually match its reference `.docx` section-for-section. Two full examples below; apply the same pattern to the other two.
+
+### 6.1 `backend/src/documents/templates/medical-certificate.template.ts`
+
+```ts
+import PDFDocument from 'pdfkit';
+import { drawLetterhead, drawGenerationDate, drawSignatureBlock, drawAssessmentList, drawMedicationList, formatPatientName, formatPatientAddress, computeAge } from './layout.helper';
+
+export const renderMedicalCertificate = async (data: any): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 });
+    const buffers: Buffer[] = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    drawLetterhead(doc, 'MEDICAL CERTIFICATE');
+    drawGenerationDate(doc);
+
+    doc.font('Helvetica-Bold').text('TO WHOM IT MAY CONCERN:');
+    doc.moveDown(0.5);
+
+    const age = computeAge(data.patient.dateOfBirth);
+    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
+    const address = formatPatientAddress(data.patient);
+    const visitDateStr = data.latestVisitDate
+      ? new Date(data.latestVisitDate).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'N/A';
+
+    doc.font('Helvetica').fontSize(10).text(
+      `This is to certify that ${formatPatientName(data.patient)}, ${age} years old / ${sex} residing at ${address} sought consult on ${visitDateStr} with the complaint of ${data.chiefComplaint}.`,
+      { align: 'justify' }
+    );
+    doc.moveDown();
+
+    drawAssessmentList(doc, data.assessment);
+
+    doc.font('Helvetica-Bold').text('Medications Given:');
+    doc.font('Helvetica');
+    drawMedicationList(doc, data.medications);
+    doc.moveDown(0.5);
+
+    doc.font('Helvetica-Bold').text('Recommendations:');
+    doc.font('Helvetica').text(data.recommendation, { align: 'justify' });
+
+    drawSignatureBlock(doc, data.physician, 'Signed By:');
+    doc.end();
+  });
+};
+```
+
+### 6.2 `backend/src/documents/templates/referral-letter.template.ts` (new file)
+
+```ts
+import PDFDocument from 'pdfkit';
+import { drawLetterhead, drawGenerationDate, drawSignatureBlock, drawAssessmentList, drawMedicationList, formatPatientName, computeAge } from './layout.helper';
+
+export const renderReferralLetter = async (data: any): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 });
+    const buffers: Buffer[] = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    drawLetterhead(doc, 'REFERRAL LETTER');
+    drawGenerationDate(doc);
+
+    doc.font('Helvetica').fontSize(10).text(`To ${data.referralRecipient}:`);
+    doc.moveDown(0.5);
+
+    const age = computeAge(data.patient.dateOfBirth);
+    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
+    doc.text(`I am kindly referring my patient ${formatPatientName(data.patient)}, ${age} years old / ${sex} with the following assessment:`, { align: 'justify' });
+    doc.moveDown(0.5);
+
+    drawAssessmentList(doc, data.assessment);
+
+    doc.font('Helvetica-Bold').text('Salient points: ', { continued: true }).font('Helvetica').text(data.salientPoints);
+    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').text('Reason for referral: ', { continued: true }).font('Helvetica').text(data.referralReason);
+    doc.moveDown(0.5);
+
+    doc.font('Helvetica-Bold').text('He/She is currently on the following medications:');
+    doc.font('Helvetica');
+    drawMedicationList(doc, data.medications);
+
+    drawSignatureBlock(doc, data.physician, 'Yours Truly,');
+    doc.end();
+  });
+};
+```
+
+### 6.3 `lab-request.template.ts` (Diagnostic Request)
+
+Same skeleton: letterhead titled `DIAGNOSTICS REQUEST`, generation date, `drawPatientBlock(doc, data.patient)`, then an `Assessment:` section via `drawAssessmentList(doc, data.assessment)`, then a `DIAGNOSTIC TESTS REQUESTED` section bulleting `data.diagnostics` (a `string[]` — bullet each entry directly, no JSON dump), then `drawSignatureBlock(doc, data.physician, 'Requested By:')`.
+
+### 6.4 `prescription.template.ts`
+
+Same skeleton: letterhead titled `PRESCRIPTION`, generation date, `drawPatientBlock(doc, data.patient)`, then an `Rx` header, then `drawMedicationList(doc, data.medications)` formatted per the reference (`Name Dose  #Qty` on one line, `Sig: instructions` on the next — already matches `drawMedicationList`'s output), then `drawSignatureBlock(doc, data.physician, 'Signed By:')`.
+
+### 6.5 Do not touch `charge-slip.template.ts`
+
+Out of scope for this task — no reference document was provided for it, leave its current stub behavior as-is.
+
+---
+
+## 7. Frontend
+
+### 7.1 Types
+
+Add to wherever shared API types live (check `frontend/src/lib/types.ts` or equivalent; if it doesn't exist as a shared file, colocate in `hooks/useDocuments.ts`):
+
+```ts
+export interface DocumentDraftData {
+  patient: any;
+  physician: { id: string; firstName: string; lastName: string } | null;
+  candidateDoctors: { id: string; firstName: string; lastName: string }[];
+  assessment: { title: string; icdCode?: string }[] | null;
+  diagnostics: string[] | null;
+  medications: any[];
+  chiefComplaintDefault?: string;
+  latestVisitDate?: string | null;
+}
+```
+
+### 7.2 `frontend/src/hooks/useDocuments.ts` additions
+
+```ts
+export function useDocumentDraft(patientId: string, type: string, visitId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['documents', patientId, 'draft', type, visitId],
+    queryFn: () => apiRequest<DocumentDraftData>(
+      `/patients/${patientId}/documents/draft?type=${type}${visitId ? `&visitId=${visitId}` : ''}`
+    ),
+    enabled: enabled && !!patientId && !!type,
+    staleTime: 0, // always fresh — clinical data changes frequently
   });
 }
 ```
 
-### 8.3 Style the optimistic row as a placeholder, not a normal row
+Update `useGenerateDocument`'s `mutationFn` param type from `{ type: string; visitId?: string }` to `Record<string, any>` (or a proper discriminated union) so it can pass through `chiefComplaint`, `recommendation`, `referralRecipient`, `salientPoints`, `referralReason`, `physicianId`.
 
-The `id` prefix (`optimistic-…`) is the marker the UI uses to render the row differently while the real request is in flight — reduced opacity plus a small spinner, similar to how `saving={createProblem.isPending}` already disables the modal's submit button. In `ActiveProblemTable.tsx` (and the equivalent in `MedicationListCard.tsx`), wherever the row is rendered:
+### 7.3 Modal flow
 
-```typescript
-const isOptimistic = problem.id.startsWith('optimistic-');
+Keep `DocumentGeneratorModal.tsx` as the entry point (type picker), but branch behavior on selection:
 
-<tr className={cn('...', isOptimistic && 'opacity-50 pointer-events-none')}>
-  {/* existing row content */}
-  {isOptimistic && <Spinner className="w-3 h-3 ml-2 inline" />}
-</tr>
+- **`LAB_REQUEST`, `PRESCRIPTION`, `CHARGE_SLIP`**: unchanged — direct "Generate PDF" button, same as today.
+- **`MEDICAL_CERTIFICATE`, `REFERRAL_LETTER`**: instead of "Generate PDF" being immediately actionable, show a **"Continue to Draft"** button that swaps the modal body into a two-step view (or opens a second modal — prefer swapping the body of the same modal to avoid modal-stacking).
+
+Build two new components: `frontend/src/components/documents/MedicalCertificateModal.tsx` and `frontend/src/components/documents/ReferralLetterModal.tsx`. Each:
+
+1. Calls `useDocumentDraft(patientId, TYPE, visitId)` on mount.
+2. Renders a read-only preview panel styled to loosely resemble the final document (clinic name, patient name/age/sex, assessment bullet list, medication list) — this is the "view draft" requirement. It does not need to be pixel-perfect PDF fidelity; a clean card-based summary using existing `bg-surface-2`/`border-border` tokens from `design-standard.md` is sufficient.
+3. Below the preview, renders the type-specific free-text inputs as `<textarea>`s using the existing form styling from `DocumentGeneratorModal.tsx` (`className="... bg-surface border border-border rounded-btn ..."`):
+   - Medical Certificate: `Chief Complaint` (pre-filled from `draft.chiefComplaintDefault`, editable), `Recommendation` (empty).
+   - Referral Letter: `Referral Recipient`, `Salient Points`, `Reason for Referral` (all empty).
+4. If `draft.physician` is `null`, render a required `<select>` populated from `draft.candidateDoctors`, bound to `physicianId` in the mutation payload. If `draft.physician` is set, show it as read-only text (`Dr. {firstName} {lastName}`) with no picker.
+5. Disable the "Generate PDF" button until all required free-text fields are non-empty (and `physicianId` is chosen if the doctor is ambiguous).
+6. On submit, call `useGenerateDocument(patientId).mutate({ type: TYPE, visitId, ...freeTextFields, physicianId })`.
+7. Reuses the same loading/error handling pattern already in `DocumentGeneratorModal.tsx` (`generateDoc.isPending`, `alert(err.message)` on error — or upgrade to a toast if the codebase has one elsewhere; check before assuming `alert` is acceptable long-term, but it's consistent with current behavior).
+
+Wire `DocumentGeneratorModal.tsx` to render `<MedicalCertificateModal>` / `<ReferralLetterModal>` in place of its own footer when `docType` is one of those two values, passing `patientId`, `visitId`, and `onClose` through.
+
+### 7.4 Document type picker copy
+
+Add the new option to the `<select>` in `DocumentGeneratorModal.tsx`:
+
+```tsx
+<option value="REFERRAL_LETTER">Referral Letter</option>
 ```
 
-`pointer-events-none` prevents the person from clicking edit/delete on a row that doesn't have a real database `id` yet. Once the real request resolves, `onSuccess` invalidates the query, the refetch replaces the optimistic row with the real one (real `id`, no `optimistic-` prefix), and the placeholder styling disappears automatically — no manual cleanup needed since the whole row is just cache data.
-
-### 8.4 Why `onSuccess` here instead of `onSettled`
-
-Section 6's optimistic examples for `useUpdateProblem`/`useUpdateMedication` reconcile in `onSettled` (runs on both success and error), which is correct there because the optimistic *edit* already looks like a real row — there's nothing further to distinguish. For *creates*, use `onSuccess` only: if the request fails, `onError`'s rollback already removes the optimistic row from the cache by restoring the previous snapshot, so there's nothing left to invalidate — calling `invalidateProblems`/`invalidateMedications` again in that case is a wasted refetch.
+Update the informational note below the dropdown to mention that Medical Certificate and Referral Letter require a short additional step to fill in clinical narrative before the PDF is generated.
 
 ---
 
-## 9. Checklist
+## 8. Validation & error handling checklist
 
-**Backend / database (makes the query itself fast):**
-- [ ] Confirm the `Attachment` model still has no dual-FK to `initial_notes`/`progress_notes` (it doesn't as of this guide — just re-verify nothing changed)
-- [ ] Add `@@index([noteType, noteId])` and `@@index([patientId, uploadedAt(sort: Desc)])` to `Attachment`
-- [ ] Add `@@index([patientId, generatedAt(sort: Desc)])` to `Document`
-- [ ] Add `@@index([action, createdAt(sort: Desc)])`, `@@index([tableName, createdAt(sort: Desc)])`, `@@index([createdAt(sort: Desc)])` to `AuditLog`
-- [ ] Replace `Medication`'s `@@index([patientId, isActive])` with `@@index([patientId, isActive, createdAt(sort: Desc)])`
-- [ ] Do **not** add indexes on `Problem.parentId` or `VitalSign.visitId` — not queried directly in current code
-- [ ] `npx prisma migrate dev --name add_missing_query_indexes` locally, review SQL diff
-- [ ] `npx prisma migrate deploy` to Supabase (or manual `CONCURRENTLY` + `migrate resolve` if tables have real traffic)
-- [ ] Run the five `EXPLAIN ANALYZE` queries above, confirm `Index Scan`
-- [ ] Separately note (not fixed in this pass): `AuditLogsService.findAll()` uses offset pagination, which will still degrade on deep pages regardless of indexing — a future cursor-pagination pass would need `(createdAt, id)` as a compound cursor key
+- [ ] `chiefComplaint`, `recommendation` required (non-empty after trim) before `MEDICAL_CERTIFICATE` generate is enabled client-side, **and** enforced server-side in the DTO/service (client checks are UX only, never trust-only).
+- [ ] `referralRecipient`, `salientPoints`, `referralReason` required for `REFERRAL_LETTER`, same client+server enforcement.
+- [ ] `physicianId` required whenever `draft.physician` is `null` (i.e., a nurse/admin is generating and there's no doctor-authored visit to fall back on).
+- [ ] `physicianId`, if supplied, must resolve to a user with `role === DOCTOR` — 400 otherwise.
+- [ ] Draft endpoint and generate endpoint both 404 if `patientId` doesn't exist.
+- [ ] Character limits on free-text fields match the DTO `@MaxLength` values in both the backend DTO and the frontend `<textarea maxLength={...}>` so users get inline feedback instead of a failed request.
 
-**Frontend / caching (makes the fast query actually *feel* instant instead of showing a mandatory loading state every time):**
-- [ ] Add `staleTime`, `gcTime`, and `placeholderData: keepPreviousData` to `useAttachmentsByNote` and `usePriorLabs` in `useAttachments.ts`
-- [ ] Add the same to `useDocuments` in `useDocuments.ts`
-- [ ] Add `placeholderData: keepPreviousData` to `useAuditLogs` in `useAuditLogs.ts` so filter/page changes don't blank the table
-- [ ] Leave `AttachmentsSection.tsx` / `DocumentsScreen.tsx` skeleton gating as-is (`isLoading`, not `isFetching`) — it's already correct, it just had nothing to work with before
-- [ ] If a component adds a new loading indicator, gate the full skeleton on `isLoading` and any background-refresh hint on `isFetching && !isLoading`
-- [ ] Optional: prefetch tab data on `ScreenNav` hover once the above lands, if first-visit latency is still noticeable
+---
 
-**Route-level loading (the actual "always loads up on every tab" fix):**
-- [ ] Delete the seven per-tab `loading.tsx` files (`[patientId]/loading.tsx`, `vitals/`, `notes/`, `initial-note/`, `problems/`, `medications/`, `documents/`) — none of these routes do server-side data fetching, so the route-level Suspense boundary was just guaranteeing a flash on every navigation regardless of client cache
-- [ ] Confirm each screen component's own `isLoading`-gated skeleton still works standalone (`ProblemListScreen.tsx`, `MedicationsScreen.tsx`, `VitalsScreen.tsx`, etc. — no changes needed there, they already gate correctly)
-- [ ] Keep `ScreenNav.tsx`'s `prefetch={true}` on tab links as-is — it's what makes removing `loading.tsx` safe
+## 9. Rollout checklist
 
-**Optimistic placeholders for adding Problems/Medications:**
-- [ ] Add `onMutate` to `useCreateProblem` in `useProblems.ts` inserting an optimistic row with an `optimistic-` prefixed id
-- [ ] Add `onMutate` to `useCreateMedication` in `useMedications.ts`, same pattern across both the `includeInactive: false` and `true` cache entries
-- [ ] Style rows with `id.startsWith('optimistic-')` as pending (reduced opacity, spinner, `pointer-events-none`) in `ActiveProblemTable.tsx` and `MedicationListCard.tsx`
-- [ ] Reconcile in `onSuccess` (not `onSettled`) for creates, since `onError`'s rollback already handles the failure case without needing a wasted refetch
+1. `npx prisma migrate dev --name add_referral_letter_and_physician_credentials` (backend).
+2. Backfill `licenseNumber` / `ptrNumber` / `s2Number` for existing `DOCTOR` accounts (manual, via account edit screen or a one-off script — not required before merge, but flag it to the user since documents generated for doctors without these values will print `N/A`).
+3. Add `CLINIC_*` env vars to all deployed environments (Vercel/Render/wherever backend is hosted), matching `.env.example`.
+4. Regenerate Prisma client: `npx prisma generate`.
+5. Run `npm run build` in `backend/` to confirm the new templates and DTOs compile.
+6. Manually generate one of each of the four document types against a test patient and diff visually against the reference `.docx` files (layout, not byte-for-byte).
+7. Confirm `useDocuments`/audit-log invalidation still fires on generate (unchanged, but verify the new mutation payload shape didn't break `onSuccess`).
+
+---
+
+## 10. Explicitly out of scope
+
+- `CHARGE_SLIP` template — no reference document supplied, left as-is.
+- Multi-clinic / multi-tenant clinic configuration — single `clinicConfig` object is sufficient for this deployment model.
+- Persisting free-text inputs (`chiefComplaint`, `recommendation`, `referralRecipient`, `salientPoints`, `referralReason`) as queryable DB columns — they are one-shot inputs baked into the generated PDF only.
+- PDF template visual polish beyond matching the reference `.docx` structure (e.g., no custom fonts/logos requested).

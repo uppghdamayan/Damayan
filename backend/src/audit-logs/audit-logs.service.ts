@@ -15,12 +15,24 @@ export class AuditLogsService {
         data: dto as any,
       });
     } catch (error) {
-      this.logger.error('Failed to create audit log', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Failed to create audit log',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
   async findAll(query: QueryAuditLogsDto) {
-    const { userId, patientId, action, tableName, from, to, page = 1, limit = 50 } = query;
+    const {
+      userId,
+      patientId,
+      action,
+      tableName,
+      from,
+      to,
+      page = 1,
+      limit = 50,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { action: { not: 'DRAFT' } };
@@ -28,7 +40,7 @@ export class AuditLogsService {
     if (patientId) where.patientId = patientId;
     if (action) where.action = action;
     if (tableName) where.tableName = tableName;
-    
+
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(from);

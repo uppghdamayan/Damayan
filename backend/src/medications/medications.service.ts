@@ -25,9 +25,13 @@ export class MedicationsService {
     return this.prisma.medication.findMany({
       where: { patientId, ...(includeInactive ? {} : { isActive: true }) },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-      include: { 
-        addedByUser: { select: { firstName: true, lastName: true, role: true } },
-        updatedByUser: { select: { firstName: true, lastName: true, role: true } }
+      include: {
+        addedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+        updatedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
       },
     });
   }
@@ -45,9 +49,13 @@ export class MedicationsService {
     return client.medication.findMany({
       where: { patientId, isActive: true },
       orderBy: { createdAt: 'asc' },
-      include: { 
-        addedByUser: { select: { firstName: true, lastName: true, role: true } },
-        updatedByUser: { select: { firstName: true, lastName: true, role: true } }
+      include: {
+        addedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+        updatedByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
       },
     });
   }
@@ -141,17 +149,23 @@ export class MedicationsService {
       if (dto.dose !== undefined && dto.dose.trim() !== existing.dose) {
         changes.push(`dose changed to '${dto.dose.trim()}'`);
       }
-      
+
       const newFormulation = dto.formulation?.trim() || null;
-      if (dto.formulation !== undefined && newFormulation !== existing.formulation) {
+      if (
+        dto.formulation !== undefined &&
+        newFormulation !== existing.formulation
+      ) {
         changes.push(`formulation changed to '${newFormulation || 'none'}'`);
       }
-      
+
       const newInstructions = dto.instructions?.trim() || null;
-      if (dto.instructions !== undefined && newInstructions !== existing.instructions) {
+      if (
+        dto.instructions !== undefined &&
+        newInstructions !== existing.instructions
+      ) {
         changes.push(`instructions changed to '${newInstructions || 'none'}'`);
       }
-      
+
       const newQuantity = dto.quantity ?? null;
       if (dto.quantity !== undefined && newQuantity !== existing.quantity) {
         changes.push(`quantity changed to '${newQuantity || 'none'}'`);
@@ -182,7 +196,11 @@ export class MedicationsService {
   // ─────────────────────────────────────────────
   // HARD DELETE — Removes medication from the database.
   // ─────────────────────────────────────────────
-  async remove(patientId: string, id: string, userId: string): Promise<Medication> {
+  async remove(
+    patientId: string,
+    id: string,
+    userId: string,
+  ): Promise<Medication> {
     const med = await this.findOne(patientId, id);
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.medication.delete({
@@ -258,24 +276,31 @@ export class MedicationsService {
       const match = existing.find(
         (m) =>
           m.name.toLowerCase() === item.name.trim().toLowerCase() &&
-          String(m.dose ?? '').toLowerCase() === String(item.dose ?? '').trim().toLowerCase(),
+          String(m.dose ?? '').toLowerCase() ===
+            String(item.dose ?? '')
+              .trim()
+              .toLowerCase(),
       );
       if (match) {
         keptIds.add(match.id);
         if (!match.isActive) {
           promises.push(
-            client.medication.update({
-              where: { id: match.id },
-              data: { isActive: true },
-            }).then(() => client.medicationLog.create({
-              data: {
-                patientId,
-                medicationId: match.id,
-                action: 'Reactivated',
-                description: `Reactivated medication '${match.name}' from ${sourceNote}`,
-                editorId: userId,
-              },
-            }))
+            client.medication
+              .update({
+                where: { id: match.id },
+                data: { isActive: true },
+              })
+              .then(() =>
+                client.medicationLog.create({
+                  data: {
+                    patientId,
+                    medicationId: match.id,
+                    action: 'Reactivated',
+                    description: `Reactivated medication '${match.name}' from ${sourceNote}`,
+                    editorId: userId,
+                  },
+                }),
+              ),
           );
         }
         continue;
@@ -293,7 +318,7 @@ export class MedicationsService {
             isActive: true,
             addedBy: userId,
           },
-        })
+        }),
       );
     }
 
@@ -301,18 +326,22 @@ export class MedicationsService {
     for (const ext of existing) {
       if (!keptIds.has(ext.id) && ext.isActive) {
         promises.push(
-          client.medication.update({
-            where: { id: ext.id },
-            data: { isActive: false },
-          }).then(() => client.medicationLog.create({
-            data: {
-              patientId,
-              medicationId: ext.id,
-              action: 'Discontinued',
-              description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
-              editorId: userId,
-            },
-          }))
+          client.medication
+            .update({
+              where: { id: ext.id },
+              data: { isActive: false },
+            })
+            .then(() =>
+              client.medicationLog.create({
+                data: {
+                  patientId,
+                  medicationId: ext.id,
+                  action: 'Discontinued',
+                  description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
+                  editorId: userId,
+                },
+              }),
+            ),
         );
       }
     }

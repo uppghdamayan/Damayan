@@ -27,8 +27,12 @@ export class VisitsService {
           physician: {
             select: { firstName: true, lastName: true, middleName: true },
           },
-          initialNote: { select: { status: true, chiefComplaint: true, isDeleted: true } },
-          progressNote: { select: { status: true, subjective: true, isDeleted: true } },
+          initialNote: {
+            select: { status: true, chiefComplaint: true, isDeleted: true },
+          },
+          progressNote: {
+            select: { status: true, subjective: true, isDeleted: true },
+          },
         },
       }),
       this.prisma.visit.count({ where: whereClause }),

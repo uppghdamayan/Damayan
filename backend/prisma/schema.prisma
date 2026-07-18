@@ -44,7 +44,7 @@ enum DocumentType {
   MEDICAL_CERTIFICATE
   LAB_REQUEST
   PRESCRIPTION
-  CHARGE_SLIP
+  REFERRAL_LETTER
 }
 
 enum AuditAction {
@@ -73,6 +73,9 @@ model User {
   middleName String?  @map("middle_name") @db.VarChar(30)
   extension  String?  @db.VarChar(3)
   role       Role
+  licenseNumber           String?  @map("license_number") @db.VarChar(30)
+  ptrNumber               String?  @map("ptr_number")     @db.VarChar(30)
+  s2Number                String?  @map("s2_number")      @db.VarChar(30)
   isActive                Boolean  @default(true) @map("is_active")
   requiresPasswordChange  Boolean  @default(false) @map("requires_password_change")
   temporaryPassword       String?  @map("temporary_password") @db.VarChar(50)

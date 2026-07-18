@@ -53,7 +53,8 @@ export class InitialNotesController {
     return notes.filter((note) => {
       if (note.status === NoteStatus.PUBLISHED) return true;
       if (req.user.role === Role.ADMIN) return true;
-      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId) return true;
+      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId)
+        return true;
       return false;
     });
   }
