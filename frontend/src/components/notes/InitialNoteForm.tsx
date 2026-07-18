@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { 
@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useUiStore } from '@/stores/uiStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
@@ -185,6 +186,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const publishMutation = usePublishInitialNote(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
+  const { registerPublishHandler } = useUiStore();
 
   const [isEditing, setIsEditing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -354,6 +356,102 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   }, [note, copyLoading, form, patientId, copyForward]);
 
   const formValues = form.watch();
+
+  const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
+
+  publishAndSwitchRef.current = async (): Promise<boolean> => {
+    setPublishError(null);
+    const isValid = await form.trigger();
+    if (!isValid) {
+      setPublishError("Please fill out all required fields: Chief Complaint, HPI, Physical Exam, and at least one Assessment.");
+      
+      const errors = form.formState.errors;
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        setTimeout(() => {
+          const element = 
+            document.getElementsByName(firstErrorField)[0] || 
+            document.getElementById(`field-${firstErrorField}`) ||
+            document.getElementById(firstErrorField);
+          
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            (element as HTMLElement).focus?.();
+          }
+        }, 50);
+      }
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      if (note) {
+        updateMutation.mutate({ id: note.id, data: formValues }, {
+          onSuccess: () => {
+            publishMutation.mutate(note.id, {
+              onSuccess: () => {
+                localStorage.removeItem(`damayan:draft:${patientId}:initial`);
+                resolve(true);
+              },
+              onError: (err: any) => {
+                setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+                resolve(false);
+              }
+            });
+          },
+          onError: (err: any) => {
+            setPublishError(err?.response?.data?.message || err.message || 'Failed to save draft before publishing');
+            resolve(false);
+          }
+        });
+      } else {
+        createMutation.mutate(formValues, {
+          onSuccess: (newNote) => {
+            const noteIdToPublish = (newNote as any)?.data?.id || newNote?.id;
+            if (!noteIdToPublish) {
+              setPublishError('Failed to retrieve new note ID for publishing');
+              resolve(false);
+              return;
+            }
+            publishMutation.mutate(noteIdToPublish, {
+              onSuccess: () => {
+                localStorage.removeItem(`damayan:draft:${patientId}:initial`);
+                resolve(true);
+              },
+              onError: (err: any) => {
+                setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+                resolve(false);
+              }
+            });
+          },
+          onError: (err: any) => {
+            setPublishError(err?.response?.data?.message || err.message || 'Failed to create draft before publishing');
+            resolve(false);
+          }
+        });
+      }
+    });
+  };
+
+  const isDraftActive = !!note?.id || form.formState.isDirty || localAttachments.length > 0;
+
+  useEffect(() => {
+    if (isPublished || !isDraftActive) {
+      registerPublishHandler(null);
+      return;
+    }
+
+    const handler = () => {
+      if (publishAndSwitchRef.current) {
+        return publishAndSwitchRef.current();
+      }
+      return Promise.resolve(false);
+    };
+
+    registerPublishHandler(handler);
+    return () => {
+      registerPublishHandler(null);
+    };
+  }, [isPublished, isDraftActive, registerPublishHandler]);
 
   const handleSave = (data: InitialNoteDraftValues) => {
     if (note) {

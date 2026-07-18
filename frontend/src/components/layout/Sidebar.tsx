@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUiStore } from '@/stores/uiStore';
@@ -10,6 +10,7 @@ import { usePatients } from '@/hooks/usePatients';
 import { useAuthStore } from '@/stores/authStore';
 import { groupByLetter, calcAge, initials } from '@/lib/patient-utils';
 import { NewPatientModal } from '@/components/patients/NewPatientModal';
+import { UnpublishedNotesModal } from '@/components/ui/UnpublishedNotesModal';
 import { SidebarSkeleton } from '@/components/layout/SidebarSkeleton';
 import { apiRequest } from '@/lib/api';
 import type { Patient } from '@/types/patient';
@@ -18,14 +19,23 @@ import { Search, Plus } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 
 export function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed } = useUiStore();
+  const { 
+    sidebarCollapsed, 
+    setSidebarCollapsed, 
+    onPublishAndSwitch, 
+    closeNoteEditor, 
+    setDocumentationPanelOpen 
+  } = useUiStore();
   const { activePatient, setActivePatient } = usePatientStore();
   const { user } = useAuthStore();
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newPatientOpen, setNewPatientOpen] = useState(false);
+  const [pendingPatient, setPendingPatient] = useState<Patient | null>(null);
+  const [isPublishingPending, setIsPublishingPending] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -41,6 +51,38 @@ export function Sidebar() {
 
   const handleSelect = (p: Patient) => {
     setActivePatient(p);
+  };
+
+  const handleConfirmPublish = async () => {
+    if (!onPublishAndSwitch || !pendingPatient) return;
+    setIsPublishingPending(true);
+    try {
+      const success = await onPublishAndSwitch();
+      if (success) {
+        const target = pendingPatient;
+        setPendingPatient(null);
+        closeNoteEditor();
+        setDocumentationPanelOpen(false);
+        setActivePatient(target);
+        router.push(`/dashboard/${target.id}`);
+      } else {
+        setPendingPatient(null);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsPublishingPending(false);
+    }
+  };
+
+  const handleKeepDraft = () => {
+    if (!pendingPatient) return;
+    const target = pendingPatient;
+    setPendingPatient(null);
+    closeNoteEditor();
+    setDocumentationPanelOpen(false);
+    setActivePatient(target);
+    router.push(`/dashboard/${target.id}`);
   };
 
   const handlePrefetch = (patientId: string) => {
@@ -120,11 +162,16 @@ export function Sidebar() {
                   key={p.id}
                   href={`/dashboard/${p.id}`}
                   prefetch={false}
-                  onClick={() => {
-                    handleSelect(p);
-                    // Close sidebar overlay on selection for smaller screens
-                    if (window.innerWidth < 768) {
-                      setSidebarCollapsed(true);
+                  onClick={(e) => {
+                    if (onPublishAndSwitch && activePatient?.id !== p.id) {
+                      e.preventDefault();
+                      setPendingPatient(p);
+                    } else {
+                      handleSelect(p);
+                      // Close sidebar overlay on selection for smaller screens
+                      if (window.innerWidth < 768) {
+                        setSidebarCollapsed(true);
+                      }
                     }
                   }}
                   onMouseEnter={() => handlePrefetch(p.id)}
@@ -217,6 +264,15 @@ export function Sidebar() {
           setNewPatientOpen(false);
           handleSelect(p as Patient);
         }}
+      />
+
+      <UnpublishedNotesModal
+        open={pendingPatient !== null}
+        onClose={() => setPendingPatient(null)}
+        onPublish={handleConfirmPublish}
+        onKeepDraft={handleKeepDraft}
+        patientName={activePatient ? `${activePatient.firstName} ${activePatient.lastName}` : ''}
+        isPublishing={isPublishingPending}
       />
     </>
   );

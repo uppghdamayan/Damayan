@@ -86,7 +86,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const updateMutation = useUpdateProgressNote(patientId);
   const publishMutation = usePublishProgressNote(patientId);
   const deleteMutation = useDeleteProgressNote(patientId);
-  const { openExistingProgressNote, setActiveScreen, setDocumentationPanelOpen } = useUiStore();
+  const { openExistingProgressNote, setActiveScreen, setDocumentationPanelOpen, registerPublishHandler } = useUiStore();
 
   const [publishError, setPublishError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -250,6 +250,75 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   }, [copyForward, copyLoading, form]);
 
   const formValues = form.watch();
+
+  const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
+
+  publishAndSwitchRef.current = async (): Promise<boolean> => {
+    const publishCheck = progressNotePublishSchema.safeParse(formValues);
+    if (!publishCheck.success) {
+      setPublishError("Please fill out Subjective and Objective fields.");
+      const el = document.getElementById('notes-workspace-container');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return false;
+    }
+    
+    return new Promise((resolve) => {
+      if (noteId) {
+        updateMutation.mutate({ id: noteId, data: cleanFormValues(formValues) }, {
+          onSuccess: () => {
+            publishMutation.mutate(noteId, {
+              onSuccess: () => {
+                localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+                resolve(true);
+              },
+              onError: (err: any) => {
+                setPublishError(err?.message || 'Failed to publish note');
+                resolve(false);
+              }
+            });
+          },
+          onError: (err: any) => {
+            setPublishError(err?.message || 'Failed to update note before publishing');
+            resolve(false);
+          }
+        });
+      } else {
+        createAndPublishMutation.mutate(cleanFormValues(formValues), {
+          onSuccess: () => {
+            localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+            resolve(true);
+          },
+          onError: (err: any) => {
+            setPublishError(err?.message || 'Failed to create and publish note');
+            resolve(false);
+          }
+        });
+      }
+    });
+  };
+
+  const isPublished = note?.status === 'PUBLISHED';
+  const isDraftActive = !!noteId || form.formState.isDirty || localAttachments.length > 0;
+
+  useEffect(() => {
+    if (isPublished || !isDraftActive) {
+      registerPublishHandler(null);
+      return;
+    }
+
+    const handler = () => {
+      if (publishAndSwitchRef.current) {
+        return publishAndSwitchRef.current();
+      }
+      return Promise.resolve(false);
+    };
+
+    registerPublishHandler(handler);
+    return () => {
+      registerPublishHandler(null);
+    };
+  }, [isPublished, isDraftActive, registerPublishHandler]);
+
   const getUnaddedSections = () => {
     const list: string[] = [];
     if (newProbTitle.trim()) {
@@ -546,7 +615,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending || createAndPublishMutation.isPending;
   const isPublishing = publishMutation.isPending || createAndPublishMutation.isPending;
-  const isPublished = note?.status === 'PUBLISHED';
   const isDisabled = isPublished || isSaving || deleteMutation.isPending;
   const isUpdateActive = !!form.formState.isDirty;
 

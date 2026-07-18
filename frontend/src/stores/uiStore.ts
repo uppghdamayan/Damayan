@@ -38,6 +38,8 @@ interface UiState {
   increaseUiScale: () => void;
   decreaseUiScale: () => void;
   resetUiScale: () => void;
+  onPublishAndSwitch: (() => Promise<boolean>) | null;
+  registerPublishHandler: (handler: (() => Promise<boolean>) | null) => void;
 }
 
 // Viewport-aware default: collapse on screens < 1440px
@@ -119,6 +121,8 @@ export const useUiStore = create<UiState>()(
       closeNoteEditor: () => set({
         activeNoteEditor: { patientId: null, noteId: null, mode: null },
       }),
+      onPublishAndSwitch: null,
+      registerPublishHandler: (handler) => set({ onPublishAndSwitch: handler }),
     }),
     {
       name: 'damayan-ui-sidebar',
