@@ -21,20 +21,21 @@ export class CreateMedicationDto {
   @MaxLength(255)
   dose: string;
 
-  @ApiProperty({ example: 'Tablet' })
+  @ApiPropertyOptional({ example: 'Tablet' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(50)
-  formulation: string;
+  formulation?: string;
 
-  @ApiProperty({ example: 'Once daily with food' })
+  @ApiPropertyOptional({ example: 'Once daily with food' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(50)
-  instructions: string;
+  instructions?: string;
 
-  @ApiProperty({ example: 30 })
+  @ApiPropertyOptional({ example: 30 })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  quantity: number;
+  quantity?: number;
 }

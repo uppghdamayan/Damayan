@@ -27,25 +27,45 @@ export function MedicationEntry({
   onStatusChange,
   hideStatus,
 }: MedicationEntryProps) {
-  const renderUpdateTag = (fieldName: string) => {
-    const isPublishedChange = recentlyPublishedFields?.includes(fieldName);
-    const isDraftChange = draftChangedFields?.includes(fieldName);
-
-    if (!isPublishedChange && !isDraftChange) return null;
-
-    return (
-      <span className={cn(
-        "ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px]",
-        isDraftChange ? "text-amber bg-amber-bg border-amber-border" : "text-green bg-green-bg border-green-border"
-      )}>
-        updated!
-      </span>
-    );
-  };
-
   const isDraftNew = draftChangedFields?.includes('_isNew') || medication.id.startsWith('temp-');
   const isPublishedNew = recentlyPublishedFields?.includes('_isNew');
   const isNewItem = isDraftNew || isPublishedNew;
+
+  const isDraftUpdated = draftChangedFields && draftChangedFields.length > 0 && !draftChangedFields.includes('_isNew');
+  const isPublishedUpdated = recentlyPublishedFields && recentlyPublishedFields.length > 0 && !recentlyPublishedFields.includes('_isNew');
+  const isUpdatedItem = isDraftUpdated || isPublishedUpdated;
+
+  const getHighlightClass = (fieldName: string) => {
+    if (!medication.isActive) return '';
+
+    const isPublishedChange = recentlyPublishedFields?.includes(fieldName);
+    const isDraftChange = draftChangedFields?.includes(fieldName);
+
+    return cn(
+      "px-1 py-0.5 rounded border transition-all duration-1000 ease-out",
+      isDraftChange 
+        ? "text-amber bg-amber-bg border-amber-border/25" 
+        : isPublishedChange
+        ? "text-green bg-green-bg border-green-border/25"
+        : "border-transparent bg-transparent text-inherit"
+    );
+  };
+
+  const getStatusHighlightClass = () => {
+    if (!medication.isActive) return '';
+
+    const isPublishedChange = recentlyPublishedFields?.includes('isActive');
+    const isDraftChange = draftChangedFields?.includes('isActive');
+
+    return cn(
+      "transition-all duration-1000 ease-out",
+      isDraftChange 
+        ? "text-amber bg-amber-bg border-amber-border" 
+        : isPublishedChange
+        ? "text-green bg-green-bg border-green-border"
+        : ""
+    );
+  };
 
   return (
     <div 
@@ -55,36 +75,48 @@ export function MedicationEntry({
       style={{ gridTemplateColumns: hideStatus ? MED_COLUMN_LAYOUT_DISCONTINUES : MED_COLUMN_LAYOUT }}
     >
       <div className={cn("text-[13px] font-bold truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-primary" : "text-text-muted line-through")}>
-        <span className="truncate">{medication.name}</span>
-        {isNewItem ? (
+        <span className={cn("truncate", getHighlightClass('name'))}>{medication.name}</span>
+        {(!medication.isActive && (isNewItem || isUpdatedItem)) ? (
+          <span className={cn(
+            "ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px]",
+            isDraftNew || isDraftUpdated 
+              ? "text-red bg-red-bg border-red-border" 
+              : "text-red bg-red-bg border-red-border animate-highlight-pill"
+          )}>
+            Discontinued
+          </span>
+        ) : isNewItem ? (
           <span className="ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px] text-green bg-green-bg border-green-border">
             new
           </span>
-        ) : (
-          renderUpdateTag('name')
-        )}
+        ) : isUpdatedItem ? (
+          <span className={cn(
+            "ml-1.5 px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px]",
+            isDraftUpdated 
+              ? "text-amber bg-amber-bg border-amber-border" 
+              : "text-green bg-green-bg border-green-border animate-highlight-pill"
+          )}>
+            updated
+          </span>
+        ) : null}
       </div>
 
       <div className={cn("text-[12px] font-medium truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        <span className="truncate">{medication.formulation || '-'}</span>
-        {renderUpdateTag('formulation')}
+        <span className={cn("truncate", getHighlightClass('formulation'))}>{medication.formulation || '-'}</span>
       </div>
 
       <div className={cn("text-[12px] font-mono flex items-center flex-wrap min-w-0", medication.isActive ? "text-accent font-semibold" : "text-text-muted")}>
-        <span>{medication.dose}</span>
-        {renderUpdateTag('dose')}
+        <span className={getHighlightClass('dose')}>{medication.dose}</span>
       </div>
 
       <div className={cn("text-[12px] truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        <span className="truncate">{medication.instructions || '-'}</span>
-        {renderUpdateTag('instructions')}
+        <span className={cn("truncate", getHighlightClass('instructions'))}>{medication.instructions || '-'}</span>
       </div>
 
       <div className={cn("text-[12px] font-mono text-left flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        <span>
+        <span className={getHighlightClass('quantity')}>
           {medication.quantity != null ? `${medication.quantity} ${medication.formulation?.toLowerCase().includes('tablet') ? 'tabs' : medication.formulation?.toLowerCase().includes('capsule') ? 'caps' : 'pcs'}` : '-'}
         </span>
-        {renderUpdateTag('quantity')}
       </div>
 
       {!hideStatus && (
@@ -94,17 +126,19 @@ export function MedicationEntry({
               disabled={!canManage}
               value={medication.isActive ? 'ACTIVE' : 'INACTIVE'}
               onChange={(e) => onStatusChange(e.target.value === 'ACTIVE')}
-              className="h-6 w-full max-w-[90px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed"
+              className={cn(
+                "h-6 w-full max-w-[90px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed",
+                getStatusHighlightClass()
+              )}
             >
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
             </select>
           ) : (
-            <div className="text-[12px] font-medium text-text-secondary">
+            <div className={cn("text-[12px] font-medium text-text-secondary", getStatusHighlightClass())}>
               {medication.isActive ? 'Active' : 'Inactive'}
             </div>
           )}
-          {renderUpdateTag('isActive')}
         </div>
       )}
 

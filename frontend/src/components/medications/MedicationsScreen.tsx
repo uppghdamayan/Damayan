@@ -257,11 +257,12 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         await updateMedication.mutateAsync({ id, ...updates });
       }
       for (const create of pendingChanges.creates) {
+        const { isActive, ...payload } = create;
         const res = await createMedication.mutateAsync({
-          ...create,
-          formulation: create.formulation ?? undefined,
-          instructions: create.instructions ?? undefined,
-          quantity: create.quantity ?? undefined,
+          ...payload,
+          formulation: payload.formulation ?? undefined,
+          instructions: payload.instructions ?? undefined,
+          quantity: payload.quantity ?? undefined,
         });
         if (res && res.id) {
           publishedChanges[res.id] = ['_isNew'];
