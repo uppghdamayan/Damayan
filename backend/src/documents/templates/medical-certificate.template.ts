@@ -10,9 +10,12 @@ import {
   computeAge,
 } from './layout.helper';
 
+const MEDICAL_CERTIFICATE_DISCLAIMER =
+  'This certification is issued upon the request of the patient for medical clearance / work excuse purposes and should not be used for any legal proceedings unless specified.';
+
 export const renderMedicalCertificate = async (data: any): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -63,6 +66,8 @@ export const renderMedicalCertificate = async (data: any): Promise<Buffer> => {
     doc.font('Helvetica-Bold').text('Recommendations:');
     doc.moveDown(0.3);
     doc.font('Helvetica').text(data.recommendation, { align: 'justify' });
+    doc.moveDown();
+    doc.text(MEDICAL_CERTIFICATE_DISCLAIMER, { align: 'justify' });
 
     drawSignatureBlock(doc, data.physician, 'Signed By:', true);
     doc.end();

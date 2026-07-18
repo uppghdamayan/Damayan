@@ -4,14 +4,14 @@ import {
   drawGenerationDate,
   drawSignatureBlock,
   drawAssessmentList,
-  drawBulletedMedicationList,
+  drawReferralMedicationList,
   formatPatientName,
   computeAge,
 } from './layout.helper';
 
 export const renderReferralLetter = async (data: any): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -20,11 +20,15 @@ export const renderReferralLetter = async (data: any): Promise<Buffer> => {
     drawLetterhead(doc, 'REFERRAL LETTER');
     drawGenerationDate(doc);
 
-    doc.font('Helvetica').fontSize(10).text(`To ${data.referralRecipient}:`);
+    // "To <recipient>:" — recipient is underlined per reference image
+    doc.font('Helvetica').fontSize(10).text('To ', { continued: true });
+    doc.text(data.referralRecipient, { underline: true, continued: true });
+    doc.text(':');
     doc.moveDown(0.5);
 
     const age = computeAge(data.patient.dateOfBirth);
     const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
+    const pronoun = data.patient.sex === 'MALE' ? 'He' : 'She';
 
     // Underlined dynamic patient fields
     doc.text('I am kindly referring my patient ', {
@@ -42,27 +46,29 @@ export const renderReferralLetter = async (data: any): Promise<Buffer> => {
 
     drawAssessmentList(doc, data.assessment);
 
+    // "Salient points:" bold label, value underlined — matches reference image
     doc
       .font('Helvetica-Bold')
       .text('Salient points: ', { continued: true })
       .font('Helvetica')
-      .text(data.salientPoints);
+      .text(data.salientPoints, { underline: true });
     doc.moveDown(0.3);
+
+    // "Reason for referral:" bold label, value underlined — matches reference image
     doc
       .font('Helvetica-Bold')
       .text('Reason for referral: ', { continued: true })
       .font('Helvetica')
-      .text(data.referralReason);
+      .text(data.referralReason, { underline: true });
     doc.moveDown(0.5);
 
     doc
-      .font('Helvetica-Bold')
-      .text('He/She is currently on the following medications:');
+      .font('Helvetica')
+      .text(`${pronoun} is currently on the following medications:`);
     doc.moveDown(0.3);
-    drawBulletedMedicationList(doc, data.medications);
-    doc.moveDown(1);
+    drawReferralMedicationList(doc, data.medications);
 
-    drawSignatureBlock(doc, data.physician, 'Yours Truly,', true);
+    drawSignatureBlock(doc, data.physician, 'Yours Truly,');
     doc.end();
   });
 };

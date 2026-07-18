@@ -165,6 +165,7 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
       case 'MEDICAL_CERTIFICATE': return 'Medical Certificate';
       case 'LAB_REQUEST': return 'Lab Request';
       case 'PRESCRIPTION': return 'Prescription';
+      case 'REFERRAL_LETTER': return 'Referral Letter';
       case 'CHARGE_SLIP': return 'Charge Slip';
       default: return type;
     }
@@ -175,6 +176,7 @@ function DocumentCard({ document, patientId }: { document: any, patientId: strin
       case 'MEDICAL_CERTIFICATE': return '📜';
       case 'LAB_REQUEST': return '🧪';
       case 'PRESCRIPTION': return '💊';
+      case 'REFERRAL_LETTER': return '✉️';
       case 'CHARGE_SLIP': return '💳';
       default: return '📄';
     }

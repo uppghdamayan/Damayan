@@ -9,7 +9,7 @@ import {
 
 export const renderLabRequest = async (data: any): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -22,14 +22,12 @@ export const renderLabRequest = async (data: any): Promise<Buffer> => {
 
     drawAssessmentList(doc, data.assessment);
 
-    doc.font('Helvetica-Bold').fontSize(10).text('DIAGNOSTIC TESTS REQUESTED:');
+    doc.font('Helvetica-Bold').fontSize(10).text('DIAGNOSTIC TESTS REQUESTED');
     doc.font('Helvetica');
     if (data.diagnostics && data.diagnostics.length > 0) {
-      data.diagnostics.forEach((d: string) =>
-        doc.text(`•  ${d}`, { indent: 20 }),
-      );
+      data.diagnostics.forEach((d: string) => doc.text(`- ${d}`));
     } else {
-      doc.text('•  No tests requested.', { indent: 20 });
+      doc.text('- No tests requested.');
     }
 
     drawSignatureBlock(doc, data.physician, 'Requested By:');
