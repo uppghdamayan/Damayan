@@ -12,6 +12,7 @@ import { ClipboardList, ArrowRight } from 'lucide-react';
 import { useDeleteProgressNote } from '@/hooks/useProgressNotes';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 interface NoteTimelineProps {
@@ -88,9 +89,60 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
 
   if (isInitialLoading || isProgressLoading || isActionLoading) {
     return (
-      <div className="animate-pulse flex flex-col gap-4 p-4 w-full">
-        <div className="h-24 bg-surface-2 rounded-card" />
-        <div className="h-24 bg-surface-2 rounded-card" />
+      <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Timeline</h2>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 relative">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="relative pl-8 pb-5 last:pb-0">
+              {/* Connecting line to the next item */}
+              {index < 2 && (
+                <div 
+                  className="absolute bg-border-strong/30 animate-pulse" 
+                  style={{ left: '15px', top: '36px', bottom: '-34px', width: '2px' }} 
+                />
+              )}
+              {/* Modern timeline dot */}
+              <div 
+                className="absolute w-3.5 h-3.5 rounded-full bg-surface border-2 border-border-strong/30 flex items-center justify-center z-10 animate-pulse"
+                style={{ left: '9px', top: '22px' }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-border-strong/30" />
+              </div>
+              
+              {/* Skeleton Entry Card */}
+              <div className="border border-border rounded-card bg-surface overflow-hidden shadow-sm p-3.5 flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-2 min-w-0 flex-1">
+                    {/* Note title placeholder */}
+                    <Skeleton className="h-4 w-32" />
+                    {/* Note meta details placeholder */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Skeleton className="h-3 w-16" />
+                      <span className="text-[var(--text-muted)] text-[10px]">•</span>
+                      <Skeleton className="h-3 w-12" />
+                      <span className="text-[var(--text-muted)] text-[10px]">•</span>
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                  {/* Note traits/badges placeholder */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-12" />
+                  </div>
+                </div>
+                {/* Note preview body placeholder */}
+                <div className="pl-2 border-l-2 border-border-strong/30">
+                  <Skeleton className="h-3.5 w-3/4" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
