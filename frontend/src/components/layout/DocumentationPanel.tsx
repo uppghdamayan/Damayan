@@ -43,8 +43,13 @@ export function DocumentationPanel() {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = window.innerWidth - e.clientX;
-      const clamped = Math.max(300, Math.min(newWidth, window.innerWidth * 0.6));
+      const scale = (useUiStore.getState().uiScale || 100) / 100;
+      const currentViewportWidth = window.innerWidth / scale;
+      const currentMouseX = e.clientX / scale;
+
+      const newWidth = currentViewportWidth - currentMouseX;
+      const maxAllowedWidth = currentViewportWidth * 0.6;
+      const clamped = Math.max(300, Math.min(newWidth, maxAllowedWidth));
       document.documentElement.style.setProperty('--documentation-panel-width', `${clamped}px`);
     };
 
