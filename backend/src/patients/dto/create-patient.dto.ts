@@ -44,26 +44,26 @@ export class CreatePatientDto {
   @IsEnum(Sex)
   sex: Sex;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: '123 Taft Ave' })
   @IsString()
-  addressStreet?: string;
+  @IsNotEmpty()
+  addressStreet: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: 'Barangay 660' })
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  addressBarangay?: string;
+  addressBarangay: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: 'Ermita, Manila' })
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  addressCity?: string;
+  addressCity: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty({ example: 'NCR (National Capital Region)' })
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
-  addressRegion?: string;
+  addressRegion: string;
 }

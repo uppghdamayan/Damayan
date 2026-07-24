@@ -14,12 +14,20 @@ import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 150px';
 
+export type DragOverAction = 'nest' | 'unnest' | 'reorder';
+
+export interface DragOverState {
+  id: string;
+  action: DragOverAction;
+  targetTitle?: string;
+}
+
 interface ActiveProblemTableProps {
   nodes: ProblemNode[];
   flatProblems: { problem: ProblemNode; depth: number }[];
   isTableDragging: boolean;
   activeDragItem: { problem: ProblemNode; depth: number } | null;
-  dragOverState: { id: string; isMerge: boolean } | null;
+  dragOverState: DragOverState | null;
   allOptions: Problem[];
   canManage: boolean;
   isEditMode: boolean;
@@ -32,6 +40,16 @@ interface ActiveProblemTableProps {
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
   onDelete: (p: Problem) => void;
   onParentChange: (p: Problem, newParentId: string | null) => void;
+}
+
+function getProblemDepth(problems: Problem[], problemId: string): number {
+  let depth = 0;
+  let curr = problems.find((p) => p.id === problemId);
+  while (curr && curr.parentId) {
+    depth++;
+    curr = problems.find((p) => p.id === curr!.parentId);
+  }
+  return depth;
 }
 
 export function ActiveProblemRow({
@@ -53,7 +71,7 @@ export function ActiveProblemRow({
   dragHandleProps?: { attributes: any; listeners: any };
   isDragging?: boolean;
   allOptions: Problem[];
-  dragOverState: { id: string; isMerge: boolean } | null;
+  dragOverState: DragOverState | null;
   onEdit: () => void;
   onStatusChange: (status: ProblemStatusValue) => void;
   onDelete: () => void;
@@ -66,8 +84,10 @@ export function ActiveProblemRow({
     return true;
   });
 
-  const isMergeHover = dragOverState?.id === problem.id && dragOverState.isMerge;
-  const isReorderHover = dragOverState?.id === problem.id && !dragOverState.isMerge;
+  const isCurrentTarget = dragOverState?.id === problem.id;
+  const isNestHover = isCurrentTarget && dragOverState?.action === 'nest';
+  const isUnnestHover = isCurrentTarget && dragOverState?.action === 'unnest';
+  const isReorderHover = isCurrentTarget && dragOverState?.action === 'reorder';
 
   const creator = problem.addedByUser;
   const addedAt = problem.createdAt;
@@ -80,15 +100,18 @@ export function ActiveProblemRow({
   };
   const creatorName = getCreatorName(creator);
 
-  const formattedAddedDateTime = new Date(addedAt).toLocaleDateString('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }) + ' · ' + new Date(addedAt).toLocaleTimeString('en-PH', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const formattedAddedDateTime =
+    new Date(addedAt).toLocaleDateString('en-PH', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }) +
+    ' · ' +
+    new Date(addedAt).toLocaleTimeString('en-PH', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
 
   const isOptimistic = problem.id.startsWith('optimistic-');
 
@@ -97,11 +120,12 @@ export function ActiveProblemRow({
       {...(canManage ? dragHandleProps?.attributes : {})}
       {...(canManage ? dragHandleProps?.listeners : {})}
       className={cn(
-        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry',
-        canManage && !isOptimistic && 'cursor-grab active:cursor-grabbing',
+        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry group relative',
+        canManage && !isOptimistic && 'cursor-grab active:cursor-grabbing hover:bg-surface-2/60',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
-        isReorderHover && 'bg-accent-light border-t-2 border-t-accent',
-        isMergeHover && 'bg-green-bg border-2 border-dashed border-green-border relative',
+        isReorderHover && 'bg-accent-light/50 border-t-2 border-t-accent',
+        isNestHover && 'bg-green-bg/80 border-2 border-dashed border-green-border relative shadow-sm',
+        isUnnestHover && 'bg-amber-500/10 border-2 border-dashed border-amber-400/80 relative shadow-sm',
         isOptimistic && 'opacity-50 pointer-events-none'
       )}
       style={{ gridTemplateColumns: COLUMN_LAYOUT }}
@@ -110,8 +134,8 @@ export function ActiveProblemRow({
       <div className="flex items-center justify-center">
         {canManage ? (
           <span
-            className="text-border-strong flex-shrink-0 select-none text-[15px] font-bold"
-            title="Drag to reorder"
+            className="text-border-strong group-hover:text-accent flex-shrink-0 select-none text-[15px] font-bold transition-colors cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-surface-3"
+            title="Drag to reorder, nest (drag right), or un-nest (drag left)"
           >
             ⠿
           </span>
@@ -120,31 +144,58 @@ export function ActiveProblemRow({
 
       {/* Column 2: Status dot */}
       <div className="flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full flex-shrink-0 bg-accent-mid" title="Active" />
+        <div
+          className={cn(
+            'w-2 h-2 rounded-full flex-shrink-0 transition-colors',
+            depth > 0 ? 'bg-accent/60 ring-2 ring-accent/15' : 'bg-accent-mid'
+          )}
+          title={depth > 0 ? `Sub-problem (Level ${depth})` : 'Top-level problem'}
+        />
       </div>
 
-      {/* Column 3: Problem name and code with nesting indentation */}
-      <div 
-        className="flex items-center gap-2 truncate text-text-primary"
-        style={depth > 0 ? { paddingLeft: `${depth * 24}px` } : undefined}
-      >
+      {/* Column 3: Problem name and code with visual tree branch connectors */}
+      <div className="flex items-center gap-2 truncate text-text-primary min-w-0">
         {depth > 0 && (
-          <span className="font-mono text-text-muted mr-1 select-none">↳</span>
+          <div className="flex items-center flex-shrink-0" style={{ width: `${depth * 20}px` }}>
+            {Array.from({ length: depth - 1 }).map((_, i) => (
+              <span key={i} className="w-[20px] h-6 inline-block border-r border-border/40" />
+            ))}
+            <div className="w-[20px] h-6 flex items-center justify-center relative">
+              <span className="absolute left-0 top-0 bottom-1/2 w-2.5 border-l-2 border-b-2 border-accent/40 rounded-bl-[4px]" />
+            </div>
+          </div>
         )}
-        <span className="text-[13px] font-semibold truncate">{problem.title}</span>
+
+        <span className={cn('text-[13px] truncate', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
+          {problem.title}
+        </span>
+
         {isOptimistic && (
           <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0 ml-1" />
         )}
+
         {problem.icdCode && (
-          <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
+          <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border flex-shrink-0">
             {problem.icdCode}
+          </span>
+        )}
+
+        {depth > 0 && (
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-accent/80 bg-accent/5 px-1.5 py-0.2 rounded border border-accent/15 flex-shrink-0 hidden @lg:inline">
+            Sub-problem
           </span>
         )}
       </div>
 
       {/* Column 4: Date of Diagnosis */}
       <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-left">
-        {problem.diagnosisDate ? new Date(problem.diagnosisDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '--'}
+        {problem.diagnosisDate
+          ? new Date(problem.diagnosisDate).toLocaleDateString('en-PH', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : '--'}
       </div>
 
       {/* Column 5: Added By */}
@@ -170,21 +221,43 @@ export function ActiveProblemRow({
         </select>
       </div>
 
-      {/* Column 7: Nest Under */}
-      <div className="flex justify-start">
+      {/* Column 7: Nest Under with Visual Option Hierarchy & Quick Un-nest */}
+      <div className="flex items-center gap-1 justify-start">
         <select
           disabled={!canManage}
           value={problem.parentId || ''}
           onChange={(e) => onParentChange(e.target.value || null)}
-          className="h-6 w-full max-w-[150px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate"
+          className={cn(
+            'h-6 w-full max-w-[140px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate transition-colors',
+            problem.parentId && 'border-accent/40 bg-accent/5 font-medium'
+          )}
         >
           <option value="">None (Top Level)</option>
-          {selectableParents.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
+          {selectableParents.map((p) => {
+            const parentDepth = getProblemDepth(allOptions, p.id);
+            const indent = parentDepth > 0 ? `${'\u00A0\u00A0'.repeat(parentDepth)}└─ ` : '';
+            return (
+              <option key={p.id} value={p.id}>
+                {indent}{p.title}
+              </option>
+            );
+          })}
         </select>
+
+        {problem.parentId && canManage && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onParentChange(null);
+            }}
+            title="Un-nest problem (Move to Top Level)"
+            className="h-6 px-1.5 rounded text-[10px] font-semibold text-text-muted hover:text-amber-700 bg-surface-2 hover:bg-amber-500/10 border border-border hover:border-amber-400/50 transition-all cursor-pointer flex items-center gap-0.5 flex-shrink-0"
+          >
+            <span>✕</span>
+            <span className="hidden @xl:inline">Un-nest</span>
+          </button>
+        )}
       </div>
 
       {/* Column 8: Actions */}
@@ -207,10 +280,15 @@ export function ActiveProblemRow({
         )}
       </div>
 
-      {/* Merge indicator overlay */}
-      {isMergeHover && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-green text-white px-2.5 py-1 rounded-full text-[11px] font-bold pointer-events-none shadow-sm z-20 animate-in fade-in duration-100">
-          + Merge Under
+      {/* Floating Action Badge Overlays */}
+      {isNestHover && (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-green text-white px-3 py-1 rounded-full text-[11px] font-bold pointer-events-none shadow-md z-20 flex items-center gap-1.5 animate-in fade-in duration-100">
+          <span>+</span> Nest under &quot;{problem.title}&quot;
+        </div>
+      )}
+      {isUnnestHover && (
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 bg-amber-600 text-white px-3 py-1 rounded-full text-[11px] font-bold pointer-events-none shadow-md z-20 flex items-center gap-1.5 animate-in fade-in duration-100">
+          <span>↖</span> Un-nest to Top Level
         </div>
       )}
     </div>
@@ -230,7 +308,7 @@ function SortableRow({
   item: { problem: ProblemNode; depth: number };
   canManage: boolean;
   allOptions: Problem[];
-  dragOverState: { id: string; isMerge: boolean } | null;
+  dragOverState: DragOverState | null;
   onEdit: (p: Problem) => void;
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
   onDelete: (p: Problem) => void;
@@ -241,10 +319,10 @@ function SortableRow({
     disabled: !canManage,
   });
 
-  const isMergeTarget = dragOverState?.id === item.problem.id && dragOverState.isMerge;
+  const isTargetNestOrUnnest = dragOverState?.id === item.problem.id && (dragOverState.action === 'nest' || dragOverState.action === 'unnest');
 
   const style = {
-    transform: CSS.Transform.toString(isMergeTarget ? null : transform),
+    transform: CSS.Transform.toString(isTargetNestOrUnnest ? null : transform),
     transition,
   };
 

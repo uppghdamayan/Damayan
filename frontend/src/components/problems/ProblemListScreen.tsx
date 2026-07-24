@@ -13,6 +13,7 @@ import {
   useSensors,
   type DragEndEvent,
   type DragMoveEvent,
+  type Modifier,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 
@@ -27,7 +28,8 @@ import {
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant } from '@/lib/problem-utils';
 import { useAuthStore } from '@/stores/authStore';
-import { ActiveProblemTable, ActiveProblemRow } from './ActiveProblemTable';
+import { useUiStore } from '@/stores/uiStore';
+import { ActiveProblemTable, ActiveProblemRow, type DragOverState } from './ActiveProblemTable';
 import { ResolvedProblemTable, ResolvedRow } from './ResolvedProblemTable';
 import { ProblemLogTable } from './ProblemLogTable';
 import { ProblemEditModal } from './ProblemEditModal';
@@ -37,7 +39,23 @@ import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 export function ProblemListScreen({ patientId }: { patientId: string }) {
   const { user } = useAuthStore();
+  const uiScale = useUiStore((state) => state.uiScale);
+  const scale = uiScale / 100;
   const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  const zoomModifier: Modifier = useMemo(() => {
+    return ({ transform, activeNodeRect }) => {
+      const currentScale = (useUiStore.getState().uiScale || 100) / 100;
+      if (currentScale === 1 || !activeNodeRect) {
+        return transform;
+      }
+      return {
+        ...transform,
+        x: transform.x + activeNodeRect.left * (1 / currentScale - 1),
+        y: transform.y + activeNodeRect.top * (1 / currentScale - 1),
+      };
+    };
+  }, []);
 
   const { data, isLoading } = useProblems(patientId);
   const { data: logsData, isLoading: logsLoading } = useProblemLogs(patientId);
@@ -226,7 +244,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   }, [patientId]);
 
   // Drag and drop state
-  const [dragOverState, setDragOverState] = useState<{ id: string; isMerge: boolean } | null>(null);
+  const [dragOverState, setDragOverState] = useState<DragOverState | null>(null);
   const [isTableDragging, setIsTableDragging] = useState(false);
   const [activeDragItem, setActiveDragItem] = useState<{ problem: ProblemNode; depth: number } | null>(null);
   const [activeResolvedDragItem, setActiveResolvedDragItem] = useState<Problem | null>(null);
@@ -461,13 +479,45 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
 
     const overElement = document.getElementById(`row-${over.id}`);
-    if (overElement) {
-      const rect = overElement.getBoundingClientRect();
-      const x = pointerPosition.current.x - rect.left;
-      const isMerge = x > 150;
-      setDragOverState({ id: over.id as string, isMerge });
-    } else {
+    if (!overElement) {
       setDragOverState(null);
+      return;
+    }
+
+    const rect = overElement.getBoundingClientRect();
+    const x = (pointerPosition.current.x - rect.left) / scale;
+
+    const activeItem = displayFlatProblems.find((p) => p.problem.id === active.id);
+    const targetItem = displayFlatProblems.find((p) => p.problem.id === over.id);
+
+    if (!activeItem || !targetItem) {
+      setDragOverState(null);
+      return;
+    }
+
+    const isNestedProblem = activeItem.problem.parentId !== null;
+    const isUnnestZone = isNestedProblem && x < 50;
+    const isSelfOrDescendant = over.id === active.id || isDescendant(draftActiveProblems, over.id as string, activeItem.problem.id);
+    const isNestZone = !isSelfOrDescendant && x > 120;
+
+    if (isUnnestZone) {
+      setDragOverState({
+        id: over.id as string,
+        action: 'unnest',
+        targetTitle: targetItem.problem.title,
+      });
+    } else if (isNestZone) {
+      setDragOverState({
+        id: over.id as string,
+        action: 'nest',
+        targetTitle: targetItem.problem.title,
+      });
+    } else {
+      setDragOverState({
+        id: over.id as string,
+        action: 'reorder',
+        targetTitle: targetItem.problem.title,
+      });
     }
   };
 
@@ -476,6 +526,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setActiveDragItem(null);
     setActiveResolvedDragItem(null);
     setActiveDragRect(null);
+    const currentAction = dragOverState?.action;
     setDragOverState(null);
     setCurrentOverId(null);
 
@@ -502,7 +553,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       return;
     }
 
-    // Dragging from Active
+    // Dragging from Active to Resolved
     if (over.id === 'resolved-table' || resolvedProblems.some(p => p.id === over.id)) {
       const activeProblem = flatActiveProblems.find(p => p.problem.id === active.id)?.problem;
       if (activeProblem) {
@@ -511,47 +562,46 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       return;
     }
 
-    if (active.id === over.id) return;
+    if (active.id === over.id && currentAction !== 'unnest') return;
 
     const activeProblem = findProblemById(active.id as string, tree);
     const targetProblem = findProblemById(over.id as string, tree);
-    
-    if (!activeProblem || !targetProblem) return;
 
-    const overElement = document.getElementById(`row-${over.id}`);
-    let isMerge = false;
-    if (overElement) {
-      const rect = overElement.getBoundingClientRect();
-      const x = pointerPosition.current.x - rect.left;
-      isMerge = x > 150;
+    if (!activeProblem) return;
+
+    if (currentAction === 'unnest') {
+      if (activeProblem.parentId) {
+        handleParentChange(activeProblem, null);
+      }
+      return;
     }
 
-    if (isMerge) {
+    if (currentAction === 'nest' && targetProblem) {
       const newParentId = targetProblem.id;
-      if (activeProblem.id === newParentId) return;
-      if (isDescendant(draftActiveProblems, newParentId, activeProblem.id)) {
-        toast.error('Cannot nest a problem under its own descendant.');
-        return;
+      if (activeProblem.id !== newParentId) {
+        if (isDescendant(draftActiveProblems, newParentId, activeProblem.id)) {
+          toast.error('Cannot nest a problem under its own descendant.');
+          return;
+        }
+        handleParentChange(activeProblem, newParentId);
       }
-      handleParentChange(activeProblem, newParentId);
-    } else {
+      return;
+    }
+
+    // Default: Reorder
+    if (targetProblem) {
       if (activeProblem.parentId !== targetProblem.parentId) {
         if (targetProblem.parentId && isDescendant(draftActiveProblems, targetProblem.parentId, activeProblem.id)) {
           toast.error('Cannot nest a problem under its own descendant.');
           return;
         }
-        try {
-          handleParentChange(activeProblem, targetProblem.parentId);
-        } catch (err) {
-          return;
-        }
+        handleParentChange(activeProblem, targetProblem.parentId);
       }
 
       const oldIndex = displayFlatProblems.findIndex((p) => p.problem.id === active.id);
       const newIndex = displayFlatProblems.findIndex((p) => p.problem.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
         const reorderedList = arrayMove(displayFlatProblems, oldIndex, newIndex);
-        // Enter edit mode — do NOT call API yet
         if (!isEditMode) setIsEditMode(true);
         setDraftOrder(reorderedList.map(item => item.problem.id));
       }
@@ -650,8 +700,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                   Draft Mode (Unpublished)
                 </span>
               ) : (
-                <span className="text-[10px] text-text-muted font-medium bg-surface-3 border border-border px-2 py-1 rounded-[4px]">
-                  Drag rows to reorder · Priority auto-sorts within levels
+                <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1.5 select-none">
+                  <span>⇄ Drag to reorder</span>
+                  <span className="text-border">·</span>
+                  <span className="text-accent font-semibold">→ Nest</span>
+                  <span className="text-border">·</span>
+                  <span className="text-amber-600 font-semibold">← Un-nest</span>
                 </span>
               )}
             </div>
@@ -742,12 +796,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           />
         </div>
 
-        {/* Drag Overlays can be placed here */}
-        <DragOverlay>
+        {/* Drag Overlays */}
+        <DragOverlay modifiers={[zoomModifier]}>
           {activeDragItem ? (
             <div 
-              style={{ width: activeDragRect?.width }} 
-              className="bg-surface shadow-lg border border-accent rounded ring-2 ring-accent/20 opacity-60 overflow-hidden"
+              style={{ width: activeDragRect ? activeDragRect.width / scale : undefined }} 
+              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm"
             >
               <ActiveProblemRow
                 problem={activeDragItem.problem}
@@ -761,11 +815,17 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                 onDelete={() => {}}
                 onParentChange={() => {}}
               />
+              {activeDragItem.problem.children && activeDragItem.problem.children.length > 0 && (
+                <div className="bg-accent/10 border-t border-accent/20 px-4 py-1 flex items-center justify-between text-[11px] text-accent font-semibold">
+                  <span>Sub-tree Drag</span>
+                  <span>Includes {activeDragItem.problem.children.length} sub-problem{activeDragItem.problem.children.length > 1 ? 's' : ''}</span>
+                </div>
+              )}
             </div>
           ) : activeResolvedDragItem ? (
             <div 
-              style={{ width: activeDragRect?.width }} 
-              className="bg-surface shadow-lg border border-accent rounded ring-2 ring-accent/20 opacity-60 overflow-hidden"
+              style={{ width: activeDragRect ? activeDragRect.width / scale : undefined }} 
+              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm"
             >
               <ResolvedRow
                 problem={activeResolvedDragItem}
