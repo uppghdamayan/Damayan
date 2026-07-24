@@ -1607,10 +1607,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       return (
                         <div className="flex flex-col gap-1.5" id="field-medications">
                           {meds.map((med: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green shrink-0"></div>
-                              <div className="flex-1 min-w-0 truncate">
-                                <span className="font-semibold">{typeof med === 'string' ? med : med.name}</span>
+                            <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green shrink-0 mt-1.5"></div>
+                              <div className="flex-1 min-w-0 break-words whitespace-normal">
+                                <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
                                 {typeof med !== 'string' && med.dose && (
                                   <span className="font-mono text-green font-semibold ml-1.5">{med.dose}{med.unit}</span>
                                 )}
