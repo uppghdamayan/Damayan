@@ -55,9 +55,9 @@ export function useProgressNote(noteId: string | null) {
 }
 
 export function useCopyForwardData(patientId: string | null) {
-  const { data: problemsData, isLoading: problemsLoading, refetch: refetchProblems } = useProblems(patientId);
-  const { data: medicationsData, isLoading: medicationsLoading, refetch: refetchMedications } = useMedications(patientId);
-  const { data: notesData, isLoading: notesLoading, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1);
+  const { data: problemsData, isLoading: problemsLoading, isFetching: problemsFetching, refetch: refetchProblems } = useProblems(patientId);
+  const { data: medicationsData, isLoading: medicationsLoading, isFetching: medicationsFetching, refetch: refetchMedications } = useMedications(patientId);
+  const { data: notesData, isLoading: notesLoading, isFetching: notesFetching, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1);
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
@@ -75,6 +75,7 @@ export function useCopyForwardData(patientId: string | null) {
   return {
     data,
     isLoading: problemsLoading || medicationsLoading || notesLoading,
+    isFetching: problemsFetching || medicationsFetching || notesFetching,
     refetch,
   };
 }

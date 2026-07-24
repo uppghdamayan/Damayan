@@ -24,8 +24,9 @@ import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
+import { NoteFormSkeleton } from './NoteFormSkeleton';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X, Loader2 } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -83,8 +84,19 @@ function PatientContextBlock({ patientId, copyForward }: { patientId: string; co
 
 export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFormProps) {
   const queryClient = useQueryClient();
-  const { data: note, isLoading: noteLoading } = useProgressNote(noteId || null);
-  const { data: copyForward, isLoading: copyLoading, refetch: refetchCopyForward } = useCopyForwardData(patientId);
+  const { data: note, isLoading: noteLoading, isFetching: noteFetching } = useProgressNote(noteId || null);
+  const { data: copyForward, isLoading: copyLoading, isFetching: copyFetching, refetch: refetchCopyForward } = useCopyForwardData(patientId);
+
+  const hasLocalDraft = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem(`damayan:draft:${patientId}:progress`);
+  }, [patientId]);
+
+  const isInitialLoading = noteId
+    ? (noteLoading && !note)
+    : (copyLoading && !copyForward && !hasLocalDraft);
+
+  const isSyncing = (noteId ? (noteFetching && !!note) : (copyFetching && !!copyForward)) || (copyFetching && !copyLoading && !isInitialLoading);
   const createMutation = useCreateProgressNote(patientId);
   const createAndPublishMutation = useCreateAndPublishProgressNote(patientId);
   const updateMutation = useUpdateProgressNote(patientId);
@@ -737,6 +749,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <PanelRightClose className="w-4 h-4" />
             </button>
             <span className="title-text shrink-0">Progress Note</span>
+            {isSyncing && (
+              <span title="Syncing patient data..." className="shrink-0 flex items-center">
+                <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+              </span>
+            )}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -867,11 +884,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        {publishError && (
-          <div className="p-3 bg-red-bg border border-red-border rounded-lg text-red text-[12px] font-medium">
-            {publishError}
-          </div>
-        )}
+        {isInitialLoading ? (
+          <NoteFormSkeleton />
+        ) : (
+          <>
+            {publishError && (
+              <div className="p-3 bg-red-bg border border-red-border rounded-lg text-red text-[12px] font-medium">
+                {publishError}
+              </div>
+            )}
 
         <PatientContextBlock patientId={patientId} copyForward={copyForward} />
 
@@ -1144,10 +1165,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                             </colgroup>
                             <thead>
                               <tr className="bg-surface-2 border-b border-border">
-                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-2.5 py-2 text-left truncate">Medication</th>
-                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left truncate">Form / Qty</th>
-                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left truncate">Sig</th>
-                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1 py-2 text-center truncate">Act.</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-2.5 py-2 text-left">Medication</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left">Form / Qty</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left">Sig</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1 py-2 text-center">Act.</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1161,32 +1182,32 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
                                 return (
                                   <tr key={idx} className="hover:bg-surface-3/50 transition-colors border-b border-border last:border-b-0">
-                                    <td className="px-2.5 py-2 text-[12px] align-middle overflow-hidden truncate">
+                                    <td className="px-2.5 py-2 text-[12px] align-top break-words">
                                       <div className="flex flex-col min-w-0">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                                          <span className="font-bold text-text-primary text-[12px] truncate" title={medName}>{medName}</span>
+                                        <div className="flex items-start gap-1.5 flex-wrap">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 mt-1.5" />
+                                          <span className="font-bold text-text-primary text-[12px] break-words whitespace-normal leading-snug flex-1 min-w-0">{medName}</span>
                                           {isNewMed && (
-                                            <span className="text-[8px] font-bold text-green bg-green-bg border border-green-border px-1 py-0.5 rounded uppercase tracking-wider shrink-0 blink-animation">New</span>
+                                            <span className="text-[8px] font-bold text-green bg-green-bg border border-green-border px-1 py-0.5 rounded uppercase tracking-wider shrink-0 blink-animation mt-0.5">New</span>
                                           )}
                                         </div>
                                         {medDose && (
-                                          <span className="font-mono text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded w-fit mt-0.5 truncate">{medDose}</span>
+                                          <span className="font-mono text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded w-fit mt-0.5 break-words whitespace-normal">{medDose}</span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-middle overflow-hidden truncate">
-                                      <span className="font-medium truncate block">{medForm || '—'}</span>
+                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-top break-words">
+                                      <span className="font-medium break-words block">{medForm || '—'}</span>
                                       {medQty && (
-                                        <span className="text-text-muted font-mono text-[10px] block truncate">Qty: {medQty}</span>
+                                        <span className="text-text-muted font-mono text-[10px] block break-words">Qty: {medQty}</span>
                                       )}
                                     </td>
-                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-middle overflow-hidden truncate">
-                                      <span className="italic text-text-muted text-[11px] truncate block" title={medSig || ''}>
+                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-top break-words">
+                                      <span className="italic text-text-muted text-[11px] break-words block" title={medSig || ''}>
                                         {medSig || '—'}
                                       </span>
                                     </td>
-                                    <td className="px-1 py-2 align-middle text-center">
+                                    <td className="px-1 py-2 align-top text-center">
                                       {!isPublished && (
                                         <Button
                                           type="button"
@@ -1309,6 +1330,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
           </div>
         </div>
+        </>
+      )}
       </div>
       <UnaddedChangesConfirmModal
         open={pendingAction !== null}
