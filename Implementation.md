@@ -1,544 +1,364 @@
-# DAMAYAN — Exact-Match Document Templates (Medical Certificate, Referral Letter, Diagnostic Request, Prescription)
+# Philippine Address Dropdown in React (Region → Province → City/Municipality → Barangay)
 
-**Target repo:** `uppghdamayan/Damayan`
-**Supersedes/extends:** `Document-Generation-Implementation.md` (architecture doc — schema changes, DTOs, service structure, modal flow). Read that first for *why*; this file is the *exact what* for the four PDF templates. Where the two disagree on wording, **this file wins**.
-
-## 0. The one rule that matters
-
-Every static label, heading, and boilerplate sentence in the four templates below must be reproduced **verbatim, character-for-character** — same capitalization, same punctuation, same colons (or absence of colons), same line breaks. Only the `{{placeholder}}` tokens are dynamic. Do not rephrase, "improve," reformat, or reorder any static text. If you're unsure whether something is static boilerplate or clinician-entered free text, check §5 (field classification table) before guessing.
-
-The four reference documents this spec is built from (already in the repo owner's possession, one already-generated real example per type):
-1. `Diagnostic Request.docx`
-2. `Medical Certificate.docx`
-3. `Prescription.docx`
-4. `Referral Letter.docx`
+A guide to building a cascading address selector backed by live, free, official Philippine Standard Geographic Code (PSGC) data — no hardcoded arrays, no API key, no cost.
 
 ---
 
-## 1. Shared letterhead (identical on all four documents)
+## 1. Why an API instead of hardcoded data
 
-```
-METRO HEALTH CLINIC & DIAGNOSTIC CENTER
-Unit 405, Medical Arts Building, St. Jude General Hospital
-456 Taft Avenue, Ermita, Manila, Philippines
-Tel No.: (02) 8123-4567 | Email: contact@metrohealthclinic.ph
-```
+Hardcoding regions/provinces/cities/barangays as static arrays has three problems:
 
-- Line 1: bold, centered, larger font (clinic name).
-- Lines 2–4: regular weight, centered, smaller font.
-- All four values come from `clinicConfig` (see architecture doc §3.1) — **do not hardcode** these strings in the templates; hardcode them only in `clinic.config.ts` defaults so the clinic can override via env vars without touching template code.
+- **Size** — the full PSGC dataset is ~42,000 barangays. Shipping that in your JS bundle bloats load time.
+- **Drift** — PSA updates the PSGC quarterly (renamed municipalities, merged barangays, new cityhood). A hardcoded list goes stale.
+- **Maintenance** — you'd own the job of tracking PSA releases and patching your data file forever.
 
-Directly below the letterhead, each document prints its own bold, centered title (see each section below) — `DIAGNOSTICS REQUEST`, `MEDICAL CERTIFICATE`, `PRESCRIPTION`, `REFERRAL LETTER`. Note **"DIAGNOSTICS REQUEST"** is plural — not "Diagnostic Request." Reproduce exactly.
-
-## 2. Shared signature block pattern
-
-Three of the four documents end with:
-
-```
-{{signOffLabel}}
-
-(Signed)
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
-```
-
-**Prescription is the exception** — it omits the `(Signed)` line entirely:
-
-```
-{{signOffLabel}}
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
-```
-
-`{{signOffLabel}}` per document:
-
-| Document | Label |
-|---|---|
-| Diagnostic Request | `Requested By:` |
-| Medical Certificate | `Signed By:` |
-| Prescription | `Signed By:` |
-| Referral Letter | `Yours Truly,` |
-
-`{{physicianName}}` format: `Dr. {firstName} {middleInitial}. {lastName}, MD` (e.g. `Dr. Maria Clara S. Santos, MD`). Omit the middle-initial segment entirely if `middleName` is null.
-
-If any of `licenseNumber` / `ptrNumber` / `s2Number` is null on the physician's account, print `N/A` — this exactly matches the reference `Diagnostic Request.docx`, which prints `S2 No.: N/A` for a physician who has no S2 license.
+Fetching from a live API keeps the data current and out of your bundle entirely.
 
 ---
 
-## 3. Template 1 — Diagnostic Request (`DocumentType.LAB_REQUEST`)
+## 2. The data source: PSGC Cloud
 
-### 3.1 Literal layout
+**Base URL:** `https://psgc.cloud/api`
+**Cost:** Free, no API key, no signup
+**Source of truth:** Philippine Statistics Authority (PSA) PSGC releases
+**Rate limits:** Returns `429 Too Many Requests` if exceeded (fine for normal form usage)
+
+### Endpoints used
+
+| Purpose | Endpoint | Notes |
+|---|---|---|
+| List all regions | `GET /api/regions` | Fields: `code`, `name` |
+| Provinces under a region | `GET /api/regions/{region_code}/provinces` | **Empty array for NCR** — it has no provinces |
+| Cities/municipalities under a region and/or province | `GET /api/v1/cities-municipalities?region_code=X&province_code=Y` | `province_code` optional — omit for NCR-style regions |
+| Barangays under a city/municipality | `GET /api/v1/cities-municipalities/{city_code}/barangays` | Fields: `code`, `name`, `status` |
+
+### The NCR gotcha
+
+Metro Manila (NCR) has **no provinces** — its cities (Manila, Quezon City, Makati, etc.) sit directly under the region. Any implementation that assumes region → province → city will break for NCR unless you handle this case explicitly. This guide's approach: fetch cities by `region_code` alone when no province is selected, so the flow degrades gracefully instead of dead-ending.
+
+---
+
+## 3. Data flow / architecture
 
 ```
-[LETTERHEAD]
+On mount
+  └─ GET /api/regions ──────────────────────────► populate Region <select>
 
-DIAGNOSTICS REQUEST
+On Region change
+  ├─ GET /api/regions/{region}/provinces ───────► populate Province <select>
+  │     (empty result is valid — e.g. NCR)
+  └─ GET /api/v1/cities-municipalities
+        ?region_code={region} ───────────────────► populate City <select>
+  reset Province, City, Barangay selections
 
-Date of Generation: {{generationDate}}
+On Province change
+  └─ GET /api/v1/cities-municipalities
+        ?region_code={region}&province_code={province} ──► re-populate City <select>
+  reset City, Barangay selections
 
-Name of Patient: {{patientName}} 	Age: {{age}} years old		Sex: {{sex}}
-Patient Address: {{patientAddress}}
+On City change
+  └─ GET /api/v1/cities-municipalities/{city}/barangays ─► populate Barangay <select>
+  reset Barangay selection
 
-Assessment:
-
-{{#each assessment}}
-- {{title}}
-{{/each}}
-
-DIAGNOSTIC TESTS REQUESTED
-
-{{#each diagnostics}}
-- {{item}}
-{{/each}}
-
-Requested By:
-
-(Signed)
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
+On Barangay change
+  └─ notify parent via onChange({ region, province, city, barangay })
 ```
 
-Notes:
-- `Assessment:` has a trailing colon. `DIAGNOSTIC TESTS REQUESTED` does **not** — reproduce that inconsistency exactly, it's in the source document.
-- Assessment bullets: one per latest `InitialNote.assessment[].title`, dash-prefixed, no ICD code appended (the reference never shows one — if you want ICD data recoverable later, store it in the DB as today, just don't print it here).
-- Diagnostic test bullets: one per latest `InitialNote.diagnostics[]` string, dash-prefixed, printed verbatim (no JSON, no transformation).
-- `Name of Patient / Age / Sex` sit on one line; `Patient Address` on the line below. No free text required anywhere in this document.
+Each level only fetches once its parent is known, and changing a parent always clears everything below it — this is what prevents mismatched combinations (e.g. a Cebu barangay showing up under a Manila city).
 
-### 3.2 PDFKit implementation
+---
 
-```ts
-// backend/src/documents/templates/lab-request.template.ts
-import PDFDocument from 'pdfkit';
-import { drawLetterhead, drawGenerationDate, drawSignatureBlock, formatPatientName, formatPatientAddress, computeAge } from './layout.helper';
+## 4. Prerequisites
 
-export const renderLabRequest = async (data: any): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => resolve(Buffer.concat(buffers)));
-    doc.on('error', reject);
+- React 18+ (hooks: `useState`, `useEffect`, `useCallback`)
+- No extra npm packages required — uses native `fetch`
+- No environment variables, no API key
 
-    drawLetterhead(doc, 'DIAGNOSTICS REQUEST');
-    drawGenerationDate(doc);
+```bash
+# Nothing to install beyond React itself
+```
 
-    const age = computeAge(data.patient.dateOfBirth);
-    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
+---
 
-    doc.fontSize(10).font('Helvetica-Bold').text('Name of Patient: ', { continued: true })
-       .font('Helvetica').text(`${formatPatientName(data.patient)}    `, { continued: true })
-       .font('Helvetica-Bold').text('Age: ', { continued: true })
-       .font('Helvetica').text(`${age} years old    `, { continued: true })
-       .font('Helvetica-Bold').text('Sex: ', { continued: true })
-       .font('Helvetica').text(sex);
+## 5. Full component code
 
-    doc.font('Helvetica-Bold').text('Patient Address: ', { continued: true })
-       .font('Helvetica').text(formatPatientAddress(data.patient));
-    doc.moveDown();
+Save as `AddressDropdown.jsx`:
 
-    doc.font('Helvetica-Bold').text('Assessment:');
-    doc.font('Helvetica');
-    (data.assessment ?? []).forEach((a: { title: string }) => doc.text(`- ${a.title}`));
-    doc.moveDown();
+```jsx
+import { useState, useEffect, useCallback } from "react";
 
-    doc.font('Helvetica-Bold').text('DIAGNOSTIC TESTS REQUESTED');
-    doc.font('Helvetica');
-    (data.diagnostics ?? []).forEach((d: string) => doc.text(`- ${d}`));
+const API = "https://psgc.cloud/api";
 
-    drawSignatureBlock(doc, data.physician, 'Requested By:');
-    doc.end();
+// Normalize response shape: some endpoints return a bare array,
+// others wrap it as { data: [...] }
+async function fetchList(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json) ? json : json.data ?? [];
+}
+
+export default function AddressDropdown({ onChange }) {
+  const [regions, setRegions] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [barangays, setBarangays] = useState([]);
+
+  const [regionCode, setRegionCode] = useState("");
+  const [provinceCode, setProvinceCode] = useState("");
+  const [cityCode, setCityCode] = useState("");
+  const [barangayCode, setBarangayCode] = useState("");
+
+  const [loading, setLoading] = useState({
+    regions: false,
+    provinces: false,
+    cities: false,
+    barangays: false,
   });
-};
-```
+  const [error, setError] = useState(null);
 
----
+  const setStage = (key, val) =>
+    setLoading((prev) => ({ ...prev, [key]: val }));
 
-## 4. Template 2 — Medical Certificate (`DocumentType.MEDICAL_CERTIFICATE`)
+  // 1. Regions — load once
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setStage("regions", true);
+      setError(null);
+      try {
+        const data = await fetchList(`${API}/regions`);
+        if (!cancelled) setRegions(data);
+      } catch {
+        if (!cancelled) setError("Couldn't load regions. Check your connection and retry.");
+      } finally {
+        if (!cancelled) setStage("regions", false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-### 4.1 Literal layout
+  // 2. Provinces — depends on region
+  useEffect(() => {
+    if (!regionCode) { setProvinces([]); return; }
+    let cancelled = false;
+    (async () => {
+      setStage("provinces", true);
+      setError(null);
+      try {
+        const data = await fetchList(`${API}/regions/${regionCode}/provinces`);
+        if (!cancelled) setProvinces(data);
+      } catch {
+        if (!cancelled) setError("Couldn't load provinces. Check your connection and retry.");
+      } finally {
+        if (!cancelled) setStage("provinces", false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [regionCode]);
 
-```
-[LETTERHEAD]
+  // 3. Cities/municipalities — depends on region (+ province if present)
+  useEffect(() => {
+    if (!regionCode) { setCities([]); return; }
+    let cancelled = false;
+    (async () => {
+      setStage("cities", true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ region_code: regionCode });
+        if (provinceCode) params.set("province_code", provinceCode);
+        const data = await fetchList(`${API}/v1/cities-municipalities?${params}`);
+        if (!cancelled) setCities(data);
+      } catch {
+        if (!cancelled) setError("Couldn't load cities/municipalities. Check your connection and retry.");
+      } finally {
+        if (!cancelled) setStage("cities", false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [regionCode, provinceCode]);
 
-MEDICAL CERTIFICATE
+  // 4. Barangays — depends on city
+  useEffect(() => {
+    if (!cityCode) { setBarangays([]); return; }
+    let cancelled = false;
+    (async () => {
+      setStage("barangays", true);
+      setError(null);
+      try {
+        const data = await fetchList(`${API}/v1/cities-municipalities/${cityCode}/barangays`);
+        if (!cancelled) setBarangays(data);
+      } catch {
+        if (!cancelled) setError("Couldn't load barangays. Check your connection and retry.");
+      } finally {
+        if (!cancelled) setStage("barangays", false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cityCode]);
 
-Date of Generation: {{generationDate}}
+  // Report full selection upward
+  useEffect(() => {
+    if (!onChange) return;
+    onChange({
+      region: regions.find((r) => r.code === regionCode) ?? null,
+      province: provinces.find((p) => p.code === provinceCode) ?? null,
+      city: cities.find((c) => c.code === cityCode) ?? null,
+      barangay: barangays.find((b) => b.code === barangayCode) ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionCode, provinceCode, cityCode, barangayCode]);
 
-TO WHOM IT MAY CONCERN:
+  const handleRegion = useCallback((e) => {
+    setRegionCode(e.target.value);
+    setProvinceCode(""); setCityCode(""); setBarangayCode("");
+  }, []);
 
-This is to certify that {{patientName}}, {{age}} years old / {{sex}} residing at {{patientAddress}} sought consult on {{latestVisitDate}} with the complaint of {{chiefComplaint}}.
+  const handleProvince = useCallback((e) => {
+    setProvinceCode(e.target.value);
+    setCityCode(""); setBarangayCode("");
+  }, []);
 
-Assessment:
+  const handleCity = useCallback((e) => {
+    setCityCode(e.target.value);
+    setBarangayCode("");
+  }, []);
 
-{{#each assessment}}
-- {{title}}
-{{/each}}
+  const handleBarangay = useCallback((e) => {
+    setBarangayCode(e.target.value);
+  }, []);
 
-Medications Given:
+  const selectStyle = {
+    width: "100%", padding: "8px 10px", borderRadius: 6,
+    border: "1px solid #d0d0d0", fontSize: 14, background: "#fff",
+  };
+  const labelStyle = { display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 };
+  const fieldWrap = { marginBottom: 14 };
 
-{{#each medications}}
-- {{name}} {{dose}} {{instructions}}
-{{/each}}
+  return (
+    <div style={{ maxWidth: 420, fontFamily: "sans-serif" }}>
+      {error && (
+        <div style={{ marginBottom: 12, padding: "8px 10px", background: "#fdecea", color: "#a33", borderRadius: 6, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
 
-Recommendations:
+      <div style={fieldWrap}>
+        <label style={labelStyle}>Region</label>
+        <select style={selectStyle} value={regionCode} onChange={handleRegion} disabled={loading.regions}>
+          <option value="">{loading.regions ? "Loading regions..." : "Select region"}</option>
+          {regions.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+        </select>
+      </div>
 
-{{recommendation}}
+      <div style={fieldWrap}>
+        <label style={labelStyle}>Province</label>
+        <select
+          style={selectStyle}
+          value={provinceCode}
+          onChange={handleProvince}
+          disabled={!regionCode || loading.provinces || provinces.length === 0}
+        >
+          <option value="">
+            {!regionCode ? "Select a region first"
+              : loading.provinces ? "Loading provinces..."
+              : provinces.length === 0 ? "No provinces (e.g. NCR) — pick city/municipality directly"
+              : "Select province"}
+          </option>
+          {provinces.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+        </select>
+      </div>
 
-This certification is issued upon the request of the patient for medical clearance / work excuse purposes and should not be used for any legal proceedings unless specified.
+      <div style={fieldWrap}>
+        <label style={labelStyle}>City / Municipality</label>
+        <select style={selectStyle} value={cityCode} onChange={handleCity} disabled={!regionCode || loading.cities}>
+          <option value="">{loading.cities ? "Loading cities..." : "Select city or municipality"}</option>
+          {cities.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}{c.type ? ` (${c.type})` : ""}</option>
+          ))}
+        </select>
+      </div>
 
-Signed By:
-
-(Signed)
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
-```
-
-**Critical field classification** (this is the part most likely to be gotten wrong):
-
-- `{{chiefComplaint}}` — free text, clinician-entered in the generate modal. It's a **clause**, not a sentence (it completes "...sought consult on [date] with the complaint of ___."). Pre-fill the input with the latest `InitialNote.chiefComplaint` as an editable default, but the clinician should edit it into full clause form if the stored value is telegraphic — e.g. stored `chiefComplaint` might be `"high-grade fever"` while the certificate needs `"acute onset of high-grade fever, severe headache, and generalized muscle/joint pain for three (3) days"`. Don't auto-expand this — just prefill and let the doctor type the real clause.
-- `{{recommendation}}` — free text, clinician-entered, **multi-paragraph**. In the reference document this single field spans three paragraphs (bed-rest instructions with specific dates, medication/fluid instructions, follow-up instructions with a specific return date). Render it as-is with paragraph breaks preserved (`\n\n` in the textarea → separate `doc.text()` / `doc.moveDown()` calls, or just pass the raw string to `doc.text()` with `{ align: 'justify' }` — PDFKit renders embedded `\n` as line breaks natively).
-- The final sentence (`"This certification is issued upon the request of the patient..."`) is **fixed boilerplate**, not part of the clinician's free text. Append it automatically after `{{recommendation}}`, always, verbatim. Store it as a constant, e.g. `MEDICAL_CERTIFICATE_DISCLAIMER`, in `layout.helper.ts` or the template file itself.
-- `Medications Given` bullet format is `{{name}} {{dose}} {{instructions}}` on one line, **no `Sig:` prefix** — this is different from the Prescription template's two-line `Sig:` format. Don't reuse the same medication-list renderer for both; they render differently. Example from the reference: `Paracetamol 500mg every 6 hours as needed for fever or pain` (name + dose + instructions, space-joined, no bullet punctuation beyond the leading dash).
-
-### 4.2 PDFKit implementation
-
-```ts
-// backend/src/documents/templates/medical-certificate.template.ts
-import PDFDocument from 'pdfkit';
-import { drawLetterhead, drawGenerationDate, drawSignatureBlock, formatPatientName, formatPatientAddress, computeAge } from './layout.helper';
-
-const MEDICAL_CERTIFICATE_DISCLAIMER =
-  'This certification is issued upon the request of the patient for medical clearance / work excuse purposes and should not be used for any legal proceedings unless specified.';
-
-export const renderMedicalCertificate = async (data: any): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => resolve(Buffer.concat(buffers)));
-    doc.on('error', reject);
-
-    drawLetterhead(doc, 'MEDICAL CERTIFICATE');
-    drawGenerationDate(doc);
-
-    doc.fontSize(10).font('Helvetica-Bold').text('TO WHOM IT MAY CONCERN:');
-    doc.moveDown(0.5);
-
-    const age = computeAge(data.patient.dateOfBirth);
-    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
-    const address = formatPatientAddress(data.patient);
-    const visitDateStr = new Date(data.latestVisitDate).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    doc.font('Helvetica').text(
-      `This is to certify that ${formatPatientName(data.patient)}, ${age} years old / ${sex} residing at ${address} sought consult on ${visitDateStr} with the complaint of ${data.chiefComplaint}.`,
-      { align: 'justify' }
-    );
-    doc.moveDown();
-
-    doc.font('Helvetica-Bold').text('Assessment:');
-    doc.font('Helvetica');
-    (data.assessment ?? []).forEach((a: { title: string }) => doc.text(`- ${a.title}`));
-    doc.moveDown();
-
-    doc.font('Helvetica-Bold').text('Medications Given:');
-    doc.font('Helvetica');
-    if (data.medications?.length) {
-      data.medications.forEach((m: any) => doc.text(`- ${[m.name, m.dose, m.instructions].filter(Boolean).join(' ')}`));
-    } else {
-      doc.text('- No active medications on record.');
-    }
-    doc.moveDown();
-
-    doc.font('Helvetica-Bold').text('Recommendations:');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').text(data.recommendation, { align: 'justify' });
-    doc.moveDown();
-    doc.text(MEDICAL_CERTIFICATE_DISCLAIMER, { align: 'justify' });
-
-    drawSignatureBlock(doc, data.physician, 'Signed By:');
-    doc.end();
-  });
-};
-```
-
----
-
-## 5. Template 3 — Prescription (`DocumentType.PRESCRIPTION`)
-
-### 5.1 Literal layout
-
-```
-[LETTERHEAD]
-
-PRESCRIPTION
-
-Date of Generation: {{generationDate}}
-
-Name of Patient: {{patientName}} 	Age: {{age}} years old		Sex: {{sex}}
-Patient Address: {{patientAddress}}
-
-Rx
-
-{{#each medications}}
-{{name}} {{dose}}{{formulation}}								#{{quantity}}
-Sig: {{instructions}}
-
-{{/each}}
-Signed By:
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
-```
-
-Notes:
-- `Rx` on its own line, bold, no colon.
-- Each medication is **two lines**: line 1 is `{name} {dose}{formulation}` left-aligned with the `#{quantity}` right-aligned on the same visual row (reference uses tab-stops to right-align the quantity — in PDFKit, use `doc.text(nameAndDose, { continued: false })` then a second call with `{ align: 'right' }` at the same `y` via `doc.text(qty, x, y, { align: 'right' })`, or simpler: fixed-width padding). Line 2 is `Sig: {instructions}`, indented or same margin as line 1.
-- Blank line between medication entries.
-- **No `(Signed)` line** before the physician name — confirmed by the reference `Prescription.docx`, which is the only one of the four that goes straight from `Signed By:` to the doctor's name with no signature placeholder line between them.
-- No `Assessment` section on this document at all.
-
-### 5.2 PDFKit implementation
-
-```ts
-// backend/src/documents/templates/prescription.template.ts
-import PDFDocument from 'pdfkit';
-import { drawLetterhead, drawGenerationDate, drawSignatureBlock, formatPatientName, formatPatientAddress, computeAge } from './layout.helper';
-
-export const renderPrescription = async (data: any): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => resolve(Buffer.concat(buffers)));
-    doc.on('error', reject);
-
-    drawLetterhead(doc, 'PRESCRIPTION');
-    drawGenerationDate(doc);
-
-    const age = computeAge(data.patient.dateOfBirth);
-    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
-
-    doc.fontSize(10).font('Helvetica-Bold').text('Name of Patient: ', { continued: true })
-       .font('Helvetica').text(`${formatPatientName(data.patient)}    `, { continued: true })
-       .font('Helvetica-Bold').text('Age: ', { continued: true })
-       .font('Helvetica').text(`${age} years old    `, { continued: true })
-       .font('Helvetica-Bold').text('Sex: ', { continued: true })
-       .font('Helvetica').text(sex);
-
-    doc.font('Helvetica-Bold').text('Patient Address: ', { continued: true })
-       .font('Helvetica').text(formatPatientAddress(data.patient));
-    doc.moveDown();
-
-    doc.font('Helvetica-Bold').fontSize(13).text('Rx');
-    doc.moveDown(0.3);
-    doc.fontSize(10);
-
-    if (data.medications?.length) {
-      data.medications.forEach((m: any) => {
-        const rightMargin = doc.page.width - doc.page.margins.right;
-        const startY = doc.y;
-        doc.font('Helvetica-Bold').text(`${m.name} ${m.dose}${m.formulation ? ` ${m.formulation}` : ''}`, doc.page.margins.left, startY, { continued: false });
-        if (m.quantity) {
-          doc.font('Helvetica').text(`#${m.quantity}`, doc.page.margins.left, startY, { width: rightMargin - doc.page.margins.left, align: 'right' });
-        }
-        doc.font('Helvetica').fontSize(9).text(`Sig: ${m.instructions ?? ''}`, doc.page.margins.left);
-        doc.fontSize(10).moveDown(0.6);
-      });
-    } else {
-      doc.font('Helvetica').text('No active medications on record.');
-    }
-
-    drawSignatureBlock(doc, data.physician, 'Signed By:', /* includeSignedPlaceholder */ false);
-    doc.end();
-  });
-};
-```
-
-`drawSignatureBlock` in `layout.helper.ts` needs a 4th parameter (`includeSignedPlaceholder: boolean = true`) so Prescription can opt out of the `(Signed)` line — update the shared helper's signature:
-
-```ts
-export function drawSignatureBlock(
-  doc: PDFKit.PDFDocument,
-  physician: { firstName: string; lastName: string; middleName?: string | null; licenseNumber?: string | null; ptrNumber?: string | null; s2Number?: string | null },
-  label: string,
-  includeSignedPlaceholder: boolean = true,
-) {
-  doc.moveDown(2);
-  doc.fontSize(10).font('Helvetica').text(label);
-  if (includeSignedPlaceholder) {
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Italic').text('(Signed)');
-    doc.moveDown(0.5);
-  } else {
-    doc.moveDown(1);
-  }
-  doc.font('Helvetica-Bold').text(formatPhysicianName(physician));
-  doc.font('Helvetica').fontSize(9);
-  doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
-  doc.text(`PTR No.: ${physician.ptrNumber ?? 'N/A'}`);
-  doc.text(`S2 No.: ${physician.s2Number ?? 'N/A'}`);
+      <div style={fieldWrap}>
+        <label style={labelStyle}>Barangay</label>
+        <select style={selectStyle} value={barangayCode} onChange={handleBarangay} disabled={!cityCode || loading.barangays}>
+          <option value="">{loading.barangays ? "Loading barangays..." : "Select barangay"}</option>
+          {barangays.map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
+        </select>
+      </div>
+    </div>
+  );
 }
 ```
 
-(This replaces the version of `drawSignatureBlock` given in the architecture doc — that version didn't render `(Signed)` at all. Use this one.)
+---
+
+## 6. Usage
+
+```jsx
+import AddressDropdown from "./AddressDropdown";
+
+function PatientForm() {
+  const handleAddressChange = (address) => {
+    // address = { region, province, city, barangay }
+    // each is either null or { code, name, ... }
+    console.log(address);
+  };
+
+  return (
+    <form>
+      <AddressDropdown onChange={handleAddressChange} />
+    </form>
+  );
+}
+```
+
+The `onChange` callback fires on every selection change, even partial ones (e.g. only region selected). Check for `null` on fields the user hasn't reached yet before submitting.
 
 ---
 
-## 6. Template 4 — Referral Letter (`DocumentType.REFERRAL_LETTER`, new)
+## 7. Error handling notes
 
-### 6.1 Literal layout
-
-```
-[LETTERHEAD]
-
-REFERRAL LETTER
-
-Date of Generation: {{generationDate}}
-
-To {{referralRecipient}}:
-
-I am kindly referring my patient {{patientName}}, {{age}} years old / {{sex}} with the following assessment:
-
-{{#each assessment}}
-- {{title}}
-{{/each}}
-
-Salient points: {{salientPoints}}
-
-Reason for referral: {{referralReason}}
-
-He is currently on the following medications:
-
-{{#each medications}}
-- {{name}} {{dose}}{{formulation}} {{instructions}}
-{{/each}}
-
-Yours Truly,
-
-(Signed)
-
-{{physicianName}}
-Lic. No.: {{licenseNumber}}
-PTR No.: {{ptrNumber}}
-S2 No.: {{s2Number}}
-```
-
-Notes:
-- `{{referralRecipient}}` is free text exactly as typed by the clinician, including title and specialty parenthetical — e.g. `Dr. Timoteo Gonzales (Infectious Disease)`. Print verbatim after `To ` and before the trailing colon: `To {{referralRecipient}}:`.
-- No patient address, no separate age/sex line block — identity is inline in the referral sentence only, matching the reference exactly (this document has less patient-identifying detail than the other three).
-- `Salient points:` and `Reason for referral:` are **not section headers on their own line** — they're bold inline labels followed immediately by the free-text value on the same paragraph/line, each its own paragraph. Do not put the free text on a new line below the label.
-- Medication bullet format here is a third variant, distinct from both the Medical Certificate's and Prescription's: `{name} {dose}{formulation} {instructions}` all on one dash-prefixed line, no `Sig:` prefix, no quantity. Reference example: `Paracetamol 500 mg tab 1 tab every 6 hours as needed.`
-- `He is currently on the following medications:` is fixed boilerplate (not free text) — always print this exact sentence before the medication bullets. Note the reference always refers to the patient as "He" — since sex varies per patient, generate the pronoun dynamically: `He` for `MALE`, `She` for `FEMALE`, rather than hardcoding — this is the one deliberate deviation from literal reproduction, required for correctness across patients.
-
-### 6.2 PDFKit implementation
-
-```ts
-// backend/src/documents/templates/referral-letter.template.ts
-import PDFDocument from 'pdfkit';
-import { drawLetterhead, drawGenerationDate, drawSignatureBlock, formatPatientName, computeAge } from './layout.helper';
-
-export const renderReferralLetter = async (data: any): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => resolve(Buffer.concat(buffers)));
-    doc.on('error', reject);
-
-    drawLetterhead(doc, 'REFERRAL LETTER');
-    drawGenerationDate(doc);
-
-    doc.fontSize(10).font('Helvetica').text(`To ${data.referralRecipient}:`);
-    doc.moveDown(0.5);
-
-    const age = computeAge(data.patient.dateOfBirth);
-    const sex = data.patient.sex === 'MALE' ? 'Male' : 'Female';
-    const pronoun = data.patient.sex === 'MALE' ? 'He' : 'She';
-
-    doc.text(
-      `I am kindly referring my patient ${formatPatientName(data.patient)}, ${age} years old / ${sex} with the following assessment:`,
-      { align: 'justify' }
-    );
-    doc.moveDown(0.5);
-
-    (data.assessment ?? []).forEach((a: { title: string }) => doc.text(`- ${a.title}`));
-    doc.moveDown(0.5);
-
-    doc.font('Helvetica-Bold').text('Salient points: ', { continued: true })
-       .font('Helvetica').text(data.salientPoints);
-    doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').text('Reason for referral: ', { continued: true })
-       .font('Helvetica').text(data.referralReason);
-    doc.moveDown(0.5);
-
-    doc.font('Helvetica').text(`${pronoun} is currently on the following medications:`);
-    if (data.medications?.length) {
-      data.medications.forEach((m: any) =>
-        doc.text(`- ${[m.name, `${m.dose}${m.formulation ? ` ${m.formulation}` : ''}`, m.instructions].filter(Boolean).join(' ')}`)
-      );
-    } else {
-      doc.text('- No active medications on record.');
-    }
-
-    drawSignatureBlock(doc, data.physician, 'Yours Truly,');
-    doc.end();
-  });
-};
-```
+- Every fetch stage (`regions`, `provinces`, `cities`, `barangays`) tracks its own `loading` flag, so only the relevant `<select>` shows a "Loading..." state.
+- A failed request sets a single shared `error` message rather than one per field, since only one request is realistically in flight at a time in a cascading UI.
+- The `cancelled` flag inside each `useEffect` prevents a slow, stale request from overwriting state after the user has already moved to a different selection (a classic race condition in cascading dropdowns).
+- Empty province list is treated as a **valid, expected state** for NCR — not an error.
 
 ---
 
-## 7. Field classification table (free text vs. auto-populated vs. fixed boilerplate)
+## 8. Testing checklist
 
-| Document | Field | Type |
-|---|---|---|
-| Medical Certificate | Chief Complaint | **free text**, modal input, pre-filled from `InitialNote.chiefComplaint` |
-| Medical Certificate | Recommendations (multi-paragraph) | **free text**, modal input, no default |
-| Medical Certificate | Final disclaimer sentence | **fixed boilerplate**, always appended, never editable |
-| Medical Certificate | Assessment, Medications Given | auto-populated from latest `InitialNote.assessment` / active `Medication[]` |
-| Referral Letter | Referral Recipient | **free text**, modal input |
-| Referral Letter | Salient Points | **free text**, modal input |
-| Referral Letter | Reason for Referral | **free text**, modal input |
-| Referral Letter | "He/She is currently on the following medications:" | **fixed boilerplate**, pronoun auto-derived from `patient.sex` |
-| Referral Letter | Assessment, medication bullets | auto-populated |
-| Diagnostic Request | everything | auto-populated — **no modal free text at all** |
-| Prescription | everything | auto-populated — **no modal free text at all** |
-
-This table should directly drive the `GenerateDocumentDto` conditional validation (`@ValidateIf`) already specified in the architecture doc §4.1 — no changes needed there, just confirming the free-text field list matches exactly what's in this table (it does).
+- [ ] Select a region with provinces (e.g. Region III) — province list populates, then city list populates after province is picked.
+- [ ] Select NCR — province field disables with the explanatory placeholder, city list populates directly from the region.
+- [ ] Change region after selecting province/city/barangay — confirm all downstream fields reset.
+- [ ] Change province after selecting city/barangay — confirm city/barangay reset.
+- [ ] Simulate offline (dev tools → Network → Offline) — confirm the error banner appears and the affected `<select>` doesn't silently stay empty without explanation.
+- [ ] Rapidly switch regions before provinces finish loading — confirm no stale data flashes in (tests the `cancelled` guard).
 
 ---
 
-## 8. QA checklist — verify against the source `.docx` files directly
+## 9. Deployment considerations
 
-Before marking this done, generate one of each document type against a seeded test patient/visit/medications, export to PDF, and check off each line against the corresponding reference `.docx`:
+- **CORS**: PSGC Cloud serves public JSON with permissive CORS, so this works from any origin including `localhost` during development.
+- **Uptime dependency**: This wires your form to a third-party wrapper around PSA data, not PSA's own endpoint. For anything mission-critical (e.g. a hospital EMR intake form), consider caching responses client-side (`localStorage` or a small in-memory cache keyed by `region_code`/`province_code`) to reduce repeated calls and soften the impact of any downtime.
+- **No API key to leak**: safe to call directly from the browser; no backend proxy required.
 
-- [ ] Letterhead: 4 lines, exact clinic name/address/tel/email, centered.
-- [ ] Document title directly below letterhead, bold, centered, exact casing (`DIAGNOSTICS REQUEST` is plural).
-- [ ] `Date of Generation:` uses `Month D, YYYY` format (e.g. `July 12, 2026`), generated at PDF-creation time, not a stored/edited date.
-- [ ] Diagnostic Request & Prescription: `Name of Patient / Age / Sex` on one line, `Patient Address` on the next.
-- [ ] Diagnostic Request: `Assessment:` has a colon; `DIAGNOSTIC TESTS REQUESTED` does not.
-- [ ] Medical Certificate: identity + chief complaint folded into one certifying sentence, not a separate patient block.
-- [ ] Medical Certificate: `Medications Given` bullets have no `Sig:` prefix (name + dose + instructions on one line).
-- [ ] Medical Certificate: fixed disclaimer sentence appears after the free-text Recommendations, verbatim, every time.
-- [ ] Prescription: two-line-per-med format (`name/dose/qty` then `Sig:` line), quantity right-aligned.
-- [ ] Prescription: **no `(Signed)` line** — straight from `Signed By:` to the doctor's name.
-- [ ] Referral Letter: `To {{recipient}}:` line, no patient address, pronoun-correct medication intro sentence.
-- [ ] Referral Letter: `Salient points:` and `Reason for referral:` are inline-labeled paragraphs, not section headers.
-- [ ] All four: signature block shows `Lic. No.`, `PTR No.`, `S2 No.`, falling back to `N/A` when a physician record has nulls.
-- [ ] All four except Prescription: `(Signed)` italic placeholder line present between the sign-off label and the doctor's name.
+---
 
-If every box above is true, the output is considered a correct implementation of this spec.
+## 10. Offline alternative (if uptime is critical)
+
+If you'd rather not depend on any external service at runtime, `ph-address` (npm) ships the full PSGC dataset as a local SQLite/JSON file with a built-in search function — zero network calls, fully free, immune to third-party downtime. Trade-off: you own re-syncing it against PSA's quarterly releases yourself.
+
+```bash
+npm install ph-address
+```
+
+Use this route only if your uptime requirements justify the added maintenance burden of manually refreshing the dataset.
+
+---
+
+## References
+
+- PSGC Cloud API docs: https://psgc.cloud/api-docs
+- PSA official PSGC page (source of truth): https://psa.gov.ph/classification/psgc
+- `ph-address` (offline alternative): https://github.com/kosinix/ph-address

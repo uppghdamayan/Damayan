@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AddressComboboxProps {
@@ -14,6 +14,7 @@ interface AddressComboboxProps {
   required?: boolean;
   error?: string;
   disabled?: boolean;
+  loading?: boolean;
   maxLength?: number;
   className?: string;
 }
@@ -27,6 +28,7 @@ export function AddressCombobox({
   required = false,
   error,
   disabled = false,
+  loading = false,
   maxLength = 100,
   className,
 }: AddressComboboxProps) {
@@ -154,7 +156,7 @@ export function AddressCombobox({
             setIsOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={loading ? 'Loading options...' : placeholder}
           disabled={disabled}
           maxLength={maxLength}
           role="combobox"
@@ -179,7 +181,11 @@ export function AddressCombobox({
           }}
           className="absolute right-2 text-text-muted hover:text-text-primary focus:outline-none disabled:opacity-50"
         >
-          <ChevronDown className={cn('w-4 h-4 transition-transform duration-150', isOpen && 'rotate-180')} />
+          {loading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+          ) : (
+            <ChevronDown className={cn('w-4 h-4 transition-transform duration-150', isOpen && 'rotate-180')} />
+          )}
         </button>
       </div>
 
@@ -200,7 +206,12 @@ export function AddressCombobox({
             }}
             className="max-h-48 overflow-y-auto bg-surface border border-border rounded-md shadow-modal py-1 text-[13px] text-text-primary"
           >
-            {filteredOptions.length > 0 ? (
+            {loading ? (
+              <li className="px-3 py-2 text-xs text-text-muted flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                <span>Fetching options from PSGC...</span>
+              </li>
+            ) : filteredOptions.length > 0 ? (
               filteredOptions.map((opt, idx) => {
                 const isSelected = value.toLowerCase() === opt.toLowerCase();
                 const isHighlighted = idx === highlightedIndex;

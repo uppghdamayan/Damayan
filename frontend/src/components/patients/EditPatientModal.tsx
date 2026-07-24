@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,9 +13,10 @@ import type { Patient } from '@/types/patient';
 import { cn } from '@/lib/utils';
 import { AddressCombobox } from './AddressCombobox';
 import {
-  getRegionNames,
-  getCitiesByRegion,
-  getBarangaysByCity,
+  fetchPsgcRegions,
+  fetchPsgcCities,
+  fetchPsgcBarangays,
+  type PsgcItem,
 } from '@/lib/ph-locations';
 
 const schema = z.object({
@@ -73,6 +75,14 @@ function Field({
 export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPatientModalProps) {
   const qc = useQueryClient();
 
+  const [regions, setRegions] = useState<PsgcItem[]>([]);
+  const [cities, setCities] = useState<PsgcItem[]>([]);
+  const [barangays, setBarangays] = useState<PsgcItem[]>([]);
+
+  const [loadingRegions, setLoadingRegions] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [loadingBarangays, setLoadingBarangays] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -99,9 +109,97 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
   const selectedRegion = watch('addressRegion');
   const selectedCity = watch('addressCity');
 
-  const regionOptions = getRegionNames();
-  const cityOptions = getCitiesByRegion(selectedRegion);
-  const barangayOptions = getBarangaysByCity(selectedCity, selectedRegion);
+  // Fetch Regions from PSGC Cloud API
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setLoadingRegions(true);
+    fetchPsgcRegions()
+      .then((data) => {
+        if (active) setRegions(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingRegions(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  // Fetch Cities when selectedRegion changes
+  useEffect(() => {
+    if (!open || !selectedRegion) {
+      setCities([]);
+      return;
+    }
+    const matchedRegion = regions.find(
+      (r) =>
+        r.name.toLowerCase() === selectedRegion.toLowerCase() ||
+        r.code === selectedRegion ||
+        selectedRegion.toLowerCase().includes(r.name.toLowerCase()) ||
+        r.name.toLowerCase().includes(selectedRegion.toLowerCase())
+    );
+
+    if (!matchedRegion) {
+      setCities([]);
+      return;
+    }
+
+    let active = true;
+    setLoadingCities(true);
+    fetchPsgcCities(matchedRegion.code)
+      .then((data) => {
+        if (active) setCities(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingCities(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, selectedRegion, regions]);
+
+  // Fetch Barangays when selectedCity changes
+  useEffect(() => {
+    if (!open || !selectedCity) {
+      setBarangays([]);
+      return;
+    }
+    const matchedCity = cities.find(
+      (c) =>
+        c.name.toLowerCase() === selectedCity.toLowerCase() ||
+        c.code === selectedCity ||
+        selectedCity.toLowerCase().includes(c.name.toLowerCase()) ||
+        c.name.toLowerCase().includes(selectedCity.toLowerCase())
+    );
+
+    if (!matchedCity) {
+      setBarangays([]);
+      return;
+    }
+
+    let active = true;
+    setLoadingBarangays(true);
+    fetchPsgcBarangays(matchedCity.code, matchedCity.type)
+      .then((data) => {
+        if (active) setBarangays(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingBarangays(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, selectedCity, cities]);
+
+  const regionOptions = regions.map((r) => r.name);
+  const cityOptions = cities.map((c) => c.name);
+  const barangayOptions = barangays.map((b) => b.name);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -238,6 +336,7 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
                   <AddressCombobox
                     label="Region"
                     required
+                    loading={loadingRegions}
                     value={field.value}
                     onChange={field.onChange}
                     options={regionOptions}
@@ -253,10 +352,14 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
                   <AddressCombobox
                     label="City / Municipality"
                     required
+                    loading={loadingCities}
                     value={field.value}
                     onChange={field.onChange}
                     options={cityOptions}
-                    placeholder="Select or type city..."
+                    placeholder={
+                      selectedRegion ? 'Select or type city...' : 'Select region first'
+                    }
+                    disabled={!selectedRegion && cityOptions.length === 0}
                     error={errors.addressCity?.message}
                   />
                 )}
@@ -271,10 +374,12 @@ export function EditPatientModal({ open, onClose, patient, onUpdated }: EditPati
                   <AddressCombobox
                     label="Barangay"
                     required
+                    loading={loadingBarangays}
                     value={field.value}
                     onChange={field.onChange}
                     options={barangayOptions}
-                    placeholder="Select or type barangay..."
+                    placeholder={selectedCity ? 'Select or type barangay...' : 'Select city first'}
+                    disabled={!selectedCity && barangayOptions.length === 0}
                     error={errors.addressBarangay?.message}
                   />
                 )}
