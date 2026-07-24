@@ -41,6 +41,11 @@ export class AuditLogInterceptor implements NestInterceptor {
       method === 'POST'
     )
       return { action: 'GENERATE', tableName: 'documents' };
+    if (
+      path.match(/^\/patients\/[^/]+\/documents\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'documents' };
     if (path.match(/^\/patients\/[^/]+$/) && method === 'PATCH')
       return { action: 'UPDATE', tableName: 'patients' };
 
@@ -158,6 +163,9 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (responseBody.lastName != null) ctx.lastName = responseBody.lastName;
     if (responseBody.status != null) ctx.status = responseBody.status;
     if (responseBody.isActive != null) ctx.isActive = responseBody.isActive;
+    if (responseBody.documentType != null)
+      ctx.documentType = responseBody.documentType;
+    if (responseBody.type != null) ctx.type = responseBody.type;
     // Patient nested object
     if (responseBody.patient?.firstName != null)
       ctx.firstName = responseBody.patient.firstName;
