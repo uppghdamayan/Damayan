@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,6 +36,42 @@ export function Sidebar() {
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [pendingPatient, setPendingPatient] = useState<Patient | null>(null);
   const [isPublishingPending, setIsPublishingPending] = useState(false);
+
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const scale = (useUiStore.getState().uiScale || 100) / 100;
+      const currentMouseX = e.clientX / scale;
+      const maxAllowedWidth = (window.innerWidth / scale) * 0.45;
+      const clamped = Math.max(200, Math.min(currentMouseX, maxAllowedWidth));
+      document.documentElement.style.setProperty('--sidebar-w', `${clamped}px`);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ew-resize';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -232,11 +268,28 @@ export function Sidebar() {
       <aside
         suppressHydrationWarning
         className={cn(
-          "bg-surface flex flex-col h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out border-r border-border hidden @md:flex",
-          sidebarCollapsed ? "w-0 border-r-transparent" : "w-[var(--sidebar-w)]"
+          "bg-surface flex flex-col h-full shrink-0 hidden @md:flex relative",
+          sidebarCollapsed ? "w-0 overflow-hidden" : "w-[var(--sidebar-w)]",
+          isResizing ? "transition-none" : "transition-[width] duration-300 ease-in-out"
         )}
       >
-        {sidebarContent}
+        {/* Continuous right border line above child background layers */}
+        {!sidebarCollapsed && (
+          <div className="absolute top-0 right-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
+        )}
+        {/* Resize handle on the right edge */}
+        {!sidebarCollapsed && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+              "absolute top-0 -right-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
+              isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
+            )}
+          />
+        )}
+        <div className="w-[var(--sidebar-w)] min-w-[var(--sidebar-w)] flex flex-col h-full overflow-hidden">
+          {sidebarContent}
+        </div>
       </aside>
 
       {/* Mobile/Tablet overlay sidebar */}

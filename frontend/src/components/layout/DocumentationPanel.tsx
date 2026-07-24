@@ -173,19 +173,25 @@ export function DocumentationPanel() {
           width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0,
         }}
         className={cn(
-          "bg-surface flex flex-col shrink-0 relative overflow-hidden h-full hidden @md:flex",
-          documentationPanelOpen ? "border-l border-border" : "border-l border-transparent",
+          "bg-surface flex flex-col shrink-0 relative h-full hidden @md:flex",
+          documentationPanelOpen ? "" : "overflow-hidden",
           isResizing ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         )}
       >
+        {/* Continuous left border line */}
+        {documentationPanelOpen && (
+          <div className="absolute top-0 left-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
+        )}
         {/* Resize handle */}
-        <div
-          onMouseDown={handleMouseDown}
-          className={cn(
-            "absolute top-0 left-0 w-[5px] h-full cursor-ew-resize z-10 transition-colors duration-150",
-            isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
-          )}
-        />
+        {documentationPanelOpen && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+              "absolute top-0 -left-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
+              isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
+            )}
+          />
+        )}
         <div className="w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)] flex flex-col h-full overflow-hidden">
           {panelContent}
         </div>
