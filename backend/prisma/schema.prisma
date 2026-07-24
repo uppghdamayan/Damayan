@@ -100,6 +100,7 @@ model User {
   problemLogs     ProblemLog[] @relation("ProblemLogEditor")
   medicationLogs  MedicationLog[] @relation("MedicationLogEditor")
 
+  @@index([role, isActive])  // AccountsService.findAll / DocumentsService candidate-doctor lookup / last-admin guard
   @@map("users")
 }
 
@@ -139,6 +140,7 @@ model Patient {
   medicationLogs MedicationLog[] @relation("MedicationLogPatient")
 
   @@index([lastName, firstName])
+  @@index([isActive, lastName, firstName])  // default list/search: WHERE isActive=true ORDER BY lastName, firstName
   @@map("patients")
 }
 
@@ -235,6 +237,7 @@ model ProgressNote {
   author      User?        @relation("ProgressNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("ProgressNoteEditor", fields: [lastEditedBy], references: [id])
 
+  @@index([authorId, status])  // duplicate-draft check + deleteAllDrafts (WHERE authorId + status)
   @@map("progress_notes")
 }
 
@@ -264,6 +267,7 @@ model Problem {
   updatedByUser User?  @relation("ProblemUpdatedBy", fields: [updatedBy], references: [id])
 
   @@index([patientId, sortOrder])
+  @@index([patientId, parentId])  // REMOVED-status cascade onto direct children (updateMany where patientId+parentId)
   @@map("problems")
 }
 
@@ -364,6 +368,7 @@ model Attachment {
   uploadedByUser User?        @relation("AttachmentUploadedBy", fields: [uploadedBy], references: [id])
 
   @@index([noteType, noteId])              // AttachmentsService.findByNote()
+  @@index([noteId])                        // note-delete cleanup filters noteId alone (composite prefix can't serve it)
   @@index([patientId, uploadedAt(sort: Desc)]) // AttachmentsService.findByPatient()
   @@map("attachments")
 }

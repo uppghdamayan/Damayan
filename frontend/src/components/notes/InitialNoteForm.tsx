@@ -628,12 +628,14 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   if (isLoading || progressLoading) {
     return (
       <div className="flex flex-col gap-6 w-full animate-pulse pb-10">
-        <div className="h-[90px] bg-surface border border-border rounded-card shadow-card" />
-        <div className="h-[180px] bg-surface border border-border rounded-card shadow-card" />
-        <div className="h-[140px] bg-surface border border-border rounded-card shadow-card" />
-        <div className="h-[180px] bg-surface border border-border rounded-card shadow-card" />
-        <div className="h-[130px] bg-surface border border-border rounded-card shadow-card" />
-        <div className="h-[160px] bg-surface border border-border rounded-card shadow-card" />
+        {/* Use the shared skeleton token, not bg-surface — bg-surface matches the card
+            background so the shimmer was effectively invisible (design-standard.md §6.8). */}
+        <div className="h-[90px] bg-skeleton rounded-card" />
+        <div className="h-[180px] bg-skeleton rounded-card" />
+        <div className="h-[140px] bg-skeleton rounded-card" />
+        <div className="h-[180px] bg-skeleton rounded-card" />
+        <div className="h-[130px] bg-skeleton rounded-card" />
+        <div className="h-[160px] bg-skeleton rounded-card" />
       </div>
     );
   }
@@ -1069,7 +1071,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           />
 
           <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
-            <fieldset disabled={isSaving || publishMutation.isPending} className="flex flex-col gap-5 w-full disabled:opacity-70 transition-opacity">
+            {/* No whole-form disable/opacity dim on save — saving is surfaced inline on the
+                action buttons (design-standard.md §7.3). The clinician can keep reading and
+                editing while a save round-trips, per the "auto-save always on" principle. */}
+            <fieldset className="flex flex-col gap-5 w-full">
             {/* Latest Vitals Snapshot Strip */}
             <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">

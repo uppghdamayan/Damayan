@@ -614,20 +614,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   }
 
   const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending || createAndPublishMutation.isPending;
-  const isPublishing = publishMutation.isPending || createAndPublishMutation.isPending;
   const isDisabled = isPublished || isSaving || deleteMutation.isPending;
   const isUpdateActive = !!form.formState.isDirty;
 
-  const loadingMessage = isPublishing ? "Finalizing note..." : "Saving draft...";
-
   return (
     <div className="flex flex-col h-full bg-surface-2 panel-container relative">
-      {isSaving && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-3 border-accent border-t-transparent rounded-full animate-spin" />
-          <span className="text-[12px] font-semibold text-text-secondary">{loadingMessage}</span>
-        </div>
-      )}
+      {/* Saving is surfaced inline via the per-button spinner and the "Autosaved"
+          indicator (design-standard.md §7.3) — no full-panel blocking overlay, so the
+          note stays readable and scrollable while a save round-trips. */}
       <style>{`
         .panel-container {
           container-type: inline-size;
@@ -688,7 +682,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </span>
           )}
           {isPublished && (
-            <Badge variant="active">
+            <Badge variant="published">
               Published
             </Badge>
           )}

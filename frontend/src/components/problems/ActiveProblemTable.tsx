@@ -362,15 +362,11 @@ export function ActiveProblemTable({
             <div className="text-right pr-4">Actions</div>
           </div>
           <div className="flex flex-col relative min-h-[100px]">
-            {isSaving && (
-              <div className="absolute inset-0 z-10 bg-surface/40 backdrop-blur-[1.5px] flex items-center justify-center rounded-b-lg pointer-events-auto transition-all duration-200">
-                <div className="flex items-center gap-2.5 px-4 py-2.5 bg-white dark:bg-surface rounded-full shadow-md border border-border/60 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="h-3.5 w-3.5 rounded-full border-2 border-accent border-r-transparent animate-spin" />
-                  <span className="text-[11px] font-semibold tracking-wide text-text-primary uppercase">Publishing...</span>
-                </div>
-              </div>
-            )}
-            <div className={cn("flex flex-col", isSaving && "pointer-events-none opacity-60 transition-opacity duration-200")}>
+            {/* Publishing is surfaced inline on the Publish button ("…" spinner) per
+                design-standard.md §7.3 — no blur/opacity overlay, so the list stays
+                readable. Row controls disable via `canManage && !isSaving` below to
+                block concurrent edits without freezing the whole section. */}
+            <div className="flex flex-col">
               <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                 {flatProblems.map((item) => (
                   <SortableRow

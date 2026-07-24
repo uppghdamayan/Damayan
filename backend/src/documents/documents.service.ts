@@ -58,45 +58,57 @@ export class DocumentsService {
     visitId: string | undefined,
     userId: string,
   ) {
-    const patient = await this.prisma.patient.findUnique({
-      where: { id: patientId },
-    });
-    if (!patient) throw new NotFoundException('Patient not found');
+    const needsAssessment =
+      type === DocumentType.MEDICAL_CERTIFICATE ||
+      type === DocumentType.REFERRAL_LETTER ||
+      type === DocumentType.LAB_REQUEST;
+    const needsMedications =
+      type === DocumentType.MEDICAL_CERTIFICATE ||
+      type === DocumentType.REFERRAL_LETTER ||
+      type === DocumentType.PRESCRIPTION;
+    const needsLatestVisit = type === DocumentType.MEDICAL_CERTIFICATE;
 
-    const physician = await this.resolvePhysician(userId, undefined, visitId);
+    // None of these lookups depend on each other's results, so run them
+    // concurrently instead of serially to cut request latency.
+    const [patient, physician, latestNote, medications, latestVisit] =
+      await Promise.all([
+        this.prisma.patient.findUnique({ where: { id: patientId } }),
+        this.resolvePhysician(userId, undefined, visitId),
+        needsAssessment
+          ? this.prisma.initialNote.findFirst({
+              where: { visit: { patientId }, status: 'PUBLISHED' },
+              orderBy: { createdAt: 'desc' },
+            })
+          : Promise.resolve(null),
+        needsMedications
+          ? this.prisma.medication.findMany({
+              where: { patientId, isActive: true },
+              orderBy: { createdAt: 'desc' },
+            })
+          : Promise.resolve(null),
+        needsLatestVisit
+          ? this.prisma.visit.findFirst({
+              where: { patientId },
+              orderBy: { visitDatetime: 'desc' },
+            })
+          : Promise.resolve(null),
+      ]);
+
+    if (!patient) throw new NotFoundException('Patient not found');
 
     const data: Record<string, any> = { patient, physician };
 
-    if (
-      type === DocumentType.MEDICAL_CERTIFICATE ||
-      type === DocumentType.REFERRAL_LETTER ||
-      type === DocumentType.LAB_REQUEST
-    ) {
-      const latestNote = await this.prisma.initialNote.findFirst({
-        where: { visit: { patientId }, status: 'PUBLISHED' },
-        orderBy: { createdAt: 'desc' },
-      });
+    if (needsAssessment) {
       data.assessment = latestNote?.assessment ?? null;
       data.diagnostics = latestNote?.diagnostics ?? null;
       data.chiefComplaintDefault = latestNote?.chiefComplaint ?? '';
     }
 
-    if (
-      type === DocumentType.MEDICAL_CERTIFICATE ||
-      type === DocumentType.REFERRAL_LETTER ||
-      type === DocumentType.PRESCRIPTION
-    ) {
-      data.medications = await this.prisma.medication.findMany({
-        where: { patientId, isActive: true },
-        orderBy: { createdAt: 'desc' },
-      });
+    if (needsMedications) {
+      data.medications = medications;
     }
 
-    if (type === DocumentType.MEDICAL_CERTIFICATE) {
-      const latestVisit = await this.prisma.visit.findFirst({
-        where: { patientId },
-        orderBy: { visitDatetime: 'desc' },
-      });
+    if (needsLatestVisit) {
       data.latestVisitDate = latestVisit?.visitDatetime ?? null;
     }
 

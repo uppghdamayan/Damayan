@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { DocumentationPanel } from '@/components/layout/DocumentationPanel';
 import { NarrowScreenNotice } from '@/components/layout/NarrowScreenNotice';
 import { AppStartupLoader } from '@/components/layout/AppStartupLoader';
+import { AppLoadingScreen } from '@/components/layout/AppLoadingScreen';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, requiresPasswordChange } = useAuthStore();
@@ -57,9 +58,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     checkAuth();
   }, [user, requiresPasswordChange, router]);
 
-  // Render nothing while auth is being verified to prevent flash of
-  // stale/unauthenticated UI (e.g., "??" avatar after logout + back button)
-  if (!authChecked) return null;
+  // Show the branded loading screen (not a blank page) while the session is
+  // being verified — the guard still prevents any flash of stale/unauthenticated
+  // UI, but the user now gets visible feedback instead of a silent white screen.
+  if (!authChecked) return <AppLoadingScreen />;
 
   return (
     <AppStartupLoader>

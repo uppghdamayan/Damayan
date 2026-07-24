@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
@@ -39,6 +39,10 @@ export function useProgressNotes(patientId: string | null, page = 1, limit = 10)
     queryKey: ['progress-notes', patientId, page, limit],
     queryFn: () => apiRequest<{ data: ProgressNote[], meta: any }>(`/patients/${patientId}/progress-notes?page=${page}&limit=${limit}`),
     enabled: !!patientId,
+    staleTime: 1000 * 20,
+    // Consistent with the other patient-scoped paginated hooks — prevents a
+    // full-skeleton flash if/when pagination controls are added for the timeline.
+    placeholderData: keepPreviousData,
   });
 }
 

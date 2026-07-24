@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -322,8 +322,13 @@ export default function AccountsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
 
+  // Only show the full-table skeleton on the very first load. Pagination and
+  // post-mutation refetches keep the current rows visible instead of blanking
+  // the whole table into a skeleton on every click.
+  const hasLoadedRef = useRef(false);
+
   const fetchAccounts = useCallback(async (page = 1) => {
-    setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const res = await apiRequest<AccountsResponse>(`/accounts?page=${page}&limit=20`);
       setAccounts(res.data);
@@ -333,6 +338,7 @@ export default function AccountsPage() {
       toast.error('Failed to load accounts');
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   }, []);
 

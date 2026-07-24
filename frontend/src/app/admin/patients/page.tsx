@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiRequest } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -54,8 +54,13 @@ export default function PatientAccountsPage() {
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: 'deactivate' | 'reactivate'; patient: Patient } | null>(null);
 
+  // Only show the full-table skeleton on the very first load. Pagination and
+  // post-action refetches keep the current rows visible instead of blanking the
+  // whole table into a skeleton on every click.
+  const hasLoadedRef = useRef(false);
+
   const fetchPatients = useCallback(async (page = 1) => {
-    setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const res = await apiRequest<PatientsResponse>(`/patients?page=${page}&limit=20&includeInactive=true`);
       setPatients(res.data);
@@ -65,6 +70,7 @@ export default function PatientAccountsPage() {
       toast.error('Failed to load patients');
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   }, []);
 

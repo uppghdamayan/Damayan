@@ -1,8 +1,9 @@
 # DAMAYAN EMR — Design Standards
 
-**Version 2.1 · Tailwind CSS + shadcn/ui + Next.js**  
+**Version 2.2 · Tailwind CSS + shadcn/ui + Next.js**  
 *Aligned with Wireframe3 · Problem-Oriented Dynamic Clinical Note Interface for Primary Care*  
-*v2.1: extends minimum supported viewport from 1280px down to 768px (small tablets) — see §4.2–§4.4.*
+*v2.1: extends minimum supported viewport from 1280px down to 768px (small tablets) — see §4.2–§4.4.*  
+*v2.2: alignment pass — reconciles the doc with the shipped components. Adds the loading/skeleton spec (§6.8), rewrites the auto-save states to match the non-blocking inline pattern actually implemented (§7.3), corrects the shadcn mapping (§9), sidebar/nav responsive mechanics (§4.2–§4.3, §5.3), topbar zoom + role pills (§5.1), the compact non-dashboard patient banner (§7.1), and the medication field spec (§11). Where a section documents intended-but-unbuilt behavior it is now labelled **Planned**.*
 
 ---
 
@@ -388,6 +389,13 @@ export function NarrowScreenNotice() {
 
 #### Responsive Adaptations at 1024px (Tablet Landscape)
 
+> **Note — reconcile with the breakpoint table (§4.2) and the sidebar reality note.** The table
+> above states the sidebar/doc panel stay **in-flow** through 768–1100px, while this subsection
+> describes them becoming **overlay drawers** below 1024px — the two conflict. Per the shipped
+> code (see the Sidebar reality note above), the sidebar is **in-flow across the whole supported
+> ≥768px range**; the overlay-drawer behavior described here is **Planned**, not current. When
+> this is implemented, make the table and this subsection agree on the exact threshold.
+
 This tier introduces the first structural shift: **the sidebar and documentation panel stop taking up in-flow width** and become overlay drawers so the main content area keeps a usable minimum width.
 
 - **Sidebar** → overlay drawer (`fixed`, slides in from the left over a scrim), triggered by the topbar menu icon. Never pushes content; closes on scrim click, `Escape`, or patient selection.
@@ -413,8 +421,21 @@ This is the minimum supported width. The header is fully icon-driven and every g
 
 #### Sidebar Behavior Across Breakpoints
 
+> **Implementation reality.** The `useSidebarMode()` hook and the `localStorage("damayan-sidebar")`
+> key shown below **do not exist in the codebase** — the block is an aspirational sketch. What
+> actually ships (`components/layout/Sidebar.tsx`): both an in-flow column and a fixed overlay
+> drawer are always rendered, and Tailwind **container-query** classes pick one — `hidden @md:flex`
+> for the in-flow column, `@md:hidden` for the overlay. Open/closed is a plain user-toggled
+> boolean (`sidebarCollapsed`) held in the `uiStore` Zustand slice (persist key
+> `damayan-ui-sidebar`), toggling width between `0` and `--sidebar-w`; it is **not** a
+> viewport-derived mode. Because no custom `@md` container size is configured, `@md` resolves to
+> Tailwind's default 28rem (448px), so within the supported ≥768px range the in-flow branch is
+> effectively always selected and the overlay branch is currently unreachable. Treat the
+> viewport-driven `useSidebarMode`/overlay-below-1280px design below as **Planned**; implement it
+> (a real breakpoint check, or a raised container threshold) if that behavior is still wanted.
+
 ```tsx
-// Sidebar mode — persisted to localStorage, recalculated on resize
+// PLANNED (not implemented) — Sidebar mode persisted to localStorage, recalculated on resize
 type SidebarMode = "inline-open" | "inline-collapsed" | "overlay";
 
 function useSidebarMode() {
@@ -624,12 +645,24 @@ Below `1280px`, both the patient sidebar and the documentation panel switch from
 </header>
 ```
 
-**Role pill:**
+**Role pill.** Three variants ship (`Topbar.tsx`), not just the Doctor example:
+
+| Role | Classes |
+|---|---|
+| Doctor | `bg-emerald-50 text-emerald-700 border-emerald-200` |
+| Nurse | `bg-emerald-50 text-emerald-700 border-emerald-200` (same as Doctor) |
+| Admin | `bg-purple-50 text-purple-700 border-purple-200` |
+
 ```tsx
 <span className="inline-flex items-center justify-center px-1.5 py-[2px] rounded text-[9px] font-bold uppercase tracking-wider border bg-emerald-50 text-emerald-700 border-emerald-200">
   Doctor
 </span>
 ```
+
+**Text-zoom control (implemented).** The topbar right zone also renders an `A- / percentage / A+`
+button group (`Topbar.tsx`) that adjusts a persisted `uiScale` between **80% and 150%** (applied
+by `providers/UiScaleEffect`). This is the mechanism behind §1.3's "support browser zoom up to
+150%" — document and preserve it when editing the topbar.
 
 ### 5.2 Patient Sidebar
 
@@ -753,6 +786,15 @@ const tabs = [
 const label = width >= 1280 ? tab.label : tab.shortLabel;
 ```
 
+> **Implementation reality.** The shipped `ScreenNav.tsx` `ALL_TABS` entries have **no
+> `shortLabel` field** and no code reads one; the two-tier 1024/1280px label resolution above is
+> not what runs. Instead, label visibility uses a single container-query breakpoint
+> (`@max-[1100px]`): below it, inactive tabs collapse to **icon-only** and reveal their label on
+> hover (fluid hover-expand), while the active tab keeps its label. Either adopt this
+> hover-expand + single-breakpoint description as canonical (recommended — it's what exists), or
+> implement the two-tier `shortLabel` scheme and add the field to `ALL_TABS`. The `icon` field
+> **is** required on every tab regardless.
+
 ---
 
 ## 6. Components
@@ -786,6 +828,10 @@ const label = width >= 1280 ? tab.label : tab.shortLabel;
   {/* content */}
 </div>
 ```
+
+> **Card-body padding.** Standard body padding is `p-3 px-3.5` (used by `ProblemListCard`,
+> `MedicationListCard`). `VitalsCard` intentionally uses tighter `p-2.5` for its dense 5-column
+> vital grid — this is an accepted **data-dense** variant, not a drift.
 
 **Last-updated timestamp** on time-sensitive cards (Vital Signs, Problem List, Medication List):
 
@@ -872,6 +918,15 @@ const badgeVariants = cva(
 );
 ```
 
+> **Canonical shape: `rounded-[4px]` + solid fills.** The raw (non-`Badge`) status pills used
+> across the app — `NoteStatusBadge`, the `ProblemListCard` status pill, the `PatientBanner`
+> allergy tag — all follow the `rounded-[4px]` solid spec above and are the majority. The shadcn
+> `Badge` component (`components/ui/badge.tsx`) currently diverges: it renders `rounded-full` and
+> applies opacity modifiers on two variants (`active: bg-accent-light/40`, `saved: bg-green-bg/15`).
+> Treat the `rounded-[4px]` solid spec here as canonical; aligning `badge.tsx` to it is a
+> **Planned** fix. Always use `variant="published"` (purple) for a published note status — never
+> `active`.
+
 ### 6.4 Form Fields
 
 ```tsx
@@ -947,6 +1002,11 @@ const badgeVariants = cva(
 // Mono:     font-mono
 ```
 
+> **Header font size — two accepted sizes.** Compact summary tables (`PriorLabsTable`,
+> `VitalsSummaryRow`) use `text-[9px]` headers as specified above. Wide, data-dense tables
+> (`VitalsHistoryTable`, the `DocumentsScreen` file tables) use `text-[10px]` headers. Both are
+> sanctioned: `9px` for compact, `10px` for data-dense.
+
 ### 6.6 Status Dots
 
 ```tsx
@@ -986,7 +1046,82 @@ Always pair color with a tooltip or text label. Never rely on color alone.
 </div>
 ```
 
-Closes on overlay click or `Escape`. Focus trapped within while open; restores to trigger on close (use shadcn `Dialog` — it handles this automatically).
+Closes on overlay click or `Escape`. Focus trapped within while open; restores to trigger on close.
+
+> **Implementation note.** The product's modals are **hand-rolled** (`DeleteConfirmModal`,
+> `DocumentGeneratorModal`, `EditPatientModal`, the note-detail modal in `ProgressNoteForm`),
+> not shadcn `Dialog`. They implement overlay-click / `Escape` close themselves. Responsive
+> width coverage varies: only the note-detail modal implements the full 4-step width table
+> below; `DeleteConfirmModal` is a fixed `w-[460px]`, and `DocumentGeneratorModal` /
+> `EditPatientModal` implement only the first step (`w-[500px] → 460px@1439`). Bringing the
+> rest up to the full table is a **Planned** cleanup — see §9.
+
+---
+
+## 6.8 Loading & Skeleton States
+
+Loading feedback is one of DAMAYAN's core UX contracts (§1.7 "auto-save always on"; doctors
+should never see a frozen or blank screen). The guiding rule:
+
+> **Show a loading animation only when the user genuinely has nothing to look at yet. Never
+> make it mandatory on a background refetch, a mutation, or a save.**
+
+#### The `Skeleton` primitive
+
+The canonical loading placeholder is `components/ui/skeleton.tsx`, backed by the `--skeleton`
+CSS variable (exposed as the `bg-skeleton` Tailwind color) with a built-in `animate-pulse`:
+
+```tsx
+// components/ui/skeleton.tsx
+<Skeleton width={120} height={12} borderRadius={4} />   // props: width, height, borderRadius, className
+// renders: <div className="shrink-0 bg-skeleton animate-pulse" style={{width,height,borderRadius}} />
+```
+
+**Always use `bg-skeleton` for placeholder blocks — never `bg-surface`/`bg-surface-2`.** A
+placeholder painted in the card's own background colour makes the shimmer invisible.
+
+#### Per-card skeleton components
+
+Each data-driven card/screen has a dedicated `<X>Skeleton` component that mirrors its real
+header/row layout so the swap-in is shape-stable (no layout shift):
+`PatientBannerSkeleton`, `VitalsStripSkeleton`, `ProblemListSkeleton`, `MedicationListSkeleton`,
+`SidebarSkeleton`, `VisitHistoryCardSkeleton`, `LabResultsSectionSkeleton`. Build one alongside
+any new data card rather than inlining ad-hoc blocks.
+
+#### When a skeleton is allowed to show (first load only)
+
+With TanStack Query v5, `isLoading` is already **first-load-only** (`isPending && isFetching`);
+it does *not* re-fire on a post-mutation background refetch of already-cached data. So the
+correct gate is simply:
+
+```tsx
+const { data, isLoading } = useThing(patientId);
+if (isLoading) return <ThingSkeleton />;   // only when there is no cached data at all
+```
+
+- **Paginated / filterable lists** must add `placeholderData: keepPreviousData` so changing
+  page/filter keeps the current rows visible while the next set loads, instead of tearing the
+  table out for a full skeleton on every click. This is the established convention
+  (`usePatients`, `useVisits`, `useVitals`, `useProgressNotes`, `useAuditLogs`, `useAttachments`).
+  - **Patient-safety exception:** do **not** add `keepPreviousData` to a *single-record* hook
+    keyed by patient (e.g. `useLatestVitals`) — it must never briefly show one patient's reading
+    while another patient's data loads.
+- **Manual `useState`/`fetch` screens** (e.g. the admin tables) must gate their skeleton the
+  same way: show it only on the true first load (track a `hasLoaded` ref / `data.length === 0`),
+  and keep existing rows visible during pagination and post-action refetches.
+
+#### App bootstrap / auth gate — never a silent blank
+
+While the app hydrates or verifies the session, render the branded
+`AppLoadingScreen` (`components/layout/AppLoadingScreen.tsx`) — **never `return null`**, which
+leaves the user staring at a blank white page ("silent loading"). `AppStartupLoader` (store
+hydration) and the dashboard auth guard both use it.
+
+#### Saving is inline, never a blocking overlay
+
+Per §7.3: a save/publish/reorder must not mount a full-panel `absolute inset-0` blur+spinner
+overlay or dim the whole form. Surface progress on the specific control being actioned (in-button
+`Loader2` spinner) and keep the surrounding content readable and scrollable.
 
 ---
 
@@ -1046,6 +1181,14 @@ Closes on overlay click or `Escape`. Focus trapped within while open; restores t
 </div>
 ```
 
+> **Two banner variants exist.** The full 3-column banner above (`components/patients/PatientBanner.tsx`,
+> Name | Demographics | Clinical Profile with allergy badges, Problems/Meds/Visits counts, and an
+> Edit action) renders **only** on the root `/dashboard/[patientId]` screen. Every other tab
+> (Vitals, Notes, Problems, Medications, Documents, Logs) renders a **compact 2-column banner**
+> (Name | Demographics only) inlined in `app/dashboard/[patientId]/layout.tsx` — no Clinical
+> Profile column, no counts, no Edit button. This is an intentional space-saving variant for the
+> deeper tabs. Keep the two in sync when editing shared Name/Demographics markup.
+
 ### 7.2 Vitals Strip
 
 ```tsx
@@ -1082,28 +1225,45 @@ Vitals cards show the datetime of the last reading. If older than 24 hours, appl
 
 ### 7.3 Initial Note & Progress Notes
 
-Auto-save behavior:
+**Auto-save behavior (as implemented).** Auto-save is handled by the `useAutoSave` hook
+(`hooks/useAutoSave.ts`) with a **5000ms** debounce (both the Initial Note and Progress Note
+forms pass `5000`). Auto-save writes the draft to **`localStorage`**, not the server — it is a
+zero-cost, non-blocking safety net so an in-progress note is never lost on reload or an
+accidental patient switch. Persisting to the server happens on an explicit **Save Draft**,
+**Save Changes**, or **Publish** click.
 
 ```tsx
-// Debounced 3s auto-save
-useEffect(() => {
-  const timer = setTimeout(() => {
-    saveDraft();
-  }, 3000);
-  return () => clearTimeout(timer);
-}, [formValues]);
+// hooks/useAutoSave.ts — 5s debounce, localStorage draft
+useAutoSave(formValues, (data) => {
+  localStorage.setItem(draftKey, JSON.stringify(data));
+  setLastSaved(new Date());
+}, draftKey, 5000);
 ```
 
-Auto-save states:
+**Saving is inline and never blocking.** Because auto-save always keeps a local copy, a save
+round-trip must never freeze or dim the editor. Feedback lives on the action controls, not on a
+full-panel overlay:
 
-| State | Component |
+| State | How it's shown (implemented) |
 |---|---|
-| Unsaved | `<Badge variant="draft">Draft</Badge>` in card header |
-| Saving | Spinner + `text-[10px] text-[var(--text-muted)]` "Saving…" |
-| Saved | `<Badge variant="saved">Saved</Badge>` for 3s then remove |
-| Offline | Amber banner: `bg-amber-bg border border-amber-border text-amber text-[11px] px-3 py-1.5 rounded-btn` |
+| Unsaved / dirty | Action buttons enabled; the "Autosaved" indicator is hidden while the form is dirty |
+| Saving | The **specific button clicked** swaps its icon for `<Loader2 className="w-3.5 h-3.5 animate-spin" />` and its label to "Saving…"; the rest of the form stays fully interactive |
+| Saved (draft, clean) | A persistent inline `font-mono text-[10px] text-green` check + "Autosaved" indicator next to the header (stays while the form is clean; not a 3s-then-remove badge) |
+| Published | `<Badge variant="published">Published</Badge>` (purple) in the panel header — use `variant="published"`, never `active` |
+| Offline | **Planned** — not yet implemented. `useAutoSave` currently only writes to `localStorage` on `beforeunload`; there is no offline-detection banner. Intended spec: amber banner `bg-amber-bg border border-amber-border text-amber text-[11px] px-3 py-1.5 rounded-btn`. |
 
-**Collapsible sections** use shadcn `Collapsible`:
+> **Do not** wrap the note editor in a blocking `absolute inset-0` blur/spinner overlay or a
+> `fieldset disabled` whole-form dim on save. Both were removed in the v2.2 loading-state pass
+> (see §6.8) precisely because they turned every routine save into a full-editor freeze.
+> Prevent double-submit by disabling only the button being clicked.
+
+**Collapsible sections.** The reusable `components/notes/CollapsibleSection.tsx` is a plain
+`useState` + `{isOpen && children}` implementation (**not** shadcn `Collapsible` — that primitive
+is used only in `TimelineEntry.tsx`). The real component also accepts a `theme` prop
+(`amber` | `purple` | `primary`, each with distinct hover/background/text colours) and a
+`variant` prop (`default` | `row`), and animates open/close via the CSS-grid
+`.collapsible-content-wrapper` / `.is-open` classes in `globals.css`. The simplified example
+below shows the structure only:
 
 ```tsx
 // components/notes/CollapsibleSection.tsx
@@ -1307,7 +1467,24 @@ Max 3 stacked toasts. Auto-dismiss after 5s. Include `×` close button.
 | Tabs (screen nav) | Custom `<button>` | Do **not** use shadcn Tabs — screen nav needs horizontal scroll + custom styling |
 | Drag handles | Native HTML5 drag or `@dnd-kit/core` | Problem list reordering |
 
-Override shadcn defaults in `components/ui/` files. Never touch the CSS variables shadcn uses internally — use `[var(--token)]` references in Tailwind classes instead so both systems coexist.
+> **Implementation reality (important).** This table describes the *intended* mapping, but most
+> of these shadcn wrappers are **not actually used** — the product hand-rolls the elements with
+> inline Tailwind (or the global `.sec-btn` / `.field-input` classes) that reproduce §6.1/§6.2/
+> §6.4/§6.7 directly:
+>
+> | Component | Status in code |
+> |---|---|
+> | `Card` / `CardHeader` / `CardContent` | **Not used** — every card is a hand-written `<div>` per §6.1. `components/ui/card.tsx` is stock shadcn and edits to it affect nothing. |
+> | `Button` (all variants) | **Not used** for the app's buttons — hand-written `<button>` per §6.2 (or `.sec-btn`). |
+> | `Input` / `Textarea` | **Not used** — hand-written `<input>`/`<textarea>` per §6.4, or the global `.field-input` class (note-authoring forms). |
+> | `Dialog` | **Not used** — modals are hand-rolled per §6.7. |
+> | `Badge` | **Used.** See §6.3 (but note the rounded-full vs `rounded-[4px]` discrepancy called out there). |
+> | `Collapsible` | Used **once** (`TimelineEntry`). The reusable `CollapsibleSection` is a custom `useState` implementation, not shadcn — see §7.3 note below. |
+>
+> Do not "fix" the UI by editing the stock `components/ui/card|button|input|dialog.tsx` files —
+> they are dead relative to the rendered product. Change the hand-rolled markup (or the global
+> classes in `globals.css`) instead. Standardising the app onto the shadcn wrappers is a
+> **Planned** consolidation, not the current state.
 
 ---
 
@@ -1355,8 +1532,9 @@ All errors display inline below the offending field. Never use `alert()`.
 | Temperature | float 30.0–45.0 |
 | O₂ Saturation | integer 50–100 |
 | Chief Complaint | free text, max 50 chars |
-| Medication Dose | float > 0 |
-| Medication Unit | `mg` \| `g` \| `mcg` \| `ml` \| `units` |
+| Medication Name | free text, max 255 chars |
+| Medication Dose | free text, max 255 chars (the unit is part of the dose string, e.g. "500 mg" — there is no separate unit enum) |
+| Medication Formulation | free text, max 50 chars (e.g. tablet, capsule, syrup) |
 | Medication Instructions | free text, max 50 chars |
 | Medication Quantity | integer > 0 |
 | Lab/Imaging uploads | JPEG, PNG, PDF only |

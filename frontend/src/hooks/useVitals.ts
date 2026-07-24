@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 import type { VitalSign, VitalsResponse, CreateVitalsInput, UpdateVitalsInput } from '@/types/vitals';
 
@@ -8,6 +8,11 @@ export function useVitals(patientId: string | null, page = 1, limit = 10) {
     queryFn: () => apiRequest<VitalsResponse>(`/patients/${patientId}/vitals?page=${page}&limit=${limit}`),
     enabled: !!patientId,
     staleTime: 1000 * 20,
+    // Keep the current page visible while the next page loads so paging never
+    // tears the whole table out for a full skeleton (isLoading stays false after
+    // the first fetch). Only the paginated list uses this — not useLatestVitals,
+    // whose result must never show a different patient's reading during a switch.
+    placeholderData: keepPreviousData,
   });
 }
 

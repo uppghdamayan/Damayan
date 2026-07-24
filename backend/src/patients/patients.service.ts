@@ -60,11 +60,13 @@ export class PatientsService {
         skip,
         take: limit,
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-        // Include latest allergy flag from initial note if it exists
+        // Include latest allergy flag from initial note if it exists.
+        // Project only what's read (initialNote.allergies) instead of the full Visit
+        // row, so the large problem/medication-changes JSON blobs are never fetched.
         include: {
           visits: {
             where: { visitType: 'INITIAL' },
-            include: { initialNote: { select: { allergies: true } } },
+            select: { initialNote: { select: { allergies: true } } },
             orderBy: { visitDatetime: 'desc' },
             take: 1,
           },
@@ -91,7 +93,7 @@ export class PatientsService {
       include: {
         visits: {
           where: { visitType: 'INITIAL' },
-          include: { initialNote: { select: { allergies: true } } },
+          select: { initialNote: { select: { allergies: true } } },
           orderBy: { visitDatetime: 'desc' },
           take: 1,
         },
