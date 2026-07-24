@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { buildProblemTree } from '@/lib/problem-utils';
 import { 
   initialNoteDraftSchema, 
   initialNotePublishSchema, 
@@ -252,6 +253,29 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       visitDatetime: new Date().toISOString(),
     },
   });
+
+  const activeProblemTree = useMemo(() => {
+    const activeProbs = copyForward?.activeProblems || [];
+    const tree = buildProblemTree(activeProbs);
+    const list: { problem: any; depth: number }[] = [];
+    const traverse = (nodes: any[], depth: number) => {
+      nodes.forEach(node => {
+        list.push({ problem: node, depth });
+        traverse(node.children || [], depth + 1);
+      });
+    };
+    traverse(tree, 0);
+    return list;
+  }, [copyForward?.activeProblems]);
+
+  const activeDepthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    activeProblemTree.forEach(item => {
+      map.set(item.problem.title.trim().toLowerCase(), item.depth);
+      if (item.problem.id) map.set(item.problem.id, item.depth);
+    });
+    return map;
+  }, [activeProblemTree]);
 
   useEffect(() => {
     if (note) {
@@ -952,11 +976,25 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 ? (
                     note.assessment.map((item: any, idx: number) => {
                       const isLast = idx === note.assessment.length - 1;
+                      const titleStr = typeof item === 'string' ? item : item.title;
+                      const titleKey = titleStr?.trim().toLowerCase();
+                      const depth = typeof item !== 'string' && item.depth !== undefined
+                        ? item.depth
+                        : (titleKey && activeDepthMap.has(titleKey)
+                            ? activeDepthMap.get(titleKey)!
+                            : (typeof item !== 'string' && item.parentId ? 1 : 0));
+
                       return (
                         <div key={idx} className={cn("flex items-center gap-2 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
                           <span className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[12px] text-text-primary font-medium">{item.title}</span>
+                          <div 
+                            className="flex-1 min-w-0"
+                            style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
+                          >
+                            <span className="text-[12px] text-text-primary font-medium">
+                              {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
+                              {titleStr}
+                            </span>
                           </div>
                           {item.icdCode && (
                             <span className="font-mono text-[9px] text-text-muted bg-surface-2 border border-border px-1.5 py-[2px] rounded flex-shrink-0">
@@ -1431,17 +1469,30 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   render={({ field }) => (
                     <div className="flex flex-col gap-1.5" id="field-assessment">
                       <div className="flex flex-col gap-1">
-                        {field.value?.map((prob: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                            <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
-                            <div className="flex-1 min-w-0 truncate">
-                              {typeof prob === 'string' ? prob : prob.title}
-                              {typeof prob !== 'string' && prob.icdCode && (
-                                <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
-                                  {prob.icdCode}
-                                </span>
-                              )}
-                            </div>
+                        {field.value?.map((prob: any, idx: number) => {
+                          const titleStr = typeof prob === 'string' ? prob : prob.title;
+                          const titleKey = titleStr?.trim().toLowerCase();
+                          const depth = typeof prob !== 'string' && prob.depth !== undefined
+                            ? prob.depth
+                            : (titleKey && activeDepthMap.has(titleKey)
+                                ? activeDepthMap.get(titleKey)!
+                                : (typeof prob !== 'string' && prob.parentId ? 1 : 0));
+
+                          return (
+                            <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
+                              <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
+                              <div 
+                                className="flex-1 min-w-0 truncate"
+                                style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
+                              >
+                                {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
+                                {titleStr}
+                                {typeof prob !== 'string' && prob.icdCode && (
+                                  <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
+                                    {prob.icdCode}
+                                  </span>
+                                )}
+                              </div>
                             {canEditAll && (
                               <Button
                                 type="button"
@@ -1454,7 +1505,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                               </Button>
                             )}
                           </div>
-                        ))}
+                        );
+                      })}
                         {canEditAll && (
                           <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
                             <div className="col-span-12 @md:col-span-8 flex flex-col gap-1">

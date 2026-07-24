@@ -57,30 +57,34 @@ export function TagInputField({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {value.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-surface-2 border border-border rounded-[6px] text-[12px] text-text-primary">
+          <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] font-medium text-text-primary hover:border-border-strong transition-colors">
             <span>{isObjectFormat ? item.title : item}</span>
             {isObjectFormat && item.icdCode && (
-              <span className="text-[10px] text-text-muted ml-1">({item.icdCode})</span>
+              <span className="font-mono text-[10px] text-text-muted bg-surface-3 px-1.5 py-0.5 rounded">({item.icdCode})</span>
             )}
             {!disabled && (
               <button
                 type="button"
                 onClick={() => handleRemove(idx)}
-                className="text-text-muted hover:text-red transition-colors ml-1"
+                className="text-text-muted hover:text-red transition-colors p-0.5 rounded-full hover:bg-surface-3 cursor-pointer"
+                title="Remove"
               >
                 <XIcon className="w-3 h-3" />
               </button>
             )}
           </div>
         ))}
+        {value.length === 0 && (
+          <span className="text-[12px] text-text-muted italic">No diagnostics added.</span>
+        )}
       </div>
       {!disabled && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-1">
           <input
             type="text"
-            className="flex-1 h-[34px] px-2.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/70"
+            className="flex-1 h-[32px] px-2.5 bg-white border border-border-strong/60 rounded-[6px] text-[12px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70"
             placeholder={placeholder}
             value={inputValue}
             onChange={(e) => {
@@ -94,7 +98,7 @@ export function TagInputField({
             type="button"
             onClick={handleAdd}
             disabled={!inputValue.trim()}
-            className="h-[34px] cursor-pointer px-3 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="h-[32px] px-3.5 bg-accent text-white hover:bg-accent-hover rounded-[6px] font-semibold text-[11px] flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer shadow-sm"
           >
             + Add
           </button>

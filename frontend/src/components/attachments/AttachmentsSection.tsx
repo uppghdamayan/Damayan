@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '../ui/button';
-import { FileText, UploadCloud, X, Eye } from 'lucide-react';
+import { FileText, UploadCloud, X, Eye, CheckCircle2, Image, Plus } from 'lucide-react';
 import { PriorLabsTable } from '../notes/PriorLabsTable';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 
@@ -123,19 +123,19 @@ export function AttachmentsSection({
   };
 
   return (
-    <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
+    <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
       <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
         <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🧪</div>
-        <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] flex-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
           Results of Labs or Imaging
         </span>
       </div>
       
-      <div className="p-[14px] flex flex-col gap-5">
+      <div className="p-[14px] flex flex-col gap-4">
         {/* Prior Labs Table Section */}
         <div className="flex flex-col">
-          <div className="text-[9px] font-bold uppercase tracking-[0.8px] text-accent-mid mb-1.5 pb-1 border-b border-border">
-            Prior Labs
+          <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary mb-1.5 pb-1 border-b border-border">
+            Prior Labs & Attachments
           </div>
           <PriorLabsTable 
             patientId={patientId} 
@@ -147,37 +147,36 @@ export function AttachmentsSection({
 
         {/* New Results Upload Section */}
         <div className="flex flex-col">
-          <div className="text-[9px] font-bold uppercase tracking-[0.8px] text-accent-mid mb-1.5 pb-1 border-b border-border">
-            New Results <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+          <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary mb-2 pb-1 border-b border-border flex items-center gap-1">
+            New Lab / Imaging Result <span className="text-red font-bold text-[11px]">*</span>
           </div>
 
-          {/* Upload Form */}
-          <div className="flex flex-col gap-3 p-[14px] border border-dashed border-border-strong/60 rounded-[8px] bg-surface relative">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Tag (Required)</label>
+          {/* Upload Form Container */}
+          <div className="flex flex-col gap-3 p-3.5 border border-border rounded-[8px] bg-surface-2/40">
+            {/* Tag Selection */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
+                Tag / Test Name <span className="text-red font-bold">*</span>
+              </label>
               <ComboboxInput
                 value={tag}
                 onChange={(val) => setTag(val)}
                 options={TAG_SUGGESTIONS}
-                placeholder="e.g. CBC, Chest X-Ray"
+                placeholder="Select or type test (e.g. CBC, Chest X-Ray)"
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Text Result (Optional)</label>
-              <textarea 
-                placeholder="Enter manual lab results here..." 
-                className="w-full px-2.5 py-2 bg-surface border border-border rounded-btn text-[13px] text-[var(--text-primary)] outline-none resize-y min-h-[80px] leading-[1.6] transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-[var(--text-muted)]"
-                value={textResult}
-                onChange={e => setTextResult(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5 mb-1">
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">File (Required) <span className="text-red font-bold">*</span></label>
+            {/* File Dropzone / Selected File Card */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
+                File Attachment <span className="text-red font-bold">*</span>
+              </label>
+              
               {!pendingFile ? (
                 <div 
-                  className={`flex flex-col items-center justify-center py-[22px] px-4 border border-dashed rounded-btn transition-colors duration-150 ${dragActive ? 'border-accent bg-accent-light/30' : 'border-border-strong/60 bg-surface hover:bg-surface-2'}`}
+                  className={`flex flex-col items-center justify-center p-4 border border-dashed rounded-[6px] transition-all cursor-pointer text-center group ${
+                    dragActive ? 'border-accent bg-accent/10' : 'border-border-strong/60 bg-surface hover:bg-surface-2 hover:border-accent/60'
+                  }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
@@ -194,55 +193,90 @@ export function AttachmentsSection({
                       }
                     }} 
                   />
-                  <UploadCloud className="w-6 h-6 text-[var(--text-muted)] mb-2.5" strokeWidth={1.5} />
-                  <p className="text-[12px] text-[var(--text-secondary)] cursor-pointer text-center">
-                    Drag and drop a file here, or <span className="text-accent underline font-medium">click to select</span>
+                  <UploadCloud className="w-5 h-5 text-text-muted group-hover:text-accent transition-colors mb-1.5" strokeWidth={1.75} />
+                  <p className="text-[12px] text-text-primary font-medium">
+                    Click to browse or drag & drop file here
+                  </p>
+                  <p className="text-[10px] text-text-muted mt-0.5">
+                    Supports PDF, PNG, JPG, DICOM files up to 10MB
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 p-3 border border-border rounded-btn bg-surface-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 truncate max-w-[85%]">
-                      <FileText className="w-4 h-4 text-accent shrink-0" />
-                      <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{pendingFile.name}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">({(pendingFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                <div className="flex flex-col gap-2 p-3 bg-surface border border-border rounded-[6px] shadow-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-[6px] flex items-center justify-center shrink-0 font-bold text-[10px] ${
+                        pendingFile.type === 'application/pdf' 
+                          ? 'bg-red/10 text-red' 
+                          : pendingFile.type.startsWith('image/') 
+                          ? 'bg-accent/10 text-accent' 
+                          : 'bg-surface-3 text-text-secondary'
+                      }`}>
+                        {pendingFile.type === 'application/pdf' ? (
+                          'PDF'
+                        ) : pendingFile.type.startsWith('image/') ? (
+                          <Image className="w-4 h-4" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[12px] font-semibold text-text-primary truncate">{pendingFile.name}</span>
+                        <span className="text-[10px] font-mono text-text-muted">{(pendingFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
                     </div>
                     <button 
                       type="button"
-                      className="h-6 w-6 rounded-full hover:bg-surface-3 hover:text-red text-[var(--text-muted)] transition-all flex items-center justify-center cursor-pointer" 
+                      className="p-1 rounded-md hover:bg-surface-3 text-text-muted hover:text-red transition-all cursor-pointer" 
                       onClick={handleRemovePendingFile}
+                      title="Remove file"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
-                  {/* File preview thumbnail if image */}
+
+                  {/* Image preview thumbnail */}
                   {pendingFile.type.startsWith('image/') && previewUrl && (
-                    <div className="relative w-full max-h-36 rounded-md overflow-hidden border border-border bg-black/5 flex items-center justify-center mt-1">
+                    <div className="relative w-full max-h-32 rounded border border-border overflow-hidden bg-black/5 flex items-center justify-center mt-1">
                       <img 
                         src={previewUrl} 
                         alt="Preview" 
-                        className="max-h-36 object-contain"
+                        className="max-h-32 object-contain"
                       />
                     </div>
                   )}
-                  {/* PDF preview indicator */}
-                  {pendingFile.type === 'application/pdf' && (
-                    <div className="flex items-center gap-2 p-2 bg-surface/50 border border-border rounded text-[11px] text-[var(--text-secondary)] mt-1">
-                      <span className="w-2 h-2 rounded-full bg-red shrink-0" />
-                      <span>PDF Document selected. Click 'Add Result' to attach.</span>
-                    </div>
-                  )}
+
+                  {/* Positive status badge */}
+                  <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/60 text-[11px] font-medium text-accent">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
+                    <span>File selected. Click "+ Add Result" below to attach to this note.</span>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end mt-1">
+            {/* Text Result / Remarks */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
+                Text Result / Remarks <span className="text-text-muted font-normal text-[10px] lowercase">(optional)</span>
+              </label>
+              <textarea 
+                placeholder="Enter manual lab results, values, or remarks..." 
+                className="w-full px-2.5 py-1.5 bg-white border border-border-strong/60 rounded-[6px] text-[12px] text-text-primary outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] min-h-[60px] resize-y placeholder:text-border-strong/70"
+                value={textResult}
+                onChange={e => setTextResult(e.target.value)}
+              />
+            </div>
+
+            {/* Add Action Button */}
+            <div className="flex justify-end pt-1">
               <button 
                 type="button"
                 disabled={!tag.trim() || !pendingFile}
                 onClick={handleUpload}
-                className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap min-w-[80px] justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="h-7 px-3.5 rounded-[6px] text-[11px] font-semibold bg-accent text-white hover:bg-accent-hover shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
+                <Plus className="w-3.5 h-3.5" />
                 Add Result
               </button>
             </div>

@@ -119,7 +119,8 @@ export function mapNoteToTimelineView(
       ? initialNote.assessment.map((item: any) => {
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
-            return item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
+            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
           }
           return '';
         }).filter(Boolean)
@@ -192,7 +193,8 @@ export function mapNoteToTimelineView(
       ? progressNote.problemListSnapshot.map((item: any) => {
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
-            return item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
+            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
           }
           return '';
         }).filter(Boolean)

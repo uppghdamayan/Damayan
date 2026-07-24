@@ -65,34 +65,40 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
   };
 
   return (
-    <div className="border border-border rounded-[6px] overflow-hidden my-1">
-      <table className="w-full border-collapse">
+    <div className="border border-border rounded-[6px] overflow-hidden my-1 w-full overflow-x-auto">
+      <table className="w-full border-collapse table-fixed text-left min-w-[290px]">
+        <colgroup>
+          <col className="w-[18%]" />
+          <col className="w-[26%]" />
+          <col className="w-[42%]" />
+          <col className="w-[14%]" />
+        </colgroup>
         <thead>
           <tr>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] px-2.5 py-2 text-left bg-surface-2 border-b border-border">Tag</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] px-2.5 py-2 text-left bg-surface-2 border-b border-border">Date</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] px-2.5 py-2 text-left bg-surface-2 border-b border-border">Result</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-[var(--text-secondary)] px-2.5 py-2 text-center bg-surface-2 border-b border-border w-[90px]">Activity</th>
+            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Tag</th>
+            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Date</th>
+            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Result</th>
+            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1 py-2 text-center bg-surface-2 border-b border-border truncate">Act.</th>
           </tr>
         </thead>
         <tbody>
           {localAttachments.map((att: any, idx: number) => (
             <tr key={`local-${idx}`} className="bg-[rgba(10,110,95,0.04)] border-l-2 border-l-accent transition-colors">
-              <td className="px-2.5 py-2 text-[12px] text-[var(--text-primary)] font-semibold align-top border-b border-border border-l-2 border-l-accent">
+              <td className="px-1.5 py-2 text-[12px] text-text-primary font-semibold align-middle border-b border-border truncate" title={att.tag}>
                 {att.tag}
               </td>
-              <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-top border-b border-border">
-                <span className="text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded uppercase tracking-[0.5px]">Added Just Now</span>
+              <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
+                <span className="text-[9px] font-bold text-accent bg-accent/10 px-1 py-0.5 rounded uppercase tracking-[0.5px] whitespace-nowrap inline-block">Just Now</span>
               </td>
-              <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-top border-b border-border">
+              <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
                 {att.textResult ? (
-                  <span className="italic text-[var(--text-secondary)]">"{att.textResult}"</span>
+                  <span className="italic text-text-secondary truncate block" title={att.textResult}>"{att.textResult}"</span>
                 ) : att.file ? (
-                  <span className="text-[12px] font-medium text-accent">{att.file.name}</span>
+                  <span className="text-[12px] font-medium text-accent truncate block" title={att.file.name}>{att.file.name}</span>
                 ) : null}
               </td>
-              <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-middle border-b border-border text-center">
-                <div className="flex items-center justify-center gap-1">
+              <td className="px-1 py-2 text-[12px] text-text-secondary align-middle border-b border-border text-center">
+                <div className="flex items-center justify-center gap-0.5">
                   {att.file && (
                     <Button
                       variant="ghost"
@@ -101,7 +107,7 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
                         const url = URL.createObjectURL(att.file);
                         window.open(url, '_blank');
                       }}
-                      className="text-text-muted hover:text-accent hover:bg-surface-2 border border-transparent hover:border-border transition-all cursor-pointer h-7 w-7 flex items-center justify-center"
+                      className="text-text-muted hover:text-accent hover:bg-surface-2 border border-transparent hover:border-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
                       title="View File"
                     >
                       <Eye size={13} />
@@ -112,7 +118,7 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
                       variant="ghost" 
                       size="icon-xs" 
                       onClick={() => onRemoveLocalAttachment(idx)}
-                      className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-7 w-7 flex items-center justify-center"
+                      className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
                       title="Remove Attachment"
                     >
                       <Trash2 size={13} />
@@ -127,29 +133,29 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
               {group.attachments.map((att: any, idx: number) => (
                 <tr key={att.id} className="hover:bg-surface-3 transition-colors">
                   {idx === 0 ? (
-                    <td className="px-2.5 py-2 text-[12px] text-[var(--text-primary)] font-semibold align-top border-b border-border" rowSpan={group.attachments.length}>
+                    <td className="px-1.5 py-2 text-[12px] text-text-primary font-semibold align-middle border-b border-border truncate" rowSpan={group.attachments.length} title={group.tag}>
                       {group.tag}
                     </td>
                   ) : null}
-                  <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-top border-b border-border">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span>{new Date(att.uploadedAt).toLocaleDateString()}</span>
+                  <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="whitespace-nowrap text-[11px] font-mono">{new Date(att.uploadedAt).toLocaleDateString()}</span>
                       {att.id === latestCurrentNoteAttachmentId && (
-                        <span className="text-[9px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded uppercase tracking-[0.5px] whitespace-nowrap">
-                          Latest Upload
+                        <span className="text-[8px] font-bold text-accent bg-accent/10 px-1 py-0.5 rounded uppercase tracking-[0.5px] whitespace-nowrap inline-block">
+                          Latest
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-top border-b border-border">
+                  <td className="px-2 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden">
                     {att.textResult ? (
-                      <span className="italic text-[var(--text-secondary)]">"{att.textResult}"</span>
+                      <span className="italic text-text-secondary truncate block" title={att.textResult}>"{att.textResult}"</span>
                     ) : (
-                      <span className="text-[var(--text-muted)] text-[11px] uppercase tracking-[0.5px]">File only</span>
+                      <span className="text-text-muted text-[10px] uppercase tracking-[0.5px] whitespace-nowrap">File only</span>
                     )}
                   </td>
-                  <td className="px-2.5 py-2 text-[12px] text-[var(--text-secondary)] align-middle border-b border-border text-center">
-                    <div className="flex items-center justify-center gap-1">
+                  <td className="px-1 py-2 text-[12px] text-text-secondary align-middle border-b border-border text-center">
+                    <div className="flex items-center justify-center gap-0.5">
                       <DownloadButton attachmentId={att.id} storageKey={att.storageKey} />
                       {canDelete && (
                         <Button
@@ -164,7 +170,7 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
                               noteId: att.noteId,
                             });
                           }}
-                          className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-7 w-7 flex items-center justify-center"
+                          className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
                           title="Delete Attachment"
                         >
                           <Trash2 size={13} />

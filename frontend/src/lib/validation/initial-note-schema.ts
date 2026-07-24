@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const assessmentItemSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   icdCode: z.string().optional(),
+  parentId: z.string().optional().nullable(),
+  depth: z.number().optional(),
+  isNew: z.boolean().optional(),
 });
 
 export const initialNoteDraftSchema = z.object({

@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { buildProblemTree } from '@/lib/problem-utils';
 import { 
   progressNoteDraftSchema, 
   progressNotePublishSchema, 
@@ -30,6 +31,8 @@ import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
+
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ProgressNoteFormProps {
   patientId: string;
@@ -79,8 +82,9 @@ function PatientContextBlock({ patientId, copyForward }: { patientId: string; co
 }
 
 export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFormProps) {
+  const queryClient = useQueryClient();
   const { data: note, isLoading: noteLoading } = useProgressNote(noteId || null);
-  const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
+  const { data: copyForward, isLoading: copyLoading, refetch: refetchCopyForward } = useCopyForwardData(patientId);
   const createMutation = useCreateProgressNote(patientId);
   const createAndPublishMutation = useCreateAndPublishProgressNote(patientId);
   const updateMutation = useUpdateProgressNote(patientId);
@@ -109,6 +113,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const patientMedications = patientMedicationsResponse?.data || [];
   const nameOptions = buildMedicationSuggestions(patientMedications);
 
+  // Refetch patient active problems, medications, vitals every time sidebar opens or patient changes
+  useEffect(() => {
+    if (patientId) {
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
+      refetchCopyForward();
+    }
+  }, [patientId, queryClient, refetchCopyForward]);
+
   const form = useForm<ProgressNoteDraftValues>({
     resolver: zodResolver(progressNoteDraftSchema),
     defaultValues: {
@@ -123,13 +137,96 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     },
   });
 
+  const activeProblemTree = useMemo(() => {
+    const activeProbs = copyForward?.activeProblems || [];
+    const tree = buildProblemTree(activeProbs);
+    const list: { problem: any; depth: number }[] = [];
+    const traverse = (nodes: any[], depth: number) => {
+      nodes.forEach(node => {
+        list.push({ problem: node, depth });
+        traverse(node.children || [], depth + 1);
+      });
+    };
+    traverse(tree, 0);
+    return list;
+  }, [copyForward?.activeProblems]);
+
+  const activeDepthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    activeProblemTree.forEach(item => {
+      map.set(item.problem.title.trim().toLowerCase(), item.depth);
+      if (item.problem.id) map.set(item.problem.id, item.depth);
+    });
+    return map;
+  }, [activeProblemTree]);
+
+  const mergeActiveProblems = (existingProblems: any[], activeProblems: any[]) => {
+    const tree = buildProblemTree(activeProblems || []);
+    const flatActive: { problem: any; depth: number }[] = [];
+    const traverse = (nodes: any[], depth: number) => {
+      nodes.forEach(node => {
+        flatActive.push({ problem: node, depth });
+        traverse(node.children || [], depth + 1);
+      });
+    };
+    traverse(tree, 0);
+
+    const existing = [...existingProblems];
+    const existingTitles = new Set(existing.map((p: any) => (typeof p === 'string' ? p : p.title)?.trim().toLowerCase()));
+
+    for (const item of flatActive) {
+      const p = item.problem;
+      if (p.title && !existingTitles.has(p.title.trim().toLowerCase())) {
+        existing.push({
+          title: p.title,
+          icdCode: p.icdCode || undefined,
+          parentId: p.parentId || undefined,
+          depth: item.depth,
+        });
+        existingTitles.add(p.title.trim().toLowerCase());
+      }
+    }
+    return existing;
+  };
+
+  const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
+    const existing = [...existingMeds];
+    const existingNames = new Set(existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()));
+
+    for (const m of activeMedications) {
+      if (m.name && !existingNames.has(m.name.trim().toLowerCase())) {
+        existing.push({
+          name: m.name,
+          dose: m.dose || undefined,
+          formulation: m.formulation || undefined,
+          quantity: m.quantity || undefined,
+          instructions: m.instructions || undefined,
+        });
+        existingNames.add(m.name.trim().toLowerCase());
+      }
+    }
+    return existing;
+  };
+
   useEffect(() => {
+    const activeProblems = copyForward?.activeProblems || [];
+    const activeMeds = copyForward?.activeMedications || [];
+
     if (noteId && note) {
+      const isPublished = note.status === 'PUBLISHED';
       const draftProblems = (note.problemListSnapshot as any[]) || [];
       const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
 
       const draftMeds = (note.medicationSnapshot as any[]) || [];
       const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
+
+      const finalProblems = isPublished
+        ? validProblems
+        : mergeActiveProblems(validProblems, activeProblems);
+
+      const finalMeds = isPublished
+        ? validMeds
+        : mergeActiveMedications(validMeds, activeMeds);
 
       form.reset({
         subjective: note.subjective,
@@ -137,18 +234,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         labs: (note as any).labs || '',
         mgmtNonpharm: note.mgmtNonpharm || '',
         diagnostics: note.diagnostics || [],
-        problemListSnapshot: (note.problemListSnapshot !== undefined && note.problemListSnapshot !== null)
-          ? validProblems
-          : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
-        medicationSnapshot: (note.medicationSnapshot !== undefined && note.medicationSnapshot !== null)
-          ? validMeds
-          : (copyForward?.activeMedications || []).map((m: any) => ({
-              name: m.name,
-              dose: m.dose || undefined,
-              formulation: m.formulation || undefined,
-              quantity: m.quantity || undefined,
-              instructions: m.instructions || undefined,
-            })),
+        problemListSnapshot: finalProblems,
+        medicationSnapshot: finalMeds,
         visitDatetime: note.createdAt,
       });
     } else if (!noteId && !copyLoading) {
@@ -156,10 +243,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       if (draft) {
         try {
           const parsed = JSON.parse(draft);
-          const draftProblems = parsed.problemListSnapshot as any[] || [];
+          const draftProblems = (parsed.problemListSnapshot as any[]) || [];
           const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
           
-          const draftMeds = parsed.medicationSnapshot as any[] || [];
+          const draftMeds = (parsed.medicationSnapshot as any[]) || [];
           const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : {
             name: m.name,
             dose: m.dose || undefined,
@@ -168,23 +255,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             instructions: m.instructions || undefined,
           });
 
-          if (parsed.problemListSnapshot === undefined || parsed.problemListSnapshot === null) {
-            parsed.problemListSnapshot = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
-          } else {
-            parsed.problemListSnapshot = validProblems;
-          }
-
-          if (parsed.medicationSnapshot === undefined || parsed.medicationSnapshot === null) {
-            parsed.medicationSnapshot = (copyForward?.activeMedications || []).map((m: any) => ({
-              name: m.name,
-              dose: m.dose || undefined,
-              formulation: m.formulation || undefined,
-              quantity: m.quantity || undefined,
-              instructions: m.instructions || undefined,
-            }));
-          } else {
-            parsed.medicationSnapshot = validMeds;
-          }
+          parsed.problemListSnapshot = mergeActiveProblems(validProblems, activeProblems);
+          parsed.medicationSnapshot = mergeActiveMedications(validMeds, activeMeds);
           
           if (parsed.diagnostics === undefined || parsed.diagnostics === null) {
             parsed.diagnostics = copyForward?.latestDiagnostics || [];
@@ -200,11 +272,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         labs: '',
         mgmtNonpharm: '',
         diagnostics: copyForward?.latestDiagnostics || [],
-        problemListSnapshot: (copyForward?.activeProblems || []).map((p: any) => ({
+        problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           title: p.title,
-          icdCode: p.icdCode || undefined
+          icdCode: p.icdCode || undefined,
+          parentId: p.parentId || undefined,
+          depth,
         })),
-        medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
+        medicationSnapshot: activeMeds.map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
           formulation: m.formulation || undefined,
@@ -214,14 +288,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         visitDatetime: new Date().toISOString(),
       });
     }
-  }, [noteId, note, copyForward, copyLoading, patientId, form]);
+  }, [noteId, note, copyForward, copyLoading, patientId, form, activeProblemTree]);
 
   const previousCopyForward = useRef<any>(null);
 
   useEffect(() => {
-    if (!copyForward || copyLoading) return;
+    if (!copyForward || copyLoading || note?.status === 'PUBLISHED') return;
     
-    // If copyForward changed after initial load, instantly sync the form's snapshots
+    // Sync newly added active problems or medications into form state live
     if (previousCopyForward.current) {
       const oldProblems = JSON.stringify(previousCopyForward.current.activeProblems);
       const newProblems = JSON.stringify(copyForward.activeProblems);
@@ -230,24 +304,18 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
       if (oldProblems !== newProblems || oldMeds !== newMeds) {
         const currentValues = form.getValues();
+        const mergedProbs = mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
+        const mergedMeds = mergeActiveMedications(currentValues.medicationSnapshot || [], copyForward.activeMedications);
+
         form.reset({
           ...currentValues,
-          problemListSnapshot: copyForward.activeProblems.map((p: any) => ({ 
-            title: p.title, 
-            icdCode: p.icdCode || undefined 
-          })),
-          medicationSnapshot: copyForward.activeMedications.map((m: any) => ({
-            name: m.name,
-            dose: m.dose || undefined,
-            formulation: m.formulation || undefined,
-            quantity: m.quantity || undefined,
-            instructions: m.instructions || undefined,
-          })),
+          problemListSnapshot: mergedProbs,
+          medicationSnapshot: mergedMeds,
         });
       }
     }
     previousCopyForward.current = copyForward;
-  }, [copyForward, copyLoading, form]);
+  }, [copyForward, copyLoading, note, form]);
 
   const formValues = form.watch();
 
@@ -885,45 +953,83 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   name="problemListSnapshot"
                   render={({ field }) => (
                     <div className="flex flex-col gap-3">
-                      <div className="flex flex-wrap gap-2">
-                        {field.value?.map((prob: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-1 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] text-text-primary">
-                            <span className="font-medium">{typeof prob === 'string' ? prob : prob.title}</span>
-                            {typeof prob !== 'string' && prob.icdCode && (
-                              <span className="text-[10px] text-text-muted">({prob.icdCode})</span>
-                            )}
-                            {typeof prob !== 'string' && prob.isNew && (
-                              <span className="text-[9px] font-bold text-green bg-green/15 px-1 py-0.5 rounded uppercase tracking-wider blink-animation shrink-0">New</span>
-                            )}
-                            {!isPublished && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                    const newProbs = [...(field.value || [])];
-                                    newProbs.splice(idx, 1);
-                                    field.onChange(newProbs);
-                                }}
-                                disabled={isDisabled}
-                                className="text-text-muted hover:text-red transition-colors ml-1 disabled:opacity-50 flex items-center justify-center"
+                      <div className="border border-border rounded-[6px] overflow-hidden bg-surface">
+                        {field.value?.map((prob: any, idx: number) => {
+                          const isLast = idx === (field.value?.length || 0) - 1;
+                          const titleStr = typeof prob === 'string' ? prob : prob.title;
+                          const icdStr = typeof prob !== 'string' ? prob.icdCode : undefined;
+                          const isNewItem = typeof prob !== 'string' && prob.isNew;
+
+                          const titleKey = titleStr?.trim().toLowerCase();
+                          const depth = typeof prob !== 'string' && prob.depth !== undefined 
+                            ? prob.depth 
+                            : (titleKey && activeDepthMap.has(titleKey) 
+                                ? activeDepthMap.get(titleKey)! 
+                                : (typeof prob !== 'string' && prob.parentId ? 1 : 0));
+
+                          return (
+                            <div key={idx} className={`flex items-center gap-2.5 px-3 py-2 ${!isLast ? 'border-b border-border' : ''} hover:bg-surface-3/50 transition-colors`}>
+                              <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
+                              <div 
+                                className="flex-1 min-w-0 flex flex-col"
+                                style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
                               >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="text-[12px] font-semibold text-text-primary truncate">
+                                    {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
+                                    {titleStr}
+                                  </span>
+                                  {icdStr && (
+                                    <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border shrink-0">
+                                      {icdStr}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isNewItem ? (
+                                <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] bg-green-bg text-green border border-green-border shrink-0 blink-animation">
+                                  New
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] bg-accent-light text-accent-hover border border-accent shrink-0">
+                                  Active
+                                </span>
+                              )}
+                              {!isPublished && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                      const newProbs = [...(field.value || [])];
+                                      newProbs.splice(idx, 1);
+                                      field.onChange(newProbs);
+                                  }}
+                                  disabled={isDisabled}
+                                  className="p-1 text-text-muted hover:text-red hover:bg-red-bg rounded-md transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                                  title="Remove Problem"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                         {field.value?.length === 0 && (
-                          <span className="text-[12px] text-text-muted italic">No problems added yet.</span>
+                          <div className="py-3 px-3 text-[12px] text-text-muted italic text-center">
+                            No problems added yet.
+                          </div>
                         )}
                       </div>
                       {!isPublished && (
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex flex-col gap-2 p-3 border border-border rounded-[8px] bg-surface-2/40">
+                          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">Add Problem</span>
+                          {/* Row 1: Problem Title */}
                           <input 
                             id="newProbTitle" 
                             value={newProbTitle}
                             onChange={(e) => setNewProbTitle(e.target.value)}
                             disabled={isDisabled} 
                             placeholder="Problem Title (e.g. Hypertension)" 
-                            className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent flex-1 bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                            className="w-full h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70" 
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -931,37 +1037,40 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                               }
                             }}
                           />
-                          <input 
-                            id="newProbIcd" 
-                            value={newProbIcd}
-                            onChange={(e) => setNewProbIcd(e.target.value)}
-                            disabled={isDisabled} 
-                            placeholder="ICD-10 (Optional)" 
-                            className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong outline-none focus:border-accent w-[120px] bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                document.getElementById('addProbBtn')?.click();
-                              }
-                            }}
-                          />
-                          <Button
-                            id="addProbBtn"
-                            type="button"
-                            variant="secondary"
-                            disabled={isDisabled}
-                            onClick={() => {
-                              if (newProbTitle.trim()) {
-                                const newProbs = [...(field.value || []), { title: newProbTitle.trim(), icdCode: newProbIcd.trim() || undefined, isNew: true }];
-                                field.onChange(newProbs);
-                                setNewProbTitle('');
-                                setNewProbIcd('');
-                              }
-                            }}
-                            className="h-[32px] px-3 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded-[6px] font-medium text-[11px] flex items-center gap-1 transition-all"
-                          >
-                            + Add
-                          </Button>
+                          {/* Row 2: ICD-10 & Add Button */}
+                          <div className="flex items-center gap-2">
+                            <input 
+                              id="newProbIcd" 
+                              value={newProbIcd}
+                              onChange={(e) => setNewProbIcd(e.target.value)}
+                              disabled={isDisabled} 
+                              placeholder="ICD-10 Code (e.g. I10) - Optional" 
+                              className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70" 
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  document.getElementById('addProbBtn')?.click();
+                                }
+                              }}
+                            />
+                            <Button
+                              id="addProbBtn"
+                              type="button"
+                              variant="default"
+                              disabled={isDisabled || !newProbTitle.trim()}
+                              onClick={() => {
+                                if (newProbTitle.trim()) {
+                                  const newProbs = [...(field.value || []), { title: newProbTitle.trim(), icdCode: newProbIcd.trim() || undefined, isNew: true }];
+                                  field.onChange(newProbs);
+                                  setNewProbTitle('');
+                                  setNewProbIcd('');
+                                }
+                              }}
+                              className="h-[32px] px-4 bg-accent hover:bg-accent-hover text-white rounded-[6px] font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              + Add Problem
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -979,7 +1088,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <div className="p-[14px]">
                 <textarea
                   {...form.register('mgmtNonpharm')}
-                  className="w-full min-h-[60px] px-2.5 py-1.5 bg-white border-[1.5px] border-border-strong rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full min-h-[60px] px-2.5 py-1.5 bg-white border border-border-strong/60 rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter non-pharmacologic management..."
                   disabled={isDisabled}
                 />
@@ -1023,105 +1132,150 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   render={({ field }) => {
                     const meds = field.value || [];
                     return (
-                      <div className="flex flex-col gap-1">
-                        {meds.map((med: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                            <div className="flex-1 min-w-0 truncate flex items-center flex-wrap">
-                              <strong>{typeof med === 'string' ? med : med.name}</strong> 
-                              {typeof med !== 'string' && med.dose && (
-                                <span className="font-mono text-accent font-semibold ml-1.5">{med.dose}</span>
+                      <div className="flex flex-col gap-3">
+                        {/* Fixed Table Layout for Medication Data */}
+                        <div className="border border-border rounded-[6px] overflow-hidden w-full overflow-x-auto bg-surface">
+                          <table className="w-full border-collapse table-fixed text-left min-w-[290px]">
+                            <colgroup>
+                              <col className="w-[40%]" />
+                              <col className="w-[24%]" />
+                              <col className="w-[26%]" />
+                              <col className="w-[10%]" />
+                            </colgroup>
+                            <thead>
+                              <tr className="bg-surface-2 border-b border-border">
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-2.5 py-2 text-left truncate">Medication</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left truncate">Form / Qty</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left truncate">Sig</th>
+                                <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1 py-2 text-center truncate">Act.</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {meds.map((med: any, idx: number) => {
+                                const medName = typeof med === 'string' ? med : med.name;
+                                const medDose = typeof med !== 'string' ? med.dose : undefined;
+                                const medForm = typeof med !== 'string' ? med.formulation : undefined;
+                                const medQty = typeof med !== 'string' ? med.quantity : undefined;
+                                const medSig = typeof med !== 'string' ? med.instructions : undefined;
+                                const isNewMed = typeof med !== 'string' && med.isNew;
+
+                                return (
+                                  <tr key={idx} className="hover:bg-surface-3/50 transition-colors border-b border-border last:border-b-0">
+                                    <td className="px-2.5 py-2 text-[12px] align-middle overflow-hidden truncate">
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                          <span className="font-bold text-text-primary text-[12px] truncate" title={medName}>{medName}</span>
+                                          {isNewMed && (
+                                            <span className="text-[8px] font-bold text-green bg-green-bg border border-green-border px-1 py-0.5 rounded uppercase tracking-wider shrink-0 blink-animation">New</span>
+                                          )}
+                                        </div>
+                                        {medDose && (
+                                          <span className="font-mono text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded w-fit mt-0.5 truncate">{medDose}</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-middle overflow-hidden truncate">
+                                      <span className="font-medium truncate block">{medForm || '—'}</span>
+                                      {medQty && (
+                                        <span className="text-text-muted font-mono text-[10px] block truncate">Qty: {medQty}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-1.5 py-2 text-[11px] text-text-secondary align-middle overflow-hidden truncate">
+                                      <span className="italic text-text-muted text-[11px] truncate block" title={medSig || ''}>
+                                        {medSig || '—'}
+                                      </span>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center">
+                                      {!isPublished && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-xs"
+                                          onClick={() => {
+                                            const newMeds = [...meds];
+                                            newMeds.splice(idx, 1);
+                                            field.onChange(newMeds);
+                                          }}
+                                          disabled={isDisabled}
+                                          className="text-text-muted hover:text-red hover:bg-red-bg transition-colors w-6 h-6 rounded-md disabled:opacity-50 shrink-0 cursor-pointer p-0"
+                                          title="Remove Medication"
+                                        >
+                                          <TrashIcon className="w-3.5 h-3.5" />
+                                        </Button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {meds.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="py-3 px-3 text-[12px] text-text-muted italic text-center">
+                                    No medications added yet.
+                                  </td>
+                                </tr>
                               )}
-                              {typeof med !== 'string' && med.formulation && (
-                                <span className="text-text-secondary ml-1.5">{med.formulation}</span>
-                              )}
-                              {typeof med !== 'string' && med.quantity && (
-                                <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                              )}
-                              {typeof med !== 'string' && med.instructions && (
-                                <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
-                              )}
-                              {typeof med !== 'string' && med.isNew && (
-                                <span className="text-[9px] font-bold text-green bg-green/15 px-1 py-0.5 rounded uppercase tracking-wider ml-1.5 shrink-0 blink-animation">New</span>
-                              )}
-                            </div>
-                            {!isPublished && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-xs"
-                                onClick={() => {
-                                  const newMeds = [...meds];
-                                  newMeds.splice(idx, 1);
-                                  field.onChange(newMeds);
-                                }}
-                                disabled={isDisabled}
-                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md disabled:opacity-50"
-                              >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                            </tbody>
+                          </table>
+                        </div>
+
                         {!isPublished && (
-                          <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-card">
-                            <div className="col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
+                          <div className="flex flex-col gap-2.5 mt-1 p-3 border border-border rounded-[8px] bg-surface-2/40">
+                            <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">Add Medication</span>
+                            
+                            {/* Row 1: Medication Name */}
+                            <div className="w-full">
                               <ComboboxInput
                                 value={newMedName}
                                 onChange={setNewMedName}
                                 options={nameOptions}
-                                placeholder="e.g. Lisinopril"
+                                placeholder="Medication Name (e.g. Lisinopril)"
                                 disabled={isDisabled}
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+                                className="h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70"
                               />
                             </div>
-                            <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+
+                            {/* Row 2: Dose, Formulation, Quantity */}
+                            <div className="flex items-center gap-2">
                               <input 
                                 type="text" 
                                 value={newMedDose}
                                 onChange={(e) => setNewMedDose(e.target.value)}
-                                placeholder="e.g. 10" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
+                                placeholder="Dose (e.g. 10 mg)" 
+                                disabled={isDisabled}
+                                className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
-                            </div>
-                            <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
                               <input 
                                 value={newMedFormulation}
                                 onChange={(e) => setNewMedFormulation(e.target.value)}
-                                placeholder="e.g. Tablet, Syrup" 
+                                placeholder="Form (e.g. Tablet)" 
                                 disabled={isDisabled}
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                                className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
-                            </div>
-                            <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
                               <input 
                                 type="number"
                                 value={newMedQuantity}
                                 onChange={(e) => setNewMedQuantity(e.target.value)}
-                                placeholder="e.g. 30" 
+                                placeholder="Qty" 
                                 disabled={isDisabled}
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                                className="w-[70px] h-[32px] px-2 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
                             </div>
-                            <div className="col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
+
+                            {/* Row 3: Sig / Instructions & Action Button */}
+                            <div className="flex items-center gap-2">
                               <input 
                                 value={newMedInstructions}
                                 onChange={(e) => setNewMedInstructions(e.target.value)}
-                                placeholder="e.g. Take 1 tab daily" 
+                                placeholder="Sig / Instructions (e.g. Take 1 tab daily)" 
                                 disabled={isDisabled}
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] disabled:bg-surface-2 disabled:cursor-not-allowed" 
+                                className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:bg-surface-2 disabled:cursor-not-allowed" 
                               />
-                            </div>
-                            <div className="col-span-12 flex justify-end mt-1">
                               <Button
                                 type="button"
-                                variant="secondary"
+                                variant="default"
                                 size="xs"
-                                disabled={isDisabled}
+                                disabled={isDisabled || !newMedName.trim() || !newMedDose.trim()}
                                 onClick={() => {
                                   if (newMedName.trim() && newMedDose.trim()) {
                                     field.onChange([...meds, { 
@@ -1139,7 +1293,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     setNewMedInstructions('');
                                   }
                                 }}
-                                className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+                                className="h-[32px] px-3.5 bg-accent text-white hover:bg-accent-hover rounded-[6px] font-semibold text-[11px] flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
                               >
                                 + Add Medication
                               </Button>
