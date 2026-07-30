@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, History } from 'lucide-react';
+import { X, History, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,12 @@ import {
   formatLogDate,
   formatLogTime,
 } from '@/lib/initial-note-log-utils';
+import {
+  buildVersionCsv,
+  buildVersionCsvFilename,
+  downloadCsv,
+} from '@/lib/initial-note-csv';
+import { usePatient } from '@/hooks/usePatients';
 import { InitialNoteVersionView } from './InitialNoteVersionView';
 
 interface InitialNoteVersionHistoryModalProps {
@@ -58,6 +64,27 @@ export function InitialNoteVersionHistoryModal({
 
   const activeSummary = versions.find((v) => v.id === activeId);
   const latestVersionNumber = versions[0]?.versionNumber;
+
+  // Identifies the record in the exported file; the query is already cached by
+  // the surrounding screen, so this costs nothing extra.
+  const { data: patient } = usePatient(open ? patientId : null);
+  const csvPatient = patient
+    ? {
+        patientCode: patient.patientCode,
+        fullName: [patient.firstName, patient.middleName, patient.lastName]
+          .filter(Boolean)
+          .join(' '),
+      }
+    : undefined;
+
+  const handleExportCsv = () => {
+    if (!version) return;
+    const changedFields = activeSummary?.changedFields ?? version.changedFields;
+    downloadCsv(
+      buildVersionCsvFilename(version, csvPatient),
+      buildVersionCsv(version, changedFields, csvPatient),
+    );
+  };
 
   // Clearing the local selection on close lets the next open honour whatever
   // initialVersionId the caller passes (e.g. a log row's "View version" chip).
@@ -254,16 +281,32 @@ export function InitialNoteVersionHistoryModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 px-[18px] py-3 border-t border-border bg-surface-2/30 flex-shrink-0">
-          <span className="text-[11px] text-text-muted">
+          <span className="text-[11px] text-text-muted max-[767px]:hidden">
             Viewing history only — earlier versions cannot be restored.
           </span>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 cursor-pointer"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2 max-[767px]:w-full max-[767px]:justify-end">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={!version}
+              className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 cursor-pointer inline-flex items-center gap-[5px] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-surface-2 disabled:hover:text-text-secondary"
+              title={
+                version
+                  ? `Export version ${version.versionNumber} as a CSV file`
+                  : 'Select a version to export'
+              }
+            >
+              <Download className="w-3.5 h-3.5" />
+              {version ? `Export v${version.versionNumber} (CSV)` : 'Export CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
