@@ -19,7 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role, NoteStatus } from '@prisma/client';
 import { AuthorGuard } from '../auth/guards/author.guard';
 import { NoteModel } from '../auth/decorators/note-model.decorator';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 
 @ApiTags('Initial Notes')
 @Controller('patients/:patientId/initial-note')
@@ -57,6 +57,45 @@ export class InitialNotesController {
         return true;
       return false;
     });
+  }
+
+  // NOTE: the literal-segment routes below must stay declared above the
+  // ':id'-prefixed ones — Nest matches in declaration order.
+
+  @Get('logs')
+  @ApiOperation({
+    summary: 'List Initial Note change logs for a patient — All roles',
+  })
+  @ApiOkResponse({ description: 'List of initial note logs.' })
+  async getLogs(@Param('patientId') patientId: string) {
+    const data = await this.initialNotesService.getLogs(patientId);
+    return { data };
+  }
+
+  @Get(':id/versions')
+  @ApiOperation({
+    summary: 'List version history for an Initial Note — All roles',
+  })
+  @ApiOkResponse({ description: 'Version metadata, newest first.' })
+  async getVersions(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+  ) {
+    const data = await this.initialNotesService.getVersions(patientId, id);
+    return { data };
+  }
+
+  @Get(':id/versions/:versionId')
+  @ApiOperation({
+    summary: 'Get one Initial Note version with its snapshot — All roles',
+  })
+  @ApiOkResponse({ description: 'The requested version.' })
+  getVersion(
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.initialNotesService.getVersion(patientId, id, versionId);
   }
 
   @Post()

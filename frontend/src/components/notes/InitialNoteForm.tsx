@@ -7,12 +7,14 @@ import {
   initialNotePublishSchema, 
   InitialNoteDraftValues 
 } from '@/lib/validation/initial-note-schema';
-import { 
-  useInitialNote, 
-  useCreateInitialNote, 
-  useUpdateInitialNote, 
+import {
+  useInitialNote,
+  useCreateInitialNote,
+  useUpdateInitialNote,
   usePublishInitialNote,
-  useDeleteInitialNote
+  useDeleteInitialNote,
+  useInitialNoteLogs,
+  useInitialNoteVersions
 } from '@/hooks/useInitialNote';
 import { useCopyForwardData, useProgressNotes } from '@/hooks/useProgressNotes';
 import { useLatestVitals } from '@/hooks/useVitals';
@@ -25,14 +27,17 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
+import { InitialNoteLogTable } from './InitialNoteLogTable';
+import { InitialNoteVersionHistoryModal } from './InitialNoteVersionHistoryModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
   classifyTemperature, classifyRespiratoryRate,
@@ -188,26 +193,40 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const deleteMutation = useDeleteInitialNote(patientId);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
   const { registerPublishHandler } = useUiStore();
+  const currentUser = useAuthStore((s) => s.user);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [historyVersionId, setHistoryVersionId] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
   const uploadAttachment = useUploadAttachment();
 
-  const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
   const isPublished = note?.status === 'PUBLISHED';
-  const canEditAll = !isPublished;
-  const isHistoryEditableOnly = false;
+  // A published note is editable in place once the user clicks "Edit Note".
+  const canEditAll = !isPublished || isEditing;
+  // Mirrors the backend AuthorGuard so we never show a button that would 403.
+  const canEditNote =
+    !!note &&
+    !!currentUser &&
+    (currentUser.role === 'ADMIN' || currentUser.id === note.authorId);
 
-  const historyInputClass = cn(
-    "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
-    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+  const { data: logsResponse, isLoading: logsLoading } = useInitialNoteLogs(patientId);
+  const initialNoteLogs = logsResponse?.data ?? [];
+  const { data: versionsResponse } = useInitialNoteVersions(
+    patientId,
+    note?.id ?? null,
   );
+  const versionCount = versionsResponse?.data.length ?? 0;
 
-  const historyTextareaClass = cn(
-    "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
-    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
-  );
+  const openVersionHistory = (versionId?: string) => {
+    setHistoryVersionId(versionId ?? null);
+    setShowVersionHistory(true);
+  };
+
+  const historyInputClass = "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all";
+
+  const historyTextareaClass = "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all";
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -743,6 +762,33 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   Edited by {note.lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}{note.lastEditor.lastName}, {note.lastEditor.firstName} · {new Date(note.lastEditedAt || new Date()).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} · {new Date(note.lastEditedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openVersionHistory()}
+                  className="sec-btn"
+                  title="View previous versions of this note"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  Version History
+                  {versionCount > 0 && (
+                    <span className="ml-1 font-mono text-[10px] text-text-muted">
+                      ({versionCount})
+                    </span>
+                  )}
+                </button>
+                {/* Author or ADMIN only — mirrors the backend AuthorGuard */}
+                {canEditNote && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="sec-btn primary"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit Note
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           {/* VITALS CARD */}
@@ -1083,16 +1129,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           )}
 
           {isPublished && (
-            <div className={cn(
-              "p-3 rounded-card text-[12px] font-medium border flex items-center justify-between",
-              isHistoryEditableOnly 
-                ? "bg-amber-bg border-amber-border text-amber"
-                : "bg-green-bg border-green-border text-green"
-            )}>
+            <div className="p-3 rounded-card text-[12px] font-medium border flex items-center justify-between gap-3 bg-blue-bg border-blue-border text-blue">
               <span>
-                {isHistoryEditableOnly 
-                  ? "⚠ Note is published and has subsequent progress notes. You can only edit the history sections (Medical, Family, Personal, OB, Psychosocial)."
-                  : "ℹ Note is published but has no progress notes. You can edit any part of the note."}
+                ℹ You are editing a published note. Saving records a new entry in
+                the version history and the master log.
               </span>
             </div>
           )}
@@ -1175,7 +1215,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 1. Subjective Card */}
-            <div className={cn("bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden transition-all">
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-blue-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -1184,11 +1224,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
                   Subjective
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
-                )}
                 <span className="text-[10px] text-blue/70 font-medium">Patient's reported complaints and history</span>
               </div>
               {/* Card Body */}
@@ -1250,11 +1285,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-amber flex-1">
                   History
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-bold bg-[#FEF3C7] text-[#D97706] border border-[#FCD34D] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0 animate-pulse">
-                    ✏️ Editable
-                  </span>
-                )}
                 <span className="text-[10px] text-amber/70 font-medium">Medical, family, personal, and social background</span>
               </div>
               {/* Card Body */}
@@ -1375,7 +1405,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 3. Objective Card */}
-            <div className={cn("bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden transition-all">
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-purple-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -1384,11 +1414,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
                   Objective
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
-                )}
                 <span className="text-[10px] text-purple/70 font-medium">Physical exam and diagnostic results</span>
               </div>
               <div className="p-4 flex flex-col gap-4 bg-surface">
@@ -1446,17 +1471,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 4. Assessment Card */}
-            <div className={cn("bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">📊</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
-                )}
                 <span className="text-[10px] text-accent-hover/70 font-medium">Required to publish</span>
               </div>
               <div className="p-4 flex flex-col gap-3 bg-surface">
@@ -1563,7 +1583,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 5. Management Plan Card */}
-            <div className={cn("bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card transition-all">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <Stethoscope className="w-3.5 h-3.5 text-green" />
@@ -1571,11 +1591,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
                   Plan / Management
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
-                )}
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
               <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 bg-surface">
@@ -1748,6 +1763,42 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             />
           </div>
         </>
+      )}
+
+      {/* MASTER INITIAL NOTE LOGS — patient-scoped change history, the Initial
+          Note counterpart of the Master Problem List / Medication logs. */}
+      {note && (
+        <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]">
+          <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center flex-shrink-0 shadow-sm border border-border">
+                <FileClock className="w-3.5 h-3.5 text-text-secondary" />
+              </div>
+              <h3 className="text-[13px] font-bold tracking-[0.3px] text-text-primary">
+                Master Initial Note Logs
+              </h3>
+              <span className="ch-badge text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-3">
+                {initialNoteLogs.length} {initialNoteLogs.length === 1 ? 'Entry' : 'Entries'}
+              </span>
+            </div>
+          </div>
+
+          <InitialNoteLogTable
+            logs={initialNoteLogs}
+            isLoading={logsLoading}
+            onViewVersion={openVersionHistory}
+          />
+        </div>
+      )}
+
+      {note && (
+        <InitialNoteVersionHistoryModal
+          open={showVersionHistory}
+          onClose={() => setShowVersionHistory(false)}
+          patientId={patientId}
+          noteId={note.id}
+          initialVersionId={historyVersionId}
+        />
       )}
 
       <DeleteConfirmModal

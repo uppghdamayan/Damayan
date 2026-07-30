@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsNotEmpty,
   IsDateString,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -17,6 +18,17 @@ class AssessmentItemDto {
   @IsString()
   @IsOptional()
   icdCode?: string;
+
+  // Nesting metadata carried by the problem list UI. Whitelisted so the
+  // indentation of an assessment survives a round-trip — the global
+  // ValidationPipe runs forbidNonWhitelisted, so an unlisted key is a 400.
+  @IsString()
+  @IsOptional()
+  parentId?: string | null;
+
+  @IsInt()
+  @IsOptional()
+  depth?: number;
 }
 
 class MedicationItemDto {
