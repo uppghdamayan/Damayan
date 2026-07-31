@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -35,7 +35,7 @@ async function bootstrap() {
       },
       exceptionFactory: (errors) => {
         console.error('Validation errors:', JSON.stringify(errors, null, 2));
-        return new import('@nestjs/common').BadRequestException(errors);
+        return new BadRequestException(errors);
       },
     }),
   );

@@ -31,10 +31,10 @@ export class ProgressNotesController {
   @Get()
   async findAll(
     @Param('patientId') patientId: string,
+    @Request() req,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Query('excludeDeleted') excludeDeleted?: string,
-    @Request() req,
   ) {
     const result = await this.progressNotesService.findAllByPatient(
       patientId,
