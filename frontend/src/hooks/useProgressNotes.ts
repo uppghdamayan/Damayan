@@ -34,10 +34,10 @@ export interface ProgressNote {
   isDeleted: boolean;
 }
 
-export function useProgressNotes(patientId: string | null, page = 1, limit = 10) {
+export function useProgressNotes(patientId: string | null, page = 1, limit = 10, excludeDeleted = false) {
   return useQuery({
-    queryKey: ['progress-notes', patientId, page, limit],
-    queryFn: () => apiRequest<{ data: ProgressNote[], meta: any }>(`/patients/${patientId}/progress-notes?page=${page}&limit=${limit}`),
+    queryKey: ['progress-notes', patientId, page, limit, excludeDeleted],
+    queryFn: () => apiRequest<{ data: ProgressNote[], meta: any }>(`/patients/${patientId}/progress-notes?page=${page}&limit=${limit}${excludeDeleted ? '&excludeDeleted=true' : ''}`),
     enabled: !!patientId,
     staleTime: 1000 * 20,
     // Consistent with the other patient-scoped paginated hooks — prevents a
@@ -57,7 +57,7 @@ export function useProgressNote(noteId: string | null) {
 export function useCopyForwardData(patientId: string | null) {
   const { data: problemsData, isLoading: problemsLoading, isFetching: problemsFetching, refetch: refetchProblems } = useProblems(patientId);
   const { data: medicationsData, isLoading: medicationsLoading, isFetching: medicationsFetching, refetch: refetchMedications } = useMedications(patientId);
-  const { data: notesData, isLoading: notesLoading, isFetching: notesFetching, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1);
+  const { data: notesData, isLoading: notesLoading, isFetching: notesFetching, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1, true);
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];

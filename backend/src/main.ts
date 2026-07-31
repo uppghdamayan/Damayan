@@ -27,11 +27,15 @@ async function bootstrap() {
   // ─────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties not declared in DTO
-      forbidNonWhitelisted: true, // Throw 400 if unknown properties are sent
-      transform: true, // Auto-transform payload to DTO class instance
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, // Convert query string types automatically
+        enableImplicitConversion: true,
+      },
+      exceptionFactory: (errors) => {
+        console.error('Validation errors:', JSON.stringify(errors, null, 2));
+        return new import('@nestjs/common').BadRequestException(errors);
       },
     }),
   );

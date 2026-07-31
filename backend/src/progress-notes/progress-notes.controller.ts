@@ -33,12 +33,14 @@ export class ProgressNotesController {
     @Param('patientId') patientId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
+    @Query('excludeDeleted') excludeDeleted?: string,
     @Request() req,
   ) {
     const result = await this.progressNotesService.findAllByPatient(
       patientId,
       +page,
       +limit,
+      excludeDeleted === 'true'
     );
 
     // Filter out drafts that the user shouldn't see

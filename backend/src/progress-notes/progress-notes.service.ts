@@ -29,11 +29,17 @@ export class ProgressNotesService {
     private storageService: StorageService,
   ) {}
 
-  async findAllByPatient(patientId: string, page = 1, limit = 10) {
+  async findAllByPatient(patientId: string, page = 1, limit = 10, excludeDeleted = false) {
     const skip = (page - 1) * limit;
+    
+    const whereClause: Prisma.ProgressNoteWhereInput = {
+      visit: { patientId },
+      ...(excludeDeleted ? { isDeleted: false } : {})
+    };
+
     const [data, total] = await Promise.all([
       this.prisma.progressNote.findMany({
-        where: { visit: { patientId } },
+        where: whereClause,
         skip,
         take: limit,
         orderBy: { visit: { visitDatetime: 'desc' } },
@@ -45,7 +51,7 @@ export class ProgressNotesService {
           },
         },
       }),
-      this.prisma.progressNote.count({ where: { visit: { patientId } } }),
+      this.prisma.progressNote.count({ where: whereClause }),
     ]);
     return {
       data,
