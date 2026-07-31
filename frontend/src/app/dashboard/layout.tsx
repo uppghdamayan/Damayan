@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.replace('/change-password');
         return;
       }
-      if (currentUser.role === 'ADMIN') {
+      if (currentUser.role === 'ADMIN' && (window.location.pathname === '/dashboard' || window.location.pathname === '/dashboard/')) {
         router.replace('/admin/accounts');
         return;
       }
