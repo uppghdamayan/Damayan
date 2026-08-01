@@ -11,7 +11,7 @@ export interface TimelineNoteView {
   authorId?: string | null;
   authorName: string;
   authorRole?: string;
-  isDisplayedUserAuthor: boolean;
+  isMainAuthor: boolean;
   lastEditorName?: string;
   lastEditedAt?: string;
   previewText: string;       // first ~65 chars of chief complaint (initial) or subjective (progress)
@@ -146,14 +146,7 @@ export function mapNoteToTimelineView(
     let displayUser = author;
     let displayUserId = initialNote.authorId;
 
-    if (initialNote.lastEditedBy && initialNote.lastEditedBy !== initialNote.authorId) {
-      if (lastEditor) {
-        displayUser = lastEditor;
-        displayUserId = initialNote.lastEditedBy;
-      }
-    }
-
-    let isDisplayedUserAuthor = displayUserId === initialNote.authorId;
+    let isMainAuthor = true; // Initial note creator is always the main author
 
     const authorName = displayUser 
       ? `${displayUser.role === 'DOCTOR' ? 'Dr. ' : ''}${displayUser.lastName}, ${displayUser.firstName}`
@@ -167,7 +160,7 @@ export function mapNoteToTimelineView(
       authorId: initialNote.authorId,
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
-      isDisplayedUserAuthor,
+      isMainAuthor,
       lastEditorName,
       lastEditedAt,
       previewText: initialNote.chiefComplaint ? initialNote.chiefComplaint.slice(0, 65) + (initialNote.chiefComplaint.length > 65 ? '...' : '') : '',
@@ -220,16 +213,9 @@ export function mapNoteToTimelineView(
     let displayUser = author;
     let displayUserId = progressNote.authorId;
 
-    if (progressNote.lastEditedBy && progressNote.lastEditedBy !== progressNote.authorId) {
-      if (lastEditor) {
-        displayUser = lastEditor;
-        displayUserId = progressNote.lastEditedBy;
-      }
-    }
-
-    let isDisplayedUserAuthor = false;
+    let isMainAuthor = false;
     if (initialNoteAuthorId) {
-      isDisplayedUserAuthor = displayUserId === initialNoteAuthorId;
+      isMainAuthor = displayUserId === initialNoteAuthorId;
     }
 
     const authorName = displayUser 
@@ -244,7 +230,7 @@ export function mapNoteToTimelineView(
       authorId: progressNote.authorId,
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
-      isDisplayedUserAuthor,
+      isMainAuthor,
       lastEditorName,
       lastEditedAt,
       previewText: progressNote.subjective ? progressNote.subjective.slice(0, 65) + (progressNote.subjective.length > 65 ? '...' : '') : '',
