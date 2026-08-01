@@ -172,10 +172,7 @@ export function drawPatientBlock(
 /**
  * Assessment list with filled ● bullets (matches reference images for all docs)
  */
-export function drawAssessmentList(
-  doc: any,
-  assessment: any[] | null,
-) {
+export function drawAssessmentList(doc: any, assessment: any[] | null) {
   doc.font('Helvetica-Bold').fontSize(10).text('Assessment:');
   doc.moveDown(0.3);
   doc.font('Helvetica');
@@ -185,7 +182,9 @@ export function drawAssessmentList(
       const indentBase = 20;
       const additionalIndent = depth * 15;
       const prefix = depth > 0 ? '->  ' : '\u2022  ';
-      doc.text(`${prefix}${a.title}`, { indent: indentBase + additionalIndent });
+      doc.text(`${prefix}${a.title}`, {
+        indent: indentBase + additionalIndent,
+      });
     });
   } else {
     doc.text('\u2022  No assessment on record.', { indent: 20 });
@@ -210,24 +209,16 @@ export function drawMedicationList(doc: any, medications: any[]) {
     const y = doc.y;
 
     // Draw medication name bold
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .text(med.name, startX, y, {
-        continued: true,
-      });
+    doc.font('Helvetica-Bold').fontSize(10).text(med.name, startX, y, {
+      continued: true,
+    });
 
     // Build the dose and formulation string, then append quantity if present
-    const detailParts = [
-      med.dose,
-      med.formulation
-    ].filter(Boolean).join(' ');
-    
+    const detailParts = [med.dose, med.formulation].filter(Boolean).join(' ');
+
     const qtyText = med.quantity ? ` #${med.quantity}` : '';
 
-    doc
-      .font('Helvetica')
-      .text(` ${detailParts}${qtyText}`);
+    doc.font('Helvetica').text(` ${detailParts}${qtyText}`);
 
     doc.x = startX;
     if (med.instructions) {
@@ -251,7 +242,9 @@ export function drawMedicationList(doc: any, medications: any[]) {
  */
 export function drawMedCertMedicationList(doc: any, medications: any[]) {
   if (!medications || medications.length === 0) {
-    doc.font('Helvetica').text('\u2022  No active medications on record.', { indent: 20 });
+    doc
+      .font('Helvetica')
+      .text('\u2022  No active medications on record.', { indent: 20 });
     return;
   }
   doc.font('Helvetica');
@@ -269,7 +262,9 @@ export function drawMedCertMedicationList(doc: any, medications: any[]) {
  */
 export function drawReferralMedicationList(doc: any, medications: any[]) {
   if (!medications || medications.length === 0) {
-    doc.font('Helvetica').text('\u2022  No active medications on record.', { indent: 20 });
+    doc
+      .font('Helvetica')
+      .text('\u2022  No active medications on record.', { indent: 20 });
     return;
   }
   doc.font('Helvetica');

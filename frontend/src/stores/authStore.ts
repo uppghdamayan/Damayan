@@ -8,6 +8,7 @@ interface AuthUser {
   lastName: string;
   role: 'DOCTOR' | 'NURSE' | 'ADMIN';
   requiresPasswordChange: boolean;
+  licenseNumber?: string;
 }
 
 interface AuthState {

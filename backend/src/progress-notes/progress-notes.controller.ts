@@ -40,7 +40,7 @@ export class ProgressNotesController {
       patientId,
       +page,
       +limit,
-      excludeDeleted === 'true'
+      excludeDeleted === 'true',
     );
 
     // Filter out drafts that the user shouldn't see

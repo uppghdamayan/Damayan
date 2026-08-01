@@ -20,9 +20,9 @@ export const renderPrescription = async (data: any): Promise<Buffer> => {
     drawGenerationDate(doc);
     drawPatientBlock(doc, data.patient);
     doc.moveDown(1);
-    
+
     drawAssessmentList(doc, data.assessment);
-    
+
     // Rx is large bold (36pt) as shown in reference image
     doc.fontSize(36).font('Helvetica-Bold').text('Rx');
     // Reset to 10pt BEFORE moveDown so the gap is calculated at body-text size

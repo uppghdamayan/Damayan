@@ -141,6 +141,11 @@ export function Topbar() {
                 {user.role === 'DOCTOR' ? 'Doctor' : user.role === 'NURSE' ? 'Nurse' : 'Admin'}
               </span>
             )}
+            {user?.role === 'DOCTOR' && user.licenseNumber && (
+              <span className="text-[10px] text-text-muted mt-0.5">
+                Lic: {user.licenseNumber}
+              </span>
+            )}
           </div>
           <div className="w-8 h-8 rounded-full bg-accent-hover text-white text-[11px] font-bold border-2 border-border flex items-center justify-center shrink-0 cursor-default">
             {userInitials}

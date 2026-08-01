@@ -114,13 +114,16 @@ export class DocumentsService {
         dbProblems.forEach((p) => {
           titleToDepth.set(p.title.trim().toLowerCase(), getDepth(p.id));
         });
-        
+
         assessment = assessment.map((a: any) => ({
           ...a,
-          depth: a.depth !== undefined ? a.depth : (titleToDepth.get(a.title?.trim().toLowerCase()) || 0),
+          depth:
+            a.depth !== undefined
+              ? a.depth
+              : titleToDepth.get(a.title?.trim().toLowerCase()) || 0,
         }));
       }
-      
+
       data.assessment = assessment ?? null;
       data.diagnostics = latestNote?.diagnostics ?? null;
       data.chiefComplaintDefault = latestNote?.chiefComplaint ?? '';
