@@ -61,7 +61,8 @@ export class DocumentsService {
     const needsAssessment =
       type === DocumentType.MEDICAL_CERTIFICATE ||
       type === DocumentType.REFERRAL_LETTER ||
-      type === DocumentType.LAB_REQUEST;
+      type === DocumentType.LAB_REQUEST ||
+      type === DocumentType.PRESCRIPTION;
     const needsMedications =
       type === DocumentType.MEDICAL_CERTIFICATE ||
       type === DocumentType.REFERRAL_LETTER ||
@@ -99,7 +100,28 @@ export class DocumentsService {
     const data: Record<string, any> = { patient, physician };
 
     if (needsAssessment) {
-      data.assessment = latestNote?.assessment ?? null;
+      let assessment = latestNote?.assessment as any[] | null;
+      if (assessment && assessment.length > 0) {
+        const dbProblems = await this.prisma.problem.findMany({
+          where: { patientId },
+        });
+        const getDepth = (id: string, currentDepth: number = 0): number => {
+          const p = dbProblems.find((x) => x.id === id);
+          if (!p || !p.parentId) return currentDepth;
+          return getDepth(p.parentId, currentDepth + 1);
+        };
+        const titleToDepth = new Map<string, number>();
+        dbProblems.forEach((p) => {
+          titleToDepth.set(p.title.trim().toLowerCase(), getDepth(p.id));
+        });
+        
+        assessment = assessment.map((a: any) => ({
+          ...a,
+          depth: a.depth !== undefined ? a.depth : (titleToDepth.get(a.title?.trim().toLowerCase()) || 0),
+        }));
+      }
+      
+      data.assessment = assessment ?? null;
       data.diagnostics = latestNote?.diagnostics ?? null;
       data.chiefComplaintDefault = latestNote?.chiefComplaint ?? '';
     }

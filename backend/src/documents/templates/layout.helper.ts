@@ -70,8 +70,6 @@ export function drawSignatureBlock(
   doc.font('Helvetica-Bold').fontSize(10).text(formatPhysicianName(physician));
   doc.font('Helvetica').fontSize(10);
   doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
-  doc.text(`PTR No.: ${physician.ptrNumber ?? 'N/A'}`);
-  doc.text(`S2 No.: ${physician.s2Number ?? 'N/A'}`);
 }
 
 export function formatPhysicianName(p: {
@@ -176,15 +174,19 @@ export function drawPatientBlock(
  */
 export function drawAssessmentList(
   doc: any,
-  assessment: { title: string; icdCode?: string | null }[] | null,
+  assessment: any[] | null,
 ) {
   doc.font('Helvetica-Bold').fontSize(10).text('Assessment:');
   doc.moveDown(0.3);
   doc.font('Helvetica');
   if (assessment && assessment.length > 0) {
-    assessment.forEach((a) =>
-      doc.text(`\u2022  ${a.title}`, { indent: 20 }),
-    );
+    assessment.forEach((a) => {
+      const depth = a.depth || 0;
+      const indentBase = 20;
+      const additionalIndent = depth * 15;
+      const prefix = depth > 0 ? '->  ' : '\u2022  ';
+      doc.text(`${prefix}${a.title}`, { indent: indentBase + additionalIndent });
+    });
   } else {
     doc.text('\u2022  No assessment on record.', { indent: 20 });
   }

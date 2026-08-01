@@ -103,11 +103,14 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
   };
 
   const handleFileDeleted = (fileId: string) => {
-    if (selectedFile?.id === fileId) {
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setIsFullscreen(false);
-    }
+    setSelectedFile((prev) => {
+      if (prev?.id === fileId) {
+        setPreviewUrl(null);
+        setIsFullscreen(false);
+        return null;
+      }
+      return prev;
+    });
   };
 
   return (

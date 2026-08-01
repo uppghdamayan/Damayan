@@ -45,6 +45,7 @@ export function DeleteConfirmModal({
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onClick={(e) => e.stopPropagation()}
       className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150"
     >
       <div className="bg-surface border border-border rounded-[10px] w-[460px] max-h-[80vh] overflow-y-auto shadow-modal">
