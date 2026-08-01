@@ -11,6 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export enum AccountRole {
   DOCTOR = 'DOCTOR',
   NURSE = 'NURSE',
+  PHARMACIST = 'PHARMACIST',
   // ADMIN is intentionally excluded — cannot be created via this endpoint
 }
 

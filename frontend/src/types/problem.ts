@@ -15,13 +15,13 @@ export interface Problem {
   addedByUser?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
   updatedBy?: string | null;
   updatedByUser?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
 }
 

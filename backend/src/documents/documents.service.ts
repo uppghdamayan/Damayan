@@ -40,7 +40,7 @@ export class DocumentsService {
       const requester = await this.prisma.user.findUnique({
         where: { id: userId },
       });
-      if (requester?.role === Role.DOCTOR) return requester;
+      if (requester?.role === Role.DOCTOR || requester?.role === Role.NURSE) return requester;
     }
     if (visitId && uuidRegex.test(visitId)) {
       const visit = await this.prisma.visit.findUnique({

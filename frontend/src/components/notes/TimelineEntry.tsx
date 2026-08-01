@@ -88,6 +88,14 @@ export function TimelineEntry({
               <span className="font-bold text-[var(--text-primary)] px-1 bg-surface-3 rounded border border-border">
                 {note.authorName}
               </span>
+              {note.authorRole && note.authorRole !== 'DOCTOR' && (
+                <Badge 
+                  variant={note.authorRole === 'PHARMACIST' ? 'info' : 'active'} 
+                  className="text-[10px] font-bold uppercase tracking-[0.5px]"
+                >
+                  {note.authorRole} NOTE
+                </Badge>
+              )}
               {note.authorId === user?.id && (
                 <Badge variant="saved" className="text-[10px] font-bold uppercase tracking-[0.5px]">
                   Author

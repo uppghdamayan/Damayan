@@ -13,8 +13,8 @@ export const progressNoteDraftSchema = z.object({
 });
 
 export const progressNotePublishSchema = progressNoteDraftSchema.extend({
-  subjective: z.string().min(1, 'Subjective is required'),
-  objective: z.string().min(1, 'Objective is required'),
+  subjective: z.string().min(1, 'Note text is required'),
+  objective: z.string().optional().or(z.literal('')),
 });
 
 export type ProgressNoteDraftValues = z.infer<typeof progressNoteDraftSchema>;

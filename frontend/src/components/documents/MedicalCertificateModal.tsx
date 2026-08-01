@@ -113,7 +113,7 @@ export function MedicalCertificateModal({ patientId, visitId, onClose }: Medical
           </div>
         ) : (
           <div className="text-[12px] text-text-secondary bg-surface-2 p-2 rounded-card border border-border">
-            <strong>Physician:</strong> Dr. {draft.physician?.firstName} {draft.physician?.lastName}
+            <strong>{draft.physician?.role === 'DOCTOR' ? 'Physician' : 'Prepared By'}:</strong> {draft.physician?.role === 'DOCTOR' ? 'Dr. ' : ''}{draft.physician?.firstName} {draft.physician?.lastName}
           </div>
         )}
       </div>

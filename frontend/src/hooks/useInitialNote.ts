@@ -28,12 +28,12 @@ export interface InitialNote {
   author?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
   lastEditor?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
   isDeleted: boolean;
 }

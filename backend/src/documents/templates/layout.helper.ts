@@ -52,6 +52,7 @@ export function drawSignatureBlock(
     licenseNumber?: string | null;
     ptrNumber?: string | null;
     s2Number?: string | null;
+    role?: string;
   },
   label = 'Requested By:',
   includeSignedPlaceholder = true,
@@ -69,15 +70,21 @@ export function drawSignatureBlock(
   }
   doc.font('Helvetica-Bold').fontSize(10).text(formatPhysicianName(physician));
   doc.font('Helvetica').fontSize(10);
-  doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
+  if (!physician.role || physician.role === 'DOCTOR') {
+    doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
+  }
 }
 
 export function formatPhysicianName(p: {
   firstName: string;
   lastName: string;
   middleName?: string | null;
+  role?: string;
 }): string {
   const mid = p.middleName ? ` ${p.middleName.charAt(0)}.` : '';
+  if (p.role && p.role !== 'DOCTOR') {
+    return `${p.firstName}${mid} ${p.lastName}`;
+  }
   return `Dr. ${p.firstName}${mid} ${p.lastName}, MD`;
 }
 

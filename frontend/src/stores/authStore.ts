@@ -6,7 +6,7 @@ interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   requiresPasswordChange: boolean;
   licenseNumber?: string;
 }

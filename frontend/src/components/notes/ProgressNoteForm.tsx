@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -103,6 +104,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const publishMutation = usePublishProgressNote(patientId);
   const deleteMutation = useDeleteProgressNote(patientId);
   const { openExistingProgressNote, setActiveScreen, setDocumentationPanelOpen, registerPublishHandler } = useUiStore();
+  const { user } = useAuthStore();
+  const isNonDoctor = user?.role === 'NURSE' || user?.role === 'PHARMACIST';
 
   const [publishError, setPublishError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -335,8 +338,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   publishAndSwitchRef.current = async (): Promise<boolean> => {
     const publishCheck = progressNotePublishSchema.safeParse(formValues);
-    if (!publishCheck.success) {
-      setPublishError("Please fill out Subjective and Objective fields.");
+    if (!publishCheck.success || (!isNonDoctor && (!formValues.objective || !formValues.objective.trim()))) {
+      setPublishError(isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields.");
       const el = document.getElementById('notes-workspace-container');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
       return false;
@@ -419,6 +422,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const cleanFormValues = (values: any) => {
     return {
       ...values,
+      subjective: values.subjective ?? '',
+      objective: values.objective ?? '',
       problemListSnapshot: values.problemListSnapshot?.map((p: any) => {
         if (typeof p === 'object' && p !== null) {
           const { isNew, ...rest } = p;
@@ -640,8 +645,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     const proceedWithPublish = () => {
       setPublishError(null);
       const publishCheck = progressNotePublishSchema.safeParse(formValues);
-      if (!publishCheck.success) {
-        setPublishError("Please fill out Subjective and Objective fields.");
+      if (!publishCheck.success || (!isNonDoctor && (!formValues.objective || !formValues.objective.trim()))) {
+        setPublishError(isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields.");
         return;
       }
       executePublish();
@@ -901,27 +906,29 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
           <div className="flex flex-col gap-4">
 
-            {/* SUBJECTIVE */}
+            {/* SUBJECTIVE (or Note Details for Non-Doctors) */}
             <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💬</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
-                  Subjective <span className="text-red ml-0.5">*</span>
+                  {isNonDoctor ? 'Note Details' : 'Subjective'} <span className="text-red ml-0.5">*</span>
                 </span>
               </div>
               <div className="p-[14px]">
                 <textarea
                   {...form.register('subjective')}
                   className={`w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed ${(!formValues.subjective || !formValues.subjective.trim()) && !isPublished ? 'border-red focus:border-red' : 'border-border-strong focus:border-accent'}`}
-                  placeholder="Enter subjective findings..."
+                  placeholder={isNonDoctor ? "Enter note details..." : "Enter subjective findings..."}
                   disabled={isDisabled}
                 />
                 {(!formValues.subjective || !formValues.subjective.trim()) && !isPublished && (
-                  <p className="text-[10px] text-red mt-1.5 font-medium">Subjective is required to publish this note.</p>
+                  <p className="text-[10px] text-red mt-1.5 font-medium">{isNonDoctor ? 'Note details are required.' : 'Subjective is required to publish this note.'}</p>
                 )}
               </div>
             </div>
 
+            {!isNonDoctor && (
+              <>
             {/* OBJECTIVE */}
             <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
@@ -1327,6 +1334,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 />
               </div>
             </div>
+              </>
+            )}
 
           </div>
         </div>

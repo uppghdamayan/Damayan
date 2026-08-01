@@ -13,7 +13,7 @@ interface Account {
   firstName: string;
   lastName: string;
   middleName?: string;
-  role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   isActive: boolean;
   requiresPasswordChange: boolean;
   temporaryPassword?: string;
@@ -269,6 +269,7 @@ function CreateAccountModal({
             >
               <option value="DOCTOR">Doctor</option>
               <option value="NURSE">Nurse</option>
+              <option value="PHARMACIST">Pharmacist</option>
             </select>
           </Field>
 
@@ -486,6 +487,7 @@ function EditAccountModal({
             >
               <option value="DOCTOR">Doctor</option>
               <option value="NURSE">Nurse</option>
+              <option value="PHARMACIST">Pharmacist</option>
             </select>
           </Field>
 
