@@ -95,12 +95,18 @@ export class AnalyticsService {
     ] = await Promise.all([
       this.prisma.patient.count({ where: patientWhere }),
       this.prisma.patient.count({ where: { ...patientWhere, isActive: true } }),
-      this.prisma.patient.count({ where: { ...patientWhere, isActive: false } }),
+      this.prisma.patient.count({
+        where: { ...patientWhere, isActive: false },
+      }),
       this.prisma.visit.count({ where: visitWhere }),
       this.prisma.problem.count({ where: problemWhere }),
-      this.prisma.problem.count({ where: { ...problemWhere, status: 'ACTIVE' } }),
+      this.prisma.problem.count({
+        where: { ...problemWhere, status: 'ACTIVE' },
+      }),
       this.prisma.medication.count({ where: medicationWhere }),
-      this.prisma.medication.count({ where: { ...medicationWhere, isActive: true } }),
+      this.prisma.medication.count({
+        where: { ...medicationWhere, isActive: true },
+      }),
     ]);
 
     return {
@@ -141,7 +147,9 @@ export class AnalyticsService {
 
   // ── Top 10 medications ─────────────────────────────────────────────────────
 
-  private async getTopMedications(medicationWhere: Prisma.MedicationWhereInput) {
+  private async getTopMedications(
+    medicationWhere: Prisma.MedicationWhereInput,
+  ) {
     const result = await this.prisma.medication.groupBy({
       by: ['name'],
       _count: { name: true },
@@ -186,7 +194,9 @@ export class AnalyticsService {
 
   // ── Patient registrations over time (monthly) ──────────────────────────────
 
-  private async getRegistrationsOverTime(patientWhere: Prisma.PatientWhereInput) {
+  private async getRegistrationsOverTime(
+    patientWhere: Prisma.PatientWhereInput,
+  ) {
     // Use raw query for date_trunc which is more reliable for monthly grouping
     const dateFilter = (patientWhere as any)?.createdAt;
     let whereClause = '';
@@ -279,7 +289,9 @@ export class AnalyticsService {
 
   // ── Problem status breakdown ───────────────────────────────────────────────
 
-  private async getProblemStatusBreakdown(problemWhere: Prisma.ProblemWhereInput) {
+  private async getProblemStatusBreakdown(
+    problemWhere: Prisma.ProblemWhereInput,
+  ) {
     const result = await this.prisma.problem.groupBy({
       by: ['status'],
       _count: { status: true },
@@ -365,5 +377,130 @@ export class AnalyticsService {
     }));
 
     return { data, meta: { total, page, limit, totalPages } };
+  }
+
+  // ── Patient Analytics (Cross-Section) ──────────────────────────────────────
+
+  async getPatientsAnalyticsPaginated(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    diagnosis?: string;
+    medication?: string;
+    city?: string;
+    region?: string;
+    dateRange?: DateRange;
+  }) {
+    const {
+      page,
+      limit,
+      search,
+      diagnosis,
+      medication,
+      city,
+      region,
+      dateRange,
+    } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.PatientWhereInput = {};
+    const andFilters: Prisma.PatientWhereInput[] = [];
+
+    if (search) {
+      andFilters.push({
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { patientCode: { contains: search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (diagnosis) {
+      andFilters.push({
+        problems: {
+          some: {
+            title: { contains: diagnosis, mode: 'insensitive' },
+          },
+        },
+      });
+    }
+
+    if (medication) {
+      andFilters.push({
+        medications: {
+          some: {
+            name: { contains: medication, mode: 'insensitive' },
+          },
+        },
+      });
+    }
+
+    if (city) {
+      andFilters.push({ addressCity: { contains: city, mode: 'insensitive' } });
+    }
+
+    if (region) {
+      andFilters.push({
+        addressRegion: { contains: region, mode: 'insensitive' },
+      });
+    }
+
+    if (dateRange) {
+      andFilters.push({
+        createdAt: { gte: dateRange.from, lte: dateRange.to },
+      });
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.patient.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          problems: {
+            where: diagnosis
+              ? { title: { contains: diagnosis, mode: 'insensitive' } }
+              : undefined,
+            take: 3,
+          },
+          medications: {
+            where: medication
+              ? { name: { contains: medication, mode: 'insensitive' } }
+              : undefined,
+            take: 3,
+          },
+        },
+      }),
+      this.prisma.patient.count({ where }),
+    ]);
+
+    const formattedData = data.map((p) => ({
+      id: p.id,
+      patientCode: p.patientCode,
+      name: `${p.firstName} ${p.lastName}`,
+      sex: p.sex,
+      dateOfBirth: p.dateOfBirth,
+      city: p.addressCity || 'N/A',
+      region: p.addressRegion || 'N/A',
+      diagnoses: p.problems.map((prob) => prob.title),
+      medications: p.medications.map((med) => med.name),
+      createdAt: p.createdAt,
+    }));
+
+    return {
+      data: formattedData,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }

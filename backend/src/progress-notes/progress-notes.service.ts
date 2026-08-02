@@ -105,7 +105,7 @@ export class ProgressNotesService {
         status: NoteStatus.PUBLISHED,
         isDeleted: false,
         author: {
-          role: 'DOCTOR'
+          role: 'DOCTOR',
         },
       },
       orderBy: { visit: { visitDatetime: 'desc' } },
@@ -249,9 +249,9 @@ export class ProgressNotesService {
   }
 
   async publish(patientId: string, id: string, userId: string) {
-    const note = await this.prisma.progressNote.findUnique({ 
+    const note = await this.prisma.progressNote.findUnique({
       where: { id },
-      include: { author: { select: { role: true } } }
+      include: { author: { select: { role: true } } },
     });
     if (!note) throw new NotFoundException('Note not found');
 
@@ -265,9 +265,7 @@ export class ProgressNotesService {
       }
     } else {
       if (!note.subjective) {
-        throw new BadRequestException(
-          'Note text is required.',
-        );
+        throw new BadRequestException('Note text is required.');
       }
     }
 
@@ -284,7 +282,10 @@ export class ProgressNotesService {
 
           const snapshotItems = ((note.problemListSnapshot as any[]) || [])
             .filter((p) => p && p.title && String(p.title).trim() !== '')
-            .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+            .map((p) => ({
+              title: String(p.title).trim(),
+              icdCode: p.icdCode,
+            }));
 
           const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
             .filter((m) => m && m.name && String(m.name).trim() !== '')
@@ -325,7 +326,10 @@ export class ProgressNotesService {
           ]);
 
           problemChanges = diffByTitle(beforeProblems, afterProblems) as object;
-          medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds) as object;
+          medicationChanges = diffByNameDoseUnit(
+            beforeMeds,
+            afterMeds,
+          ) as object;
         }
 
         await this.visitsService.updateChangeSummary(

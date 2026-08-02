@@ -47,8 +47,7 @@ export class ProgressNotesController {
     const filteredData = result.data.filter((note) => {
       if (note.status === NoteStatus.PUBLISHED) return true;
       if (req.user.role === Role.ADMIN) return true;
-      if (req.user.id === note.authorId)
-        return true;
+      if (req.user.id === note.authorId) return true;
       return false;
     });
 
@@ -63,10 +62,7 @@ export class ProgressNotesController {
     const note = await this.progressNotesService.findOne(id);
 
     if (note.status === NoteStatus.DRAFT) {
-      if (
-        req.user.id !== note.authorId &&
-        req.user.role !== Role.ADMIN
-      ) {
+      if (req.user.id !== note.authorId && req.user.role !== Role.ADMIN) {
         throw new NotFoundException('Progress Note not found');
       }
     }

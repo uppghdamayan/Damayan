@@ -30,7 +30,7 @@ export default function LoginPage() {
             if (storeUser.requiresPasswordChange) {
               router.replace('/change-password');
             } else if (storeUser.role === 'ADMIN') {
-              router.replace('/admin/accounts');
+              router.replace('/admin/dashboard');
             } else {
               router.replace('/dashboard');
             }
@@ -93,7 +93,7 @@ export default function LoginPage() {
       if (profile.requiresPasswordChange) {
         router.replace('/change-password');
       } else if (profile.role === 'ADMIN') {
-        router.replace('/admin/accounts');
+        router.replace('/admin/dashboard');
       } else {
         router.replace('/dashboard');
       }
