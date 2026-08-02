@@ -29,11 +29,22 @@ export class ProgressNotesService {
     private storageService: StorageService,
   ) {}
 
-  async findAllByPatient(patientId: string, page = 1, limit = 10) {
+  async findAllByPatient(
+    patientId: string,
+    page = 1,
+    limit = 10,
+    excludeDeleted = false,
+  ) {
     const skip = (page - 1) * limit;
+
+    const whereClause: Prisma.ProgressNoteWhereInput = {
+      visit: { patientId },
+      ...(excludeDeleted ? { isDeleted: false } : {}),
+    };
+
     const [data, total] = await Promise.all([
       this.prisma.progressNote.findMany({
-        where: { visit: { patientId } },
+        where: whereClause,
         skip,
         take: limit,
         orderBy: { visit: { visitDatetime: 'desc' } },
@@ -45,7 +56,7 @@ export class ProgressNotesService {
           },
         },
       }),
-      this.prisma.progressNote.count({ where: { visit: { patientId } } }),
+      this.prisma.progressNote.count({ where: whereClause }),
     ]);
     return {
       data,
@@ -93,6 +104,9 @@ export class ProgressNotesService {
         visit: { patientId },
         status: NoteStatus.PUBLISHED,
         isDeleted: false,
+        author: {
+          role: 'DOCTOR',
+        },
       },
       orderBy: { visit: { visitDatetime: 'desc' } },
       select: {
@@ -131,6 +145,7 @@ export class ProgressNotesService {
       where: {
         authorId: userId,
         status: NoteStatus.DRAFT,
+        isDeleted: false,
         visit: {
           patientId,
         },
@@ -234,66 +249,88 @@ export class ProgressNotesService {
   }
 
   async publish(patientId: string, id: string, userId: string) {
-    const note = await this.prisma.progressNote.findUnique({ where: { id } });
+    const note = await this.prisma.progressNote.findUnique({
+      where: { id },
+      include: { author: { select: { role: true } } },
+    });
     if (!note) throw new NotFoundException('Note not found');
 
-    if (!note.subjective || !note.objective) {
-      throw new BadRequestException(
-        'Subjective and Objective are required to publish a progress note.',
-      );
+    const authorRole = note.author?.role;
+
+    if (authorRole === 'DOCTOR' || !authorRole) {
+      if (!note.subjective || !note.objective) {
+        throw new BadRequestException(
+          'Subjective and Objective are required to publish a progress note.',
+        );
+      }
+    } else {
+      if (!note.subjective) {
+        throw new BadRequestException('Note text is required.');
+      }
     }
 
     return this.prisma.$transaction(
       async (tx) => {
-        const [beforeProblems, beforeMeds] = await Promise.all([
-          this.problemsService.findActiveForPatient(patientId, tx),
-          this.medicationsService.findActiveForPatient(patientId, tx),
-        ]);
+        let problemChanges: any = null;
+        let medicationChanges: any = null;
 
-        const snapshotItems = ((note.problemListSnapshot as any[]) || [])
-          .filter((p) => p && p.title && String(p.title).trim() !== '')
-          .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+        if (authorRole === 'DOCTOR' || !authorRole) {
+          const [beforeProblems, beforeMeds] = await Promise.all([
+            this.problemsService.findActiveForPatient(patientId, tx),
+            this.medicationsService.findActiveForPatient(patientId, tx),
+          ]);
 
-        const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
-          .filter((m) => m && m.name && String(m.name).trim() !== '')
-          .map((m) => ({
-            name: String(m.name).trim(),
-            dose:
-              m.dose !== undefined && m.dose !== null
-                ? String(m.dose).trim()
-                : '',
-            formulation: m.formulation,
-            quantity:
-              m.quantity !== undefined && m.quantity !== null
-                ? Number(m.quantity)
-                : undefined,
-            instructions: m.instructions,
-          }));
+          const snapshotItems = ((note.problemListSnapshot as any[]) || [])
+            .filter((p) => p && p.title && String(p.title).trim() !== '')
+            .map((p) => ({
+              title: String(p.title).trim(),
+              icdCode: p.icdCode,
+            }));
 
-        await Promise.all([
-          this.problemsService.upsertFromAssessment(
-            patientId,
-            snapshotItems,
-            userId,
-            'Progress Note',
-            tx,
-          ),
-          this.medicationsService.upsertFromNoteMedications(
-            patientId,
-            snapshotMeds,
-            userId,
-            'Progress Note',
-            tx,
-          ),
-        ]);
+          const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
+            .filter((m) => m && m.name && String(m.name).trim() !== '')
+            .map((m) => ({
+              name: String(m.name).trim(),
+              dose:
+                m.dose !== undefined && m.dose !== null
+                  ? String(m.dose).trim()
+                  : '',
+              formulation: m.formulation,
+              quantity:
+                m.quantity !== undefined && m.quantity !== null
+                  ? Number(m.quantity)
+                  : undefined,
+              instructions: m.instructions,
+            }));
 
-        const [afterProblems, afterMeds] = await Promise.all([
-          this.problemsService.findActiveForPatient(patientId, tx),
-          this.medicationsService.findActiveForPatient(patientId, tx),
-        ]);
+          await Promise.all([
+            this.problemsService.upsertFromAssessment(
+              patientId,
+              snapshotItems,
+              userId,
+              'Progress Note',
+              tx,
+            ),
+            this.medicationsService.upsertFromNoteMedications(
+              patientId,
+              snapshotMeds,
+              userId,
+              'Progress Note',
+              tx,
+            ),
+          ]);
 
-        const problemChanges = diffByTitle(beforeProblems, afterProblems);
-        const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+          const [afterProblems, afterMeds] = await Promise.all([
+            this.problemsService.findActiveForPatient(patientId, tx),
+            this.medicationsService.findActiveForPatient(patientId, tx),
+          ]);
+
+          problemChanges = diffByTitle(beforeProblems, afterProblems) as object;
+          medicationChanges = diffByNameDoseUnit(
+            beforeMeds,
+            afterMeds,
+          ) as object;
+        }
 
         await this.visitsService.updateChangeSummary(
           note.visitId,

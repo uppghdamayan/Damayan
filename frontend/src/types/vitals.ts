@@ -1,7 +1,7 @@
 export interface VitalsMeasuredByUser {
   firstName: string;
   lastName: string;
-  role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
 }
 
 export interface VitalSign {

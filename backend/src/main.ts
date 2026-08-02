@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -27,11 +27,15 @@ async function bootstrap() {
   // ─────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties not declared in DTO
-      forbidNonWhitelisted: true, // Throw 400 if unknown properties are sent
-      transform: true, // Auto-transform payload to DTO class instance
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, // Convert query string types automatically
+        enableImplicitConversion: true,
+      },
+      exceptionFactory: (errors) => {
+        console.error('Validation errors:', JSON.stringify(errors, null, 2));
+        return new BadRequestException(errors);
       },
     }),
   );

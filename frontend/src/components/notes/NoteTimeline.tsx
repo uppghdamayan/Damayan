@@ -77,7 +77,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   }, [allNotesRaw, activeInitialNote]);
 
   const inheritedSourceId = useMemo(() => {
-    const latestPublished = mappedNotes.find(n => n.status === 'PUBLISHED' && !n.isDeleted);
+    const latestPublished = mappedNotes.find(n => n.status === 'PUBLISHED' && !n.isDeleted && (!n.authorRole || n.authorRole === 'DOCTOR'));
     return latestPublished?.id;
   }, [mappedNotes]);
 
@@ -205,9 +205,9 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           </div>
         ) : (
           mappedNotes.map((note, index) => {
-            // Diff baseline: chronologically diff against the next note older in sorted order (index index + 1).
-            // Decided per fix.md §6.3.
-            const previousNote = index < mappedNotes.length - 1 ? mappedNotes[index + 1] : null;
+            // Diff baseline: chronologically diff against the next note older in sorted order that is authored by a DOCTOR.
+            // Decided per fix.md §6.3, and updated to skip NURSE/PHARMACIST notes which lack clinical snapshots.
+            const previousNote = mappedNotes.slice(index + 1).find(n => !n.authorRole || n.authorRole === 'DOCTOR') || null;
             const isOpenNote = expandedNotes.has(note.id);
 
             return (

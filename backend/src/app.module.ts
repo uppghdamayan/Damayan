@@ -15,6 +15,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { StorageModule } from './storage/storage.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { StorageModule } from './storage/storage.module';
     AuditLogsModule,
     SupabaseModule,
     StorageModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

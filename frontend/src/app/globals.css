@@ -265,6 +265,11 @@
     @apply outline-2 outline-offset-2 outline-accent;
   }
 
+  /* Global clickables cursor */
+  button, a, [role="button"], select, summary, input[type="radio"], input[type="checkbox"], tr.cursor-pointer, .sec-btn {
+    cursor: pointer;
+  }
+
   /* Thin scrollbars */
   ::-webkit-scrollbar {
     @apply w-[5px] h-[5px];

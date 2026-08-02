@@ -136,9 +136,16 @@ export function Topbar() {
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                   : user.role === 'NURSE' 
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : user.role === 'PHARMACIST'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
                   : 'bg-purple-50 text-purple-700 border-purple-200'
               }`}>
-                {user.role === 'DOCTOR' ? 'Doctor' : user.role === 'NURSE' ? 'Nurse' : 'Admin'}
+                {user.role === 'DOCTOR' ? 'Doctor' : user.role === 'NURSE' ? 'Nurse' : user.role === 'PHARMACIST' ? 'Pharmacist' : 'Admin'}
+              </span>
+            )}
+            {user?.role === 'DOCTOR' && user.licenseNumber && (
+              <span className="text-[10px] text-text-muted mt-0.5">
+                Lic: {user.licenseNumber}
               </span>
             )}
           </div>

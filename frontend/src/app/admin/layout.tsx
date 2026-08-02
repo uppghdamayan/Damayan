@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { PlusCircle } from 'lucide-react';
@@ -52,9 +52,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'AD';
   return (
-    <div className="min-h-full bg-bg font-sans">
+    <div className="h-screen overflow-y-auto bg-bg font-sans flex flex-col">
       {/* Topbar */}
-      <header className="h-[56px] bg-surface border-b border-border flex items-center px-4 gap-3 sticky top-0 z-[200]">
+      <header className="h-[56px] bg-surface border-b border-border flex items-center px-4 gap-3 sticky top-0 z-[200] shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-2 w-[var(--sidebar-w)] flex-shrink-0 overflow-hidden">
           <div className="w-[22px] h-[22px] bg-accent rounded-[5px] flex items-center justify-center flex-shrink-0">
@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </header>
 
       {/* Main */}
-      <main className="py-6 px-5 max-w-[1200px] mx-auto">
+      <main className="py-6 px-5 max-w-[1200px] w-full mx-auto flex-1">
         <div className="mb-6">
           <AdminTabsNav />
         </div>
@@ -109,8 +109,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 }
 
 function AdminTabsNav() {
-  const pathname = require('next/navigation').usePathname();
-  const router = require('next/navigation').useRouter();
+  const pathname = usePathname();
+  const router = useRouter();
   const activeTab = pathname.includes('/admin/dashboard') 
     ? 'dashboard' 
     : pathname.includes('/admin/patients')
@@ -120,6 +120,19 @@ function AdminTabsNav() {
   return (
     <div className="border-b border-border">
       <div className="flex gap-6">
+        <button
+          onClick={() => router.push('/admin/dashboard')}
+          className={`pb-3 text-[13px] font-semibold transition-colors relative ${
+            activeTab === 'dashboard'
+              ? 'text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          Analytics Dashboard
+          {activeTab === 'dashboard' && (
+            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+          )}
+        </button>
         <button
           onClick={() => router.push('/admin/accounts')}
           className={`pb-3 text-[13px] font-semibold transition-colors relative ${
@@ -143,19 +156,6 @@ function AdminTabsNav() {
         >
           Patient Accounts
           {activeTab === 'patients' && (
-            <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
-          )}
-        </button>
-        <button
-          onClick={() => router.push('/admin/dashboard')}
-          className={`pb-3 text-[13px] font-semibold transition-colors relative ${
-            activeTab === 'dashboard'
-              ? 'text-text-primary'
-              : 'text-text-muted hover:text-text-secondary'
-          }`}
-        >
-          Dashboard
-          {activeTab === 'dashboard' && (
             <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent rounded-t-full" />
           )}
         </button>

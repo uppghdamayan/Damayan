@@ -31,23 +31,24 @@ export class ProgressNotesController {
   @Get()
   async findAll(
     @Param('patientId') patientId: string,
+    @Request() req,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
-    @Request() req,
+    @Query('excludeDeleted') excludeDeleted?: string,
   ) {
     const result = await this.progressNotesService.findAllByPatient(
       patientId,
       +page,
       +limit,
+      excludeDeleted === 'true',
     );
 
     // Filter out drafts that the user shouldn't see
     const filteredData = result.data.filter((note) => {
       if (note.status === NoteStatus.PUBLISHED) return true;
       if (req.user.role === Role.ADMIN) return true;
-      if (req.user.role === Role.DOCTOR && req.user.id === note.authorId)
-        return true;
-      return false; // Nurses shouldn't see drafts, or other doctors
+      if (req.user.id === note.authorId) return true;
+      return false;
     });
 
     return {
@@ -61,11 +62,7 @@ export class ProgressNotesController {
     const note = await this.progressNotesService.findOne(id);
 
     if (note.status === NoteStatus.DRAFT) {
-      if (
-        req.user.role === Role.DOCTOR &&
-        req.user.id !== note.authorId &&
-        req.user.role !== Role.ADMIN
-      ) {
+      if (req.user.id !== note.authorId && req.user.role !== Role.ADMIN) {
         throw new NotFoundException('Progress Note not found');
       }
     }
@@ -74,7 +71,7 @@ export class ProgressNotesController {
   }
 
   @Post()
-  @Roles(Role.DOCTOR, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.ADMIN, Role.NURSE, Role.PHARMACIST)
   create(
     @Param('patientId') patientId: string,
     @Body() createProgressNoteDto: CreateProgressNoteDto,
@@ -88,7 +85,7 @@ export class ProgressNotesController {
   }
 
   @Post('create-and-publish')
-  @Roles(Role.DOCTOR, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.ADMIN, Role.NURSE, Role.PHARMACIST)
   createAndPublish(
     @Param('patientId') patientId: string,
     @Body() createProgressNoteDto: CreateProgressNoteDto,
@@ -124,7 +121,7 @@ export class ProgressNotesController {
   }
 
   @Delete('drafts')
-  @Roles(Role.DOCTOR, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.ADMIN, Role.NURSE, Role.PHARMACIST)
   removeAllDrafts(@Param('patientId') patientId: string, @Request() req) {
     return this.progressNotesService.deleteAllDrafts(patientId, req.user.id);
   }

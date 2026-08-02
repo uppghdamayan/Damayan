@@ -14,12 +14,12 @@ export interface Medication {
   addedByUser?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
   updatedByUser?: {
     firstName: string;
     lastName: string;
-    role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+    role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   } | null;
 }
 

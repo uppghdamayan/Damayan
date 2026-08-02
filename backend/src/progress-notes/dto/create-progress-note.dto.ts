@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsNotEmpty,
   ValidateNested,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -16,6 +17,14 @@ class AssessmentItemDto {
   @IsString()
   @IsOptional()
   icdCode?: string;
+
+  @IsString()
+  @IsOptional()
+  parentId?: string | null;
+
+  @IsInt()
+  @IsOptional()
+  depth?: number;
 }
 
 class MedicationItemDto {

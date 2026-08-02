@@ -93,6 +93,21 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const prevAssessment = previousNote?.sections.assessment || null;
   const assessmentDiff = diffListItems(currentAssessment, prevAssessment);
 
+  const isNonDoctor = note.authorRole === 'NURSE' || note.authorRole === 'PHARMACIST';
+
+  if (isNonDoctor && note.sections.subjective && note.sections.subjective.length > 0) {
+    return (
+      <div className="flex flex-col gap-4 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+        <div className="flex flex-col gap-2 pl-1">
+          {note.sections.subjective.map((sub, idx) => (
+            <p key={idx} className="whitespace-pre-wrap pl-1 text-[var(--text-primary)]">{sub.body || '—'}</p>
+          ))}
+        </div>
+        <NoteAttachmentsSection note={note} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 text-[13px] text-[var(--text-secondary)] leading-relaxed">
       {/* Subjective (Chief Complaint + HPI, or Subjective for progress notes) */}

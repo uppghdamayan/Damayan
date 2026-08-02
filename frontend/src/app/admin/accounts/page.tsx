@@ -13,11 +13,12 @@ interface Account {
   firstName: string;
   lastName: string;
   middleName?: string;
-  role: 'DOCTOR' | 'NURSE' | 'ADMIN';
+  role: 'DOCTOR' | 'NURSE' | 'PHARMACIST' | 'ADMIN';
   isActive: boolean;
   requiresPasswordChange: boolean;
   temporaryPassword?: string;
   createdAt: string;
+  licenseNumber?: string;
 }
 
 interface AccountsResponse {
@@ -100,7 +101,7 @@ function CreateAccountModal({
   onClose: () => void;
   onCreated: (result: CreateResult) => void;
 }) {
-  const [form, setForm] = useState({ email: '', firstName: '', lastName: '', middleName: '', role: 'DOCTOR' });
+  const [form, setForm] = useState({ email: '', firstName: '', lastName: '', middleName: '', role: 'DOCTOR', licenseNumber: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
@@ -125,6 +126,11 @@ function CreateAccountModal({
     if (form.middleName && form.middleName.length > 30) {
       e.middleName = 'Middle name must not exceed 30 characters.';
     }
+    if (form.role === 'DOCTOR' && !form.licenseNumber?.trim()) {
+      e.licenseNumber = 'License number is required for doctors.';
+    } else if (form.licenseNumber && form.licenseNumber.length > 30) {
+      e.licenseNumber = 'License number must not exceed 30 characters.';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -141,12 +147,15 @@ function CreateAccountModal({
           lastName: form.lastName,
           middleName: form.middleName || undefined,
           role: form.role,
+          ...(form.role === 'DOCTOR' && {
+            licenseNumber: form.licenseNumber || undefined,
+          }),
         }),
       });
       toast.success('Account created successfully');
       onCreated(result);
       onClose();
-      setForm({ email: '', firstName: '', lastName: '', middleName: '', role: 'DOCTOR' });
+      setForm({ email: '', firstName: '', lastName: '', middleName: '', role: 'DOCTOR', licenseNumber: '' });
     } catch (err: any) {
       setErrors({ submit: err.message });
       toast.error(err.message || 'Failed to create account');
@@ -260,8 +269,31 @@ function CreateAccountModal({
             >
               <option value="DOCTOR">Doctor</option>
               <option value="NURSE">Nurse</option>
+              <option value="PHARMACIST">Pharmacist</option>
             </select>
           </Field>
+
+          {form.role === 'DOCTOR' && (
+            <div className="mb-3.5">
+              <Field label="License No." required>
+                <input
+                  className={cn(
+                    inputClassName,
+                    errors.licenseNumber
+                      ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                      : 'border-border focus:border-accent focus:shadow-accent-focus'
+                  )}
+                  value={form.licenseNumber}
+                  onChange={set('licenseNumber')}
+                  maxLength={30}
+                />
+                {errors.licenseNumber && <p className="text-[12px] text-red mt-1">{errors.licenseNumber}</p>}
+                <p className="text-[11px] text-text-muted mt-1.5">
+                  This will be used for generating documents.
+                </p>
+              </Field>
+            </div>
+          )}
 
           <p className="text-[11px] text-text-muted mt-2">
             A 16-character temporary password will be generated. Share it securely — it is shown only once.
@@ -273,6 +305,216 @@ function CreateAccountModal({
           <SecBtn onClick={onClose}>Cancel</SecBtn>
           <PrimaryBtn onClick={handleSubmit} disabled={loading}>
             {loading ? 'Creating…' : 'Create Account'}
+          </PrimaryBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditAccountModal({
+  account,
+  open,
+  onClose,
+  onUpdated,
+}: {
+  account: Account | null;
+  open: boolean;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    middleName: '',
+    role: 'DOCTOR',
+    licenseNumber: '',
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (account && open) {
+      setForm({
+        firstName: account.firstName,
+        lastName: account.lastName,
+        middleName: account.middleName || '',
+        role: account.role,
+        licenseNumber: account.licenseNumber || '',
+      });
+      setErrors({});
+    }
+  }, [account, open]);
+
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!form.firstName || form.firstName.trim().length < 2) {
+      e.firstName = 'First name must be at least 2 characters.';
+    } else if (form.firstName.length > 30) {
+      e.firstName = 'First name must not exceed 30 characters.';
+    }
+    if (!form.lastName || form.lastName.trim().length < 2) {
+      e.lastName = 'Last name must be at least 2 characters.';
+    } else if (form.lastName.length > 30) {
+      e.lastName = 'Last name must not exceed 30 characters.';
+    }
+    if (form.middleName && form.middleName.length > 30) {
+      e.middleName = 'Middle name must not exceed 30 characters.';
+    }
+    if (form.role === 'DOCTOR' && !form.licenseNumber?.trim()) {
+      e.licenseNumber = 'License number is required for doctors.';
+    } else if (form.licenseNumber && form.licenseNumber.length > 30) {
+      e.licenseNumber = 'License number must not exceed 30 characters.';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate() || !account) return;
+    setLoading(true);
+    try {
+      await apiRequest(`/accounts/${account.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          middleName: form.middleName || undefined,
+          role: form.role,
+          ...(form.role === 'DOCTOR' && {
+            licenseNumber: form.licenseNumber || undefined,
+          }),
+        }),
+      });
+      toast.success('Account updated successfully');
+      onUpdated();
+      onClose();
+    } catch (err: any) {
+      setErrors({ submit: err.message });
+      toast.error(err.message || 'Failed to update account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!open || !account) return null;
+
+  return (
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center animate-in fade-in duration-150"
+    >
+      <div
+        className="bg-surface border border-border rounded-[10px] w-[500px] @max-[1439px]:w-[460px] max-h-[80vh] overflow-y-auto shadow-modal"
+      >
+        <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
+          <h2 className="text-[15px] font-bold flex-1 text-text-primary">Edit User Account</h2>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="px-[18px] py-[18px]">
+          {errors.submit && (
+            <div className="bg-red-bg border border-red-border rounded-btn px-3 py-2 mb-3.5 text-[12px] text-red font-medium">
+              {errors.submit}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="First Name" required>
+              <input
+                className={cn(
+                  inputClassName,
+                  errors.firstName
+                    ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                    : 'border-border focus:border-accent focus:shadow-accent-focus'
+                )}
+                value={form.firstName}
+                onChange={set('firstName')}
+                maxLength={30}
+              />
+              {errors.firstName && <p className="text-[12px] text-red mt-1">{errors.firstName}</p>}
+            </Field>
+            <Field label="Last Name" required>
+              <input
+                className={cn(
+                  inputClassName,
+                  errors.lastName
+                    ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                    : 'border-border focus:border-accent focus:shadow-accent-focus'
+                )}
+                value={form.lastName}
+                onChange={set('lastName')}
+                maxLength={30}
+              />
+              {errors.lastName && <p className="text-[12px] text-red mt-1">{errors.lastName}</p>}
+            </Field>
+          </div>
+
+          <Field label="Middle Name">
+            <input
+              className={cn(
+                inputClassName,
+                errors.middleName
+                  ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                  : 'border-border focus:border-accent focus:shadow-accent-focus'
+              )}
+              value={form.middleName}
+              onChange={set('middleName')}
+              maxLength={30}
+              placeholder="Optional"
+            />
+            {errors.middleName && <p className="text-[12px] text-red mt-1">{errors.middleName}</p>}
+          </Field>
+
+          <Field label="Role" required>
+            <select
+              value={form.role}
+              onChange={set('role')}
+              className={cn(
+                inputClassName,
+                "cursor-pointer focus:border-accent focus:shadow-accent-focus border-border"
+              )}
+            >
+              <option value="DOCTOR">Doctor</option>
+              <option value="NURSE">Nurse</option>
+              <option value="PHARMACIST">Pharmacist</option>
+            </select>
+          </Field>
+
+          {form.role === 'DOCTOR' && (
+            <div className="mb-3.5">
+              <Field label="License No." required>
+                <input
+                  className={cn(
+                    inputClassName,
+                    errors.licenseNumber
+                      ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]'
+                      : 'border-border focus:border-accent focus:shadow-accent-focus'
+                  )}
+                  value={form.licenseNumber}
+                  onChange={set('licenseNumber')}
+                  maxLength={30}
+                />
+                {errors.licenseNumber && <p className="text-[12px] text-red mt-1">{errors.licenseNumber}</p>}
+              </Field>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-[18px] py-3 border-t border-border">
+          <SecBtn onClick={onClose}>Cancel</SecBtn>
+          <PrimaryBtn onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Saving…' : 'Save Changes'}
           </PrimaryBtn>
         </div>
       </div>
@@ -318,6 +560,7 @@ export default function AccountsPage() {
   const [meta, setMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [tempResult, setTempResult] = useState<CreateResult | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -479,7 +722,10 @@ export default function AccountsPage() {
                   </td>
                   <td className="px-2.5 py-2">
                     {account.isActive && account.role !== 'ADMIN' && (
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
+                        <SecBtn onClick={() => setEditAccount(account)}>
+                          Edit
+                        </SecBtn>
                         <SecBtn
                           onClick={() => handleResetPassword(account.id)}
                         >
@@ -531,11 +777,17 @@ export default function AccountsPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modals */}
       <CreateAccountModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={handleCreated}
+      />
+      <EditAccountModal
+        account={editAccount}
+        open={!!editAccount}
+        onClose={() => setEditAccount(null)}
+        onUpdated={fetchAccounts}
       />
 
       {/* Temp password toast */}

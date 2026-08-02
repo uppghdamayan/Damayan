@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDocuments, useDocumentDownloadUrl, useDeleteDocument } from '@/hooks/useDocuments';
 import { usePriorLabs, useAttachmentDownloadUrl, useDeleteAttachment } from '@/hooks/useAttachments';
 import { usePatient } from '@/hooks/usePatients';
 import { Button } from '../ui/button';
 import { DeleteConfirmModal } from '../ui/DeleteConfirmModal';
-import { Download, Plus, Trash2, FileIcon, X, ExternalLink } from 'lucide-react';
+import { Download, Plus, Trash2, FileIcon, X, ExternalLink, ZoomIn, ZoomOut, Maximize2, Hand } from 'lucide-react';
 import { DocumentGeneratorModal } from './DocumentGeneratorModal';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -31,28 +31,86 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isPanMode, setIsPanMode] = useState<boolean>(false);
 
   // Flatten grouped labs to get an array of attachments
   const attachments = groupedLabs ? groupedLabs.flatMap((g: any) => g.attachments) : [];
   const isLoading = docsLoading || labsLoading;
 
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 25, 300));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 25, 50));
+  const handleResetZoom = () => setZoomLevel(100);
+
+  // Close full screen on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  // Drag-to-scroll in zoomed preview
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (zoomLevel <= 100 || !isPanMode || !viewportRef.current) return;
+    isDragging.current = true;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: viewportRef.current.scrollLeft,
+      scrollTop: viewportRef.current.scrollTop,
+    };
+    viewportRef.current.style.cursor = 'grabbing';
+  }, [zoomLevel, isPanMode]);
+
+  const handleDragMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current || !viewportRef.current) return;
+    e.preventDefault();
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    viewportRef.current.scrollLeft = dragStart.current.scrollLeft - dx;
+    viewportRef.current.scrollTop = dragStart.current.scrollTop - dy;
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (viewportRef.current) {
+      viewportRef.current.style.cursor = '';
+    }
+  }, []);
+
   const handleSelectFile = (file: FileItem, url: string) => {
     setSelectedFile(file);
     setPreviewUrl(url);
     setPreviewLoading(false);
+    setZoomLevel(100);
   };
 
   const handleStartLoadingPreview = (file: FileItem) => {
     setSelectedFile(file);
     setPreviewLoading(true);
     setPreviewUrl(null);
+    setZoomLevel(100);
   };
 
   const handleFileDeleted = (fileId: string) => {
-    if (selectedFile?.id === fileId) {
-      setSelectedFile(null);
-      setPreviewUrl(null);
-    }
+    setSelectedFile((prev) => {
+      if (prev?.id === fileId) {
+        setPreviewUrl(null);
+        setIsFullscreen(false);
+        return null;
+      }
+      return prev;
+    });
   };
 
   return (
@@ -216,48 +274,119 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
 
         {/* OneDrive Style Detail/Preview Pane */}
         {selectedFile && (
-          <div className="lg:col-span-1 bg-surface border border-border rounded-card p-4 flex flex-col gap-4 sticky top-4 shadow-sm animate-in slide-in-from-right duration-200">
+          <div className="lg:col-span-1 bg-surface border border-border rounded-card p-4 flex flex-col gap-4 sticky top-4 shadow-sm animate-in slide-in-from-right duration-200 z-20 w-fit min-w-full justify-self-end">
             {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-border">
+            <div className="flex items-center justify-between pb-2 border-b border-border w-0 min-w-full">
               <span className="text-[12px] font-bold text-text-primary uppercase tracking-wider">File Details</span>
               <button 
                 onClick={() => {
                   setSelectedFile(null);
                   setPreviewUrl(null);
+                  setIsFullscreen(false);
                 }}
                 className="p-1 rounded-btn hover:bg-surface-3 transition-colors cursor-pointer text-text-muted hover:text-text-primary"
+                title="Close File Details"
               >
                 <X size={15} />
               </button>
             </div>
 
-            {/* Visual Preview Area */}
-            <div className="bg-surface-2 border border-border rounded-card aspect-[4/3] flex items-center justify-center overflow-hidden relative shadow-inner">
-              {previewLoading ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[11px] text-text-muted">Loading preview...</span>
-                </div>
-              ) : previewUrl ? (
-                ['.png', '.jpg', '.jpeg', '.gif'].includes(selectedFile.ext.toLowerCase()) ? (
-                  <img 
-                    src={previewUrl} 
-                    alt={selectedFile.name} 
-                    className="max-h-full max-w-full object-contain animate-in fade-in duration-200" 
-                  />
-                ) : (
-                  <iframe 
-                    src={previewUrl} 
-                    className="w-full h-full border-0 animate-in fade-in duration-200" 
-                    title={selectedFile.name}
-                  />
-                )
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 p-3 text-center">
-                  <FileIconBadge ext={selectedFile.ext} />
-                  <span className="text-[11px] text-text-muted truncate max-w-[150px]">{selectedFile.name}</span>
+            {/* Visual Preview Container */}
+            <div className="bg-surface-2 border border-border rounded-card flex flex-col overflow-hidden relative shadow-lg group resize min-w-[250px] w-full min-h-[300px] h-[350px] max-h-[80vh] max-w-[80vw] z-10" style={{ direction: 'rtl' }}>
+              {/* Toolbar with Zoom & Fullscreen buttons */}
+              {previewUrl && !previewLoading && (
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-surface-3/90 backdrop-blur border-b border-border text-[11px] text-text-secondary select-none z-10" style={{ direction: 'ltr' }}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setIsPanMode(!isPanMode)}
+                      className={`p-1 rounded border transition-colors cursor-pointer ${isPanMode ? 'bg-surface-2 border-border text-accent' : 'hover:bg-surface border-transparent hover:border-border text-text-muted hover:text-text-primary'}`}
+                      title="Pan Tool (Drag to move)"
+                    >
+                      <Hand size={13} />
+                    </button>
+                    <div className="w-px h-3.5 bg-border mx-1" />
+                    <button
+                      onClick={handleZoomOut}
+                      disabled={zoomLevel <= 50}
+                      className="p-1 rounded hover:bg-surface border border-transparent hover:border-border disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-text-muted hover:text-text-primary cursor-pointer"
+                      title="Zoom Out (-)"
+                    >
+                      <ZoomOut size={13} />
+                    </button>
+                    <button
+                      onClick={handleResetZoom}
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold hover:bg-surface border border-transparent hover:border-border transition-colors text-text-secondary cursor-pointer"
+                      title="Reset Zoom to 100%"
+                    >
+                      {zoomLevel}%
+                    </button>
+                    <button
+                      onClick={handleZoomIn}
+                      disabled={zoomLevel >= 300}
+                      className="p-1 rounded hover:bg-surface border border-transparent hover:border-border disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-text-muted hover:text-text-primary cursor-pointer"
+                      title="Zoom In (+)"
+                    >
+                      <ZoomIn size={13} />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setIsFullscreen(true)}
+                    className="p-1 rounded hover:bg-surface border border-transparent hover:border-border transition-colors text-accent hover:text-accent-hover flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                    title="Open Fullscreen Preview (In-Tab)"
+                  >
+                    <Maximize2 size={13} />
+                    <span className="hidden sm:inline text-[10px]">Fullscreen</span>
+                  </button>
                 </div>
               )}
+
+              {/* Viewport */}
+              <div
+                ref={viewportRef}
+                className={`flex-1 w-full h-full overflow-auto relative bg-surface-2 select-none ${isPanMode && zoomLevel > 100 ? 'cursor-grab' : ''}`}
+                style={{ direction: 'ltr' }}
+                onMouseDown={handleDragStart}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+              >
+                {previewLoading ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                    <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[11px] text-text-muted">Loading preview...</span>
+                  </div>
+                ) : previewUrl ? (
+                  <div 
+                    className="relative origin-top-left"
+                    style={{
+                      width: `${zoomLevel}%`,
+                      height: `${zoomLevel}%`,
+                    }}
+                  >
+                    {isPanMode && zoomLevel > 100 && (
+                      <div className="absolute inset-0 z-10" />
+                    )}
+                    {['.png', '.jpg', '.jpeg', '.gif'].includes(selectedFile.ext.toLowerCase()) ? (
+                      <img 
+                        src={previewUrl} 
+                        alt={selectedFile.name} 
+                        className="w-full h-auto object-contain select-none block" 
+                      />
+                    ) : (
+                      <iframe 
+                        src={`${previewUrl}#view=FitH&toolbar=0`}
+                        className="w-full h-full border-0 bg-white" 
+                        title={selectedFile.name}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+                    <FileIconBadge ext={selectedFile.ext} />
+                    <span className="text-[11px] text-text-muted truncate max-w-[150px]">{selectedFile.name}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Open / External Link if iframe is sandboxed/blocked */}
@@ -266,14 +395,14 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
                 href={previewUrl} 
                 target="_blank" 
                 rel="noreferrer"
-                className="h-[28px] w-full rounded-btn text-[11px] font-semibold border border-border bg-surface hover:bg-surface-2 text-text-secondary flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="h-[28px] w-0 min-w-full rounded-btn text-[11px] font-semibold border border-border bg-surface hover:bg-surface-2 text-text-secondary flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <ExternalLink size={12} /> Open in New Tab
               </a>
             )}
 
             {/* Meta Details list */}
-            <div className="flex flex-col gap-2.5 text-[12px] pt-1">
+            <div className="flex flex-col gap-2.5 text-[12px] pt-1 w-0 min-w-full">
               <div>
                 <span className="text-text-muted block text-[10px] uppercase font-bold tracking-wide">Name</span>
                 <span className="text-text-primary font-semibold break-all">{selectedFile.name}</span>
@@ -304,6 +433,72 @@ export function DocumentsScreen({ patientId }: DocumentsScreenProps) {
           </div>
         )}
       </div>
+
+      {/* In-Tab Fullscreen Document Viewer Modal */}
+      {isFullscreen && selectedFile && previewUrl && (
+        <div 
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-[1000] flex flex-col animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsFullscreen(false);
+          }}
+        >
+          {/* Top Bar */}
+          <div className="h-14 px-6 bg-[#0f172a]/95 border-b border-slate-700/60 flex items-center justify-between text-white shrink-0 shadow-lg select-none">
+            <div className="flex items-center gap-3 min-w-0">
+              <FileIconBadge ext={selectedFile.ext} />
+              <div className="flex flex-col truncate">
+                <span className="text-[14px] font-semibold truncate text-slate-100">{selectedFile.name}</span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {selectedFile.ext.toUpperCase().substring(1)} Document • {getMockSize(selectedFile.id, selectedFile.type === 'attachment')}
+                </span>
+              </div>
+            </div>
+
+            {/* Header Actions (No redundant zoom) */}
+            <div className="flex items-center gap-3">
+              {/* Retained Open in New Tab Button */}
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="h-8 px-3 rounded-lg text-[12px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Open in New Tab"
+              >
+                <ExternalLink size={14} />
+                <span className="hidden sm:inline">Open in New Tab</span>
+              </a>
+
+              {/* Close Fullscreen */}
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 rounded-lg bg-slate-800 hover:bg-red/80 hover:text-white text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                title="Close Fullscreen (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Document Content Viewport */}
+          <div className="flex-1 w-full h-full overflow-hidden p-3 bg-[#090d16] flex items-center justify-center">
+            {['.png', '.jpg', '.jpeg', '.gif'].includes(selectedFile.ext.toLowerCase()) ? (
+              <div className="w-full h-full flex items-center justify-center overflow-auto">
+                <img 
+                  src={previewUrl} 
+                  alt={selectedFile.name} 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200" 
+                />
+              </div>
+            ) : (
+              <iframe 
+                src={previewUrl} 
+                className="w-full h-full border-0 bg-white rounded-lg shadow-2xl" 
+                title={selectedFile.name}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <DocumentGeneratorModal 

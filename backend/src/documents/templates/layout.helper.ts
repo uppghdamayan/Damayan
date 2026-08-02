@@ -52,6 +52,7 @@ export function drawSignatureBlock(
     licenseNumber?: string | null;
     ptrNumber?: string | null;
     s2Number?: string | null;
+    role?: string;
   },
   label = 'Requested By:',
   includeSignedPlaceholder = true,
@@ -69,17 +70,21 @@ export function drawSignatureBlock(
   }
   doc.font('Helvetica-Bold').fontSize(10).text(formatPhysicianName(physician));
   doc.font('Helvetica').fontSize(10);
-  doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
-  doc.text(`PTR No.: ${physician.ptrNumber ?? 'N/A'}`);
-  doc.text(`S2 No.: ${physician.s2Number ?? 'N/A'}`);
+  if (!physician.role || physician.role === 'DOCTOR') {
+    doc.text(`Lic. No.: ${physician.licenseNumber ?? 'N/A'}`);
+  }
 }
 
 export function formatPhysicianName(p: {
   firstName: string;
   lastName: string;
   middleName?: string | null;
+  role?: string;
 }): string {
   const mid = p.middleName ? ` ${p.middleName.charAt(0)}.` : '';
+  if (p.role && p.role !== 'DOCTOR') {
+    return `${p.firstName}${mid} ${p.lastName}`;
+  }
   return `Dr. ${p.firstName}${mid} ${p.lastName}, MD`;
 }
 
@@ -174,17 +179,20 @@ export function drawPatientBlock(
 /**
  * Assessment list with filled ● bullets (matches reference images for all docs)
  */
-export function drawAssessmentList(
-  doc: any,
-  assessment: { title: string; icdCode?: string | null }[] | null,
-) {
+export function drawAssessmentList(doc: any, assessment: any[] | null) {
   doc.font('Helvetica-Bold').fontSize(10).text('Assessment:');
   doc.moveDown(0.3);
   doc.font('Helvetica');
   if (assessment && assessment.length > 0) {
-    assessment.forEach((a) =>
-      doc.text(`\u2022  ${a.title}`, { indent: 20 }),
-    );
+    assessment.forEach((a) => {
+      const depth = a.depth || 0;
+      const indentBase = 20;
+      const additionalIndent = depth * 15;
+      const prefix = depth > 0 ? '->  ' : '\u2022  ';
+      doc.text(`${prefix}${a.title}`, {
+        indent: indentBase + additionalIndent,
+      });
+    });
   } else {
     doc.text('\u2022  No assessment on record.', { indent: 20 });
   }
@@ -208,24 +216,16 @@ export function drawMedicationList(doc: any, medications: any[]) {
     const y = doc.y;
 
     // Draw medication name bold
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .text(med.name, startX, y, {
-        continued: true,
-      });
+    doc.font('Helvetica-Bold').fontSize(10).text(med.name, startX, y, {
+      continued: true,
+    });
 
     // Build the dose and formulation string, then append quantity if present
-    const detailParts = [
-      med.dose,
-      med.formulation
-    ].filter(Boolean).join(' ');
-    
+    const detailParts = [med.dose, med.formulation].filter(Boolean).join(' ');
+
     const qtyText = med.quantity ? ` #${med.quantity}` : '';
 
-    doc
-      .font('Helvetica')
-      .text(` ${detailParts}${qtyText}`);
+    doc.font('Helvetica').text(` ${detailParts}${qtyText}`);
 
     doc.x = startX;
     if (med.instructions) {
@@ -249,7 +249,9 @@ export function drawMedicationList(doc: any, medications: any[]) {
  */
 export function drawMedCertMedicationList(doc: any, medications: any[]) {
   if (!medications || medications.length === 0) {
-    doc.font('Helvetica').text('\u2022  No active medications on record.', { indent: 20 });
+    doc
+      .font('Helvetica')
+      .text('\u2022  No active medications on record.', { indent: 20 });
     return;
   }
   doc.font('Helvetica');
@@ -267,7 +269,9 @@ export function drawMedCertMedicationList(doc: any, medications: any[]) {
  */
 export function drawReferralMedicationList(doc: any, medications: any[]) {
   if (!medications || medications.length === 0) {
-    doc.font('Helvetica').text('\u2022  No active medications on record.', { indent: 20 });
+    doc
+      .font('Helvetica')
+      .text('\u2022  No active medications on record.', { indent: 20 });
     return;
   }
   doc.font('Helvetica');

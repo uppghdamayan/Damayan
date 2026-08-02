@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
   OnModuleInit,
   Logger,
 } from '@nestjs/common';
@@ -170,6 +171,15 @@ export class AccountsService implements OnModuleInit {
   }
 
   async create(dto: CreateAccountDto) {
+    if (
+      dto.role === Role.DOCTOR &&
+      (!dto.licenseNumber || dto.licenseNumber.trim() === '')
+    ) {
+      throw new BadRequestException(
+        'License number is required for doctor accounts.',
+      );
+    }
+
     // Check for existing email in users table
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -200,6 +210,7 @@ export class AccountsService implements OnModuleInit {
         lastName: dto.lastName,
         middleName: dto.middleName,
         role: dto.role,
+        licenseNumber: dto.licenseNumber,
         isActive: true,
         requiresPasswordChange: true,
         temporaryPassword: tempPassword,
@@ -215,7 +226,20 @@ export class AccountsService implements OnModuleInit {
   }
 
   async update(id: string, dto: UpdateAccountDto) {
-    await this.findOne(id); // throws if not found
+    const user = await this.findOne(id); // throws if not found
+
+    const isDoctor =
+      dto.role === Role.DOCTOR || (user.role === Role.DOCTOR && !dto.role);
+    if (
+      isDoctor &&
+      dto.licenseNumber !== undefined &&
+      (!dto.licenseNumber || dto.licenseNumber.trim() === '')
+    ) {
+      throw new BadRequestException(
+        'License number is required for doctor accounts.',
+      );
+    }
+
     return this.prisma.user.update({
       where: { id },
       data: {
@@ -223,6 +247,9 @@ export class AccountsService implements OnModuleInit {
         ...(dto.lastName && { lastName: dto.lastName }),
         ...(dto.middleName !== undefined && { middleName: dto.middleName }),
         ...(dto.role && { role: dto.role }),
+        ...(dto.licenseNumber !== undefined && {
+          licenseNumber: dto.licenseNumber,
+        }),
       },
     });
   }

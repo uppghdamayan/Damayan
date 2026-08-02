@@ -3,8 +3,8 @@ import { apiRequest } from '@/lib/api';
 
 export interface DocumentDraftData {
   patient: any;
-  physician: { id: string; firstName: string; lastName: string } | null;
-  candidateDoctors: { id: string; firstName: string; lastName: string }[];
+  physician: { id: string; firstName: string; lastName: string; role?: string } | null;
+  candidateDoctors: { id: string; firstName: string; lastName: string; role?: string }[];
   assessment: { title: string; icdCode?: string }[] | null;
   diagnostics: string[] | null;
   medications: any[];

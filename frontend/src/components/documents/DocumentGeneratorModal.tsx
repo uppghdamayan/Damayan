@@ -45,7 +45,7 @@ export function DocumentGeneratorModal({ patientId, onClose }: DocumentGenerator
   return (
     <div 
       className="fixed inset-0 bg-black/45 backdrop-blur-[4px] z-[500] flex items-center justify-center p-4 animate-in fade-in duration-150"
-      onClick={(e) => {
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >

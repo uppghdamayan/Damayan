@@ -11,6 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export enum AccountRole {
   DOCTOR = 'DOCTOR',
   NURSE = 'NURSE',
+  PHARMACIST = 'PHARMACIST',
   // ADMIN is intentionally excluded — cannot be created via this endpoint
 }
 
@@ -46,16 +47,4 @@ export class CreateAccountDto {
   @IsString()
   @MaxLength(30)
   licenseNumber?: string;
-
-  @ApiPropertyOptional({ example: 'PTR-1234' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  ptrNumber?: string;
-
-  @ApiPropertyOptional({ example: 'S2-1234' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  s2Number?: string;
 }
