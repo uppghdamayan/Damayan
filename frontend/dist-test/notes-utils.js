@@ -80,7 +80,7 @@ function mapNoteToTimelineView(note, isLatest) {
                 if (typeof item === 'string')
                     return item;
                 if (item && typeof item === 'object') {
-                    return item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+                    return item.title;
                 }
                 return '';
             }).filter(Boolean)
@@ -114,7 +114,7 @@ function mapNoteToTimelineView(note, isLatest) {
                 if (typeof item === 'string')
                     return item;
                 if (item && typeof item === 'object') {
-                    return item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+                    return item.title;
                 }
                 return '';
             }).filter(Boolean)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useDroppable, useDndContext } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
@@ -85,7 +85,7 @@ export function ResolvedRow({
       </div>
 
       {/* Column 3: Problem name */}
-      <div className="flex items-center gap-2 truncate text-text-muted line-through">
+      <div className="flex items-center gap-2 truncate text-text-muted line-through decoration-text-muted/65 decoration-1">
         <span className="text-[13px] font-semibold truncate">{problem.title}</span>
       </div>
       

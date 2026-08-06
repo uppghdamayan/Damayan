@@ -43,11 +43,13 @@ export class VitalsController {
     @Param('patientId') patientId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('excludeDeleted') excludeDeleted?: string,
   ) {
     return this.vitalsService.findAll(
       patientId,
       Number(page) || 1,
       Number(limit) || 10,
+      excludeDeleted === 'true',
     );
   }
 

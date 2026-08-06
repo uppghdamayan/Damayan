@@ -28,6 +28,7 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
   
   const [measureDate, setMeasureDate] = useState<string>('');
   const [measureTime, setMeasureTime] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) {
@@ -57,8 +58,6 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
       setErrors({});
     }
   }, [open, editing]);
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -174,32 +173,24 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Date <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <input
                 type="date"
-                disabled={saving}
-                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
+                disabled
+                readOnly
+                title="Date is set automatically and cannot be edited"
+                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface-2 text-[13px] font-mono text-text-muted outline-none cursor-not-allowed"
                 value={measureDate}
-                onChange={(e) => { 
-                  setMeasureDate(e.target.value); 
-                  if (!e.target.value) setErrors(er => ({ ...er, measuredAt: 'Required' }));
-                  else setErrors(er => { const next = {...er}; delete next.measuredAt; return next; });
-                }}
               />
-              {errors.measuredAt && !measureDate && <div className="text-[10px] text-red mt-1">Required</div>}
             </div>
 
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Time <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
               <input
                 type="time"
-                disabled={saving}
-                className={`w-full h-[34px] px-2 border ${errors.measuredAt ? 'border-red-border focus:border-red-border focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]' : 'border-border focus:border-accent focus:shadow-accent-focus'} rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none transition-colors disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed`}
+                disabled
+                readOnly
+                title="Time is set automatically and cannot be edited"
+                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface-2 text-[13px] font-mono text-text-muted outline-none cursor-not-allowed"
                 value={measureTime}
-                onChange={(e) => { 
-                  setMeasureTime(e.target.value); 
-                  if (!e.target.value) setErrors(er => ({ ...er, measuredAt: 'Required' }));
-                  else setErrors(er => { const next = {...er}; delete next.measuredAt; return next; });
-                }}
               />
-              {errors.measuredAt && !measureTime && <div className="text-[10px] text-red mt-1">Required</div>}
             </div>
 
             <div className="col-span-1">

@@ -174,12 +174,6 @@ export function ActiveProblemRow({
           <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0 ml-1" />
         )}
 
-        {problem.icdCode && (
-          <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border flex-shrink-0">
-            {problem.icdCode}
-          </span>
-        )}
-
         {depth > 0 && (
           <span className="text-[9px] font-semibold uppercase tracking-wider text-accent/80 bg-accent/5 px-1.5 py-0.2 rounded border border-accent/15 flex-shrink-0 hidden @lg:inline">
             Sub-problem

@@ -119,7 +119,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const [newMedQuantity, setNewMedQuantity] = useState('');
 
   const [newProbTitle, setNewProbTitle] = useState('');
-  const [newProbIcd, setNewProbIcd] = useState('');
   const [diagnosticsInput, setDiagnosticsInput] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ hasFile: boolean; tag: string; textResult: string; fileName?: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -194,7 +193,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       if (p.title && !existingTitles.has(p.title.trim().toLowerCase())) {
         existing.push({
           title: p.title,
-          icdCode: p.icdCode || undefined,
           parentId: p.parentId || undefined,
           depth: item.depth,
         });
@@ -289,7 +287,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         diagnostics: copyForward?.latestDiagnostics || [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           title: p.title,
-          icdCode: p.icdCode || undefined,
           parentId: p.parentId || undefined,
           depth,
         })),
@@ -805,7 +802,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   onClick={() => {
                     const defaultProblems = (copyForward?.activeProblems || []).map((p: any) => ({
                       title: p.title,
-                      icdCode: p.icdCode || undefined
                     }));
                     const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
                       name: m.name,
@@ -828,7 +824,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
                     // Clear controlled inputs
                     setNewProbTitle('');
-                    setNewProbIcd('');
                     setDiagnosticsInput('');
 
                     // Clear new medication states
@@ -985,7 +980,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                         {field.value?.map((prob: any, idx: number) => {
                           const isLast = idx === (field.value?.length || 0) - 1;
                           const titleStr = typeof prob === 'string' ? prob : prob.title;
-                          const icdStr = typeof prob !== 'string' ? prob.icdCode : undefined;
                           const isNewItem = typeof prob !== 'string' && prob.isNew;
 
                           const titleKey = titleStr?.trim().toLowerCase();
@@ -1007,11 +1001,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
                                     {titleStr}
                                   </span>
-                                  {icdStr && (
-                                    <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border shrink-0">
-                                      {icdStr}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                               {isNewItem ? (
@@ -1050,30 +1039,15 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       {!isPublished && (
                         <div className="flex flex-col gap-2 p-3 border border-border rounded-[8px] bg-surface-2/40">
                           <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">Add Problem</span>
-                          {/* Row 1: Problem Title */}
-                          <input 
-                            id="newProbTitle" 
-                            value={newProbTitle}
-                            onChange={(e) => setNewProbTitle(e.target.value)}
-                            disabled={isDisabled} 
-                            placeholder="Problem Title (e.g. Hypertension)" 
-                            className="w-full h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70" 
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                document.getElementById('addProbBtn')?.click();
-                              }
-                            }}
-                          />
-                          {/* Row 2: ICD-10 & Add Button */}
+                          {/* Problem Title & Add Button */}
                           <div className="flex items-center gap-2">
-                            <input 
-                              id="newProbIcd" 
-                              value={newProbIcd}
-                              onChange={(e) => setNewProbIcd(e.target.value)}
-                              disabled={isDisabled} 
-                              placeholder="ICD-10 Code (e.g. I10) - Optional" 
-                              className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70" 
+                            <input
+                              id="newProbTitle"
+                              value={newProbTitle}
+                              onChange={(e) => setNewProbTitle(e.target.value)}
+                              disabled={isDisabled}
+                              placeholder="Problem Title (e.g. Hypertension)"
+                              className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
@@ -1088,10 +1062,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                               disabled={isDisabled || !newProbTitle.trim()}
                               onClick={() => {
                                 if (newProbTitle.trim()) {
-                                  const newProbs = [...(field.value || []), { title: newProbTitle.trim(), icdCode: newProbIcd.trim() || undefined, isNew: true }];
+                                  const newProbs = [...(field.value || []), { title: newProbTitle.trim(), isNew: true }];
                                   field.onChange(newProbs);
                                   setNewProbTitle('');
-                                  setNewProbIcd('');
                                 }
                               }}
                               className="h-[32px] px-4 bg-accent hover:bg-accent-hover text-white rounded-[6px] font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"

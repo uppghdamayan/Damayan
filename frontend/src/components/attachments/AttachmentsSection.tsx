@@ -148,7 +148,7 @@ export function AttachmentsSection({
         {/* New Results Upload Section */}
         <div className="flex flex-col">
           <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary mb-2 pb-1 border-b border-border flex items-center gap-1">
-            New Lab / Imaging Result <span className="text-red font-bold text-[11px]">*</span>
+            New Lab / Imaging Result
           </div>
 
           {/* Upload Form Container */}
@@ -156,7 +156,7 @@ export function AttachmentsSection({
             {/* Tag Selection */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
-                Tag / Test Name <span className="text-red font-bold">*</span>
+                Tag / Test Name
               </label>
               <ComboboxInput
                 value={tag}
@@ -169,7 +169,7 @@ export function AttachmentsSection({
             {/* File Dropzone / Selected File Card */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
-                File Attachment <span className="text-red font-bold">*</span>
+                File Attachment
               </label>
               
               {!pendingFile ? (

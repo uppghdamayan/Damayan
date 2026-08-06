@@ -284,7 +284,6 @@ export class ProgressNotesService {
             .filter((p) => p && p.title && String(p.title).trim() !== '')
             .map((p) => ({
               title: String(p.title).trim(),
-              icdCode: p.icdCode,
             }));
 
           const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
@@ -416,7 +415,7 @@ export class ProgressNotesService {
 
         const validProblems = prevSnapshotProblems
           .filter((p) => p && p.title && String(p.title).trim() !== '')
-          .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+          .map((p) => ({ title: String(p.title).trim() }));
 
         const validMeds = prevSnapshotMeds
           .filter((m) => m && m.name && String(m.name).trim() !== '')

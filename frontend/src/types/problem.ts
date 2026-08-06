@@ -5,7 +5,6 @@ export interface Problem {
   patientId: string;
   parentId: string | null;
   title: string;
-  icdCode: string | null;
   status: ProblemStatusValue;
   sortOrder: number;
   addedBy: string | null;

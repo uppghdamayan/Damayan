@@ -1,4 +1,3 @@
-import type { VitalSign } from '@/types/vitals';
 
 export function isRecentlyUpdated(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;

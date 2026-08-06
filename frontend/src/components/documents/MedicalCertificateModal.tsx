@@ -57,7 +57,7 @@ export function MedicalCertificateModal({ patientId, visitId, onClose }: Medical
           <div className="mt-2 font-bold">Assessment:</div>
           <ul className="list-disc list-inside">
             {draft.assessment && draft.assessment.length > 0 ? draft.assessment.map((a, i) => (
-              <li key={i}>{a.title} {a.icdCode ? `(${a.icdCode})` : ''}</li>
+              <li key={i}>{a.title}</li>
             )) : <li>No assessment</li>}
           </ul>
           <div className="mt-2 font-bold">Medications:</div>

@@ -120,7 +120,7 @@ export function mapNoteToTimelineView(
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
             const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            return prefix + item.title;
           }
           return '';
         }).filter(Boolean)
@@ -143,10 +143,10 @@ export function mapNoteToTimelineView(
       : undefined;
     const lastEditedAt = (initialNote as any).lastEditedAt;
     
-    let displayUser = author;
-    let displayUserId = initialNote.authorId;
+    const displayUser = author;
+    const displayUserId = initialNote.authorId;
 
-    let isMainAuthor = true; // Initial note creator is always the main author
+    const isMainAuthor = true; // Initial note creator is always the main author
 
     const authorName = displayUser 
       ? `${displayUser.role === 'DOCTOR' ? 'Dr. ' : ''}${displayUser.lastName}, ${displayUser.firstName}`
@@ -187,7 +187,7 @@ export function mapNoteToTimelineView(
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
             const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            return prefix + item.title;
           }
           return '';
         }).filter(Boolean)
@@ -210,8 +210,8 @@ export function mapNoteToTimelineView(
       : undefined;
     const lastEditedAt = (progressNote as any).lastEditedAt;
     
-    let displayUser = author;
-    let displayUserId = progressNote.authorId;
+    const displayUser = author;
+    const displayUserId = progressNote.authorId;
 
     let isMainAuthor = false;
     if (initialNoteAuthorId) {

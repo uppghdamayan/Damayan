@@ -299,7 +299,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           physicalExam: note.physicalExam || '',
           assessment: validProblems.length > 0
             ? validProblems
-            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
           medicationSnapshot: validMeds.length > 0
             ? validMeds
             : (copyForward?.activeMedications || []).map((m: any) => ({
@@ -331,7 +331,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           });
 
           if (validProblems.length === 0) {
-            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
+            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title }));
           } else {
             parsed.assessment = validProblems;
           }
@@ -364,7 +364,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         obHistory: '',
         psychosocialHistory: '',
         physicalExam: '',
-        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
@@ -996,11 +996,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                               {titleStr}
                             </span>
                           </div>
-                          {item.icdCode && (
-                            <span className="font-mono text-[9px] text-text-muted bg-surface-2 border border-border px-1.5 py-[2px] rounded flex-shrink-0">
-                              {item.icdCode}
-                            </span>
-                          )}
                         </div>
                       );
                     })
@@ -1487,11 +1482,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                               >
                                 {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
                                 {titleStr}
-                                {typeof prob !== 'string' && prob.icdCode && (
-                                  <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
-                                    {prob.icdCode}
-                                  </span>
-                                )}
                               </div>
                             {canEditAll && (
                               <Button
@@ -1509,13 +1499,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       })}
                         {canEditAll && (
                           <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                            <div className="col-span-12 @md:col-span-8 flex flex-col gap-1">
+                            <div className="col-span-12 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
                               <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
-                            </div>
-                            <div className="col-span-12 @md:col-span-4 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
-                              <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
                             </div>
                             <div className="col-span-12 flex justify-between items-center mt-1">
                               {probError ? (
@@ -1528,7 +1514,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 disabled={addingProb}
                                 onClick={() => {
                                   const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                                  const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
                                   if (!titleEl.value.trim()) {
                                     setProbError('Problem title is required');
                                     return;
@@ -1536,10 +1521,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   setProbError('');
                                   setAddingProb(true);
                                   setTimeout(() => {
-                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined }];
+                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim() }];
                                     field.onChange(newProbs);
                                     titleEl.value = '';
-                                    icdEl.value = '';
                                     setAddingProb(false);
                                   }, 400);
                                 }}
@@ -1766,7 +1750,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             obHistory: '',
             psychosocialHistory: '',
             physicalExam: '',
-            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
             medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
               dose: m.dose || undefined,

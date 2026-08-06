@@ -77,7 +77,6 @@ export class ProblemsService {
         patientId,
         parentId: dto.parentId ?? null,
         title: dto.title.trim(),
-        icdCode: dto.icdCode?.trim() || null,
         diagnosisDate: dto.diagnosisDate ? new Date(dto.diagnosisDate) : null,
         status: ProblemStatus.ACTIVE,
         sortOrder,
@@ -139,8 +138,6 @@ export class ProblemsService {
       }
 
       if (dto.title !== undefined) data.title = dto.title.trim();
-      if (dto.icdCode !== undefined)
-        data.icdCode = dto.icdCode ? dto.icdCode.trim() : null;
 
       if (dto.diagnosisDate !== undefined) {
         data.diagnosisDate = dto.diagnosisDate
@@ -303,9 +300,6 @@ export class ProblemsService {
             sortOrder: item.sortOrder,
             ...(item.parentId !== undefined && { parentId: item.parentId }),
             ...(item.title !== undefined && { title: item.title.trim() }),
-            ...(item.icdCode !== undefined && {
-              icdCode: item.icdCode ? item.icdCode.trim() : null,
-            }),
             ...(item.diagnosisDate !== undefined && {
               diagnosisDate: item.diagnosisDate
                 ? new Date(item.diagnosisDate)
@@ -349,7 +343,7 @@ export class ProblemsService {
 
   async upsertFromAssessment(
     patientId: string,
-    assessmentItems: { title: string; icdCode?: string }[],
+    assessmentItems: { title: string }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
@@ -371,13 +365,12 @@ export class ProblemsService {
     });
 
     // Map by title to avoid duplicates and keep first occurrence
-    const uniqueItems = new Map<string, { title: string; icdCode?: string }>();
+    const uniqueItems = new Map<string, { title: string }>();
     for (const item of validItems) {
       const key = item.title.trim().toLowerCase();
       if (!uniqueItems.has(key)) {
         uniqueItems.set(key, {
           title: item.title.trim(),
-          icdCode: item.icdCode,
         });
       }
     }
@@ -454,7 +447,6 @@ export class ProblemsService {
             data: {
               patientId,
               title: item.title,
-              icdCode: item.icdCode,
               status: ProblemStatus.ACTIVE,
               sortOrder,
               addedBy: userId,

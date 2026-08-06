@@ -183,7 +183,6 @@ export class InitialNotesService {
               .filter((a) => a && a.title && String(a.title).trim() !== '')
               .map((a) => ({
                 title: String(a.title).trim(),
-                icdCode: a.icdCode,
               }));
             await this.problemsService.upsertFromAssessment(
               patientId,
@@ -284,7 +283,6 @@ export class InitialNotesService {
           .filter((a) => a && a.title && String(a.title).trim() !== '')
           .map((a) => ({
             title: String(a.title).trim(),
-            icdCode: a.icdCode,
           }));
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
           .filter((m) => m && m.name && String(m.name).trim() !== '')

@@ -130,6 +130,7 @@ export function VitalsScreen({ patientId }: { patientId: string }) {
           totalPages={meta.totalPages}
           total={meta.total}
           onPageChange={setPage}
+          deletingId={deleteVitals.isPending ? vitalToDelete?.id : null}
         />
       )}
     </div>

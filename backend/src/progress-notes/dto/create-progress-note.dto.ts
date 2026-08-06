@@ -16,10 +16,6 @@ class AssessmentItemDto {
 
   @IsString()
   @IsOptional()
-  icdCode?: string;
-
-  @IsString()
-  @IsOptional()
   parentId?: string | null;
 
   @IsInt()

@@ -13,10 +13,6 @@ class AssessmentItemDto {
   @IsString()
   @IsNotEmpty()
   title: string;
-
-  @IsString()
-  @IsOptional()
-  icdCode?: string;
 }
 
 class MedicationItemDto {
