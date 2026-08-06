@@ -130,7 +130,10 @@ export function mapNoteToTimelineView(
       ? initialNote.medicationSnapshot.map((med: any) => {
           if (typeof med === 'string') return med;
           if (med && typeof med === 'object') {
-            return `${med.name} ${med.dose}${med.unit}`;
+            const doseStr = med.dose != null ? String(med.dose).trim() : '';
+            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+            const fullDose = `${doseStr}${unitStr}`.trim();
+            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
           }
           return '';
         }).filter(Boolean)
@@ -197,7 +200,10 @@ export function mapNoteToTimelineView(
       ? progressNote.medicationSnapshot.map((med: any) => {
           if (typeof med === 'string') return med;
           if (med && typeof med === 'object') {
-            return `${med.name} ${med.dose}${med.unit}`;
+            const doseStr = med.dose != null ? String(med.dose).trim() : '';
+            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+            const fullDose = `${doseStr}${unitStr}`.trim();
+            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
           }
           return '';
         }).filter(Boolean)

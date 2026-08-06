@@ -124,7 +124,7 @@ function mapNoteToTimelineView(note, isLatest) {
                 if (typeof med === 'string')
                     return med;
                 if (med && typeof med === 'object') {
-                    return `${med.name} ${med.dose}${med.unit}`;
+                    return `${med.name} ${med.dose}`;
                 }
                 return '';
             }).filter(Boolean)

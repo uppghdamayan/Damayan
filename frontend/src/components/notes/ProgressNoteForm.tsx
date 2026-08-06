@@ -25,8 +25,9 @@ import { buildMedicationSuggestions } from '@/lib/medication-utils';
 import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
 import { NoteFormSkeleton } from './NoteFormSkeleton';
+import { MedicationSnapshotModal } from './MedicationSnapshotModal';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X, Loader2 } from 'lucide-react';
+import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X, Loader2, Edit } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -117,6 +118,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const [newMedFormulation, setNewMedFormulation] = useState('');
   const [newMedInstructions, setNewMedInstructions] = useState('');
   const [newMedQuantity, setNewMedQuantity] = useState('');
+  const [editMedIndex, setEditMedIndex] = useState<number | null>(null);
 
   const [newProbTitle, setNewProbTitle] = useState('');
   const [diagnosticsInput, setDiagnosticsInput] = useState('');
@@ -1189,21 +1191,34 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     </td>
                                     <td className="px-1 py-2 align-top text-center">
                                       {!isPublished && (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          onClick={() => {
-                                            const newMeds = [...meds];
-                                            newMeds.splice(idx, 1);
-                                            field.onChange(newMeds);
-                                          }}
-                                          disabled={isDisabled}
-                                          className="text-text-muted hover:text-red hover:bg-red-bg transition-colors w-6 h-6 rounded-md disabled:opacity-50 shrink-0 cursor-pointer p-0"
-                                          title="Remove Medication"
-                                        >
-                                          <TrashIcon className="w-3.5 h-3.5" />
-                                        </Button>
+                                        <div className="flex items-center justify-center gap-0.5">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            onClick={() => setEditMedIndex(idx)}
+                                            disabled={isDisabled}
+                                            className="text-text-muted hover:text-accent hover:bg-accent/10 transition-colors w-6 h-6 rounded-md disabled:opacity-50 shrink-0 cursor-pointer p-0"
+                                            title="Edit Medication"
+                                          >
+                                            <Edit className="w-3.5 h-3.5" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            onClick={() => {
+                                              const newMeds = [...meds];
+                                              newMeds.splice(idx, 1);
+                                              field.onChange(newMeds);
+                                            }}
+                                            disabled={isDisabled}
+                                            className="text-text-muted hover:text-red hover:bg-red-bg transition-colors w-6 h-6 rounded-md disabled:opacity-50 shrink-0 cursor-pointer p-0"
+                                            title="Remove Medication"
+                                          >
+                                            <TrashIcon className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </div>
                                       )}
                                     </td>
                                   </tr>
@@ -1325,6 +1340,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           setPendingAction(null);
         }}
         unaddedItems={getUnaddedSections()}
+      />
+
+      <MedicationSnapshotModal
+        open={editMedIndex !== null}
+        onClose={() => setEditMedIndex(null)}
+        editing={editMedIndex !== null ? (form.getValues('medicationSnapshot') || [])[editMedIndex] ?? null : null}
+        nameOptions={nameOptions}
+        onSave={(values) => {
+          if (editMedIndex === null) return;
+          const current = form.getValues('medicationSnapshot') || [];
+          const updated = [...current];
+          updated[editMedIndex] = { ...updated[editMedIndex], ...values };
+          form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
+          setEditMedIndex(null);
+        }}
       />
     </div>
   );

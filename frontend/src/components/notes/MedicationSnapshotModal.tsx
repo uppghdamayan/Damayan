@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { buildMedicationSuggestions, MEDICATION_DICTIONARY } from '@/lib/medication-utils';
-import type { Medication } from '@/types/medication';
+import { ComboboxInput } from '@/components/ui/ComboboxInput';
 
-interface MedicationFormValues {
+export interface MedicationSnapshotValues {
+  name: string;
+  dose: string;
+  formulation?: string;
+  quantity?: number;
+  instructions?: string;
+}
+
+interface MedicationSnapshotFormValues {
   name: string;
   dose: string;
   formulation: string;
@@ -14,25 +21,24 @@ interface MedicationFormValues {
   quantity: string;
 }
 
-interface MedicationFormModalProps {
+interface MedicationSnapshotModalProps {
   open: boolean;
   onClose: () => void;
-  editing: Medication | null;
-  suggestions: Medication[];
-  saving: boolean;
-  onSave: (values: { name: string; dose: string; formulation: string; instructions: string; quantity: number }) => void;
+  editing: MedicationSnapshotValues | null;
+  nameOptions: string[];
+  onSave: (values: MedicationSnapshotValues) => void;
 }
 
-const FORMULATION_OPTIONS = [
-  'Tablet', 'Capsule', 'Syrup', 'Suspension', 'Injection', 'Cream', 'Ointment', 'Drops', 'Patch', 'Suppository', 'Inhaler', 'Lotion', 'Gel'
-];
+const emptyValues: MedicationSnapshotFormValues = { name: '', dose: '', formulation: '', instructions: '', quantity: '' };
 
-const emptyValues: MedicationFormValues = { name: '', dose: '', formulation: '', instructions: '', quantity: '' };
-
-import { ComboboxInput } from '@/components/ui/ComboboxInput';
-
-export function MedicationFormModal({ open, onClose, editing, suggestions, saving, onSave }: MedicationFormModalProps) {
-  const [values, setValues] = useState<MedicationFormValues>(emptyValues);
+/**
+ * Edits a single row of a note's local `medicationSnapshot` draft array
+ * (InitialNoteForm / ProgressNoteForm). Deliberately separate from
+ * MedicationFormModal (components/medications/MedicationForm.tsx), which
+ * edits the patient's cumulative medication list — that flow is untouched.
+ */
+export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, onSave }: MedicationSnapshotModalProps) {
+  const [values, setValues] = useState<MedicationSnapshotFormValues>(emptyValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -54,34 +60,18 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
 
   if (!open) return null;
 
-  const nameOptions = buildMedicationSuggestions(suggestions);
-
   const validate = () => {
     const e: Record<string, string> = {};
     const nameStr = String(values.name ?? '').trim();
     const doseStr = String(values.dose ?? '').trim();
-    const instStr = String(values.instructions ?? '').trim();
-    const formStr = String(values.formulation ?? '').trim();
     const qtyStr = String(values.quantity ?? '').trim();
 
     if (!nameStr) e.name = 'Medication name is required.';
-    else if (nameStr.length > 255) e.name = 'Max 255 characters.';
-
     if (!doseStr) e.dose = 'Dose is required.';
-    else if (doseStr.length > 255) e.dose = 'Max 255 characters.';
-
-    if (!instStr) e.instructions = 'Instructions are required.';
-    else if (instStr.length > 50) e.instructions = 'Max 50 characters.';
-
-    if (!formStr) e.formulation = 'Formulation is required.';
-
-    if (!qtyStr) {
-      e.quantity = 'Quantity is required.';
-    } else {
+    if (qtyStr) {
       const qtyNum = parseInt(qtyStr, 10);
       if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
     }
-
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -97,9 +87,9 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     onSave({
       name: nameStr,
       dose: doseStr,
-      formulation: formStr,
-      instructions: instStr,
-      quantity: parseInt(qtyStr, 10),
+      formulation: formStr || undefined,
+      quantity: qtyStr ? parseInt(qtyStr, 10) : undefined,
+      instructions: instStr || undefined,
     });
   };
 
@@ -118,9 +108,7 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
     >
       <div className="bg-surface border border-border rounded-[10px] w-[460px] max-h-[80vh] overflow-y-auto shadow-modal">
         <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
-          <h2 className="text-[15px] font-bold flex-1 text-text-primary">
-            {editing ? 'Edit Medication' : 'Add Medication'}
-          </h2>
+          <h2 className="text-[15px] font-bold flex-1 text-text-primary">Edit Medication</h2>
           <button onClick={onClose} aria-label="Close modal"
             className="w-6 h-6 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer">
             <X className="w-3.5 h-3.5" />
@@ -134,9 +122,9 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             </label>
             <ComboboxInput
               value={values.name}
-              onChange={(val) => { 
-                setValues(v => ({ ...v, name: val })); 
-                setErrors(er => ({ ...er, name: !val.trim() ? 'Medication name is required.' : val.length > 255 ? 'Max 255 characters.' : '' })); 
+              onChange={(val) => {
+                setValues(v => ({ ...v, name: val }));
+                setErrors(er => ({ ...er, name: !val.trim() ? 'Medication name is required.' : '' }));
               }}
               options={nameOptions}
               placeholder="e.g. Losartan"
@@ -154,12 +142,12 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
               <input
                 type="text"
                 value={values.dose}
-                onChange={(e) => { 
+                onChange={(e) => {
                   const val = e.target.value;
-                  setValues((v) => ({ ...v, dose: val })); 
-                  setErrors((er) => ({ ...er, dose: !val.trim() ? 'Dose is required.' : val.length > 255 ? 'Max 255 characters.' : '' })); 
+                  setValues((v) => ({ ...v, dose: val }));
+                  setErrors((er) => ({ ...er, dose: !val.trim() ? 'Dose is required.' : '' }));
                 }}
-                placeholder="e.g. 500 mg, 1 tablet"
+                placeholder="e.g. 10mg"
                 maxLength={255}
                 className={inputCn(!!errors.dose)}
               />
@@ -167,59 +155,48 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-                Formulation <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+                Formulation
               </label>
-              <ComboboxInput
+              <input
+                type="text"
                 value={values.formulation}
-                onChange={(val) => { 
-                  setValues(v => ({ ...v, formulation: val })); 
-                  setErrors(er => ({ ...er, formulation: !val.trim() ? 'Formulation is required.' : '' })); 
-                }}
-                options={FORMULATION_OPTIONS}
-                placeholder="e.g. Tablet"
-                hasError={!!errors.formulation}
+                onChange={(e) => setValues((v) => ({ ...v, formulation: e.target.value }))}
+                placeholder="e.g. Tablet, Syrup"
                 maxLength={50}
+                className={inputCn()}
               />
-              {errors.formulation && <p className="text-[12px] text-red mt-1">{errors.formulation}</p>}
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5 mb-3.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              Instructions <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+              Sig / Instructions
             </label>
             <input
               value={values.instructions}
-              onChange={(e) => { 
-                const val = e.target.value;
-                setValues((v) => ({ ...v, instructions: val })); 
-                setErrors((er) => ({ ...er, instructions: !val.trim() ? 'Instructions are required.' : val.length > 50 ? 'Max 50 characters.' : '' })); 
-              }}
-              placeholder="e.g. Once daily with food"
+              onChange={(e) => setValues((v) => ({ ...v, instructions: e.target.value }))}
+              placeholder="e.g. Take 1 tab daily"
               maxLength={50}
-              className={inputCn(!!errors.instructions)}
+              className={inputCn()}
             />
-            {errors.instructions && <p className="text-[12px] text-red mt-1">{errors.instructions}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              Quantity <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+              Quantity
             </label>
             <input
               type="number" step="1" min="1"
               value={values.quantity}
-              onChange={(e) => { 
+              onChange={(e) => {
                 const val = e.target.value;
-                setValues((v) => ({ ...v, quantity: val })); 
+                setValues((v) => ({ ...v, quantity: val }));
                 let err = '';
-                if (!val) {
-                  err = 'Quantity is required.';
-                } else {
+                if (val) {
                   const qtyNum = parseInt(val, 10);
                   if (isNaN(qtyNum) || qtyNum <= 0) err = 'Quantity must be a whole number greater than 0.';
                 }
-                setErrors((er) => ({ ...er, quantity: err })); 
+                setErrors((er) => ({ ...er, quantity: err }));
               }}
               placeholder="e.g. 30"
               className={inputCn(!!errors.quantity)}
@@ -233,13 +210,12 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
             className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:bg-text-muted disabled:border-border-strong disabled:cursor-not-allowed">
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Medication'}
+          <button onClick={handleSubmit}
+            className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer">
+            Save Changes
           </button>
         </div>
       </div>
     </div>
   );
 }
-

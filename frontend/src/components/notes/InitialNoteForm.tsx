@@ -25,7 +25,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit, Pill } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
+import { MedicationSnapshotModal, type MedicationSnapshotValues } from './MedicationSnapshotModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
   classifyTemperature, classifyRespiratoryRate,
@@ -143,6 +144,129 @@ function VitalMiniCell({
   );
 }
 
+export type MedSource = 'past' | 'prescribed';
+
+/**
+ * Legacy entries are plain strings; every pre-feature object entry has no
+ * `source` at all. Both, and any unrecognized value, resolve to 'prescribed'
+ * so an entry never silently disappears from the Prescribed Medications list.
+ * Only an explicit 'past' counts as a past medication.
+ */
+function getMedSource(med: any): MedSource {
+  return med && typeof med === 'object' && med.source === 'past' ? 'past' : 'prescribed';
+}
+
+interface MedicationAddFormProps {
+  nameOptions: string[];
+  onAdd: (values: MedicationSnapshotValues) => void;
+  addLabel?: string;
+}
+
+/**
+ * Inline "add a medication" sub-form. Used both by the Prescribed Medications
+ * list (Plan/Management) and the Past Medication list (History) — each call
+ * site owns its own state so typing in one never leaks into the other.
+ */
+function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }: MedicationAddFormProps) {
+  const [newMedName, setNewMedName] = useState('');
+  const [newMedDose, setNewMedDose] = useState('');
+  const [newMedFormulation, setNewMedFormulation] = useState('');
+  const [newMedInstructions, setNewMedInstructions] = useState('');
+  const [newMedQuantity, setNewMedQuantity] = useState('');
+  const [medError, setMedError] = useState('');
+  const [addingMed, setAddingMed] = useState(false);
+
+  return (
+    <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
+      <div className="col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
+        <ComboboxInput
+          value={newMedName}
+          onChange={setNewMedName}
+          options={nameOptions}
+          placeholder="e.g. Lisinopril"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+        <input
+          type="text"
+          value={newMedDose}
+          onChange={(e) => setNewMedDose(e.target.value)}
+          placeholder="e.g. 10mg"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
+        <input
+          value={newMedFormulation}
+          onChange={(e) => setNewMedFormulation(e.target.value)}
+          placeholder="e.g. Tablet, Syrup"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
+        <input
+          type="number"
+          value={newMedQuantity}
+          onChange={(e) => setNewMedQuantity(e.target.value)}
+          placeholder="e.g. 30"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
+        <input
+          value={newMedInstructions}
+          onChange={(e) => setNewMedInstructions(e.target.value)}
+          placeholder="e.g. Take 1 tab daily"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 flex justify-between items-center mt-1">
+        {medError ? (
+          <span className="text-red font-medium text-[10px]">{medError}</span>
+        ) : <span />}
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
+          disabled={addingMed}
+          onClick={() => {
+            if (!newMedName.trim() || !newMedDose.trim()) {
+              setMedError('Medication name and dose are required');
+              return;
+            }
+            setMedError('');
+            setAddingMed(true);
+            setTimeout(() => {
+              onAdd({
+                name: newMedName.trim(),
+                dose: newMedDose.trim(),
+                formulation: newMedFormulation.trim() || undefined,
+                quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
+                instructions: newMedInstructions.trim(),
+              });
+              setNewMedName('');
+              setNewMedDose('');
+              setNewMedFormulation('');
+              setNewMedQuantity('');
+              setNewMedInstructions('');
+              setAddingMed(false);
+            }, 400);
+          }}
+          className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+        >
+          {addingMed ? 'Adding...' : addLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 interface InitialNoteFormProps {
   patientId: string;
 }
@@ -199,13 +323,15 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const canEditAll = !isPublished;
   const isHistoryEditableOnly = false;
 
-  const historyInputClass = cn(
-    "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
+  const historyTextareaClass = cn(
+    "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
     isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
   );
 
-  const historyTextareaClass = cn(
-    "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
+  // Shorter than historyTextareaClass (min-h-[90px]) — four of those in a 2x2
+  // grid would roughly double the PMH section's height. ~68px ≈ 2 lines.
+  const pmhTextareaClass = cn(
+    "w-full px-3 py-2.5 field-input resize-y min-h-[68px] leading-[1.65] transition-all",
     isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
   );
   const [showClearModal, setShowClearModal] = useState(false);
@@ -214,15 +340,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const [deleteProblemIndex, setDeleteProblemIndex] = useState<number | null>(null);
   const [deleteMedIndex, setDeleteMedIndex] = useState<number | null>(null);
+  const [editMedIndex, setEditMedIndex] = useState<number | null>(null);
 
-  const [newMedName, setNewMedName] = useState('');
-  const [newMedDose, setNewMedDose] = useState('');
-    const [newMedFormulation, setNewMedFormulation] = useState('');
-  const [newMedInstructions, setNewMedInstructions] = useState('');
-  const [newMedQuantity, setNewMedQuantity] = useState('');
-
-  const [medError, setMedError] = useState('');
-  const [addingMed, setAddingMed] = useState(false);
   const [probError, setProbError] = useState('');
   const [addingProb, setAddingProb] = useState(false);
 
@@ -328,6 +447,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             formulation: m.formulation || undefined,
             quantity: m.quantity || undefined,
             instructions: m.instructions || undefined,
+            source: m.source,
           });
 
           if (validProblems.length === 0) {
@@ -380,6 +500,18 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   }, [note, copyLoading, form, patientId, copyForward]);
 
   const formValues = form.watch();
+
+  const appendMedication = (values: MedicationSnapshotValues, source: MedSource) => {
+    const current = form.getValues('medicationSnapshot') || [];
+    form.setValue('medicationSnapshot', [...current, { ...values, source }], { shouldDirty: true, shouldTouch: true });
+  };
+
+  // Flat-array indices preserved through the filter — the History section's
+  // edit/delete buttons splice the same medicationSnapshot array as the Plan
+  // section, so they must operate on true indices, not filtered-list ones.
+  const pastMedEntries = (formValues.medicationSnapshot || [])
+    .map((med: any, index: number) => ({ med, index }))
+    .filter(({ med }: { med: any }) => getMedSource(med) === 'past');
 
   const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
 
@@ -1038,17 +1170,23 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
                       note.medicationSnapshot.map((med: any, idx: number, arr) => {
                         const isLast = idx === arr.length - 1;
+                        const isPast = getMedSource(med) === 'past';
                         const medName = typeof med === 'string' ? med : med.name;
-                        const medDetails = typeof med !== 'string' 
-                          ? `${med.dose ?? ''}${med.unit ?? ''}${med.formulation ? ` · ${med.formulation}` : ''}${med.quantity ? ` (Qty: ${med.quantity})` : ''}`
+                        const medDetails = typeof med !== 'string'
+                          ? `${med.dose ?? ''}${med.formulation ? ` · ${med.formulation}` : ''}${med.quantity ? ` (Qty: ${med.quantity})` : ''}`
                           : '';
                         const instructions = typeof med !== 'string' ? med.instructions : '';
 
                         return (
                           <div key={idx} className={cn("flex flex-col gap-0.5 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
                             <div className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
+                              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", isPast ? "bg-amber" : "bg-green")} />
                               <span className="text-[12px] font-bold text-text-primary">{medName}</span>
+                              {isPast && (
+                                <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
+                                  Past
+                                </span>
+                              )}
                               {medDetails && <span className="text-[11px] text-text-muted ml-auto font-medium">{medDetails}</span>}
                             </div>
                             {instructions && (
@@ -1236,9 +1374,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 2. History Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-amber rounded-card shadow-card overflow-hidden">
+            {/* No overflow-hidden here: the Past Medication combobox below needs to
+                escape this card's bottom edge (see Plan/Management card for precedent). */}
+            <div className="bg-surface border border-border border-l-[3px] border-l-amber rounded-card shadow-card">
               {/* Card Header */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <History className="w-3.5 h-3.5 text-amber" />
                 </div>
@@ -1261,14 +1401,15 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   theme="amber"
                   icon={<ClipboardList className="w-3.5 h-3.5" />}
                 >
-                  <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-3 items-start">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Comorbidities
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhComorbidities')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Diabetes Mellitus (2018), Asthma"
                       />
                     </div>
@@ -1276,9 +1417,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Previous Surgeries
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhSurgeries')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Appendectomy (2015)"
                       />
                     </div>
@@ -1286,9 +1428,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Previous Hospitalizations
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhHospitalizations')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Dengue (2022)"
                       />
                     </div>
@@ -1296,17 +1439,86 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Allergies
                       </label>
-                      <input
+                      <textarea
                         {...form.register('allergies')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Penicillin (rash), Sulfa"
                       />
                     </div>
                   </div>
                 </CollapsibleSection>
- 
-                <CollapsibleSection 
-                  title="Family Medical History" 
+
+                <CollapsibleSection
+                  title="Past Medication"
+                  variant="row"
+                  theme="amber"
+                  icon={<Pill className="w-3.5 h-3.5" />}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[11px] text-text-muted -mt-0.5 mb-1">
+                      Medications recorded here also appear under Prescribed Medications and are saved to the patient's cumulative medication list when this note is published.
+                    </p>
+                    {pastMedEntries.length === 0 ? (
+                      <div className="text-[11px] text-text-muted">No past medications recorded.</div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {pastMedEntries.map(({ med, index }: { med: any; index: number }) => (
+                          <div key={index} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5"></div>
+                            <div className="flex-1 min-w-0 break-words whitespace-normal">
+                              <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
+                              {typeof med !== 'string' && med.dose && (
+                                <span className="font-mono text-amber font-semibold ml-1.5">{med.dose}</span>
+                              )}
+                              {typeof med !== 'string' && med.formulation && (
+                                <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                              )}
+                              {typeof med !== 'string' && med.quantity && (
+                                <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                              )}
+                              {typeof med !== 'string' && med.instructions && (
+                                <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                              )}
+                            </div>
+                            {canEditAll && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => setEditMedIndex(index)}
+                                  className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => setDeleteMedIndex(index)}
+                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {canEditAll && (
+                      <MedicationAddForm
+                        nameOptions={nameOptions}
+                        onAdd={(values) => appendMedication(values, 'past')}
+                        addLabel="+ Add Past Medication"
+                      />
+                    )}
+                  </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                  title="Family Medical History"
                   variant="row"
                   theme="amber"
                   icon={<Users className="w-3.5 h-3.5" />}
@@ -1590,125 +1802,61 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       const meds = field.value || [];
                       return (
                         <div className="flex flex-col gap-1.5" id="field-medications">
-                          {meds.map((med: any, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green shrink-0 mt-1.5"></div>
-                              <div className="flex-1 min-w-0 break-words whitespace-normal">
-                                <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
-                                {typeof med !== 'string' && med.dose && (
-                                  <span className="font-mono text-green font-semibold ml-1.5">{med.dose}{med.unit}</span>
-                                )}
-                                {typeof med !== 'string' && med.formulation && (
-                                  <span className="text-text-secondary ml-1.5">{med.formulation}</span>
-                                )}
-                                {typeof med !== 'string' && med.quantity && (
-                                  <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                                )}
-                                {typeof med !== 'string' && med.instructions && (
-                                  <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                          {meds.map((med: any, idx: number) => {
+                            const isPast = getMedSource(med) === 'past';
+                            return (
+                              <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5", isPast ? "bg-amber" : "bg-green")}></div>
+                                <div className="flex-1 min-w-0 break-words whitespace-normal">
+                                  <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
+                                  {isPast && (
+                                    <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1 py-0.5 rounded uppercase tracking-wider ml-1.5 align-middle whitespace-nowrap">
+                                      Past
+                                    </span>
+                                  )}
+                                  {typeof med !== 'string' && med.dose && (
+                                    <span className={cn("font-mono font-semibold ml-1.5", isPast ? "text-amber" : "text-green")}>{med.dose}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.formulation && (
+                                    <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.quantity && (
+                                    <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.instructions && (
+                                    <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                                  )}
+                                </div>
+                                {canEditAll && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setEditMedIndex(idx)}
+                                      className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setDeleteMedIndex(idx)}
+                                      className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                    >
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
-                              {canEditAll && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => setDeleteMedIndex(idx)}
-                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                                >
-                                  <TrashIcon className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                           {canEditAll && (
-                            <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                              <div className="col-span-12 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
-                                <ComboboxInput
-                                  value={newMedName}
-                                  onChange={setNewMedName}
-                                  options={nameOptions}
-                                  placeholder="e.g. Lisinopril"
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
-                                />
-                              </div>
-                              <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
-                              <input 
-                                type="text" 
-                                value={newMedDose}
-                                onChange={(e) => setNewMedDose(e.target.value)}
-                                placeholder="e.g. 10mg" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                              />
-                            </div>
-                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
-                                <input 
-                                  value={newMedFormulation}
-                                  onChange={(e) => setNewMedFormulation(e.target.value)}
-                                  placeholder="e.g. Tablet, Syrup" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
-                                <input 
-                                  type="number"
-                                  value={newMedQuantity}
-                                  onChange={(e) => setNewMedQuantity(e.target.value)}
-                                  placeholder="e.g. 30" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
-                                <input 
-                                  value={newMedInstructions}
-                                  onChange={(e) => setNewMedInstructions(e.target.value)}
-                                  placeholder="e.g. Take 1 tab daily" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 flex justify-between items-center mt-1">
-                                {medError ? (
-                                  <span className="text-red font-medium text-[10px]">{medError}</span>
-                                ) : <span />}
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="xs"
-                                  disabled={addingMed}
-                                  onClick={() => {
-                                    if (!newMedName.trim() || !newMedDose.trim()) {
-                                      setMedError('Medication name and dose are required');
-                                      return;
-                                    }
-                                    setMedError('');
-                                    setAddingMed(true);
-                                    setTimeout(() => {
-                                      field.onChange([...meds, { 
-                                        name: newMedName.trim(), 
-                                        dose: newMedDose.trim(), 
-                                        formulation: newMedFormulation.trim() || undefined,
-                                        quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
-                                        instructions: newMedInstructions.trim() 
-                                      }]);
-                                      setNewMedName('');
-                                      setNewMedDose('');
-                                      setNewMedFormulation('');
-                                      setNewMedQuantity('');
-                                      setNewMedInstructions('');
-                                      setAddingMed(false);
-                                    }, 400);
-                                  }}
-                                  className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
-                                >
-                                  {addingMed ? 'Adding...' : '+ Add Medication'}
-                                </Button>
-                              </div>
-                            </div>
+                            <MedicationAddForm
+                              nameOptions={nameOptions}
+                              onAdd={(values) => field.onChange([...meds, { ...values, source: 'prescribed' }])}
+                            />
                           )}
                         </div>
                       );
@@ -1833,6 +1981,21 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         title="Remove Medication"
         message="Are you sure you want to remove this medication from the prescribed list?"
         confirmLabel="Remove"
+      />
+
+      <MedicationSnapshotModal
+        open={editMedIndex !== null}
+        onClose={() => setEditMedIndex(null)}
+        editing={editMedIndex !== null ? (form.getValues('medicationSnapshot') || [])[editMedIndex] ?? null : null}
+        nameOptions={nameOptions}
+        onSave={(values) => {
+          if (editMedIndex === null) return;
+          const current = form.getValues('medicationSnapshot') || [];
+          const updated = [...current];
+          updated[editMedIndex] = { ...updated[editMedIndex], ...values };
+          form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
+          setEditMedIndex(null);
+        }}
       />
     </div>
   );

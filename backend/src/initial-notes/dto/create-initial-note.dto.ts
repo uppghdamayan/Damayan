@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsNotEmpty,
   IsDateString,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -20,9 +21,9 @@ class MedicationItemDto {
   @IsNotEmpty()
   name: string;
 
-  @Type(() => Number)
+  @IsString()
   @IsOptional()
-  dose?: number;
+  dose?: string;
 
   @IsString()
   @IsOptional()
@@ -39,6 +40,11 @@ class MedicationItemDto {
   @IsString()
   @IsOptional()
   instructions?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['past', 'prescribed'])
+  source?: 'past' | 'prescribed';
 }
 
 export class CreateInitialNoteDto {

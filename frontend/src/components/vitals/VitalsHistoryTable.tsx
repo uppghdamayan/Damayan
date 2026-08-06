@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { 
   formatTemperature, 
   formatBloodPressure, 
@@ -27,6 +28,19 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
   const { user } = useAuthStore();
   const canEdit = user?.role === 'DOCTOR' || user?.role === 'NURSE' || user?.role === 'ADMIN';
   const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  // Automatically place soft-deleted/ghost vitals at the bottom of the list,
+  // while keeping date ordering (newest first) within active and deleted groups.
+  const sortedVitals = useMemo(() => {
+    return [...vitals].sort((a, b) => {
+      const aGhost = !!a.isDeleted || deletingId === a.id;
+      const bGhost = !!b.isDeleted || deletingId === b.id;
+      if (aGhost !== bGhost) {
+        return aGhost ? 1 : -1;
+      }
+      return new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime();
+    });
+  }, [vitals, deletingId]);
 
   const getColorClass = (severity: 'normal' | 'warn' | 'critical') => {
     if (severity === 'critical') return 'text-red font-semibold';
@@ -61,14 +75,14 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {vitals.length === 0 ? (
+            {sortedVitals.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-[13px] text-text-muted italic">
                   No vital signs recorded.
                 </td>
               </tr>
             ) : (
-              vitals.map((v) => {
+              sortedVitals.map((v) => {
                 const dt = new Date(v.measuredAt);
                 const dateStr = dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
@@ -87,7 +101,7 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                 return (
                   <tr
                     key={v.id}
-                    className={`transition-colors ${isGhost ? 'opacity-70 grayscale' : 'hover:bg-surface-2'}`}
+                    className={`transition-all duration-200 ${isGhost ? 'opacity-55 grayscale blur-[0.5px] select-none hover:opacity-75 hover:blur-none' : 'hover:bg-surface-2'}`}
                   >
                     <td className={`py-2.5 px-4 whitespace-nowrap ${strikeClass}`}>
                       <div className="font-mono">{dateStr}</div>
