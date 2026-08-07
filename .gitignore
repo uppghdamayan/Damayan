@@ -126,5 +126,6 @@ Thumbs.db
 .temp
 .tmp
 
+#graphify
 graph.json
 graphify-out/

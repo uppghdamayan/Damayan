@@ -26,8 +26,7 @@ import { useUploadAttachment } from '@/hooks/useAttachments';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -36,8 +35,6 @@ import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { InitialNoteLogTable } from './InitialNoteLogTable';
-import { InitialNoteVersionHistoryModal } from './InitialNoteVersionHistoryModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
   classifyTemperature, classifyRespiratoryRate,
@@ -148,6 +145,129 @@ function VitalMiniCell({
   );
 }
 
+export type MedSource = 'past' | 'prescribed';
+
+/**
+ * Legacy entries are plain strings; every pre-feature object entry has no
+ * `source` at all. Both, and any unrecognized value, resolve to 'prescribed'
+ * so an entry never silently disappears from the Prescribed Medications list.
+ * Only an explicit 'past' counts as a past medication.
+ */
+function getMedSource(med: any): MedSource {
+  return med && typeof med === 'object' && med.source === 'past' ? 'past' : 'prescribed';
+}
+
+interface MedicationAddFormProps {
+  nameOptions: string[];
+  onAdd: (values: MedicationSnapshotValues) => void;
+  addLabel?: string;
+}
+
+/**
+ * Inline "add a medication" sub-form. Used both by the Prescribed Medications
+ * list (Plan/Management) and the Past Medication list (History) — each call
+ * site owns its own state so typing in one never leaks into the other.
+ */
+function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }: MedicationAddFormProps) {
+  const [newMedName, setNewMedName] = useState('');
+  const [newMedDose, setNewMedDose] = useState('');
+  const [newMedFormulation, setNewMedFormulation] = useState('');
+  const [newMedInstructions, setNewMedInstructions] = useState('');
+  const [newMedQuantity, setNewMedQuantity] = useState('');
+  const [medError, setMedError] = useState('');
+  const [addingMed, setAddingMed] = useState(false);
+
+  return (
+    <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
+      <div className="col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
+        <ComboboxInput
+          value={newMedName}
+          onChange={setNewMedName}
+          options={nameOptions}
+          placeholder="e.g. Lisinopril"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
+        <input
+          type="text"
+          value={newMedDose}
+          onChange={(e) => setNewMedDose(e.target.value)}
+          placeholder="e.g. 10mg"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
+        <input
+          value={newMedFormulation}
+          onChange={(e) => setNewMedFormulation(e.target.value)}
+          placeholder="e.g. Tablet, Syrup"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
+        <input
+          type="number"
+          value={newMedQuantity}
+          onChange={(e) => setNewMedQuantity(e.target.value)}
+          placeholder="e.g. 30"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
+        <input
+          value={newMedInstructions}
+          onChange={(e) => setNewMedInstructions(e.target.value)}
+          placeholder="e.g. Take 1 tab daily"
+          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+        />
+      </div>
+      <div className="col-span-12 flex justify-between items-center mt-1">
+        {medError ? (
+          <span className="text-red font-medium text-[10px]">{medError}</span>
+        ) : <span />}
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
+          disabled={addingMed}
+          onClick={() => {
+            if (!newMedName.trim() || !newMedDose.trim()) {
+              setMedError('Medication name and dose are required');
+              return;
+            }
+            setMedError('');
+            setAddingMed(true);
+            setTimeout(() => {
+              onAdd({
+                name: newMedName.trim(),
+                dose: newMedDose.trim(),
+                formulation: newMedFormulation.trim() || undefined,
+                quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
+                instructions: newMedInstructions.trim(),
+              });
+              setNewMedName('');
+              setNewMedDose('');
+              setNewMedFormulation('');
+              setNewMedQuantity('');
+              setNewMedInstructions('');
+              setAddingMed(false);
+            }, 400);
+          }}
+          className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
+        >
+          {addingMed ? 'Adding...' : addLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 interface InitialNoteFormProps {
   patientId: string;
 }
@@ -202,46 +322,31 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
   const uploadAttachment = useUploadAttachment();
 
+  const { user } = useAuthStore();
+  const isDoctorOrAdmin = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+  const isNonDoctor = user?.role === 'NURSE' || user?.role === 'PHARMACIST';
+
   const isPublished = note?.status === 'PUBLISHED';
-  // A published note is editable in place once the user clicks "Edit Note".
-  const canEditAll = !isPublished || isEditing;
-  // Mirrors the backend AuthorGuard so we never show a button that would 403.
-  const canEditNote =
-    !!note &&
-    !!currentUser &&
-    (currentUser.role === 'ADMIN' || currentUser.id === note.authorId);
+  const canEditAll = !isPublished;
+  const isHistoryEditableOnly = false;
 
-  const { data: logsResponse, isLoading: logsLoading } = useInitialNoteLogs(patientId);
-  const initialNoteLogs = logsResponse?.data ?? [];
-  const { data: versionsResponse } = useInitialNoteVersions(
-    patientId,
-    note?.id ?? null,
+  const historyInputClass = cn(
+    "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
+    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
   );
-  const versionCount = versionsResponse?.data.length ?? 0;
 
-  const openVersionHistory = (versionId?: string) => {
-    setHistoryVersionId(versionId ?? null);
-    setShowVersionHistory(true);
-  };
-
-  const historyInputClass = "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all";
-
-  const historyTextareaClass = "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all";
+  const historyTextareaClass = cn(
+    "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
+    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+  );
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
 
   const [deleteProblemIndex, setDeleteProblemIndex] = useState<number | null>(null);
   const [deleteMedIndex, setDeleteMedIndex] = useState<number | null>(null);
+  const [editMedIndex, setEditMedIndex] = useState<number | null>(null);
 
-  const [newMedName, setNewMedName] = useState('');
-  const [newMedDose, setNewMedDose] = useState('');
-    const [newMedFormulation, setNewMedFormulation] = useState('');
-  const [newMedInstructions, setNewMedInstructions] = useState('');
-  const [newMedQuantity, setNewMedQuantity] = useState('');
-
-  const [medError, setMedError] = useState('');
-  const [addingMed, setAddingMed] = useState(false);
   const [probError, setProbError] = useState('');
   const [addingProb, setAddingProb] = useState(false);
 
@@ -268,6 +373,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       assessment: [],
       medicationSnapshot: [],
       mgmtNonpharm: '',
+      mgmtPharm: '',
       diagnostics: [],
       visitDatetime: new Date().toISOString(),
     },
@@ -318,7 +424,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           physicalExam: note.physicalExam || '',
           assessment: validProblems.length > 0
             ? validProblems
-            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
           medicationSnapshot: validMeds.length > 0
             ? validMeds
             : (copyForward?.activeMedications || []).map((m: any) => ({
@@ -329,6 +435,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 instructions: m.instructions || undefined,
               })),
           mgmtNonpharm: note.mgmtNonpharm || '',
+          mgmtPharm: note.mgmtPharm || '',
         diagnostics: note.diagnostics || [],
         visitDatetime: note.createdAt,
       });
@@ -347,10 +454,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             formulation: m.formulation || undefined,
             quantity: m.quantity || undefined,
             instructions: m.instructions || undefined,
+            source: m.source,
           });
 
           if (validProblems.length === 0) {
-            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined }));
+            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title }));
           } else {
             parsed.assessment = validProblems;
           }
@@ -383,7 +491,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         obHistory: '',
         psychosocialHistory: '',
         physicalExam: '',
-        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
@@ -392,6 +500,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           instructions: m.instructions || undefined,
         })),
         mgmtNonpharm: '',
+        mgmtPharm: '',
         diagnostics: [],
         visitDatetime: new Date().toISOString(),
       });
@@ -399,6 +508,18 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   }, [note, copyLoading, form, patientId, copyForward]);
 
   const formValues = form.watch();
+
+  const appendMedication = (values: MedicationSnapshotValues, source: MedSource) => {
+    const current = form.getValues('medicationSnapshot') || [];
+    form.setValue('medicationSnapshot', [...current, { ...values, source }], { shouldDirty: true, shouldTouch: true });
+  };
+
+  // Flat-array indices preserved through the filter — the History section's
+  // edit/delete buttons splice the same medicationSnapshot array as the Plan
+  // section, so they must operate on true indices, not filtered-list ones.
+  const pastMedEntries = (formValues.medicationSnapshot || [])
+    .map((med: any, index: number) => ({ med, index }))
+    .filter(({ med }: { med: any }) => getMedSource(med) === 'past');
 
   const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
 
@@ -740,117 +861,173 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     </div>
   );
 
-  return (
+    if (!isDoctorOrAdmin && (!note || note.status !== 'PUBLISHED')) {
+      return (
+        <div className="flex flex-col gap-6 pb-32">
+          {/* HEADER BAR */}
+          <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-btn bg-accent-light flex items-center justify-center text-accent shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold text-text-primary">Initial Consultation Note</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-3 text-text-secondary border border-border">
+                    Read-Only Access
+                  </span>
+                </div>
+                <span className="text-[11px] text-text-muted mt-0.5">
+                  Initial notes can only be documented and published by an attending physician.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/${patientId}/notes`)}
+                className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-surface-2 border border-border text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>View Timeline</span>
+              </button>
+            </div>
+          </div>
+
+          {/* EMPTY STATE CONTAINER */}
+          <div className="bg-surface border border-border rounded-card shadow-card p-12 flex flex-col items-center justify-center text-center min-h-[380px]">
+            <div className="w-14 h-14 rounded-full bg-accent/10 text-accent flex items-center justify-center mb-4 transition-transform hover:scale-105 duration-300">
+              <ClipboardList className="w-7 h-7 text-accent" />
+            </div>
+            <h2 className="text-[16px] font-bold text-text-primary mb-2">
+              No Initial Consultation Note Published
+            </h2>
+            <p className="text-[13px] text-text-muted max-w-[420px] mb-6 leading-relaxed">
+              An Initial Consultation Note has not been documented for this patient yet. Once an attending doctor completes and publishes the initial note, you will be able to review the consultation history here and document progress notes.
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/${patientId}/vitals`)}
+                className="text-[12px] h-[34px] px-4 rounded-btn font-semibold cursor-pointer"
+              >
+                View Vital Signs
+              </Button>
+              <Button
+                onClick={() => router.push(`/dashboard/${patientId}/notes`)}
+                className="text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
+              >
+                Go to Note Timeline
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="flex flex-col gap-6 pb-32">
       {note?.status === 'PUBLISHED' && !isEditing ? (
         // ==================== READ-ONLY PUBLISHED VIEW ====================
         <div className="flex flex-col gap-6 w-full">
           {/* HEADER BAR FOR PUBLISHED NOTE */}
-          <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-2.5 w-full">
-            <div className="flex flex-col">
-              <span className="text-[14px] font-bold text-[var(--text-primary)]">Initial Consultation Note</span>
-              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                <span className="text-[10px] text-[var(--text-muted)]">
-                  Published by {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Author'} on {new Date(note.createdAt).toLocaleDateString()}
-                </span>
+          <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-btn bg-accent-light flex items-center justify-center text-accent shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold text-text-primary">Initial Consultation Note</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Published
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-text-muted mt-0.5">
+                  <span>
+                    Published by <strong className="font-semibold text-text-secondary">{note.author ? `${note.author.role === 'DOCTOR' ? 'Dr. ' : ''}${note.author.firstName} ${note.author.lastName}` : 'Author'}</strong>
+                  </span>
+                  <span>•</span>
+                  <span>{new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
+
+            <div className="flex items-center gap-2">
               {note.lastEditor && (
-                <div className="flex items-center gap-1 text-[10px] font-bold tracking-[0.5px] text-[var(--text-muted)]">
-                  <Edit className="w-2.5 h-2.5" />
-                  Edited by {note.lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}{note.lastEditor.lastName}, {note.lastEditor.firstName} · {new Date(note.lastEditedAt || new Date()).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} · {new Date(note.lastEditedAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="hidden @md:flex items-center gap-1.5 text-[10px] font-medium text-text-muted bg-surface-2 border border-border px-2.5 py-1 rounded-btn">
+                  <Edit className="w-3 h-3 text-text-secondary" />
+                  <span>
+                    Edited by {note.lastEditor.role === 'DOCTOR' ? 'Dr. ' : ''}{note.lastEditor.lastName} · {new Date(note.lastEditedAt || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => openVersionHistory()}
-                  className="sec-btn"
-                  title="View previous versions of this note"
-                >
-                  <History className="w-3.5 h-3.5" />
-                  Version History
-                  {versionCount > 0 && (
-                    <span className="ml-1 font-mono text-[10px] text-text-muted">
-                      ({versionCount})
-                    </span>
-                  )}
-                </button>
-                {/* Author or ADMIN only — mirrors the backend AuthorGuard */}
-                {canEditNote && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditing(true)}
-                    className="sec-btn primary"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit Note
-                  </button>
-                )}
-              </div>
             </div>
           </div>
+
           {/* VITALS CARD */}
           <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-              <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                <Heart size={14} className="text-accent" strokeWidth={2.5} />
+            <div className="flex items-center justify-between px-4 py-2.5 bg-surface-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-[24px] h-[24px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
+                  <Heart size={13} className="text-accent" strokeWidth={2.5} />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-primary">
+                  Vital Signs
+                </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
-                Vital Signs
-              </span>
+              {latestVitals && (
+                <div className="flex items-center gap-2 text-[10px] text-text-muted font-sans">
+                  <span>Recorded {new Date(latestVitals.measuredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(latestVitals.measuredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {latestVitals.measuredByUser && (
+                    <>
+                      <span>•</span>
+                      <span>By {latestVitals.measuredByUser.firstName} {latestVitals.measuredByUser.lastName}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="p-3.5">
               {latestVitals ? (
-                <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-5 gap-2.5 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
-                    {renderVitalCell(
-                      'Blood Pressure',
-                      latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
-                      'mmHg',
-                      bpStatus,
-                      'systolic / diastolic'
-                    )}
-                    {renderVitalCell(
-                      'Heart Rate',
-                      latestVitals.heartRate?.toString() ?? '—',
-                      'bpm',
-                      hrStatus,
-                      hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
-                    )}
-                    {renderVitalCell(
-                      'Resp Rate',
-                      latestVitals.respiratoryRate?.toString() ?? '—',
-                      '/min',
-                      rrStatus,
-                      rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
-                    )}
-                    {renderVitalCell(
-                      'Temperature',
-                      formatTemperature(Number(latestVitals.temperature)),
-                      '°C',
-                      tempStatus,
-                      tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
-                    )}
-                    {renderVitalCell(
-                      'SpO2',
-                      latestVitals.oxygenSaturation?.toString() ?? '—',
-                      '%',
-                      o2Status,
-                      o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'
-                    )}
-                  </div>
-                  
-                  {/* Timestamp & Recorder Info */}
-                  <div className="flex items-center justify-between text-[9px] text-text-muted mt-2 px-1 font-sans">
-                    <span>
-                      Measured at: <strong className="text-text-secondary">{new Date(latestVitals.measuredAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
-                    </span>
-                    <span>
-                      Recorded by: <strong className="text-text-secondary">{latestVitals.measuredByUser ? `${latestVitals.measuredByUser.firstName} ${latestVitals.measuredByUser.lastName}` : (latestVitals.measuredBy ?? '—')}</strong>
-                    </span>
-                  </div>
+                <div className="grid grid-cols-5 gap-2.5 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
+                  {renderVitalCell(
+                    'Blood Pressure',
+                    latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
+                    'mmHg',
+                    bpStatus,
+                    'systolic / diastolic'
+                  )}
+                  {renderVitalCell(
+                    'Heart Rate',
+                    latestVitals.heartRate?.toString() ?? '—',
+                    'bpm',
+                    hrStatus,
+                    hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                  )}
+                  {renderVitalCell(
+                    'Resp Rate',
+                    latestVitals.respiratoryRate?.toString() ?? '—',
+                    '/min',
+                    rrStatus,
+                    rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                  )}
+                  {renderVitalCell(
+                    'Temperature',
+                    formatTemperature(Number(latestVitals.temperature)),
+                    '°C',
+                    tempStatus,
+                    tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                  )}
+                  {renderVitalCell(
+                    'SpO2',
+                    latestVitals.oxygenSaturation?.toString() ?? '—',
+                    '%',
+                    o2Status,
+                    o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'
+                  )}
                 </div>
               ) : (
                 <div className="text-[12px] text-text-muted p-1">No vitals recorded for this note.</div>
@@ -860,52 +1037,62 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
           {/* SUBJECTIVE CARD */}
           <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-              <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                <MessageSquare size={14} className="text-accent" strokeWidth={2.5} />
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-blue-bg/30 border-b border-border">
+              <div className="w-[24px] h-[24px] rounded-icon bg-blue-bg flex items-center justify-center flex-shrink-0">
+                <MessageSquare size={13} className="text-blue" strokeWidth={2.5} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+              <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
                 Subjective
               </span>
+              <span className="text-[10px] text-text-muted font-medium">Patient's reported complaints and history</span>
             </div>
+
             <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-start">
               {/* Left Column */}
               <div className="flex flex-col gap-4">
+                {/* Chief Complaint */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
-                    <span>🗣️</span> Chief Complaint
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-blue mb-1.5 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-blue" />
+                    <span>Chief Complaint</span>
                   </div>
-                  <div className="text-[12px] text-text-primary font-semibold leading-relaxed">
+                  <div className="text-[13px] text-text-primary font-semibold leading-relaxed bg-blue-bg/20 border border-blue-border/30 rounded-btn px-3.5 py-2.5">
                     {note.chiefComplaint || '—'}
                   </div>
                 </div>
 
+                {/* History of Present Illness */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
-                    <span>📝</span> History of Present Illness
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-blue mb-1.5 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue" />
+                    <span>History of Present Illness</span>
                   </div>
-                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[13px] text-text-secondary whitespace-pre-wrap leading-[1.7] bg-surface-2/40 border border-border/70 rounded-btn p-3.5">
                     {note.hpi || '—'}
                   </div>
                 </div>
 
+                {/* Personal and Social History */}
                 {note.socialHistory && (
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
-                      <span>🏃‍♂️</span> Personal and Social History
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-blue mb-1.5 flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-blue" />
+                      <span>Personal and Social History</span>
                     </div>
-                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                    <div className="text-[12.5px] text-text-secondary whitespace-pre-wrap leading-relaxed bg-surface-2/40 border border-border/70 rounded-btn p-3">
                       {note.socialHistory}
                     </div>
                   </div>
                 )}
 
+                {/* Psychosocial History */}
                 {note.psychosocialHistory && (
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-blue mb-1 flex items-center gap-1.5">
-                      <span>🧠</span> Psychosocial History
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-blue mb-1.5 flex items-center gap-1.5">
+                      <Brain className="w-3.5 h-3.5 text-blue" />
+                      <span>Psychosocial History</span>
                     </div>
-                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                    <div className="text-[12.5px] text-text-secondary whitespace-pre-wrap leading-relaxed bg-surface-2/40 border border-border/70 rounded-btn p-3">
                       {note.psychosocialHistory}
                     </div>
                   </div>
@@ -914,49 +1101,60 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
               {/* Right Column */}
               <div className="flex flex-col gap-4 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
+                {/* Past Medical History */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-2 flex items-center gap-1.5">
-                    <span>🏥</span> Past Medical History
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-amber mb-2 flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-amber" />
+                    <span>Past Medical History</span>
                   </div>
-                  <div className="flex flex-col gap-3 text-[12px] bg-surface-2 border border-border rounded-lg p-3">
-                    <div>
-                      <span className="font-semibold text-text-primary block mb-0.5">Comorbidities</span>
-                      <span className="text-text-secondary leading-relaxed">{note.pmhComorbidities || 'None'}</span>
+                  <div className="flex flex-col text-[12.5px] bg-surface-2/60 border border-border rounded-lg overflow-hidden divide-y divide-border/60">
+                    <div className="p-3 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Comorbidities</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhComorbidities || 'None'}</span>
                     </div>
-                    <div className="border-t border-border/50 pt-2">
-                      <span className="font-semibold text-text-primary block mb-0.5">Surgeries</span>
-                      <span className="text-text-secondary leading-relaxed">{note.pmhSurgeries || 'None'}</span>
+                    <div className="p-3 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Surgeries</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhSurgeries || 'None'}</span>
                     </div>
-                    <div className="border-t border-border/50 pt-2">
-                      <span className="font-semibold text-text-primary block mb-0.5">Hospitalizations</span>
-                      <span className="text-text-secondary leading-relaxed">{note.pmhHospitalizations || 'None'}</span>
+                    <div className="p-3 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Hospitalizations</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhHospitalizations || 'None'}</span>
                     </div>
-                    <div className="border-t border-border/50 pt-2">
-                      <span className="font-semibold text-text-primary block mb-0.5">Allergies</span>
-                      <span className={cn("leading-relaxed", note.allergies ? "text-red font-bold" : "text-text-secondary")}>
-                        {note.allergies || 'No known allergies'}
-                      </span>
+                    <div className="p-3 flex flex-col gap-1 bg-surface">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Allergies</span>
+                      {note.allergies ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-bg border border-red-border text-red font-semibold text-[12px] w-fit">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{note.allergies}</span>
+                        </div>
+                      ) : (
+                        <span className="text-text-secondary font-medium">No known allergies</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
+                {/* Family Medical History */}
                 {note.familyHistory && (
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-1 flex items-center gap-1.5">
-                      <span>👨‍👩‍👧‍👦</span> Family Medical History
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-amber mb-1.5 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-amber" />
+                      <span>Family Medical History</span>
                     </div>
-                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                    <div className="text-[12.5px] text-text-secondary whitespace-pre-wrap leading-relaxed bg-surface-2/40 border border-border/70 rounded-btn p-3">
                       {note.familyHistory}
                     </div>
                   </div>
                 )}
 
+                {/* OB/Menstrual History */}
                 {isFemale && note.obHistory && (
                   <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber mb-1 flex items-center gap-1.5">
-                      <span>♀️</span> OB/Menstrual History
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-amber mb-1.5 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber" />
+                      <span>OB / Menstrual History</span>
                     </div>
-                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                    <div className="text-[12.5px] text-text-secondary whitespace-pre-wrap leading-relaxed bg-surface-2/40 border border-border/70 rounded-btn p-3">
                       {note.obHistory}
                     </div>
                   </div>
@@ -969,59 +1167,54 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-stretch">
             {/* OBJECTIVE CARD */}
             <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                  <Microscope size={14} className="text-accent" strokeWidth={2.5} />
+              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-purple-bg/30 border-b border-border">
+                <div className="w-[24px] h-[24px] rounded-icon bg-purple-bg flex items-center justify-center flex-shrink-0">
+                  <Microscope size={13} className="text-purple" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
                   Objective
                 </span>
+                <span className="text-[10px] text-text-muted font-medium">Physical exam & findings</span>
               </div>
               <div className="p-4 flex flex-col gap-4 flex-1">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-purple mb-1 flex items-center gap-1.5">
-                    <span>🩺</span> Physical Examination
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-purple mb-1.5 flex items-center gap-1.5">
+                    <Stethoscope className="w-3.5 h-3.5 text-purple" />
+                    <span>Physical Examination</span>
                   </div>
-                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[13px] text-text-secondary whitespace-pre-wrap leading-[1.7] bg-surface-2/40 border border-border/70 rounded-btn p-3.5 font-sans">
                     {note.physicalExam || '—'}
                   </div>
                 </div>
-
-                {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-purple mb-1.5 flex items-center gap-1.5">
-                      <span>🧪</span> Labs and Imaging Results
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {note.diagnostics.map((diag: string, idx: number) => (
-                        <span key={idx} className="text-[10px] font-bold uppercase tracking-[0.5px] bg-surface-2 text-text-secondary border border-border px-2 py-0.5 rounded-[4px] shadow-sm">
-                          {diag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
             {/* ASSESSMENT CARD */}
             <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                  <ClipboardList size={14} className="text-accent" strokeWidth={2.5} />
+              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-accent-light/30 border-b border-border">
+                <div className="w-[24px] h-[24px] rounded-icon bg-accent-light flex items-center justify-center flex-shrink-0">
+                  <ClipboardList size={13} className="text-accent" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-accent flex-1">
                   Assessment
                 </span>
+                <span className="text-[10px] text-text-muted font-medium">Active diagnoses</span>
               </div>
               <div className="p-4 flex flex-col gap-3 flex-1">
-                <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-accent-hover mb-1 flex items-center gap-1.5">
-                  <span>📌</span> Active Problems
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-accent mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-accent" />
+                    <span>Active Problems</span>
+                  </div>
+                  {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 && (
+                    <span className="text-[10px] font-bold bg-accent-light text-accent px-1.5 py-0.5 rounded-full">
+                      {note.assessment.length}
+                    </span>
+                  )}
                 </div>
-                <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface-2/30">
+                <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
                   {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 ? (
                     note.assessment.map((item: any, idx: number) => {
-                      const isLast = idx === note.assessment.length - 1;
                       const titleStr = typeof item === 'string' ? item : item.title;
                       const titleKey = titleStr?.trim().toLowerCase();
                       const depth = typeof item !== 'string' && item.depth !== undefined
@@ -1031,27 +1224,25 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                             : (typeof item !== 'string' && item.parentId ? 1 : 0));
 
                       return (
-                        <div key={idx} className={cn("flex items-center gap-2 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
-                          <span className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
+                        <div key={idx} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-surface-2/60 transition-colors">
+                          <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
                           <div 
                             className="flex-1 min-w-0"
-                            style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
+                            style={depth > 0 ? { paddingLeft: `${depth * 18}px` } : undefined}
                           >
-                            <span className="text-[12px] text-text-primary font-medium">
-                              {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
+                            <span className="text-[13px] text-text-primary font-semibold">
+                              {depth > 0 && <span className="font-mono text-text-muted mr-1.5 select-none">↳</span>}
                               {titleStr}
                             </span>
                           </div>
-                          {item.icdCode && (
-                            <span className="font-mono text-[9px] text-text-muted bg-surface-2 border border-border px-1.5 py-[2px] rounded flex-shrink-0">
-                              {item.icdCode}
-                            </span>
-                          )}
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-accent bg-accent-light/50 border border-accent/20 px-1.5 py-0.5 rounded">
+                            Active
+                          </span>
                         </div>
                       );
                     })
                   ) : (
-                    <div className="p-3 text-[12px] text-text-muted text-center bg-surface">No active problems registered.</div>
+                    <div className="p-4 text-[12px] text-text-muted text-center">No active problems registered.</div>
                   )}
                 </div>
               </div>
@@ -1060,50 +1251,104 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
           {/* PLAN / MANAGEMENT CARD */}
           <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2 border-b border-border">
-              <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center text-[12px] flex-shrink-0">
-                <Stethoscope size={14} className="text-accent" strokeWidth={2.5} />
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-green-bg/30 border-b border-border">
+              <div className="w-[24px] h-[24px] rounded-icon bg-green-bg flex items-center justify-center flex-shrink-0">
+                <Stethoscope size={13} className="text-green" strokeWidth={2.5} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+              <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-green flex-1">
                 Plan / Management
               </span>
+              <span className="text-[10px] text-text-muted font-medium">Treatment & orders</span>
             </div>
             <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 items-start">
+              {/* Left Column */}
               <div className="flex flex-col gap-4">
+                {/* Non-Pharmacologic */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1 flex items-center gap-1.5">
-                    <span>🥦</span> Non-Pharmacologic Management
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-1.5 flex items-center gap-1.5">
+                    <HeartPulse className="w-3.5 h-3.5 text-green" />
+                    <span>Non-Pharmacologic Management</span>
                   </div>
-                  <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[13px] text-text-secondary whitespace-pre-wrap leading-[1.7] bg-surface-2/40 border border-border/70 rounded-btn p-3.5 font-sans">
                     {note.mgmtNonpharm || '—'}
                   </div>
                 </div>
+
+                {/* Diagnostics */}
+                {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
+                  <div>
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-1.5 flex items-center gap-1.5">
+                      <FlaskConical className="w-3.5 h-3.5 text-green" />
+                      <span>Diagnostics</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {note.diagnostics.map((diag: string, idx: number) => (
+                        <span key={idx} className="text-[11px] font-semibold bg-surface-2 text-text-primary border border-border px-2.5 py-1 rounded-[6px] shadow-2xs">
+                          {diag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pharmacologic Treatment Remarks */}
+                {note.mgmtPharm && (
+                  <div>
+                    <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-1.5 flex items-center gap-1.5">
+                      <Pill className="w-3.5 h-3.5 text-green" />
+                      <span>Pharmacologic Treatment Remarks</span>
+                    </div>
+                    <div className="text-[13px] text-text-secondary whitespace-pre-wrap leading-[1.7] bg-surface-2/40 border border-border/70 rounded-btn p-3.5 font-sans">
+                      {note.mgmtPharm}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Right Column */}
               <div className="flex flex-col gap-3 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center gap-1.5">
-                    <span>💊</span> Medications Prescribed
+                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Pill className="w-3.5 h-3.5 text-green" />
+                      <span>Medications Prescribed</span>
+                    </div>
+                    {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 && (
+                      <span className="text-[10px] font-bold bg-green-bg text-green px-1.5 py-0.5 rounded-full">
+                        {note.medicationSnapshot.length}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface-2/30">
+                  <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
                     {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
-                      note.medicationSnapshot.map((med: any, idx: number, arr) => {
-                        const isLast = idx === arr.length - 1;
+                      note.medicationSnapshot.map((med: any, idx: number) => {
+                        const isPast = getMedSource(med) === 'past';
                         const medName = typeof med === 'string' ? med : med.name;
-                        const medDetails = typeof med !== 'string' 
-                          ? `${med.dose ?? ''}${med.unit ?? ''}${med.formulation ? ` · ${med.formulation}` : ''}${med.quantity ? ` (Qty: ${med.quantity})` : ''}`
+                        const medDetails = typeof med !== 'string'
+                          ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
                           : '';
                         const instructions = typeof med !== 'string' ? med.instructions : '';
 
                         return (
-                          <div key={idx} className={cn("flex flex-col gap-0.5 px-3 py-2 border-border bg-surface", !isLast && "border-b")}>
-                            <div className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-                              <span className="text-[12px] font-bold text-text-primary">{medName}</span>
-                              {medDetails && <span className="text-[11px] text-text-muted ml-auto font-medium">{medDetails}</span>}
+                          <div key={idx} className="flex flex-col gap-1 p-3 hover:bg-surface-2/50 transition-colors">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={cn("w-2 h-2 rounded-full shrink-0", isPast ? "bg-amber" : "bg-green")} />
+                                <span className="text-[13px] font-bold text-text-primary truncate">{medName}</span>
+                                {isPast && (
+                                  <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
+                                    Past
+                                  </span>
+                                )}
+                              </div>
+                              {medDetails && (
+                                <span className="text-[11px] font-medium font-mono text-text-secondary shrink-0 bg-surface-2 px-2 py-0.5 rounded border border-border">
+                                  {medDetails}
+                                </span>
+                              )}
                             </div>
                             {instructions && (
-                              <div className="text-[11px] text-text-secondary pl-3.5 leading-normal mt-0.5 font-medium">
+                              <div className="text-[11.5px] text-text-secondary pl-4 leading-relaxed font-sans">
                                 {instructions}
                               </div>
                             )}
@@ -1111,7 +1356,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         );
                       })
                     ) : (
-                      <div className="p-3 text-[12px] text-text-muted text-center bg-surface">No medications prescribed.</div>
+                      <div className="p-4 text-[12px] text-text-muted text-center">No medications prescribed.</div>
                     )}
                   </div>
                 </div>
@@ -1154,7 +1399,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 editing while a save round-trips, per the "auto-save always on" principle. */}
             <fieldset className="flex flex-col gap-5 w-full">
             {/* Latest Vitals Snapshot Strip */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-accent-mid rounded-card shadow-card overflow-hidden">
+            <div className="bg-surface border border-border rounded-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-accent-mid">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <Heart className="w-3.5 h-3.5 text-accent" />
@@ -1215,7 +1460,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 1. Subjective Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden transition-all">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-blue rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-blue-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -1276,9 +1521,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 2. History Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-amber rounded-card shadow-card overflow-hidden">
+            {/* No overflow-hidden here: the Past Medication combobox below needs to
+                escape this card's bottom edge (see Plan/Management card for precedent). */}
+            <div className="bg-surface border border-border rounded-card shadow-card">
               {/* Card Header */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <History className="w-3.5 h-3.5 text-amber" />
                 </div>
@@ -1296,14 +1543,15 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   theme="amber"
                   icon={<ClipboardList className="w-3.5 h-3.5" />}
                 >
-                  <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-3 items-start">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Comorbidities
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhComorbidities')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Diabetes Mellitus (2018), Asthma"
                       />
                     </div>
@@ -1311,9 +1559,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Previous Surgeries
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhSurgeries')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Appendectomy (2015)"
                       />
                     </div>
@@ -1321,9 +1570,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Previous Hospitalizations
                       </label>
-                      <input
+                      <textarea
                         {...form.register('pmhHospitalizations')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Dengue (2022)"
                       />
                     </div>
@@ -1331,17 +1581,86 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.6px] block mb-1">
                         Allergies
                       </label>
-                      <input
+                      <textarea
                         {...form.register('allergies')}
-                        className={historyInputClass}
+                        rows={2}
+                        className={pmhTextareaClass}
                         placeholder="e.g. Penicillin (rash), Sulfa"
                       />
                     </div>
                   </div>
                 </CollapsibleSection>
- 
-                <CollapsibleSection 
-                  title="Family Medical History" 
+
+                <CollapsibleSection
+                  title="Past Medication"
+                  variant="row"
+                  theme="amber"
+                  icon={<Pill className="w-3.5 h-3.5" />}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[11px] text-text-muted -mt-0.5 mb-1">
+                      Medications recorded here also appear under Prescribed Medications and are saved to the patient's cumulative medication list when this note is published.
+                    </p>
+                    {pastMedEntries.length === 0 ? (
+                      <div className="text-[11px] text-text-muted">No past medications recorded.</div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {pastMedEntries.map(({ med, index }: { med: any; index: number }) => (
+                          <div key={index} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5"></div>
+                            <div className="flex-1 min-w-0 break-words whitespace-normal">
+                              <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
+                              {typeof med !== 'string' && med.dose && (
+                                <span className="font-mono text-amber font-semibold ml-1.5">{med.dose}</span>
+                              )}
+                              {typeof med !== 'string' && med.formulation && (
+                                <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                              )}
+                              {typeof med !== 'string' && med.quantity && (
+                                <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                              )}
+                              {typeof med !== 'string' && med.instructions && (
+                                <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                              )}
+                            </div>
+                            {canEditAll && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => setEditMedIndex(index)}
+                                  className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  onClick={() => setDeleteMedIndex(index)}
+                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {canEditAll && (
+                      <MedicationAddForm
+                        nameOptions={nameOptions}
+                        onAdd={(values) => appendMedication(values, 'past')}
+                        addLabel="+ Add Past Medication"
+                      />
+                    )}
+                  </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                  title="Family Medical History"
                   variant="row"
                   theme="amber"
                   icon={<Users className="w-3.5 h-3.5" />}
@@ -1405,7 +1724,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 3. Objective Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden transition-all">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-purple rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               {/* Card Header */}
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-purple-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
@@ -1443,19 +1762,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
                     Labs and Imaging Results
                   </label>
-                  <Controller
-                    control={form.control}
-                    name="diagnostics"
-                    render={({ field }) => (
-                      <TagInputField
-                        value={field.value || []}
-                        onChange={field.onChange}
-                        placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
-                        isObjectFormat={false}
-                        disabled={!canEditAll}
-                      />
-                    )}
-                  />
                   {canEditAll && (
                     <AttachmentsSection 
                       patientId={patientId} 
@@ -1471,9 +1777,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 4. Assessment Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-accent rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">📊</div>
+                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">
+                  <ClipboardList size={14} className="text-accent" strokeWidth={2.5} />
+                </div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
@@ -1507,11 +1815,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                               >
                                 {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
                                 {titleStr}
-                                {typeof prob !== 'string' && prob.icdCode && (
-                                  <span className="font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border ml-2">
-                                    {prob.icdCode}
-                                  </span>
-                                )}
                               </div>
                             {canEditAll && (
                               <Button
@@ -1529,13 +1832,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       })}
                         {canEditAll && (
                           <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                            <div className="col-span-12 @md:col-span-8 flex flex-col gap-1">
+                            <div className="col-span-12 flex flex-col gap-1">
                               <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
                               <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
-                            </div>
-                            <div className="col-span-12 @md:col-span-4 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">ICD-10 Code</label>
-                              <input id="newProbIcd" placeholder="e.g. I10" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
                             </div>
                             <div className="col-span-12 flex justify-between items-center mt-1">
                               {probError ? (
@@ -1548,7 +1847,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 disabled={addingProb}
                                 onClick={() => {
                                   const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                                  const icdEl = document.getElementById('newProbIcd') as HTMLInputElement;
                                   if (!titleEl.value.trim()) {
                                     setProbError('Problem title is required');
                                     return;
@@ -1556,10 +1854,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   setProbError('');
                                   setAddingProb(true);
                                   setTimeout(() => {
-                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim(), icdCode: icdEl.value.trim() || undefined }];
+                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim() }];
                                     field.onChange(newProbs);
                                     titleEl.value = '';
-                                    icdEl.value = '';
                                     setAddingProb(false);
                                   }, 400);
                                 }}
@@ -1583,7 +1880,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 5. Management Plan Card */}
-            <div className="bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card transition-all">
+            <div className={cn("bg-surface border border-border border-l-[3px] border-l-green-border rounded-card shadow-card transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
                   <Stethoscope className="w-3.5 h-3.5 text-green" />
@@ -1594,17 +1891,50 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
               <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 bg-surface">
-                {/* Left: Non-Pharmacologic */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
-                    Non-Pharmacologic Management
-                  </label>
-                  <textarea
-                    {...form.register('mgmtNonpharm')}
-                    disabled={!canEditAll}
-                    className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
-                    placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
-                  />
+                {/* Left: Non-Pharmacologic & Diagnostics */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Non-Pharmacologic Management
+                    </label>
+                    <textarea
+                      {...form.register('mgmtNonpharm')}
+                      disabled={!canEditAll}
+                      className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
+                      placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Diagnostics
+                    </label>
+                    <Controller
+                      control={form.control}
+                      name="diagnostics"
+                      render={({ field }) => (
+                        <TagInputField
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
+                          isObjectFormat={false}
+                          disabled={!canEditAll}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Pharmacologic Treatment Remarks
+                    </label>
+                    <textarea
+                      {...form.register('mgmtPharm')}
+                      disabled={!canEditAll}
+                      className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[80px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
+                      placeholder="e.g. Continue anti-hypertensives, initiate statin therapy at bedtime…"
+                    />
+                  </div>
                 </div>
                 {/* Right: Prescribed Medications */}
                 <div className="flex flex-col gap-1.5">
@@ -1621,125 +1951,61 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       const meds = field.value || [];
                       return (
                         <div className="flex flex-col gap-1.5" id="field-medications">
-                          {meds.map((med: any, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green shrink-0 mt-1.5"></div>
-                              <div className="flex-1 min-w-0 break-words whitespace-normal">
-                                <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
-                                {typeof med !== 'string' && med.dose && (
-                                  <span className="font-mono text-green font-semibold ml-1.5">{med.dose}{med.unit}</span>
-                                )}
-                                {typeof med !== 'string' && med.formulation && (
-                                  <span className="text-text-secondary ml-1.5">{med.formulation}</span>
-                                )}
-                                {typeof med !== 'string' && med.quantity && (
-                                  <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                                )}
-                                {typeof med !== 'string' && med.instructions && (
-                                  <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                          {meds.map((med: any, idx: number) => {
+                            const isPast = getMedSource(med) === 'past';
+                            return (
+                              <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5", isPast ? "bg-amber" : "bg-green")}></div>
+                                <div className="flex-1 min-w-0 break-words whitespace-normal">
+                                  <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
+                                  {isPast && (
+                                    <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1 py-0.5 rounded uppercase tracking-wider ml-1.5 align-middle whitespace-nowrap">
+                                      Past
+                                    </span>
+                                  )}
+                                  {typeof med !== 'string' && med.dose && (
+                                    <span className={cn("font-mono font-semibold ml-1.5", isPast ? "text-amber" : "text-green")}>{med.dose}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.formulation && (
+                                    <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.quantity && (
+                                    <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                                  )}
+                                  {typeof med !== 'string' && med.instructions && (
+                                    <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                                  )}
+                                </div>
+                                {canEditAll && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setEditMedIndex(idx)}
+                                      className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => setDeleteMedIndex(idx)}
+                                      className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                    >
+                                      <TrashIcon className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
-                              {canEditAll && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => setDeleteMedIndex(idx)}
-                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                                >
-                                  <TrashIcon className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                           {canEditAll && (
-                            <div className="grid grid-cols-12 gap-2.5 mt-2 pt-2 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                              <div className="col-span-12 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Medication Name</label>
-                                <ComboboxInput
-                                  value={newMedName}
-                                  onChange={setNewMedName}
-                                  options={nameOptions}
-                                  placeholder="e.g. Lisinopril"
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
-                                />
-                              </div>
-                              <div className="col-span-12 @md:col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Dose</label>
-                              <input 
-                                type="text" 
-                                value={newMedDose}
-                                onChange={(e) => setNewMedDose(e.target.value)}
-                                placeholder="e.g. 10mg" 
-                                className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                              />
-                            </div>
-                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
-                                <input 
-                                  value={newMedFormulation}
-                                  onChange={(e) => setNewMedFormulation(e.target.value)}
-                                  placeholder="e.g. Tablet, Syrup" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
-                                <input 
-                                  type="number"
-                                  value={newMedQuantity}
-                                  onChange={(e) => setNewMedQuantity(e.target.value)}
-                                  placeholder="e.g. 30" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
-                                <input 
-                                  value={newMedInstructions}
-                                  onChange={(e) => setNewMedInstructions(e.target.value)}
-                                  placeholder="e.g. Take 1 tab daily" 
-                                  className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" 
-                                />
-                              </div>
-                              <div className="col-span-12 flex justify-between items-center mt-1">
-                                {medError ? (
-                                  <span className="text-red font-medium text-[10px]">{medError}</span>
-                                ) : <span />}
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="xs"
-                                  disabled={addingMed}
-                                  onClick={() => {
-                                    if (!newMedName.trim() || !newMedDose.trim()) {
-                                      setMedError('Medication name and dose are required');
-                                      return;
-                                    }
-                                    setMedError('');
-                                    setAddingMed(true);
-                                    setTimeout(() => {
-                                      field.onChange([...meds, { 
-                                        name: newMedName.trim(), 
-                                        dose: newMedDose.trim(), 
-                                        formulation: newMedFormulation.trim() || undefined,
-                                        quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
-                                        instructions: newMedInstructions.trim() 
-                                      }]);
-                                      setNewMedName('');
-                                      setNewMedDose('');
-                                      setNewMedFormulation('');
-                                      setNewMedQuantity('');
-                                      setNewMedInstructions('');
-                                      setAddingMed(false);
-                                    }, 400);
-                                  }}
-                                  className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
-                                >
-                                  {addingMed ? 'Adding...' : '+ Add Medication'}
-                                </Button>
-                              </div>
-                            </div>
+                            <MedicationAddForm
+                              nameOptions={nameOptions}
+                              onAdd={(values) => field.onChange([...meds, { ...values, source: 'prescribed' }])}
+                            />
                           )}
                         </div>
                       );
@@ -1817,7 +2083,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             obHistory: '',
             psychosocialHistory: '',
             physicalExam: '',
-            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title, icdCode: p.icdCode || undefined })),
+            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
             medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
               dose: m.dose || undefined,
@@ -1826,6 +2092,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               instructions: m.instructions || undefined,
             })),
             mgmtNonpharm: '',
+            mgmtPharm: '',
             diagnostics: [],
             visitDatetime: new Date().toISOString(),
           });
@@ -1900,6 +2167,21 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         title="Remove Medication"
         message="Are you sure you want to remove this medication from the prescribed list?"
         confirmLabel="Remove"
+      />
+
+      <MedicationSnapshotModal
+        open={editMedIndex !== null}
+        onClose={() => setEditMedIndex(null)}
+        editing={editMedIndex !== null ? (form.getValues('medicationSnapshot') || [])[editMedIndex] ?? null : null}
+        nameOptions={nameOptions}
+        onSave={(values) => {
+          if (editMedIndex === null) return;
+          const current = form.getValues('medicationSnapshot') || [];
+          const updated = [...current];
+          updated[editMedIndex] = { ...updated[editMedIndex], ...values };
+          form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
+          setEditMedIndex(null);
+        }}
       />
     </div>
   );

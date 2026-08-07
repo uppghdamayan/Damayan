@@ -24,6 +24,7 @@ export interface InitialNote {
   assessment: any[];
   medicationSnapshot?: any[];
   mgmtNonpharm?: string;
+  mgmtPharm?: string;
   diagnostics?: string[];
   status: 'DRAFT' | 'PUBLISHED';
   lastEditedBy?: string;

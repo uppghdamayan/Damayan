@@ -22,25 +22,22 @@ export function useProblemLogs(patientId: string | null) {
 
 interface CreateProblemInput {
   title: string;
-  icdCode?: string | null;
   parentId?: string;
   diagnosisDate?: string | null;
 }
 interface UpdateProblemInput {
   id: string;
   title?: string;
-  icdCode?: string | null;
   status?: ProblemStatusValue;
   parentId?: string | null;
   diagnosisDate?: string | null;
 }
 interface ReorderInput {
-  items: { 
-    id: string; 
+  items: {
+    id: string;
     sortOrder: number;
     parentId?: string | null;
     title?: string;
-    icdCode?: string | null;
     diagnosisDate?: string | null;
   }[];
 }
@@ -70,7 +67,6 @@ export function useCreateProblem(patientId: string) {
         patientId,
         parentId: input.parentId ?? null,
         title: input.title,
-        icdCode: input.icdCode ?? null,
         status: 'ACTIVE',
         sortOrder: (previous?.data.length ?? 0) + 1,
         addedBy: null,

@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const assessmentItemSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  icdCode: z.string().optional(),
   parentId: z.string().optional().nullable(),
   depth: z.number().optional(),
   isNew: z.boolean().optional(),
@@ -23,6 +22,7 @@ export const initialNoteDraftSchema = z.object({
   assessment: z.array(assessmentItemSchema).optional(),
   medicationSnapshot: z.array(z.any()).optional(),
   mgmtNonpharm: z.string().optional().or(z.literal('')),
+  mgmtPharm: z.string().optional().or(z.literal('')),
   diagnostics: z.array(z.string()).optional(),
   visitDatetime: z.string().optional(),
 });

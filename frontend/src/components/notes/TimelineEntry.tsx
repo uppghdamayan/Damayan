@@ -87,7 +87,7 @@ export function TimelineEntry({
             <span className={cn(
               "text-[13px] text-[var(--text-primary)]",
               note.status === 'DRAFT' ? "font-normal" : "font-bold",
-              note.isDeleted && "line-through"
+              note.isDeleted && "line-through decoration-text-muted/65 decoration-1"
             )}>
               {isInitial ? 'Initial Consultation Note' : 'Progress Note'}
             </span>
@@ -176,7 +176,7 @@ export function TimelineEntry({
         {!isOpen && note.previewText && (
           <p className={cn(
             "text-[12px] text-[var(--text-secondary)] italic line-clamp-1 mt-0.5 pl-2 border-l-2 border-border-strong",
-            note.isDeleted && "line-through"
+            note.isDeleted && "line-through decoration-text-muted/65 decoration-1"
           )}>
             {note.previewText}
           </p>
@@ -186,7 +186,7 @@ export function TimelineEntry({
       {/* Expanded SOAP contents using shadcn Collapsible */}
       <Collapsible open={isOpen} onOpenChange={onToggle}>
         <CollapsibleContent className="border-t border-border bg-surface p-4">
-          <div className={note.isDeleted ? "line-through opacity-70" : ""}>
+          <div className={note.isDeleted ? "line-through decoration-text-muted/65 decoration-1 opacity-70" : ""}>
             <NoteFormattedSections note={note} previousNote={previousNote} />
           </div>
           

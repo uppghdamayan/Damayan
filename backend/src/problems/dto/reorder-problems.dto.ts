@@ -32,10 +32,6 @@ class ReorderItemDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  icdCode?: string | null;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
   @IsString()
   diagnosisDate?: string | null;
 }

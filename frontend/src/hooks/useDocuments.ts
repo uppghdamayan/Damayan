@@ -5,7 +5,7 @@ export interface DocumentDraftData {
   patient: any;
   physician: { id: string; firstName: string; lastName: string; role?: string } | null;
   candidateDoctors: { id: string; firstName: string; lastName: string; role?: string }[];
-  assessment: { title: string; icdCode?: string }[] | null;
+  assessment: { title: string }[] | null;
   diagnostics: string[] | null;
   medications: any[];
   chiefComplaintDefault?: string;

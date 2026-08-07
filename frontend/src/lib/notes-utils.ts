@@ -22,6 +22,7 @@ export interface TimelineNoteView {
     labs?: string;
     assessment?: string[];          // problem titles
     nonPharm?: string;
+    pharm?: string;
     diagnostics?: string[];
     medications?: string[];
   };
@@ -120,7 +121,7 @@ export function mapNoteToTimelineView(
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
             const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            return prefix + item.title;
           }
           return '';
         }).filter(Boolean)
@@ -130,7 +131,10 @@ export function mapNoteToTimelineView(
       ? initialNote.medicationSnapshot.map((med: any) => {
           if (typeof med === 'string') return med;
           if (med && typeof med === 'object') {
-            return `${med.name} ${med.dose}${med.unit}`;
+            const doseStr = med.dose != null ? String(med.dose).trim() : '';
+            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+            const fullDose = `${doseStr}${unitStr}`.trim();
+            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
           }
           return '';
         }).filter(Boolean)
@@ -143,10 +147,10 @@ export function mapNoteToTimelineView(
       : undefined;
     const lastEditedAt = (initialNote as any).lastEditedAt;
     
-    let displayUser = author;
-    let displayUserId = initialNote.authorId;
+    const displayUser = author;
+    const displayUserId = initialNote.authorId;
 
-    let isMainAuthor = true; // Initial note creator is always the main author
+    const isMainAuthor = true; // Initial note creator is always the main author
 
     const authorName = displayUser 
       ? `${displayUser.role === 'DOCTOR' ? 'Dr. ' : ''}${displayUser.lastName}, ${displayUser.firstName}`
@@ -172,6 +176,7 @@ export function mapNoteToTimelineView(
         labs: Array.isArray(initialNote.diagnostics) && initialNote.diagnostics.length > 0 ? initialNote.diagnostics.join(', ') : undefined,
         assessment: assessmentTitles,
         nonPharm: initialNote.mgmtNonpharm || undefined,
+        pharm: initialNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(initialNote.diagnostics) ? initialNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
       }
@@ -187,7 +192,7 @@ export function mapNoteToTimelineView(
           if (typeof item === 'string') return item;
           if (item && typeof item === 'object') {
             const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title + (item.icdCode ? ` (${item.icdCode})` : '');
+            return prefix + item.title;
           }
           return '';
         }).filter(Boolean)
@@ -197,7 +202,10 @@ export function mapNoteToTimelineView(
       ? progressNote.medicationSnapshot.map((med: any) => {
           if (typeof med === 'string') return med;
           if (med && typeof med === 'object') {
-            return `${med.name} ${med.dose}${med.unit}`;
+            const doseStr = med.dose != null ? String(med.dose).trim() : '';
+            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+            const fullDose = `${doseStr}${unitStr}`.trim();
+            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
           }
           return '';
         }).filter(Boolean)
@@ -210,8 +218,8 @@ export function mapNoteToTimelineView(
       : undefined;
     const lastEditedAt = (progressNote as any).lastEditedAt;
     
-    let displayUser = author;
-    let displayUserId = progressNote.authorId;
+    const displayUser = author;
+    const displayUserId = progressNote.authorId;
 
     let isMainAuthor = false;
     if (initialNoteAuthorId) {
@@ -241,6 +249,7 @@ export function mapNoteToTimelineView(
         objective: progressNote.objective || undefined,
         assessment: assessmentTitles,
         nonPharm: progressNote.mgmtNonpharm || undefined,
+        pharm: progressNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(progressNote.diagnostics) ? progressNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
       }

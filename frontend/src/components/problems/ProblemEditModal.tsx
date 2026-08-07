@@ -12,12 +12,11 @@ interface ProblemEditModalProps {
   editing: Problem | null;
   allOptions: Problem[];
   saving: boolean;
-  onSave: (values: { title: string; icdCode?: string | null; parentId?: string | null; diagnosisDate?: string | null }) => void;
+  onSave: (values: { title: string; parentId?: string | null; diagnosisDate?: string | null }) => void;
 }
 
 export function ProblemEditModal({ open, onClose, editing, allOptions, saving, onSave }: ProblemEditModalProps) {
   const [title, setTitle] = useState('');
-  const [icdCode, setIcdCode] = useState('');
   const [parentId, setParentId] = useState('');
   const [diagnosisDate, setDiagnosisDate] = useState('');
   const [error, setError] = useState('');
@@ -25,7 +24,6 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
   useEffect(() => {
     if (open) {
       setTitle(editing?.title ?? '');
-      setIcdCode(editing?.icdCode ?? '');
       setParentId(editing?.parentId ?? '');
       setDiagnosisDate(editing?.diagnosisDate ? new Date(editing.diagnosisDate).toISOString().split('T')[0] : '');
       setError('');
@@ -49,7 +47,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
       setError('Problem title is required.');
       return;
     }
-    onSave({ title: title.trim(), icdCode: icdCode.trim() || null, parentId: parentId || null, diagnosisDate: diagnosisDate || null });
+    onSave({ title: title.trim(), parentId: parentId || null, diagnosisDate: diagnosisDate || null });
   };
 
   return (

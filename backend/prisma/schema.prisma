@@ -199,6 +199,7 @@ model InitialNote {
   assessment           Json
   medicationSnapshot   Json?      @map("medication_snapshot")
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  mgmtPharm            String?    @map("mgmt_pharm")
   diagnostics          Json?
   status               NoteStatus @default(DRAFT)
   isDeleted            Boolean    @default(false) @map("is_deleted")
@@ -228,6 +229,7 @@ model ProgressNote {
   objective            String
   labs                 String?
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  mgmtPharm            String?    @map("mgmt_pharm")
   diagnostics          Json?
   problemListSnapshot  Json?      @map("problem_list_snapshot")
   medicationSnapshot   Json?      @map("medication_snapshot")
@@ -256,7 +258,6 @@ model Problem {
   patientId String        @map("patient_id") @db.Uuid
   parentId  String?       @map("parent_id") @db.Uuid
   title     String
-  icdCode   String?       @map("icd_code") @db.VarChar(10)
   diagnosisDate DateTime? @map("diagnosis_date")
   status    ProblemStatus @default(ACTIVE)
   sortOrder Int           @map("sort_order")
@@ -320,6 +321,7 @@ model VitalSign {
   oxygenSaturation  Int?     @map("oxygen_saturation")
   measuredBy        String?  @map("measured_by") @db.Uuid
   measuredAt        DateTime @map("measured_at")
+  isDeleted         Boolean  @default(false) @map("is_deleted")
   createdAt         DateTime @default(now()) @map("created_at")
 
   // Relations

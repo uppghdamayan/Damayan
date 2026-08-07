@@ -14,12 +14,6 @@ export class CreateProblemDto {
   @MaxLength(255)
   title: string;
 
-  @ApiPropertyOptional({ example: 'I10' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  icdCode?: string;
-
   @ApiPropertyOptional({ example: '2023-01-01' })
   @IsOptional()
   @IsString()

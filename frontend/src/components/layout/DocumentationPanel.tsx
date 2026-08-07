@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { Pen, Edit, ClipboardList, ArrowRight, PanelRightClose } from 'lucide-react';
 import { ProgressNoteForm } from '@/components/notes/ProgressNoteForm';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button';
 
 
 export function DocumentationPanel() {
+  const { user } = useAuthStore();
   const { documentationPanelOpen, activeNoteEditor, closeNoteEditor, setDocumentationPanelOpen } = useUiStore();
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -133,18 +135,33 @@ export function DocumentationPanel() {
                   Initial Note Required
                 </h3>
                 <p className="text-[12px] text-text-muted max-w-[260px] mb-5 leading-relaxed">
-                  Before documenting progress notes, you must first create and publish an Initial Consultation Note for this patient.
+                  {(user?.role === 'DOCTOR' || user?.role === 'ADMIN')
+                    ? "Before documenting progress notes, you must first create and publish an Initial Consultation Note for this patient."
+                    : "An Initial Consultation Note must be created and published by a doctor before progress notes can be documented for this patient."}
                 </p>
-                <Button
-                  onClick={() => {
-                    setDocumentationPanelOpen(false);
-                    router.push(`/dashboard/${patientId}/initial-note`);
-                  }}
-                  className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
-                >
-                  Create Initial Note
-                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
-                </Button>
+                {(user?.role === 'DOCTOR' || user?.role === 'ADMIN') ? (
+                  <Button
+                    onClick={() => {
+                      setDocumentationPanelOpen(false);
+                      router.push(`/dashboard/${patientId}/initial-note`);
+                    }}
+                    className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
+                  >
+                    Create Initial Note
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setDocumentationPanelOpen(false);
+                      router.push(`/dashboard/${patientId}/initial-note`);
+                    }}
+                    className="group text-[12px] h-[34px] px-4 bg-surface-2 hover:bg-surface-3 text-text-primary border border-border rounded-btn font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    View Initial Note Tab
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>

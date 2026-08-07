@@ -75,12 +75,11 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
   const [draftParents, setDraftParents] = useState<Record<string, string | null> | null>(null);
   const [draftTitles, setDraftTitles] = useState<Record<string, string> | null>(null);
-  const [draftIcds, setDraftIcds] = useState<Record<string, string | null> | null>(null);
   const [draftDiagnosisDates, setDraftDiagnosisDates] = useState<Record<string, string | null> | null>(null);
   const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
 
   // Ref to always hold the latest draft values for cleanup functions (avoids stale closures)
-  const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null, draftTitles: Record<string, string> | null, draftIcds: Record<string, string | null> | null, draftDiagnosisDates: Record<string, string | null> | null }>({ isEditMode: false, draftOrder: null, draftParents: null, draftTitles: null, draftIcds: null, draftDiagnosisDates: null });
+  const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null, draftTitles: Record<string, string> | null, draftDiagnosisDates: Record<string, string | null> | null }>({ isEditMode: false, draftOrder: null, draftParents: null, draftTitles: null, draftDiagnosisDates: null });
   // Ref to track which patient's draft has been restored (prevents double-restore)
   const lastRestoredPatientRef = useRef<string | null>(null);
 
@@ -88,8 +87,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   // Keep draftRef in sync so cleanup functions always see current values
   useEffect(() => {
-    draftRef.current = { isEditMode, draftOrder, draftParents, draftTitles, draftIcds, draftDiagnosisDates };
-  }, [isEditMode, draftOrder, draftParents, draftTitles, draftIcds, draftDiagnosisDates]);
+    draftRef.current = { isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates };
+  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates]);
 
   const problems = data?.data ?? [];
 
@@ -144,9 +143,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       if (draftTitles && p.id in draftTitles) {
         overrides.title = draftTitles[p.id];
       }
-      if (draftIcds && p.id in draftIcds) {
-        overrides.icdCode = draftIcds[p.id];
-      }
       if (draftDiagnosisDates && p.id in draftDiagnosisDates) {
         overrides.diagnosisDate = draftDiagnosisDates[p.id];
       }
@@ -155,7 +151,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       }
       return p;
     });
-  }, [activeProblems, isEditMode, draftParents, draftTitles, draftIcds, draftDiagnosisDates]);
+  }, [activeProblems, isEditMode, draftParents, draftTitles, draftDiagnosisDates]);
 
   const tree = useMemo(() => buildProblemTree(draftActiveProblems), [draftActiveProblems]);
 
@@ -192,17 +188,15 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftOrder(null);
     setDraftParents(null);
     setDraftTitles(null);
-    setDraftIcds(null);
     setLastAutoSaved(null);
     const saved = localStorage.getItem(`damayan_problem_draft_${patientId}`);
     if (!saved) return;
     try {
-      const parsed = JSON.parse(saved) as { order: string[]; parents?: Record<string, string | null>; titles?: Record<string, string>; icds?: Record<string, string | null>; diagnosisDates?: Record<string, string | null>; savedAt: string };
+      const parsed = JSON.parse(saved) as { order: string[]; parents?: Record<string, string | null>; titles?: Record<string, string>; diagnosisDates?: Record<string, string | null>; savedAt: string };
       if (Array.isArray(parsed.order) && parsed.order.length > 0) {
         setDraftOrder(parsed.order);
         setDraftParents(parsed.parents || null);
         setDraftTitles(parsed.titles || null);
-        setDraftIcds(parsed.icds || null);
         setDraftDiagnosisDates(parsed.diagnosisDates || null);
         setIsEditMode(true);
         toast.info('Restored your unsaved draft order. Publish or revert when ready.', { duration: 5000 });
@@ -218,21 +212,21 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     const interval = setInterval(() => {
       localStorage.setItem(
         `damayan_problem_draft_${patientId}`,
-        JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, icds: draftIcds, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() })
+        JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() })
       );
       setLastAutoSaved(new Date());
     }, 10000);
     return () => clearInterval(interval);
-  }, [isEditMode, draftOrder, draftParents, draftTitles, draftIcds, draftDiagnosisDates, patientId]);
+  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates, patientId]);
 
   // Persist draft to localStorage on unmount (patient switch, tab close) and on page reload
   useEffect(() => {
     const persistDraft = () => {
-      const { isEditMode: editMode, draftOrder: order, draftParents: parents, draftTitles: titles, draftIcds: icds, draftDiagnosisDates: diagnosisDates } = draftRef.current;
+      const { isEditMode: editMode, draftOrder: order, draftParents: parents, draftTitles: titles, draftDiagnosisDates: diagnosisDates } = draftRef.current;
       if (editMode && order) {
         localStorage.setItem(
           `damayan_problem_draft_${patientId}`,
-          JSON.stringify({ order, parents, titles, icds, diagnosisDates, savedAt: new Date().toISOString() })
+          JSON.stringify({ order, parents, titles, diagnosisDates, savedAt: new Date().toISOString() })
         );
       }
     };
@@ -274,7 +268,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setModalOpen(true);
   };
 
-  const handleSave = async (values: { title: string; icdCode?: string | null; parentId?: string | null; diagnosisDate?: string | null }) => {
+  const handleSave = async (values: { title: string; parentId?: string | null; diagnosisDate?: string | null }) => {
     try {
       if (editing) {
         if (!isEditMode) setIsEditMode(true);
@@ -287,7 +281,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         }
 
         setDraftTitles(prev => ({ ...prev, [editing.id]: values.title }));
-        setDraftIcds(prev => ({ ...prev, [editing.id]: values.icdCode || null }));
         setDraftDiagnosisDates(prev => ({ ...prev, [editing.id]: values.diagnosisDate || null }));
 
         const oldParentId = draftParents && draftParents[editing.id] !== undefined ? draftParents[editing.id] : editing.parentId;
@@ -316,7 +309,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         
         toast.success(`Draft updated for '${values.title}'.`);
       } else {
-        await createProblem.mutateAsync({ title: values.title, icdCode: values.icdCode, parentId: values.parentId ?? undefined, diagnosisDate: values.diagnosisDate });
+        await createProblem.mutateAsync({ title: values.title, parentId: values.parentId ?? undefined, diagnosisDate: values.diagnosisDate });
         toast.success(`'${values.title}' added to the list.`);
       }
       setModalOpen(false);
@@ -400,7 +393,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftOrder(null);
     setDraftParents(null);
     setDraftTitles(null);
-    setDraftIcds(null);
     setDraftDiagnosisDates(null);
     setLastAutoSaved(null);
     localStorage.removeItem(draftStorageKey);
@@ -411,7 +403,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // so other co-doctors never see unpublished edits
   const handleSaveDraft = () => {
     if (!draftOrder) return;
-    localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, icds: draftIcds, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() }));
+    localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() }));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
@@ -422,7 +414,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       sortOrder: index,
       ...(draftParents && draftParents[item.problem.id] !== undefined ? { parentId: draftParents[item.problem.id] } : {}),
       ...(draftTitles && draftTitles[item.problem.id] !== undefined ? { title: draftTitles[item.problem.id] } : {}),
-      ...(draftIcds && draftIcds[item.problem.id] !== undefined ? { icdCode: draftIcds[item.problem.id] } : {}),
       ...(draftDiagnosisDates && draftDiagnosisDates[item.problem.id] !== undefined ? { diagnosisDate: draftDiagnosisDates[item.problem.id] } : {})
     }));
     reorderProblems.mutate({ items }, {
@@ -431,7 +422,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         setDraftOrder(null);
         setDraftParents(null);
         setDraftTitles(null);
-        setDraftIcds(null);
         setDraftDiagnosisDates(null);
         setLastAutoSaved(null);
         localStorage.removeItem(draftStorageKey);

@@ -40,10 +40,10 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
       setValues(
         editing
           ? {
-              name: editing.name,
-              dose: editing.dose,
-              formulation: editing.formulation ?? '',
-              instructions: editing.instructions ?? '',
+              name: editing.name != null ? String(editing.name) : '',
+              dose: editing.dose != null ? String(editing.dose) : '',
+              formulation: editing.formulation != null ? String(editing.formulation) : '',
+              instructions: editing.instructions != null ? String(editing.instructions) : '',
               quantity: editing.quantity != null ? String(editing.quantity) : '',
             }
           : emptyValues,
@@ -58,21 +58,27 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!values.name.trim()) e.name = 'Medication name is required.';
-    else if (values.name.length > 255) e.name = 'Max 255 characters.';
+    const nameStr = String(values.name ?? '').trim();
+    const doseStr = String(values.dose ?? '').trim();
+    const instStr = String(values.instructions ?? '').trim();
+    const formStr = String(values.formulation ?? '').trim();
+    const qtyStr = String(values.quantity ?? '').trim();
 
-    if (!values.dose.trim()) e.dose = 'Dose is required.';
-    else if (values.dose.length > 255) e.dose = 'Max 255 characters.';
+    if (!nameStr) e.name = 'Medication name is required.';
+    else if (nameStr.length > 255) e.name = 'Max 255 characters.';
 
-    if (!values.instructions.trim()) e.instructions = 'Instructions are required.';
-    else if (values.instructions.length > 50) e.instructions = 'Max 50 characters.';
+    if (!doseStr) e.dose = 'Dose is required.';
+    else if (doseStr.length > 255) e.dose = 'Max 255 characters.';
 
-    if (!values.formulation.trim()) e.formulation = 'Formulation is required.';
+    if (!instStr) e.instructions = 'Instructions are required.';
+    else if (instStr.length > 50) e.instructions = 'Max 50 characters.';
 
-    if (!values.quantity) {
+    if (!formStr) e.formulation = 'Formulation is required.';
+
+    if (!qtyStr) {
       e.quantity = 'Quantity is required.';
     } else {
-      const qtyNum = parseInt(values.quantity, 10);
+      const qtyNum = parseInt(qtyStr, 10);
       if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
     }
 
@@ -82,12 +88,18 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
 
   const handleSubmit = () => {
     if (!validate()) return;
+    const nameStr = String(values.name ?? '').trim();
+    const doseStr = String(values.dose ?? '').trim();
+    const formStr = String(values.formulation ?? '').trim();
+    const instStr = String(values.instructions ?? '').trim();
+    const qtyStr = String(values.quantity ?? '').trim();
+
     onSave({
-      name: values.name.trim(),
-      dose: values.dose.trim(),
-      formulation: values.formulation.trim(),
-      instructions: values.instructions.trim(),
-      quantity: parseInt(values.quantity, 10),
+      name: nameStr,
+      dose: doseStr,
+      formulation: formStr,
+      instructions: instStr,
+      quantity: parseInt(qtyStr, 10),
     });
   };
 

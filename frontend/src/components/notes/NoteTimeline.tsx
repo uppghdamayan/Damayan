@@ -192,16 +192,28 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             <h3 className="text-[14px] font-semibold text-text-primary mb-1.5">
               No consultation notes yet
             </h3>
-            <p className="text-[12px] text-text-muted max-w-[240px] mb-5 leading-relaxed">
-              Every patient record starts with an initial note. Create one to begin tracking the patient's history.
+            <p className="text-[12px] text-text-muted max-w-[260px] mb-5 leading-relaxed">
+              {(user?.role === 'DOCTOR' || user?.role === 'ADMIN')
+                ? "Every patient record starts with an initial note. Create one to begin tracking the patient's history."
+                : "An initial consultation note must be created and published by a doctor before notes can be viewed."}
             </p>
-            <Button
-              onClick={() => router.push(`/dashboard/${patientId}/initial-note`)}
-              className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
-            >
-              Create Initial Note
-              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
-            </Button>
+            {(user?.role === 'DOCTOR' || user?.role === 'ADMIN') ? (
+              <Button
+                onClick={() => router.push(`/dashboard/${patientId}/initial-note`)}
+                className="group text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
+              >
+                Create Initial Note
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 duration-200" />
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/${patientId}/initial-note`)}
+                className="text-[12px] h-[34px] px-4 rounded-btn font-semibold cursor-pointer"
+              >
+                View Initial Note
+              </Button>
+            )}
           </div>
         ) : (
           mappedNotes.map((note, index) => {

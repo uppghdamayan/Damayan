@@ -254,7 +254,6 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
   const fieldLabel = (key: string): string => {
     const map: Record<string, string> = {
       title: 'title',
-      icdCode: 'ICD code',
       status: 'status',
       parentId: 'nesting',
       name: 'name',
@@ -307,8 +306,7 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
     const nameStr = rawName ? `'${rawName}'` : '';
     
     if (action === 'CREATE') {
-      const codeStr = changes?.icdCode || reqBody?.icdCode ? ` (ICD: ${changes?.icdCode || reqBody?.icdCode})` : '';
-      return <span className="text-text-secondary"><FormattedLogText text={`Added problem ${nameStr || 'a new problem'}${codeStr}`} /></span>;
+      return <span className="text-text-secondary"><FormattedLogText text={`Added problem ${nameStr || 'a new problem'}`} /></span>;
     } else if (action === 'DELETE') {
       return <span className="text-text-secondary"><FormattedLogText text={`Removed problem ${nameStr || 'a problem'}`} /></span>;
     } else if (action === 'UPDATE') {
@@ -339,9 +337,6 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
       
       if ('title' in reqBody && reqBody.title !== changes?.title) {
         parts.push(`Renamed to '${reqBody.title}'`);
-      }
-      if ('icdCode' in reqBody) {
-        parts.push(`ICD code changed to '${reqBody.icdCode || 'none'}'`);
       }
       if ('parentId' in reqBody && !reqBody?.items) {
         parts.push(reqBody.parentId ? `Nested under parent problem` : `Unnested to top level`);

@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   ValidateNested,
   IsInt,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -13,10 +14,6 @@ class AssessmentItemDto {
   @IsString()
   @IsNotEmpty()
   title: string;
-
-  @IsString()
-  @IsOptional()
-  icdCode?: string;
 
   @IsString()
   @IsOptional()
@@ -32,9 +29,9 @@ class MedicationItemDto {
   @IsNotEmpty()
   name: string;
 
-  @Type(() => Number)
+  @IsString()
   @IsOptional()
-  dose?: number;
+  dose?: string;
 
   @IsString()
   @IsOptional()
@@ -51,6 +48,11 @@ class MedicationItemDto {
   @IsString()
   @IsOptional()
   instructions?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['past', 'prescribed'])
+  source?: 'past' | 'prescribed';
 }
 
 export class CreateProgressNoteDto {
@@ -69,6 +71,10 @@ export class CreateProgressNoteDto {
   @IsString()
   @IsOptional()
   mgmtNonpharm?: string;
+
+  @IsString()
+  @IsOptional()
+  mgmtPharm?: string;
 
   @IsArray()
   @IsString({ each: true })

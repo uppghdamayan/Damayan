@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 
 export interface TagItem {
   title: string;
-  icdCode?: string;
 }
 
 interface TagInputFieldProps {
@@ -61,9 +60,6 @@ export function TagInputField({
         {value.map((item, idx) => (
           <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] font-medium text-text-primary hover:border-border-strong transition-colors">
             <span>{isObjectFormat ? item.title : item}</span>
-            {isObjectFormat && item.icdCode && (
-              <span className="font-mono text-[10px] text-text-muted bg-surface-3 px-1.5 py-0.5 rounded">({item.icdCode})</span>
-            )}
             {!disabled && (
               <button
                 type="button"

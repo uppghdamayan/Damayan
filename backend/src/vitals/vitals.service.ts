@@ -24,13 +24,25 @@ export class VitalsService {
   constructor(private prisma: PrismaService) {}
 
   // ─────────────────────────────────────────────
-  // LIST — paginated, newest first
+  // LIST — paginated, newest first.
+  // Deleted records stay in the list (isDeleted: true) so the history table
+  // can render them as a struck-through "ghost", same as the note timeline.
+  // Pass excludeDeleted=true to hide them entirely.
   // ─────────────────────────────────────────────
-  async findAll(patientId: string, page = 1, limit = 10) {
+  async findAll(
+    patientId: string,
+    page = 1,
+    limit = 10,
+    excludeDeleted = false,
+  ) {
     const skip = (page - 1) * limit;
+    const where: Prisma.VitalSignWhereInput = {
+      patientId,
+      ...(excludeDeleted ? { isDeleted: false } : {}),
+    };
     const [data, total] = await Promise.all([
       this.prisma.vitalSign.findMany({
-        where: { patientId },
+        where,
         skip,
         take: limit,
         orderBy: { measuredAt: 'desc' },
@@ -40,7 +52,7 @@ export class VitalsService {
           },
         },
       }),
-      this.prisma.vitalSign.count({ where: { patientId } }),
+      this.prisma.vitalSign.count({ where }),
     ]);
     return {
       data,
@@ -51,10 +63,12 @@ export class VitalsService {
   // ─────────────────────────────────────────────
   // LATEST — single most recent record (or null)
   // Used by: Dashboard VitalsCard, and Phase 8 Initial Note pre-fill.
+  // Deleted records are excluded — a ghosted entry should never surface as
+  // "the" current reading.
   // ─────────────────────────────────────────────
   async findLatest(patientId: string): Promise<VitalSign | null> {
     return this.prisma.vitalSign.findFirst({
-      where: { patientId },
+      where: { patientId, isDeleted: false },
       orderBy: { measuredAt: 'desc' },
       include: {
         measuredByUser: {
@@ -77,7 +91,7 @@ export class VitalsService {
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<VitalSign | null> {
     return client.vitalSign.findFirst({
-      where: { patientId },
+      where: { patientId, isDeleted: false },
       orderBy: { measuredAt: 'desc' },
     });
   }
@@ -127,6 +141,11 @@ export class VitalsService {
     dto: UpdateVitalsDto,
   ): Promise<VitalSign> {
     const existing = await this.findOne(patientId, id);
+    if (existing.isDeleted) {
+      throw new BadRequestException(
+        'This vital signs record has been deleted and can no longer be edited.',
+      );
+    }
 
     const merged: CreateVitalsDto = {
       sbp: dto.sbp !== undefined ? dto.sbp : (existing.sbp ?? undefined),
@@ -169,11 +188,21 @@ export class VitalsService {
   }
 
   // ─────────────────────────────────────────────
-  // DELETE — hard delete (no soft-delete field on this model)
+  // DELETE — soft delete. The record stays in the history list flagged
+  // isDeleted so it renders as a struck-through ghost, same as a deleted
+  // note in the timeline, instead of disappearing outright.
   // ─────────────────────────────────────────────
   async remove(patientId: string, id: string): Promise<VitalSign> {
-    await this.findOne(patientId, id);
-    return this.prisma.vitalSign.delete({ where: { id } });
+    const existing = await this.findOne(patientId, id);
+    if (existing.isDeleted) {
+      throw new BadRequestException(
+        'This vital signs record has already been deleted.',
+      );
+    }
+    return this.prisma.vitalSign.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
   }
 
   // ─────────────────────────────────────────────

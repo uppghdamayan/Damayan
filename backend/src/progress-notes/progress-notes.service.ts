@@ -138,6 +138,32 @@ export class ProgressNotesService {
     return null;
   }
 
+  private async getLatestPharmMgmt(
+    patientId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string | null> {
+    const client = tx ?? this.prisma;
+    const initial = await client.initialNote.findFirst({
+      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
+    });
+    const latestProgress = await client.progressNote.findFirst({
+      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      orderBy: { visit: { visitDatetime: 'desc' } },
+      select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
+    });
+
+    if (latestProgress && initial) {
+      return latestProgress.visit.visitDatetime > initial.visit.visitDatetime
+        ? latestProgress.mgmtPharm
+        : initial.mgmtPharm;
+    }
+
+    if (latestProgress) return latestProgress.mgmtPharm;
+    if (initial) return initial.mgmtPharm;
+    return null;
+  }
+
   async create(patientId: string, dto: CreateProgressNoteDto, userId: string) {
     await this.assertInitialNotePublished(patientId);
 
@@ -172,6 +198,11 @@ export class ProgressNotesService {
           tx,
         );
 
+        const priorMgmtPharm = await this.getLatestPharmMgmt(
+          patientId,
+          tx,
+        );
+
         const visit = await this.visitsService.createForNote(
           patientId,
           userId,
@@ -187,6 +218,7 @@ export class ProgressNotesService {
             subjective: dto.subjective ?? '',
             objective: dto.objective ?? '',
             mgmtNonpharm: dto.mgmtNonpharm ?? priorMgmtNonpharm ?? '',
+            mgmtPharm: dto.mgmtPharm ?? priorMgmtPharm ?? '',
             diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
             problemListSnapshot: dto.problemListSnapshot
               ? (dto.problemListSnapshot as any)
@@ -228,6 +260,9 @@ export class ProgressNotesService {
       }),
       ...(updateData.mgmtNonpharm !== undefined && {
         mgmtNonpharm: updateData.mgmtNonpharm,
+      }),
+      ...(updateData.mgmtPharm !== undefined && {
+        mgmtPharm: updateData.mgmtPharm,
       }),
       ...(updateData.diagnostics !== undefined && {
         diagnostics: updateData.diagnostics,
@@ -284,7 +319,6 @@ export class ProgressNotesService {
             .filter((p) => p && p.title && String(p.title).trim() !== '')
             .map((p) => ({
               title: String(p.title).trim(),
-              icdCode: p.icdCode,
             }));
 
           const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
@@ -416,7 +450,7 @@ export class ProgressNotesService {
 
         const validProblems = prevSnapshotProblems
           .filter((p) => p && p.title && String(p.title).trim() !== '')
-          .map((p) => ({ title: String(p.title).trim(), icdCode: p.icdCode }));
+          .map((p) => ({ title: String(p.title).trim() }));
 
         const validMeds = prevSnapshotMeds
           .filter((m) => m && m.name && String(m.name).trim() !== '')

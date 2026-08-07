@@ -17,6 +17,7 @@ export interface VitalSign {
   measuredBy: string | null;
   measuredAt: string;
   createdAt: string;
+  isDeleted?: boolean;
   measuredByUser?: VitalsMeasuredByUser | null;
 }
 

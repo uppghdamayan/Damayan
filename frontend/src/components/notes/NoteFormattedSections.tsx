@@ -226,6 +226,17 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
         </div>
       )}
 
+      {/* Pharmacologic Treatment Remarks */}
+      {note.sections.pharm && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
+            <Pill className="w-3.5 h-3.5" />
+            <span className="text-[11.5px] uppercase tracking-[0.6px]">Pharmacologic Treatment Remarks</span>
+          </div>
+          <p className="whitespace-pre-wrap mt-1 pl-2 text-[12px]">{note.sections.pharm}</p>
+        </div>
+      )}
+
       {/* Medications */}
       {((note.sections.medications && note.sections.medications.length > 0) || medDiff.length > 0) && (
         <div className="flex flex-col gap-1.5">

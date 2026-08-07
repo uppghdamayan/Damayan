@@ -89,6 +89,7 @@ export class InitialNotesService {
           obHistory: dto.obHistory,
           psychosocialHistory: dto.psychosocialHistory,
           mgmtNonpharm: dto.mgmtNonpharm,
+          mgmtPharm: dto.mgmtPharm,
           diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
           medicationSnapshot: dto.medicationSnapshot
             ? (dto.medicationSnapshot as any)
@@ -166,6 +167,9 @@ export class InitialNotesService {
       ...(updateData.mgmtNonpharm !== undefined && {
         mgmtNonpharm: updateData.mgmtNonpharm,
       }),
+      ...(updateData.mgmtPharm !== undefined && {
+        mgmtPharm: updateData.mgmtPharm,
+      }),
       ...(updateData.diagnostics !== undefined && {
         diagnostics: updateData.diagnostics,
       }),
@@ -228,7 +232,6 @@ export class InitialNotesService {
               .filter((a) => a && a.title && String(a.title).trim() !== '')
               .map((a) => ({
                 title: String(a.title).trim(),
-                icdCode: a.icdCode,
               }));
             await this.problemsService.upsertFromAssessment(
               patientId,
@@ -370,7 +373,6 @@ export class InitialNotesService {
           .filter((a) => a && a.title && String(a.title).trim() !== '')
           .map((a) => ({
             title: String(a.title).trim(),
-            icdCode: a.icdCode,
           }));
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
           .filter((m) => m && m.name && String(m.name).trim() !== '')

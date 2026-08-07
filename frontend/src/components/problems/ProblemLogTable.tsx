@@ -62,10 +62,16 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset page to 1 when filters or search query changes
-  useEffect(() => {
+  // Reset page to 1 during render when filters or search query changes
+  const [prevFilter, setPrevFilter] = useState({ searchQuery, selectedAction, dateRange });
+  if (
+    prevFilter.searchQuery !== searchQuery ||
+    prevFilter.selectedAction !== selectedAction ||
+    prevFilter.dateRange !== dateRange
+  ) {
+    setPrevFilter({ searchQuery, selectedAction, dateRange });
     setCurrentPage(1);
-  }, [searchQuery, selectedAction, dateRange]);
+  }
 
   // Filter logs client-side (instant and responsive)
   const filteredLogs = useMemo(() => {

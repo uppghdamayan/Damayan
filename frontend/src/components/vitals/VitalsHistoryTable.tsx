@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { 
   formatTemperature, 
   formatBloodPressure, 
@@ -20,12 +21,26 @@ interface VitalsHistoryTableProps {
   totalPages: number;
   total?: number;
   onPageChange: (page: number) => void;
+  deletingId?: string | null;
 }
 
-export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages, total, onPageChange }: VitalsHistoryTableProps) {
+export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages, total, onPageChange, deletingId }: VitalsHistoryTableProps) {
   const { user } = useAuthStore();
   const canEdit = user?.role === 'DOCTOR' || user?.role === 'NURSE' || user?.role === 'ADMIN';
   const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  // Automatically place soft-deleted/ghost vitals at the bottom of the list,
+  // while keeping date ordering (newest first) within active and deleted groups.
+  const sortedVitals = useMemo(() => {
+    return [...vitals].sort((a, b) => {
+      const aGhost = !!a.isDeleted || deletingId === a.id;
+      const bGhost = !!b.isDeleted || deletingId === b.id;
+      if (aGhost !== bGhost) {
+        return aGhost ? 1 : -1;
+      }
+      return new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime();
+    });
+  }, [vitals, deletingId]);
 
   const getColorClass = (severity: 'normal' | 'warn' | 'critical') => {
     if (severity === 'critical') return 'text-red font-semibold';
@@ -60,14 +75,14 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {vitals.length === 0 ? (
+            {sortedVitals.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-[13px] text-text-muted italic">
                   No vital signs recorded.
                 </td>
               </tr>
             ) : (
-              vitals.map((v) => {
+              sortedVitals.map((v) => {
                 const dt = new Date(v.measuredAt);
                 const dateStr = dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
@@ -77,19 +92,27 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                 const rrClass = getColorClass(classifyRespiratoryRate(v.respiratoryRate));
                 const tempClass = getColorClass(classifyTemperature(v.temperature));
                 const spo2Class = getColorClass(classifyOxygenSaturation(v.oxygenSaturation));
+                // Row is being deleted right now (mutation in flight) — transient ghost.
+                const isDeleting = deletingId === v.id;
+                // Row is permanently soft-deleted — persistent ghost, same as a
+                const isGhost = !!v.isDeleted || isDeleting;
+                const strikeClass = isGhost ? 'line-through decoration-text-muted/65 decoration-1' : '';
 
                 return (
-                  <tr key={v.id} className="hover:bg-surface-2 transition-colors">
-                    <td className="py-2.5 px-4 whitespace-nowrap">
+                  <tr
+                    key={v.id}
+                    className={`transition-all duration-200 ${isGhost ? 'opacity-55 grayscale blur-[0.5px] select-none hover:opacity-75 hover:blur-none' : 'hover:bg-surface-2'}`}
+                  >
+                    <td className={`py-2.5 px-4 whitespace-nowrap ${strikeClass}`}>
                       <div className="font-mono">{dateStr}</div>
                       <div className="font-mono text-[10px] text-text-muted">{timeStr}</div>
                     </td>
-                    <td className={`py-2.5 px-4 ${bpClass}`}>{formatBloodPressure(v.sbp, v.dbp)}</td>
-                    <td className={`py-2.5 px-4 ${hrClass}`}>{v.heartRate ?? '—'}</td>
-                    <td className={`py-2.5 px-4 ${rrClass}`}>{v.respiratoryRate ?? '—'}</td>
-                    <td className={`py-2.5 px-4 ${tempClass}`}>{formatTemperature(v.temperature)}</td>
-                    <td className={`py-2.5 px-4 ${spo2Class}`}>{v.oxygenSaturation ? `${v.oxygenSaturation}%` : '—'}</td>
-                    <td className="py-2.5 px-4">
+                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : bpClass}`}>{formatBloodPressure(v.sbp, v.dbp)}</td>
+                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : hrClass}`}>{v.heartRate ?? '—'}</td>
+                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : rrClass}`}>{v.respiratoryRate ?? '—'}</td>
+                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : tempClass}`}>{formatTemperature(v.temperature)}</td>
+                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : spo2Class}`}>{v.oxygenSaturation ? `${v.oxygenSaturation}%` : '—'}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>
                       {v.measuredByUser ? (
                         <div className="flex items-center gap-1.5">
                           <span className="truncate">{v.measuredByUser.firstName} {v.measuredByUser.lastName[0]}.</span>
@@ -103,21 +126,31 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                     </td>
                     <td className="py-2.5 px-4">
                       <div className="flex items-center justify-start gap-1.5">
-                        {canEdit && (
-                          <button
-                            onClick={() => onEdit(v)}
-                            className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => onDelete(v)}
-                            className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer"
-                          >
-                            Delete
-                          </button>
+                        {isDeleting ? (
+                          <span className="text-[10px] font-semibold text-red italic">Deleting…</span>
+                        ) : v.isDeleted ? (
+                          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-0.5 rounded bg-red-bg text-red border border-red-border">
+                            Deleted
+                          </span>
+                        ) : (
+                          <>
+                            {canEdit && (
+                              <button
+                                onClick={() => onEdit(v)}
+                                className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => onDelete(v)}
+                                className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

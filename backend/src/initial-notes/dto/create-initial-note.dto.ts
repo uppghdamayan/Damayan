@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsDateString,
   IsInt,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -14,10 +15,6 @@ class AssessmentItemDto {
   @IsString()
   @IsNotEmpty()
   title: string;
-
-  @IsString()
-  @IsOptional()
-  icdCode?: string;
 
   // Nesting metadata carried by the problem list UI. Whitelisted so the
   // indentation of an assessment survives a round-trip — the global
@@ -36,9 +33,9 @@ class MedicationItemDto {
   @IsNotEmpty()
   name: string;
 
-  @Type(() => Number)
+  @IsString()
   @IsOptional()
-  dose?: number;
+  dose?: string;
 
   @IsString()
   @IsOptional()
@@ -55,6 +52,11 @@ class MedicationItemDto {
   @IsString()
   @IsOptional()
   instructions?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['past', 'prescribed'])
+  source?: 'past' | 'prescribed';
 }
 
 export class CreateInitialNoteDto {
@@ -112,6 +114,10 @@ export class CreateInitialNoteDto {
   @IsString()
   @IsOptional()
   mgmtNonpharm?: string;
+
+  @IsString()
+  @IsOptional()
+  mgmtPharm?: string;
 
   @IsArray()
   @IsString({ each: true })
