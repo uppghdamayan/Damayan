@@ -25,6 +25,9 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUploadAttachment } from '@/hooks/useAttachments';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
+import { MedicationSnapshotModal, MedicationSnapshotValues } from './MedicationSnapshotModal';
+import { InitialNoteLogTable } from './InitialNoteLogTable';
+import { InitialNoteVersionHistoryModal } from './InitialNoteVersionHistoryModal';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -312,12 +315,19 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const publishMutation = usePublishInitialNote(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
+  const { data: initialNoteLogsResponse, isLoading: logsLoading } = useInitialNoteLogs(patientId);
+  const initialNoteLogs = initialNoteLogsResponse?.data || [];
   const { registerPublishHandler } = useUiStore();
   const currentUser = useAuthStore((s) => s.user);
 
   const [isEditing, setIsEditing] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [historyVersionId, setHistoryVersionId] = useState<string | null>(null);
+
+  const openVersionHistory = (versionId: string) => {
+    setHistoryVersionId(versionId);
+    setShowVersionHistory(true);
+  };
   const [publishError, setPublishError] = useState<string | null>(null);
   const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
   const uploadAttachment = useUploadAttachment();
@@ -964,6 +974,16 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </span>
                 </div>
               )}
+              {isDoctorOrAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white hover:bg-accent-hover transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Edit Note</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1551,7 +1571,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhComorbidities')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Diabetes Mellitus (2018), Asthma"
                       />
                     </div>
@@ -1562,7 +1582,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhSurgeries')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Appendectomy (2015)"
                       />
                     </div>
@@ -1573,7 +1593,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhHospitalizations')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Dengue (2022)"
                       />
                     </div>
@@ -1584,7 +1604,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('allergies')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Penicillin (rash), Sulfa"
                       />
                     </div>
