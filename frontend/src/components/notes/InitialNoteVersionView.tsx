@@ -11,6 +11,7 @@ import {
   FlaskConical,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { InitialNoteSnapshot } from '@/types/initial-note';
 
 interface SectionProps {
@@ -26,13 +27,16 @@ interface SectionProps {
  */
 function Section({ title, icon, changed, children }: SectionProps) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={cn(
+      "flex flex-col gap-1.5 rounded-lg transition-all",
+      changed && "bg-accent-light/10 border border-accent/20 p-2.5"
+    )}>
       <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--border-strong)] pb-1 w-full text-[var(--text-secondary)] font-bold">
         {icon}
         <span className="text-[11.5px] uppercase tracking-[0.6px]">{title}</span>
         {changed && (
-          <Badge variant="info" className="ml-1.5">
-            Changed
+          <Badge variant="info" className="ml-1.5 text-[9.5px] px-1.5 py-0">
+            Changed in this version
           </Badge>
         )}
       </div>
@@ -96,22 +100,40 @@ export function InitialNoteVersionView({
       </Section>
 
       <Section
-        title="History"
+        title="History (PMH, Family, Social)"
         icon={<History className="w-3.5 h-3.5" />}
         changed={historyChanged}
       >
         {hasAnyHistory ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             {historyFields
               .filter((f) => !!snapshot[f.key])
-              .map((f) => (
-                <div key={f.key} className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-[var(--text-muted)]">
-                    {f.label}
-                  </span>
-                  <span>{snapshot[f.key] as string}</span>
-                </div>
-              ))}
+              .map((f) => {
+                const isFieldChanged = changed(f.key as string);
+                return (
+                  <div
+                    key={f.key}
+                    className={cn(
+                      "flex flex-col p-1.5 rounded transition-all",
+                      isFieldChanged && "bg-amber-bg/30 border border-amber-border/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-[var(--text-muted)]">
+                        {f.label}
+                      </span>
+                      {isFieldChanged && (
+                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-amber bg-amber-bg border border-amber-border px-1.5 py-0.2 rounded">
+                          Modified
+                        </span>
+                      )}
+                    </div>
+                    <span className={cn(isFieldChanged && "font-medium text-text-primary")}>
+                      {snapshot[f.key] as string}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         ) : (
           <EmptyValue />
@@ -127,7 +149,7 @@ export function InitialNoteVersionView({
       </Section>
 
       <Section
-        title="Assessment"
+        title="Assessment (Diagnoses)"
         icon={<Search className="w-3.5 h-3.5" />}
         changed={changed('assessment')}
       >

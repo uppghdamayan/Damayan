@@ -25,6 +25,29 @@ export const INITIAL_NOTE_FIELD_LABELS: Record<string, string> = {
   diagnostics: 'Diagnostics',
 };
 
+/** Short badge-friendly section names for chips and version tags. */
+export const INITIAL_NOTE_FIELD_SHORT_LABELS: Record<string, string> = {
+  chiefComplaint: 'Chief Complaint',
+  hpi: 'HPI',
+  pmhComorbidities: 'Comorbidities',
+  pmhSurgeries: 'Surgeries',
+  pmhHospitalizations: 'Hospitalizations',
+  allergies: 'Allergies',
+  familyHistory: 'Family History',
+  socialHistory: 'Social History',
+  obHistory: 'OB History',
+  psychosocialHistory: 'Psychosocial History',
+  physicalExam: 'Physical Exam',
+  assessment: 'Assessment',
+  medicationSnapshot: 'Medications',
+  mgmtNonpharm: 'Non-pharm Mgmt',
+  diagnostics: 'Diagnostics',
+};
+
+export function getFieldShortLabel(field: string): string {
+  return INITIAL_NOTE_FIELD_SHORT_LABELS[field] || INITIAL_NOTE_FIELD_LABELS[field] || field;
+}
+
 /** Role-prefixed display name, matching the problem/medication log tables. */
 export function formatEditorName(editor: LogEditor): string {
   if (editor.role === 'DOCTOR') return `Dr. ${editor.lastName}`;

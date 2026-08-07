@@ -138,8 +138,8 @@ function joinList(items: string[]): string {
 
 /**
  * For list-valued sections, name the items that came and went — "added
- * Hypertension, removed Migraine" — so the log says what actually moved rather
- * than just that the section changed.
+ * Hypertension, removed Migraine" — and identify in-place modifications (e.g. dose changes)
+ * so the log says what actually moved rather than just that the section changed.
  */
 function describeListDelta(
   field: InitialNoteContentField,
@@ -154,10 +154,22 @@ function describeListDelta(
   const added = afterItems.filter((item) => !beforeItems.includes(item));
   const removed = beforeItems.filter((item) => !afterItems.includes(item));
 
+  // Check for in-place modifications for items with same label
+  const modified: string[] = [];
+  const common = beforeItems.filter((item) => afterItems.includes(item));
+  for (const label of common) {
+    const beforeObj = before.find((item) => labelOf(item) === label);
+    const afterObj = after.find((item) => labelOf(item) === label);
+    if (stableStringify(beforeObj) !== stableStringify(afterObj)) {
+      modified.push(label);
+    }
+  }
+
   const parts: string[] = [];
   if (added.length > 0) parts.push(`added ${joinList(added)}`);
   if (removed.length > 0) parts.push(`removed ${joinList(removed)}`);
-  // An in-place edit (e.g. a dose change) leaves both lists identical by name
+  if (modified.length > 0) parts.push(`updated ${joinList(modified)}`);
+
   return parts.length > 0 ? parts.join(', ') : null;
 }
 

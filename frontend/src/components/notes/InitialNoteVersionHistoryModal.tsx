@@ -13,6 +13,7 @@ import {
   formatEditorName,
   formatLogDate,
   formatLogTime,
+  getFieldShortLabel,
 } from '@/lib/initial-note-log-utils';
 import {
   buildVersionCsv,
@@ -64,6 +65,7 @@ export function InitialNoteVersionHistoryModal({
 
   const activeSummary = versions.find((v) => v.id === activeId);
   const latestVersionNumber = versions[0]?.versionNumber;
+  const activeChangedFields = activeSummary?.changedFields ?? version?.changedFields ?? [];
 
   // Identifies the record in the exported file; the query is already cached by
   // the surrounding screen, so this costs nothing extra.
@@ -182,6 +184,7 @@ export function InitialNoteVersionHistoryModal({
             ) : (
               versions.map((v) => {
                 const isActive = v.id === activeId;
+                const fieldList = v.changedFields ?? [];
                 return (
                   <button
                     key={v.id}
@@ -210,6 +213,18 @@ export function InitialNoteVersionHistoryModal({
                     <div className="font-mono text-[10px] text-text-muted mt-0.5">
                       {formatLogDate(v.createdAt)} · {formatLogTime(v.createdAt)}
                     </div>
+                    {fieldList.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap mt-1">
+                        {fieldList.map((f) => (
+                          <span
+                            key={f}
+                            className="text-[9px] font-semibold bg-surface-3 text-text-secondary border border-border px-1.5 py-0.5 rounded leading-none"
+                          >
+                            {getFieldShortLabel(f)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-[10px] text-text-muted mt-1 line-clamp-2 leading-snug">
                       {v.versionNumber === 1
                         ? 'Original published version'
@@ -250,7 +265,7 @@ export function InitialNoteVersionHistoryModal({
               )
             ) : (
               <>
-                <div className="flex flex-col gap-1 pb-3 mb-4 border-b border-border">
+                <div className="flex flex-col gap-1.5 pb-3 mb-4 border-b border-border">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[13px] font-bold text-text-primary">
                       Version {version.versionNumber}
@@ -262,7 +277,22 @@ export function InitialNoteVersionHistoryModal({
                       {formatLogTime(version.createdAt)}
                     </span>
                   </div>
-                  <span className="text-[11px] text-text-secondary">
+                  {activeChangedFields.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                        Changed:
+                      </span>
+                      {activeChangedFields.map((f) => (
+                        <span
+                          key={f}
+                          className="text-[9.5px] font-bold bg-amber-bg text-amber border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider"
+                        >
+                          {getFieldShortLabel(f)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <span className="text-[11px] text-text-secondary leading-relaxed">
                     {version.versionNumber === 1
                       ? 'Original published version — nothing precedes it to compare against.'
                       : activeSummary?.changeSummary ??
@@ -272,7 +302,7 @@ export function InitialNoteVersionHistoryModal({
                 </div>
                 <InitialNoteVersionView
                   snapshot={version.snapshot}
-                  changedFields={activeSummary?.changedFields ?? version.changedFields}
+                  changedFields={activeChangedFields}
                 />
               </>
             )}
