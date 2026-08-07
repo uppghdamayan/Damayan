@@ -22,6 +22,7 @@ export interface TimelineNoteView {
     labs?: string;
     assessment?: string[];          // problem titles
     nonPharm?: string;
+    pharm?: string;
     diagnostics?: string[];
     medications?: string[];
   };
@@ -175,6 +176,7 @@ export function mapNoteToTimelineView(
         labs: Array.isArray(initialNote.diagnostics) && initialNote.diagnostics.length > 0 ? initialNote.diagnostics.join(', ') : undefined,
         assessment: assessmentTitles,
         nonPharm: initialNote.mgmtNonpharm || undefined,
+        pharm: initialNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(initialNote.diagnostics) ? initialNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
       }
@@ -247,6 +249,7 @@ export function mapNoteToTimelineView(
         objective: progressNote.objective || undefined,
         assessment: assessmentTitles,
         nonPharm: progressNote.mgmtNonpharm || undefined,
+        pharm: progressNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(progressNote.diagnostics) ? progressNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
       }

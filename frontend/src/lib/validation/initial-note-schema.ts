@@ -22,6 +22,7 @@ export const initialNoteDraftSchema = z.object({
   assessment: z.array(assessmentItemSchema).optional(),
   medicationSnapshot: z.array(z.any()).optional(),
   mgmtNonpharm: z.string().optional().or(z.literal('')),
+  mgmtPharm: z.string().optional().or(z.literal('')),
   diagnostics: z.array(z.string()).optional(),
   visitDatetime: z.string().optional(),
 });

@@ -72,6 +72,10 @@ export class CreateProgressNoteDto {
   @IsOptional()
   mgmtNonpharm?: string;
 
+  @IsString()
+  @IsOptional()
+  mgmtPharm?: string;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

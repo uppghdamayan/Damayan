@@ -146,6 +146,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       objective: '',
       labs: '',
       mgmtNonpharm: '',
+      mgmtPharm: '',
       diagnostics: [],
       problemListSnapshot: [],
       medicationSnapshot: [],
@@ -248,6 +249,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         objective: note.objective,
         labs: (note as any).labs || '',
         mgmtNonpharm: note.mgmtNonpharm || '',
+        mgmtPharm: note.mgmtPharm || '',
         diagnostics: note.diagnostics || [],
         problemListSnapshot: finalProblems,
         medicationSnapshot: finalMeds,
@@ -286,6 +288,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         objective: '',
         labs: '',
         mgmtNonpharm: '',
+        mgmtPharm: '',
         diagnostics: copyForward?.latestDiagnostics || [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           title: p.title,
@@ -818,6 +821,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       objective: '',
                       labs: '',
                       mgmtNonpharm: '',
+                      mgmtPharm: '',
                       diagnostics: [],
                       problemListSnapshot: defaultProblems,
                       medicationSnapshot: defaultMeds,
@@ -1118,6 +1122,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       onInputChange={setDiagnosticsInput}
                     />
                   )}
+                />
+              </div>
+            </div>
+
+            {/* PHARMACOLOGIC TREATMENT REMARKS */}
+            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
+                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💊</div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Pharmacologic Treatment Remarks</span>
+              </div>
+              <div className="p-[14px]">
+                <textarea
+                  {...form.register('mgmtPharm')}
+                  className="w-full min-h-[60px] px-2.5 py-1.5 bg-white border border-border-strong/60 rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Enter pharmacologic treatment remarks..."
+                  disabled={isDisabled}
                 />
               </div>
             </div>

@@ -103,6 +103,10 @@ export class CreateInitialNoteDto {
   @IsOptional()
   mgmtNonpharm?: string;
 
+  @IsString()
+  @IsOptional()
+  mgmtPharm?: string;
+
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

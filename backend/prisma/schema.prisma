@@ -195,6 +195,7 @@ model InitialNote {
   assessment           Json
   medicationSnapshot   Json?      @map("medication_snapshot")
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  mgmtPharm            String?    @map("mgmt_pharm")
   diagnostics          Json?
   status               NoteStatus @default(DRAFT)
   isDeleted            Boolean    @default(false) @map("is_deleted")
@@ -223,6 +224,7 @@ model ProgressNote {
   objective            String
   labs                 String?
   mgmtNonpharm         String?    @map("mgmt_nonpharm")
+  mgmtPharm            String?    @map("mgmt_pharm")
   diagnostics          Json?
   problemListSnapshot  Json?      @map("problem_list_snapshot")
   medicationSnapshot   Json?      @map("medication_snapshot")

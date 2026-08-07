@@ -6,6 +6,7 @@ export const progressNoteDraftSchema = z.object({
   objective: z.string().optional().or(z.literal('')),
   labs: z.string().optional().or(z.literal('')),
   mgmtNonpharm: z.string().optional().or(z.literal('')),
+  mgmtPharm: z.string().optional().or(z.literal('')),
   diagnostics: z.array(z.string()).optional(),
   problemListSnapshot: z.array(assessmentItemSchema).optional(),
   medicationSnapshot: z.array(z.any()).optional(),

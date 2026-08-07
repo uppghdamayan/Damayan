@@ -12,6 +12,7 @@ export interface ProgressNote {
   objective: string;
   labs?: string;
   mgmtNonpharm?: string;
+  mgmtPharm?: string;
   diagnostics?: string[];
   problemListSnapshot?: any[];
   medicationSnapshot?: any[];

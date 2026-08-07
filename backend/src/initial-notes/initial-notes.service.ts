@@ -86,6 +86,7 @@ export class InitialNotesService {
           obHistory: dto.obHistory,
           psychosocialHistory: dto.psychosocialHistory,
           mgmtNonpharm: dto.mgmtNonpharm,
+          mgmtPharm: dto.mgmtPharm,
           diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
           medicationSnapshot: dto.medicationSnapshot
             ? (dto.medicationSnapshot as any)
@@ -151,6 +152,9 @@ export class InitialNotesService {
       }),
       ...(updateData.mgmtNonpharm !== undefined && {
         mgmtNonpharm: updateData.mgmtNonpharm,
+      }),
+      ...(updateData.mgmtPharm !== undefined && {
+        mgmtPharm: updateData.mgmtPharm,
       }),
       ...(updateData.diagnostics !== undefined && {
         diagnostics: updateData.diagnostics,

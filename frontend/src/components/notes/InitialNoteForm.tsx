@@ -368,6 +368,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
       assessment: [],
       medicationSnapshot: [],
       mgmtNonpharm: '',
+      mgmtPharm: '',
       diagnostics: [],
       visitDatetime: new Date().toISOString(),
     },
@@ -429,6 +430,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 instructions: m.instructions || undefined,
               })),
           mgmtNonpharm: note.mgmtNonpharm || '',
+          mgmtPharm: note.mgmtPharm || '',
         diagnostics: note.diagnostics || [],
         visitDatetime: note.createdAt,
       });
@@ -493,6 +495,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           instructions: m.instructions || undefined,
         })),
         mgmtNonpharm: '',
+        mgmtPharm: '',
         diagnostics: [],
         visitDatetime: new Date().toISOString(),
       });
@@ -1072,21 +1075,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     {note.physicalExam || '—'}
                   </div>
                 </div>
-
-                {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-purple mb-1.5 flex items-center gap-1.5">
-                      <span>🧪</span> Labs and Imaging Results
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {note.diagnostics.map((diag: string, idx: number) => (
-                        <span key={idx} className="text-[10px] font-bold uppercase tracking-[0.5px] bg-surface-2 text-text-secondary border border-border px-2 py-0.5 rounded-[4px] shadow-sm">
-                          {diag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1159,6 +1147,32 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     {note.mgmtNonpharm || '—'}
                   </div>
                 </div>
+
+                {note.diagnostics && Array.isArray(note.diagnostics) && note.diagnostics.length > 0 && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1.5 flex items-center gap-1.5">
+                      <span>🧪</span> Diagnostics
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {note.diagnostics.map((diag: string, idx: number) => (
+                        <span key={idx} className="text-[10px] font-bold uppercase tracking-[0.5px] bg-surface-2 text-text-secondary border border-border px-2 py-0.5 rounded-[4px] shadow-sm">
+                          {diag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {note.mgmtPharm && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.5px] text-green mb-1 flex items-center gap-1.5">
+                      <span>💊</span> Pharmacologic Treatment Remarks
+                    </div>
+                    <div className="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">
+                      {note.mgmtPharm}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
@@ -1625,19 +1639,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
                     Labs and Imaging Results
                   </label>
-                  <Controller
-                    control={form.control}
-                    name="diagnostics"
-                    render={({ field }) => (
-                      <TagInputField
-                        value={field.value || []}
-                        onChange={field.onChange}
-                        placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
-                        isObjectFormat={false}
-                        disabled={!canEditAll}
-                      />
-                    )}
-                  />
                   {canEditAll && (
                     <AttachmentsSection 
                       patientId={patientId} 
@@ -1775,17 +1776,50 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
               <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 bg-surface">
-                {/* Left: Non-Pharmacologic */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
-                    Non-Pharmacologic Management
-                  </label>
-                  <textarea
-                    {...form.register('mgmtNonpharm')}
-                    disabled={!canEditAll}
-                    className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
-                    placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
-                  />
+                {/* Left: Non-Pharmacologic & Diagnostics */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Non-Pharmacologic Management
+                    </label>
+                    <textarea
+                      {...form.register('mgmtNonpharm')}
+                      disabled={!canEditAll}
+                      className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[100px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
+                      placeholder="e.g. Low-sodium DASH diet. Daily home BP monitoring. Regular aerobic exercise 30 min/day."
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Diagnostics
+                    </label>
+                    <Controller
+                      control={form.control}
+                      name="diagnostics"
+                      render={({ field }) => (
+                        <TagInputField
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="Search and select diagnostic... e.g. Lipid Profile pending, Chest X-ray clear"
+                          isObjectFormat={false}
+                          disabled={!canEditAll}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-bold text-[#374151] uppercase tracking-[0.6px] block">
+                      Pharmacologic Treatment Remarks
+                    </label>
+                    <textarea
+                      {...form.register('mgmtPharm')}
+                      disabled={!canEditAll}
+                      className="w-full px-3 py-2.5 bg-white border-[1.5px] border-[#9BA3B5] rounded-btn text-[13px] text-text-primary outline-none resize-y min-h-[80px] leading-[1.65] transition-all duration-150 focus:bg-white focus:border-accent focus:shadow-accent-focus placeholder:text-[#9BA3B5] disabled:bg-surface-2 disabled:text-text-muted disabled:border-border"
+                      placeholder="e.g. Continue anti-hypertensives, initiate statin therapy at bedtime…"
+                    />
+                  </div>
                 </div>
                 {/* Right: Prescribed Medications */}
                 <div className="flex flex-col gap-1.5">
@@ -1907,6 +1941,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               instructions: m.instructions || undefined,
             })),
             mgmtNonpharm: '',
+            mgmtPharm: '',
             diagnostics: [],
             visitDatetime: new Date().toISOString(),
           });
