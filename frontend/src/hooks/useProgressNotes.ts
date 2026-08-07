@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
 import { useMedications } from './useMedications';
+import { useInitialNote } from './useInitialNote';
 
 export interface ProgressNote {
   id: string;
@@ -59,24 +60,40 @@ export function useCopyForwardData(patientId: string | null) {
   const { data: problemsData, isLoading: problemsLoading, isFetching: problemsFetching, refetch: refetchProblems } = useProblems(patientId);
   const { data: medicationsData, isLoading: medicationsLoading, isFetching: medicationsFetching, refetch: refetchMedications } = useMedications(patientId);
   const { data: notesData, isLoading: notesLoading, isFetching: notesFetching, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1, true);
+  const { data: initialNoteData, isLoading: initialNoteLoading, isFetching: initialNoteFetching, refetch: refetchInitialNote } = useInitialNote(patientId);
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
     const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
-    const latestDiagnostics = notesData?.data?.[0]?.diagnostics || [];
-    return { activeProblems, activeMedications, latestDiagnostics };
-  }, [problemsData, medicationsData, notesData]);
+    
+    const latestProgressNote = notesData?.data?.[0];
+    
+    const latestDiagnostics = latestProgressNote?.diagnostics?.length 
+      ? latestProgressNote.diagnostics 
+      : (initialNoteData?.diagnostics || []);
+      
+    const latestMgmtPharm = latestProgressNote?.mgmtPharm 
+      ? latestProgressNote.mgmtPharm 
+      : (initialNoteData?.mgmtPharm || '');
+
+    const latestMgmtNonpharm = latestProgressNote?.mgmtNonpharm 
+      ? latestProgressNote.mgmtNonpharm 
+      : (initialNoteData?.mgmtNonpharm || '');
+
+    return { activeProblems, activeMedications, latestDiagnostics, latestMgmtPharm, latestMgmtNonpharm };
+  }, [problemsData, medicationsData, notesData, initialNoteData]);
 
   const refetch = useMemo(() => () => {
     refetchProblems();
     refetchMedications();
     refetchNotes();
-  }, [refetchProblems, refetchMedications, refetchNotes]);
+    refetchInitialNote();
+  }, [refetchProblems, refetchMedications, refetchNotes, refetchInitialNote]);
 
   return {
     data,
-    isLoading: problemsLoading || medicationsLoading || notesLoading,
-    isFetching: problemsFetching || medicationsFetching || notesFetching,
+    isLoading: problemsLoading || medicationsLoading || notesLoading || initialNoteLoading,
+    isFetching: problemsFetching || medicationsFetching || notesFetching || initialNoteFetching,
     refetch,
   };
 }

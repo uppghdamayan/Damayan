@@ -244,13 +244,23 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         ? validMeds
         : mergeActiveMedications(validMeds, activeMeds);
 
+      const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished 
+        ? copyForward?.latestDiagnostics || [] 
+        : note.diagnostics || [];
+      const finalMgmtPharm = !note.mgmtPharm && !isPublished 
+        ? copyForward?.latestMgmtPharm || '' 
+        : note.mgmtPharm || '';
+      const finalMgmtNonpharm = !note.mgmtNonpharm && !isPublished 
+        ? copyForward?.latestMgmtNonpharm || '' 
+        : note.mgmtNonpharm || '';
+
       form.reset({
         subjective: note.subjective,
         objective: note.objective,
         labs: (note as any).labs || '',
-        mgmtNonpharm: note.mgmtNonpharm || '',
-        mgmtPharm: note.mgmtPharm || '',
-        diagnostics: note.diagnostics || [],
+        mgmtNonpharm: finalMgmtNonpharm,
+        mgmtPharm: finalMgmtPharm,
+        diagnostics: finalDiagnostics,
         problemListSnapshot: finalProblems,
         medicationSnapshot: finalMeds,
         visitDatetime: note.createdAt,
@@ -275,8 +285,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           parsed.problemListSnapshot = mergeActiveProblems(validProblems, activeProblems);
           parsed.medicationSnapshot = mergeActiveMedications(validMeds, activeMeds);
           
-          if (parsed.diagnostics === undefined || parsed.diagnostics === null) {
+          if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
             parsed.diagnostics = copyForward?.latestDiagnostics || [];
+          }
+          if (!parsed.mgmtPharm) {
+            parsed.mgmtPharm = copyForward?.latestMgmtPharm || '';
+          }
+          if (!parsed.mgmtNonpharm) {
+            parsed.mgmtNonpharm = copyForward?.latestMgmtNonpharm || '';
           }
           
           form.reset(parsed);
@@ -287,8 +303,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         subjective: '',
         objective: '',
         labs: '',
-        mgmtNonpharm: '',
-        mgmtPharm: '',
+        mgmtNonpharm: copyForward?.latestMgmtNonpharm || '',
+        mgmtPharm: copyForward?.latestMgmtPharm || '',
         diagnostics: copyForward?.latestDiagnostics || [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           title: p.title,
