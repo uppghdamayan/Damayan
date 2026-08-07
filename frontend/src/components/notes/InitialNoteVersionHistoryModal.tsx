@@ -192,44 +192,51 @@ export function InitialNoteVersionHistoryModal({
                     onClick={() => setSelectedId(v.id)}
                     aria-current={isActive}
                     className={cn(
-                      'w-full text-left px-3 py-2.5 border-b border-border/60 border-l-[3px] border-l-transparent transition-colors duration-150 cursor-pointer',
+                      'w-full text-left px-3.5 py-3 border-b border-border/60 transition-colors duration-150 cursor-pointer',
                       isActive
-                        ? 'bg-accent-light border-l-accent'
-                        : 'hover:bg-surface-2',
+                        ? 'bg-accent-light text-text-primary font-medium'
+                        : 'hover:bg-surface-2 text-text-secondary',
                     )}
                   >
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center justify-between gap-1.5">
                       <span className="font-mono text-[12px] font-bold text-text-primary">
                         v{v.versionNumber}
                       </span>
-                      {v.versionNumber === latestVersionNumber && (
-                        <Badge variant="published">Current</Badge>
+                      {v.versionNumber === latestVersionNumber ? (
+                        <Badge variant="published" className="text-[9px] px-1.5 py-0">Current</Badge>
+                      ) : v.versionNumber === 1 ? (
+                        <Badge variant="info" className="text-[9px] px-1.5 py-0">Original</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Revision</Badge>
                       )}
-                      {v.versionNumber === 1 && <Badge variant="info">Original</Badge>}
                     </div>
-                    <div className="text-[11px] text-text-secondary truncate mt-0.5">
+                    <div className="text-[11px] text-text-secondary truncate mt-1">
                       {formatEditorName(v.editor)}
                     </div>
                     <div className="font-mono text-[10px] text-text-muted mt-0.5">
                       {formatLogDate(v.createdAt)} · {formatLogTime(v.createdAt)}
                     </div>
-                    {fieldList.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap mt-1">
-                        {fieldList.map((f) => (
+                    {fieldList.length > 0 ? (
+                      <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                        {fieldList.slice(0, 3).map((f) => (
                           <span
                             key={f}
-                            className="text-[9px] font-semibold bg-surface-3 text-text-secondary border border-border px-1.5 py-0.5 rounded leading-none"
+                            className="text-[9px] font-medium bg-surface-3 text-text-secondary border border-border px-1.5 py-0.5 rounded leading-none"
                           >
                             {getFieldShortLabel(f)}
                           </span>
                         ))}
+                        {fieldList.length > 3 && (
+                          <span className="text-[9px] font-medium text-text-muted">
+                            +{fieldList.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-text-muted mt-1 italic">
+                        {v.versionNumber === 1 ? 'Initial publication' : 'No field tags'}
                       </div>
                     )}
-                    <div className="text-[10px] text-text-muted mt-1 line-clamp-2 leading-snug">
-                      {v.versionNumber === 1
-                        ? 'Original published version'
-                        : v.changeSummary}
-                    </div>
                   </button>
                 );
               })
@@ -265,40 +272,49 @@ export function InitialNoteVersionHistoryModal({
               )
             ) : (
               <>
-                <div className="flex flex-col gap-1.5 pb-3 mb-4 border-b border-border">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[13px] font-bold text-text-primary">
-                      Version {version.versionNumber}
-                    </span>
+                <div className="flex flex-col gap-2 pb-3 mb-4 border-b border-border">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-bold text-text-primary">
+                        Version {version.versionNumber} Snapshot
+                      </span>
+                      {version.versionNumber === latestVersionNumber ? (
+                        <Badge variant="published" className="text-[10px]">Current Note</Badge>
+                      ) : version.versionNumber === 1 ? (
+                        <Badge variant="info" className="text-[10px]">Original Note</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px]">Revision</Badge>
+                      )}
+                    </div>
                     <span className="text-[11px] text-text-muted">
-                      {version.versionNumber === 1 ? 'published by' : 'saved by'}{' '}
-                      {formatEditorName(version.editor)} ·{' '}
-                      {formatLogDate(version.createdAt)} ·{' '}
-                      {formatLogTime(version.createdAt)}
+                      {version.versionNumber === 1 ? 'Published by' : 'Saved by'}{' '}
+                      <strong className="text-text-secondary font-semibold">{formatEditorName(version.editor)}</strong> ·{' '}
+                      {formatLogDate(version.createdAt)} at {formatLogTime(version.createdAt)}
                     </span>
                   </div>
-                  {activeChangedFields.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+
+                  {activeChangedFields.length > 0 ? (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                        Changed:
+                        Modified in this version:
                       </span>
                       {activeChangedFields.map((f) => (
                         <span
                           key={f}
-                          className="text-[9.5px] font-bold bg-amber-bg text-amber border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider"
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-bg text-amber border border-amber-border px-2 py-0.5 rounded-full"
                         >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber" />
                           {getFieldShortLabel(f)}
                         </span>
                       ))}
                     </div>
+                  ) : (
+                    <div className="text-[11px] text-text-muted italic">
+                      {version.versionNumber === 1
+                        ? 'Original published version'
+                        : 'No specific modified sections recorded.'}
+                    </div>
                   )}
-                  <span className="text-[11px] text-text-secondary leading-relaxed">
-                    {version.versionNumber === 1
-                      ? 'Original published version — nothing precedes it to compare against.'
-                      : activeSummary?.changeSummary ??
-                        version.changeSummary ??
-                        'No section changes recorded.'}
-                  </span>
                 </div>
                 <InitialNoteVersionView
                   snapshot={version.snapshot}
