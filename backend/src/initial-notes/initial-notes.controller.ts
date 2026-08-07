@@ -33,11 +33,7 @@ export class InitialNotesController {
 
     // Draft visibility rule
     if (note.status === NoteStatus.DRAFT) {
-      if (
-        req.user.role === Role.DOCTOR &&
-        req.user.id !== note.authorId &&
-        req.user.role !== Role.ADMIN
-      ) {
+      if (req.user.id !== note.authorId && req.user.role !== Role.ADMIN) {
         throw new NotFoundException('Initial note not found for this patient.');
       }
     }

@@ -24,14 +24,14 @@ import { useUploadAttachment } from '@/hooks/useAttachments';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { NoteStatusBadge } from './NoteStatusBadge';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
+import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import { MedicationSnapshotModal, type MedicationSnapshotValues } from './MedicationSnapshotModal';
 import { 
@@ -318,9 +318,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
   const uploadAttachment = useUploadAttachment();
 
+  const { user } = useAuthStore();
+  const isDoctorOrAdmin = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+  const isNonDoctor = user?.role === 'NURSE' || user?.role === 'PHARMACIST';
+
   const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
   const isPublished = note?.status === 'PUBLISHED';
-  const canEditAll = !isPublished;
+  const canEditAll = !isPublished && isDoctorOrAdmin;
   const isHistoryEditableOnly = false;
 
   const historyTextareaClass = cn(
@@ -856,7 +860,72 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     </div>
   );
 
-  return (
+    if (!isDoctorOrAdmin && (!note || note.status !== 'PUBLISHED')) {
+      return (
+        <div className="flex flex-col gap-6 pb-32">
+          {/* HEADER BAR */}
+          <div className="flex items-center justify-between bg-surface border border-border rounded-card shadow-card px-4 py-3 w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-btn bg-accent-light flex items-center justify-center text-accent shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold text-text-primary">Initial Consultation Note</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-3 text-text-secondary border border-border">
+                    Read-Only Access
+                  </span>
+                </div>
+                <span className="text-[11px] text-text-muted mt-0.5">
+                  Initial notes can only be documented and published by an attending physician.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/${patientId}/notes`)}
+                className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-surface-2 border border-border text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>View Timeline</span>
+              </button>
+            </div>
+          </div>
+
+          {/* EMPTY STATE CONTAINER */}
+          <div className="bg-surface border border-border rounded-card shadow-card p-12 flex flex-col items-center justify-center text-center min-h-[380px]">
+            <div className="w-14 h-14 rounded-full bg-accent/10 text-accent flex items-center justify-center mb-4 transition-transform hover:scale-105 duration-300">
+              <ClipboardList className="w-7 h-7 text-accent" />
+            </div>
+            <h2 className="text-[16px] font-bold text-text-primary mb-2">
+              No Initial Consultation Note Published
+            </h2>
+            <p className="text-[13px] text-text-muted max-w-[420px] mb-6 leading-relaxed">
+              An Initial Consultation Note has not been documented for this patient yet. Once an attending doctor completes and publishes the initial note, you will be able to review the consultation history here and document progress notes.
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/${patientId}/vitals`)}
+                className="text-[12px] h-[34px] px-4 rounded-btn font-semibold cursor-pointer"
+              >
+                View Vital Signs
+              </Button>
+              <Button
+                onClick={() => router.push(`/dashboard/${patientId}/notes`)}
+                className="text-[12px] h-[34px] px-4 bg-accent hover:bg-accent-hover text-white rounded-btn font-bold flex items-center gap-1.5 cursor-pointer shadow-btn-primary hover:shadow-btn-primary-hover transition-all"
+              >
+                Go to Note Timeline
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="flex flex-col gap-6 pb-32">
       {note?.status === 'PUBLISHED' && !isEditing ? (
         // ==================== READ-ONLY PUBLISHED VIEW ====================
@@ -894,14 +963,16 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </span>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white hover:bg-accent-hover transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Edit className="w-3.5 h-3.5" />
-                <span>Edit Note</span>
-              </button>
+              {isDoctorOrAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-accent text-white hover:bg-accent-hover transition-colors inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Edit Note</span>
+                </button>
+              )}
             </div>
           </div>
 
