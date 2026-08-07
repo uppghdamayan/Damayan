@@ -125,3 +125,6 @@ Thumbs.db
 *.pem
 .temp
 .tmp
+
+graph.json
+graphify-out/
