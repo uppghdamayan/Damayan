@@ -128,16 +128,18 @@ export function mapNoteToTimelineView(
       : [];
 
     const medicationList = Array.isArray(initialNote.medicationSnapshot)
-      ? initialNote.medicationSnapshot.map((med: any) => {
-          if (typeof med === 'string') return med;
-          if (med && typeof med === 'object') {
-            const doseStr = med.dose != null ? String(med.dose).trim() : '';
-            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
-            const fullDose = `${doseStr}${unitStr}`.trim();
-            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
-          }
-          return '';
-        }).filter(Boolean)
+      ? initialNote.medicationSnapshot
+          .filter((med: any) => !med || typeof med !== 'object' || med.source !== 'past')
+          .map((med: any) => {
+            if (typeof med === 'string') return med;
+            if (med && typeof med === 'object') {
+              const doseStr = med.dose != null ? String(med.dose).trim() : '';
+              const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+              const fullDose = `${doseStr}${unitStr}`.trim();
+              return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
+            }
+            return '';
+          }).filter(Boolean)
       : [];
 
     const author = initialNote.author;

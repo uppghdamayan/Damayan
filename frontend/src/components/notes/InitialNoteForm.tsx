@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
@@ -508,17 +509,38 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const formValues = form.watch();
 
-  const appendMedication = (values: MedicationSnapshotValues, source: MedSource) => {
+  const appendMedication = (values: MedicationSnapshotValues, source: MedSource, fromPast?: boolean) => {
     const current = form.getValues('medicationSnapshot') || [];
-    form.setValue('medicationSnapshot', [...current, { ...values, source }], { shouldDirty: true, shouldTouch: true });
+    if (source === 'past') {
+      // One-way reflection: adding a past medication adds it to past medications
+      // AND reflects/copies it into prescribed medications as an independent entry with `fromPast: true`.
+      form.setValue(
+        'medicationSnapshot',
+        [
+          ...current,
+          { ...values, source: 'past' },
+          { ...values, source: 'prescribed', fromPast: true },
+        ],
+        { shouldDirty: true, shouldTouch: true }
+      );
+    } else {
+      form.setValue(
+        'medicationSnapshot',
+        [...current, { ...values, source: 'prescribed', ...(fromPast ? { fromPast: true } : {}) }],
+        { shouldDirty: true, shouldTouch: true }
+      );
+    }
   };
 
-  // Flat-array indices preserved through the filter — the History section's
-  // edit/delete buttons splice the same medicationSnapshot array as the Plan
-  // section, so they must operate on true indices, not filtered-list ones.
+  // Flat-array indices preserved through the filters — the History section's
+  // and Plan section's edit/delete buttons operate on true indices of the medicationSnapshot array.
   const pastMedEntries = (formValues.medicationSnapshot || [])
     .map((med: any, index: number) => ({ med, index }))
     .filter(({ med }: { med: any }) => getMedSource(med) === 'past');
+
+  const prescribedMedEntries = (formValues.medicationSnapshot || [])
+    .map((med: any, index: number) => ({ med, index }))
+    .filter(({ med }: { med: any }) => getMedSource(med) === 'prescribed');
 
   const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
 
@@ -1140,6 +1162,31 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         <span className="text-text-secondary font-medium">No known allergies</span>
                       )}
                     </div>
+                    {(() => {
+                      const pastMeds = (note.medicationSnapshot && Array.isArray(note.medicationSnapshot))
+                        ? note.medicationSnapshot.filter((m: any) => getMedSource(m) === 'past')
+                        : [];
+                      if (pastMeds.length === 0) return null;
+                      return (
+                        <div className="p-3 flex flex-col gap-1 bg-surface">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Past Medications</span>
+                          <div className="flex flex-col gap-1 mt-0.5">
+                            {pastMeds.map((med: any, idx: number) => {
+                              const medName = typeof med === 'string' ? med : med.name;
+                              const medDetails = typeof med !== 'string'
+                                ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
+                                : '';
+                              return (
+                                <div key={idx} className="text-[12px] text-text-primary flex items-center justify-between">
+                                  <span className="font-semibold">{medName}</span>
+                                  {medDetails && <span className="text-[11px] font-mono text-amber">{medDetails}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1317,57 +1364,67 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               {/* Right Column */}
               <div className="flex flex-col gap-3 border-l border-border pl-6 max-@md:border-l-0 max-@md:pl-0">
                 <div>
-                  <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Pill className="w-3.5 h-3.5 text-green" />
-                      <span>Medications Prescribed</span>
-                    </div>
-                    {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 && (
-                      <span className="text-[10px] font-bold bg-green-bg text-green px-1.5 py-0.5 rounded-full">
-                        {note.medicationSnapshot.length}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
-                    {note.medicationSnapshot && Array.isArray(note.medicationSnapshot) && note.medicationSnapshot.length > 0 ? (
-                      note.medicationSnapshot.map((med: any, idx: number) => {
-                        const isPast = getMedSource(med) === 'past';
-                        const medName = typeof med === 'string' ? med : med.name;
-                        const medDetails = typeof med !== 'string'
-                          ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
-                          : '';
-                        const instructions = typeof med !== 'string' ? med.instructions : '';
+                  {(() => {
+                    const prescribedReadOnly = (note.medicationSnapshot && Array.isArray(note.medicationSnapshot))
+                      ? note.medicationSnapshot.filter((med: any) => getMedSource(med) === 'prescribed')
+                      : [];
 
-                        return (
-                          <div key={idx} className="flex flex-col gap-1 p-3 hover:bg-surface-2/50 transition-colors">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={cn("w-2 h-2 rounded-full shrink-0", isPast ? "bg-amber" : "bg-green")} />
-                                <span className="text-[13px] font-bold text-text-primary truncate">{medName}</span>
-                                {isPast && (
-                                  <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
-                                    Past
-                                  </span>
-                                )}
-                              </div>
-                              {medDetails && (
-                                <span className="text-[11px] font-medium font-mono text-text-secondary shrink-0 bg-surface-2 px-2 py-0.5 rounded border border-border">
-                                  {medDetails}
-                                </span>
-                              )}
-                            </div>
-                            {instructions && (
-                              <div className="text-[11.5px] text-text-secondary pl-4 leading-relaxed font-sans">
-                                {instructions}
-                              </div>
-                            )}
+                    return (
+                      <>
+                        <div className="text-[10.5px] font-bold uppercase tracking-[0.5px] text-green mb-2 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Pill className="w-3.5 h-3.5 text-green" />
+                            <span>Medications Prescribed</span>
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="p-4 text-[12px] text-text-muted text-center">No medications prescribed.</div>
-                    )}
-                  </div>
+                          {prescribedReadOnly.length > 0 && (
+                            <span className="text-[10px] font-bold bg-green-bg text-green px-1.5 py-0.5 rounded-full">
+                              {prescribedReadOnly.length}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
+                          {prescribedReadOnly.length > 0 ? (
+                            prescribedReadOnly.map((med: any, idx: number) => {
+                              const medName = typeof med === 'string' ? med : med.name;
+                              const medDetails = typeof med !== 'string'
+                                ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
+                                : '';
+                              const instructions = typeof med !== 'string' ? med.instructions : '';
+
+                              const isFromPast = typeof med !== 'string' && med.fromPast;
+                              return (
+                                <div key={idx} className="flex flex-col gap-1 p-3 hover:bg-surface-2/50 transition-colors">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={cn("w-2 h-2 rounded-full shrink-0", isFromPast ? "bg-amber" : "bg-green")} />
+                                      <span className="text-[13px] font-bold text-text-primary truncate">{medName}</span>
+                                      {isFromPast && (
+                                        <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap">
+                                          Past
+                                        </span>
+                                      )}
+                                    </div>
+                                    {medDetails && (
+                                      <span className="text-[11px] font-medium font-mono text-text-secondary shrink-0 bg-surface-2 px-2 py-0.5 rounded border border-border">
+                                        {medDetails}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {instructions && (
+                                    <div className="text-[11.5px] text-text-secondary pl-4 leading-relaxed font-sans">
+                                      {instructions}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="p-4 text-[12px] text-text-muted text-center">No medications prescribed.</div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1630,48 +1687,79 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <div className="text-[11px] text-text-muted">No past medications recorded.</div>
                     ) : (
                       <div className="flex flex-col gap-1.5">
-                        {pastMedEntries.map(({ med, index }: { med: any; index: number }) => (
-                          <div key={index} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
-                            <div className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5"></div>
-                            <div className="flex-1 min-w-0 break-words whitespace-normal">
-                              <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
-                              {typeof med !== 'string' && med.dose && (
-                                <span className="font-mono text-amber font-semibold ml-1.5">{med.dose}</span>
-                              )}
-                              {typeof med !== 'string' && med.formulation && (
-                                <span className="text-text-secondary ml-1.5">{med.formulation}</span>
-                              )}
-                              {typeof med !== 'string' && med.quantity && (
-                                <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                              )}
-                              {typeof med !== 'string' && med.instructions && (
-                                <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                        {pastMedEntries.map(({ med, index }: { med: any; index: number }) => {
+                          const medName = typeof med === 'string' ? med : med.name;
+                          const isAlreadyReflected = prescribedMedEntries.some(
+                            ({ med: pMed }) => (typeof pMed === 'string' ? pMed : pMed.name)?.trim().toLowerCase() === medName?.trim().toLowerCase()
+                          );
+
+                          return (
+                            <div key={index} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5"></div>
+                              <div className="flex-1 min-w-0 break-words whitespace-normal">
+                                <span className="font-semibold break-words">{medName}</span>
+                                {typeof med !== 'string' && med.dose && (
+                                  <span className="font-mono text-amber font-semibold ml-1.5">{med.dose}</span>
+                                )}
+                                {typeof med !== 'string' && med.formulation && (
+                                  <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                                )}
+                                {typeof med !== 'string' && med.quantity && (
+                                  <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                                )}
+                                {typeof med !== 'string' && med.instructions && (
+                                  <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                                )}
+                              </div>
+                              {canEditAll && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {!isAlreadyReflected && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => {
+                                        const values = typeof med === 'string'
+                                          ? { name: med, dose: '' }
+                                          : {
+                                              name: med.name,
+                                              dose: med.dose || '',
+                                              formulation: med.formulation,
+                                              quantity: med.quantity,
+                                              instructions: med.instructions,
+                                            };
+                                        appendMedication(values, 'prescribed', true);
+                                        toast.success(`Reflected "${medName}" to Prescribed Medications.`);
+                                      }}
+                                      title="Reflect to Prescribed Medications"
+                                      className="text-text-muted hover:text-green transition-colors w-6 h-6 rounded-md"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => setEditMedIndex(index)}
+                                    className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => setDeleteMedIndex(index)}
+                                    className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                                  >
+                                    <TrashIcon className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
                               )}
                             </div>
-                            {canEditAll && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => setEditMedIndex(index)}
-                                  className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => setDeleteMedIndex(index)}
-                                  className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                                >
-                                  <TrashIcon className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     {canEditAll && (
@@ -1984,73 +2072,65 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <p className="text-[11px] text-text-muted -mt-0.5">
                     Medications added here are saved to the patient's cumulative medication list when this note is published.
                   </p>
-                  <Controller
-                    control={form.control}
-                    name="medicationSnapshot"
-                    render={({ field }) => {
-                      const meds = field.value || [];
+                  <div className="flex flex-col gap-1.5" id="field-medications">
+                    {prescribedMedEntries.map(({ med, index }) => {
+                      const isFromPast = typeof med !== 'string' && med.fromPast;
                       return (
-                        <div className="flex flex-col gap-1.5" id="field-medications">
-                          {meds.map((med: any, idx: number) => {
-                            const isPast = getMedSource(med) === 'past';
-                            return (
-                              <div key={idx} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
-                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5", isPast ? "bg-amber" : "bg-green")}></div>
-                                <div className="flex-1 min-w-0 break-words whitespace-normal">
-                                  <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
-                                  {isPast && (
-                                    <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1 py-0.5 rounded uppercase tracking-wider ml-1.5 align-middle whitespace-nowrap">
-                                      Past
-                                    </span>
-                                  )}
-                                  {typeof med !== 'string' && med.dose && (
-                                    <span className={cn("font-mono font-semibold ml-1.5", isPast ? "text-amber" : "text-green")}>{med.dose}</span>
-                                  )}
-                                  {typeof med !== 'string' && med.formulation && (
-                                    <span className="text-text-secondary ml-1.5">{med.formulation}</span>
-                                  )}
-                                  {typeof med !== 'string' && med.quantity && (
-                                    <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                                  )}
-                                  {typeof med !== 'string' && med.instructions && (
-                                    <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
-                                  )}
-                                </div>
-                                {canEditAll && (
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      onClick={() => setEditMedIndex(idx)}
-                                      className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      onClick={() => setDeleteMedIndex(idx)}
-                                      className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                                    >
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                        <div key={index} className="flex items-start gap-2 py-2 px-3 border border-border bg-white rounded-btn text-[12px] text-text-primary shadow-sm group">
+                          <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5", isFromPast ? "bg-amber" : "bg-green")}></div>
+                          <div className="flex-1 min-w-0 break-words whitespace-normal">
+                            <span className="font-semibold break-words">{typeof med === 'string' ? med : med.name}</span>
+                            {isFromPast && (
+                              <span className="text-[8px] font-bold text-amber bg-amber-bg border border-amber-border px-1.5 py-0.5 rounded uppercase tracking-wider ml-1.5 align-middle whitespace-nowrap">
+                                Past
+                              </span>
+                            )}
+                            {typeof med !== 'string' && med.dose && (
+                              <span className={cn("font-mono font-semibold ml-1.5", isFromPast ? "text-amber" : "text-green")}>{med.dose}</span>
+                            )}
+                            {typeof med !== 'string' && med.formulation && (
+                              <span className="text-text-secondary ml-1.5">{med.formulation}</span>
+                            )}
+                            {typeof med !== 'string' && med.quantity && (
+                              <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
+                            )}
+                            {typeof med !== 'string' && med.instructions && (
+                              <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
+                            )}
+                          </div>
                           {canEditAll && (
-                            <MedicationAddForm
-                              nameOptions={nameOptions}
-                              onAdd={(values) => field.onChange([...meds, { ...values, source: 'prescribed' }])}
-                            />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setEditMedIndex(index)}
+                                className="text-text-muted hover:text-accent transition-colors w-6 h-6 rounded-md"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeleteMedIndex(index)}
+                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );
-                    }}
-                  />
+                    })}
+                    {canEditAll && (
+                      <MedicationAddForm
+                        nameOptions={nameOptions}
+                        onAdd={(values) => appendMedication(values, 'prescribed')}
+                        addLabel="+ Add Medication"
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2162,14 +2242,37 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         onConfirm={() => {
           if (deleteMedIndex !== null) {
             const current = form.getValues('medicationSnapshot') || [];
+            const deletedItem = current[deleteMedIndex];
             const updated = [...current];
             updated.splice(deleteMedIndex, 1);
             form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
             setDeleteMedIndex(null);
+
+            if (deletedItem) {
+              const medName = typeof deletedItem === 'string' ? deletedItem : deletedItem.name;
+              const isFromPast = typeof deletedItem !== 'string' && (deletedItem.fromPast || deletedItem.source === 'past');
+              
+              toast.info(
+                isFromPast
+                  ? `Removed "${medName}" (from Past Medication) from Prescribed Medications.`
+                  : `Removed "${medName}" from medications list.`,
+                {
+                  action: {
+                    label: 'Undo',
+                    onClick: () => {
+                      const latest = form.getValues('medicationSnapshot') || [];
+                      form.setValue('medicationSnapshot', [...latest, deletedItem], { shouldDirty: true, shouldTouch: true });
+                      toast.success(`Restored "${medName}" back to Prescribed Medications.`);
+                    },
+                  },
+                  duration: 8000,
+                }
+              );
+            }
           }
         }}
         title="Remove Medication"
-        message="Are you sure you want to remove this medication from the prescribed list?"
+        message="Are you sure you want to remove this medication?"
         confirmLabel="Remove"
       />
 
@@ -2182,7 +2285,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           if (editMedIndex === null) return;
           const current = form.getValues('medicationSnapshot') || [];
           const updated = [...current];
-          updated[editMedIndex] = { ...updated[editMedIndex], ...values };
+          const existingItem = updated[editMedIndex];
+          const existingSource = existingItem?.source || 'prescribed';
+          const fromPast = existingItem?.fromPast;
+          updated[editMedIndex] = { ...existingItem, ...values, source: existingSource, fromPast };
           form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
           setEditMedIndex(null);
         }}
