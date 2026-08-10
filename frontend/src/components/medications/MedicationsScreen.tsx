@@ -18,8 +18,15 @@ import { MedicationListSkeleton } from './MedicationListSkeleton';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { Medication } from '@/types/medication';
 
+type PendingMedicationCreate = Omit<
+  Medication,
+  'id' | 'patientId' | 'createdAt' | 'updatedAt' | 'addedBy' | 'updatedBy' | 'addedByUser' | 'updatedByUser'
+> & {
+  tempId: string;
+};
+
 type PendingChanges = {
-  creates: Omit<Medication, 'id' | 'patientId' | 'createdAt' | 'updatedAt' | 'addedBy' | 'updatedBy' | 'addedByUser' | 'updatedByUser'>[];
+  creates: PendingMedicationCreate[];
   updates: Record<string, Partial<Medication>>;
   deletes: string[];
 };
@@ -54,7 +61,21 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     const saved = localStorage.getItem(draftStorageKey);
     if (saved) {
       try {
-        setPendingChanges(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        const creates: PendingMedicationCreate[] = (parsed.creates || []).map((c: any) => ({
+          name: c.name ?? '',
+          dose: c.dose ?? '',
+          formulation: c.formulation ?? '',
+          instructions: c.instructions ?? '',
+          quantity: c.quantity ?? undefined,
+          isActive: c.isActive ?? true,
+          tempId: c.tempId || c.id || `temp-${Math.random().toString(36).slice(2, 9)}`,
+        }));
+        setPendingChanges({
+          creates,
+          updates: parsed.updates || {},
+          deletes: parsed.deletes || [],
+        });
         setLastAutoSaved(new Date());
       } catch {}
     }
@@ -104,9 +125,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       return m;
     });
 
-    const newItems = pendingChanges.creates.map((c, idx) => ({
+    const newItems = pendingChanges.creates.map((c) => ({
       ...c,
-      id: `temp-${idx}`,
+      id: c.tempId,
       patientId,
       addedBy: user?.id ?? null,
       createdAt: new Date().toISOString(),
@@ -167,31 +188,37 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const handleSave = async (values: { name: string; dose: string; formulation: string; instructions: string; quantity: number }) => {
     if (editing) {
       if (editing.id.startsWith('temp-')) {
-        const idx = parseInt(editing.id.replace('temp-', ''), 10);
-        setPendingChanges(prev => {
-          const newCreates = [...prev.creates];
-          newCreates[idx] = { ...newCreates[idx], ...values };
-          return { ...prev, creates: newCreates };
-        });
+        setPendingChanges(prev => ({
+          ...prev,
+          creates: prev.creates.map(c => (c.tempId === editing.id ? { ...c, ...values } : c)),
+        }));
       } else {
-        setPendingChanges(prev => ({ ...prev, updates: { ...prev.updates, [editing.id]: { ...prev.updates[editing.id], ...values } } }));
+        setPendingChanges(prev => ({
+          ...prev,
+          updates: { ...prev.updates, [editing.id]: { ...prev.updates[editing.id], ...values } },
+        }));
       }
     } else {
-      setPendingChanges(prev => ({ ...prev, creates: [...prev.creates, { ...values, isActive: true }] }));
+      const tempId = `temp-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2, 7)}`;
+      setPendingChanges(prev => ({
+        ...prev,
+        creates: [...prev.creates, { tempId, ...values, isActive: true }],
+      }));
     }
     setModalOpen(false);
   };
 
   const handleStatusChange = async (m: Medication, isActive: boolean) => {
     if (m.id.startsWith('temp-')) {
-      const idx = parseInt(m.id.replace('temp-', ''), 10);
-      setPendingChanges(prev => {
-        const newCreates = [...prev.creates];
-        newCreates[idx] = { ...newCreates[idx], isActive };
-        return { ...prev, creates: newCreates };
-      });
+      setPendingChanges(prev => ({
+        ...prev,
+        creates: prev.creates.map(c => (c.tempId === m.id ? { ...c, isActive } : c)),
+      }));
     } else {
-      setPendingChanges(prev => ({ ...prev, updates: { ...prev.updates, [m.id]: { ...prev.updates[m.id], isActive } } }));
+      setPendingChanges(prev => ({
+        ...prev,
+        updates: { ...prev.updates, [m.id]: { ...prev.updates[m.id], isActive } },
+      }));
     }
   };
 
@@ -202,15 +229,23 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
   const handleConfirmDelete = () => {
     if (!medicationToDelete) return;
-    if (medicationToDelete.id.startsWith('temp-')) {
-      const idx = parseInt(medicationToDelete.id.replace('temp-', ''), 10);
-      setPendingChanges(prev => {
-        const newCreates = [...prev.creates];
-        newCreates.splice(idx, 1);
-        return { ...prev, creates: newCreates };
-      });
+    const targetId = medicationToDelete.id;
+
+    if (targetId.startsWith('temp-')) {
+      setPendingChanges(prev => ({
+        ...prev,
+        creates: prev.creates.filter(c => c.tempId !== targetId),
+      }));
     } else {
-      setPendingChanges(prev => ({ ...prev, deletes: [...prev.deletes, medicationToDelete.id] }));
+      setPendingChanges(prev => {
+        const nextUpdates = { ...prev.updates };
+        delete nextUpdates[targetId];
+        return {
+          ...prev,
+          updates: nextUpdates,
+          deletes: prev.deletes.includes(targetId) ? prev.deletes : [...prev.deletes, targetId],
+        };
+      });
     }
     setDeleteModalOpen(false);
     setMedicationToDelete(null);
@@ -234,6 +269,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     try {
       const publishedChanges: Record<string, string[]> = {};
       for (const [id, updates] of Object.entries(pendingChanges.updates)) {
+        if (pendingChanges.deletes.includes(id)) continue;
         const original = rawData.find((r) => r.id === id);
         if (original) {
           const fields: string[] = [];
@@ -250,14 +286,20 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         }
       }
 
+      // 1. Process deletes
       for (const id of pendingChanges.deletes) {
         await deleteMedication.mutateAsync(id);
       }
+
+      // 2. Process updates for non-deleted items
       for (const [id, updates] of Object.entries(pendingChanges.updates)) {
+        if (pendingChanges.deletes.includes(id)) continue;
         await updateMedication.mutateAsync({ id, ...updates });
       }
+
+      // 3. Process creates
       for (const create of pendingChanges.creates) {
-        const { isActive, ...payload } = create;
+        const { tempId, isActive, ...payload } = create as any;
         const res = await createMedication.mutateAsync({
           ...payload,
           formulation: payload.formulation ?? undefined,
@@ -266,8 +308,12 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         });
         if (res && res.id) {
           publishedChanges[res.id] = ['_isNew'];
+          if (isActive === false) {
+            await updateMedication.mutateAsync({ id: res.id, isActive: false });
+          }
         }
       }
+
       setPendingChanges({ creates: [], updates: {}, deletes: [] });
       setLastAutoSaved(null);
       localStorage.removeItem(draftStorageKey);
@@ -278,7 +324,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       }, 5000);
       toast.success('Medication changes published successfully.');
     } catch (err) {
-      toast.error('Failed to publish changes.');
+      toast.error(err instanceof Error ? err.message : 'Failed to publish changes.');
     } finally {
       setIsPublishing(false);
     }

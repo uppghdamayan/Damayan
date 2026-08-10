@@ -36,6 +36,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { formatErrorMessage } from '@/lib/error-utils';
 
 interface ProgressNoteFormProps {
   patientId: string;
@@ -241,9 +242,18 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         ? validProblems
         : mergeActiveProblems(validProblems, activeProblems);
 
+      // For unpublished (draft) notes, always use the authoritative active medications list
+      // instead of merging with the stale snapshot to avoid duplicates.
       const finalMeds = isPublished
         ? validMeds
-        : mergeActiveMedications(validMeds, activeMeds);
+        : activeMeds.map((m: any) => ({
+            name: m.name,
+            dose: m.dose || undefined,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+            fromPast: m.fromPast || false,
+          }));
 
       const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished 
         ? copyForward?.latestDiagnostics || [] 
@@ -274,17 +284,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           const draftProblems = (parsed.problemListSnapshot as any[]) || [];
           const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
           
-          const draftMeds = (parsed.medicationSnapshot as any[]) || [];
-          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : {
+          parsed.problemListSnapshot = mergeActiveProblems(validProblems, activeProblems);
+          // Always replace with authoritative active medications — never merge stale draft meds
+          parsed.medicationSnapshot = activeMeds.map((m: any) => ({
             name: m.name,
             dose: m.dose || undefined,
             formulation: m.formulation || undefined,
             quantity: m.quantity || undefined,
             instructions: m.instructions || undefined,
-          });
-
-          parsed.problemListSnapshot = mergeActiveProblems(validProblems, activeProblems);
-          parsed.medicationSnapshot = mergeActiveMedications(validMeds, activeMeds);
+            fromPast: m.fromPast || false,
+          }));
           
           if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
             parsed.diagnostics = copyForward?.latestDiagnostics || [];
@@ -339,12 +348,24 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       if (oldProblems !== newProblems || oldMeds !== newMeds) {
         const currentValues = form.getValues();
         const mergedProbs = mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
-        const mergedMeds = mergeActiveMedications(currentValues.medicationSnapshot || [], copyForward.activeMedications);
+        // Replace the baseline from active list, but preserve any medications the user added this session (isNew)
+        const userAddedMeds = (currentValues.medicationSnapshot || []).filter((m: any) => m && m.isNew);
+        const replacedMeds = [
+          ...copyForward.activeMedications.map((m: any) => ({
+            name: m.name,
+            dose: m.dose || undefined,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+            fromPast: m.fromPast || false,
+          })),
+          ...userAddedMeds,
+        ];
 
         form.reset({
           ...currentValues,
           problemListSnapshot: mergedProbs,
-          medicationSnapshot: mergedMeds,
+          medicationSnapshot: replacedMeds,
         });
       }
     }
@@ -373,26 +394,26 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 localStorage.removeItem(`damayan:draft:${patientId}:progress`);
                 resolve(true);
               },
-              onError: (err: any) => {
-                setPublishError(err?.message || 'Failed to publish note');
-                resolve(false);
-              }
-            });
-          },
           onError: (err: any) => {
-            setPublishError(err?.message || 'Failed to update note before publishing');
+            setPublishError(formatErrorMessage(err, 'Failed to publish note'));
             resolve(false);
           }
         });
-      } else {
-        createAndPublishMutation.mutate(cleanFormValues(formValues), {
-          onSuccess: () => {
-            localStorage.removeItem(`damayan:draft:${patientId}:progress`);
-            resolve(true);
-          },
-          onError: (err: any) => {
-            setPublishError(err?.message || 'Failed to create and publish note');
-            resolve(false);
+      },
+      onError: (err: any) => {
+        setPublishError(formatErrorMessage(err, 'Failed to update note before publishing'));
+        resolve(false);
+      }
+    });
+  } else {
+    createAndPublishMutation.mutate(cleanFormValues(formValues), {
+      onSuccess: () => {
+        localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+        resolve(true);
+      },
+      onError: (err: any) => {
+        setPublishError(formatErrorMessage(err, 'Failed to create and publish note'));
+        resolve(false);
           }
         });
       }
@@ -617,12 +638,12 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               setActiveScreen('note-timeline');
             },
             onError: (err: any) => {
-              setPublishError(err?.message || 'Failed to publish note');
+              setPublishError(formatErrorMessage(err, 'Failed to publish note'));
             }
           });
         },
         onError: (err: any) => {
-          setPublishError(err?.message || 'Failed to update note before publishing');
+          setPublishError(formatErrorMessage(err, 'Failed to update note before publishing'));
         }
       });
     } else {
@@ -652,7 +673,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           setActiveScreen('note-timeline');
         },
         onError: (err: any) => {
-          setPublishError(err?.message || 'Failed to create and publish note');
+          setPublishError(formatErrorMessage(err, 'Failed to create and publish note'));
         }
       });
     }

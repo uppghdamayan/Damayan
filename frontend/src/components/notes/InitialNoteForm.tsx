@@ -747,7 +747,8 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               }
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
-              router.push(`/dashboard/${patientId}/notes`);
+              // Stay on initial-note so the published note is visible immediately
+              router.push(`/dashboard/${patientId}/initial-note`);
             },
             onError: (err: any) => {
               setShowPublishModal(false);
@@ -791,7 +792,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               }
               setShowPublishModal(false);
               localStorage.removeItem(`damayan:draft:${patientId}:initial`);
-              router.push(`/dashboard/${patientId}/notes`);
+              router.push(`/dashboard/${patientId}/initial-note`);
             },
             onError: (err: any) => {
               setShowPublishModal(false);
