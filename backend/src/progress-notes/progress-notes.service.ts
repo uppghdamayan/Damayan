@@ -95,6 +95,43 @@ export class ProgressNotesService {
     }
   }
 
+  // ─────────────────────────────────────────────
+  // Guards against stale medicationSnapshot payloads: the frontend keeps its
+  // own copy of the patient's active medications in form state, and can lag
+  // behind a deletion made concurrently in the Medications module (different
+  // tab, race with cache invalidation, etc.). Anything in the incoming
+  // snapshot that isn't flagged `isNew` (added by the clinician in this note)
+  // must still match a currently-active medication BY NAME — otherwise it's a
+  // carried-over entry for a medication that no longer exists/is active, and
+  // we drop it so deletions take effect immediately in new/updated notes.
+  // Deliberately name-only (not name+dose): the clinician can freely edit an
+  // existing medication's dose within the note itself (that's the whole
+  // point of the dose-change badge) — the active record's dose only gets
+  // updated later, on publish, so matching on dose here would wrongly treat
+  // every in-note dose edit as a deleted medication.
+  // ─────────────────────────────────────────────
+  private async reconcileMedicationSnapshot(
+    patientId: string,
+    snapshot: any[] | undefined,
+    tx: Prisma.TransactionClient | PrismaService,
+  ): Promise<any[] | undefined> {
+    if (!snapshot) return snapshot;
+
+    const activeMeds = await this.medicationsService.findActiveForPatient(
+      patientId,
+      tx,
+    );
+    const activeNames = new Set(
+      activeMeds.map((m) => m.name.trim().toLowerCase()),
+    );
+
+    return snapshot.filter((m) => {
+      if (!m || !m.name) return false;
+      if (m.isNew) return true;
+      return activeNames.has(String(m.name).trim().toLowerCase());
+    });
+  }
+
   private async getLatestNonpharmMgmt(
     patientId: string,
     tx: Prisma.TransactionClient,
@@ -208,6 +245,13 @@ export class ProgressNotesService {
 
         const priorMgmtPharm = await this.getLatestPharmMgmt(patientId, tx);
 
+        const reconciledMedicationSnapshot =
+          await this.reconcileMedicationSnapshot(
+            patientId,
+            dto.medicationSnapshot as any[] | undefined,
+            tx,
+          );
+
         const visit = await this.visitsService.createForNote(
           patientId,
           userId,
@@ -228,8 +272,8 @@ export class ProgressNotesService {
             problemListSnapshot: dto.problemListSnapshot
               ? (dto.problemListSnapshot as any)
               : (activeProblems as any),
-            medicationSnapshot: dto.medicationSnapshot
-              ? (dto.medicationSnapshot as any)
+            medicationSnapshot: reconciledMedicationSnapshot
+              ? (reconciledMedicationSnapshot as any)
               : (activeMedications as any),
             status: NoteStatus.DRAFT,
           },
@@ -252,10 +296,27 @@ export class ProgressNotesService {
   }
 
   async update(id: string, dto: UpdateProgressNoteDto, userId: string) {
-    const note = await this.prisma.progressNote.findUnique({ where: { id } });
+    const note = await this.prisma.progressNote.findUnique({
+      where: { id },
+      include: { visit: true },
+    });
     if (!note) throw new NotFoundException('Note not found');
 
     const { visitDatetime, ...updateData } = dto;
+
+    // Only reconcile for drafts — a published note's snapshot is a locked
+    // historical record and should not be silently rewritten by this guard.
+    if (
+      updateData.medicationSnapshot !== undefined &&
+      note.status === NoteStatus.DRAFT
+    ) {
+      updateData.medicationSnapshot = await this.reconcileMedicationSnapshot(
+        note.visit.patientId,
+        updateData.medicationSnapshot as any[],
+        this.prisma,
+      );
+    }
+
     const data: Prisma.ProgressNoteUpdateInput = {
       ...(updateData.subjective !== undefined && {
         subjective: updateData.subjective,
@@ -323,6 +384,7 @@ export class ProgressNotesService {
           const snapshotItems = ((note.problemListSnapshot as any[]) || [])
             .filter((p) => p && p.title && String(p.title).trim() !== '')
             .map((p) => ({
+              id: p.id ? String(p.id) : undefined,
               title: String(p.title).trim(),
             }));
 
@@ -462,7 +524,10 @@ export class ProgressNotesService {
 
         const validProblems = prevSnapshotProblems
           .filter((p) => p && p.title && String(p.title).trim() !== '')
-          .map((p) => ({ title: String(p.title).trim() }));
+          .map((p) => ({
+            id: p.id ? String(p.id) : undefined,
+            title: String(p.title).trim(),
+          }));
 
         const validMeds = prevSnapshotMeds
           .filter(

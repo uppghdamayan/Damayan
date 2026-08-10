@@ -25,6 +25,7 @@ export interface TimelineNoteView {
     pharm?: string;
     diagnostics?: string[];
     medications?: string[];
+    medicationsDetailed?: { name: string; dose?: string }[];
   };
   isDeleted: boolean;
 }
@@ -70,6 +71,77 @@ export function diffListItems(
   for (let i = 0; i < previous.length; i++) {
     if (!matchedPrevIndices.has(i)) {
       diffItems.push({ text: previous[i], status: 'removed' });
+    }
+  }
+
+  return diffItems;
+}
+
+/**
+ * Same-name fuzzy matching between consecutive notes' medication lists, but
+ * dose-aware: a name match with a differing dose is tagged 'dose-up' /
+ * 'dose-down' / 'dose-changed' instead of being collapsed into 'existing'
+ * (plain diffListItems bakes name+dose into one string, so a name-only match
+ * on the leading drug name silently hides dose-only edits).
+ */
+export function diffMedicationItems(
+  current: { name: string; dose?: string }[],
+  previous: { name: string; dose?: string }[] | null
+): {
+  text: string;
+  status: 'existing' | 'added' | 'removed' | 'dose-up' | 'dose-down' | 'dose-changed';
+  fromDose?: string;
+  toDose?: string;
+}[] {
+  const formatItem = (item: { name: string; dose?: string }) =>
+    item.dose ? `${item.name} ${item.dose}` : item.name;
+
+  if (!previous) {
+    return current.map(item => ({ text: formatItem(item), status: 'existing' as const }));
+  }
+
+  const isMatch = (n1: string, n2: string): boolean => {
+    const norm = (str: string) => str.toLowerCase().trim();
+    const getDrugName = (s: string) => {
+      const match = norm(s).match(/^[a-z0-9]+/i);
+      return match ? match[0] : norm(s);
+    };
+    const d1 = getDrugName(n1);
+    const d2 = getDrugName(n2);
+    return d1 === d2 || d1.includes(d2) || d2.includes(d1);
+  };
+
+  const matchedPrevIndices = new Set<number>();
+  const diffItems: ReturnType<typeof diffMedicationItems> = [];
+
+  for (const curr of current) {
+    const prevIdx = previous.findIndex(
+      (prevVal, idx) => isMatch(curr.name, prevVal.name) && !matchedPrevIndices.has(idx)
+    );
+    if (prevIdx !== -1) {
+      matchedPrevIndices.add(prevIdx);
+      const prevVal = previous[prevIdx];
+      const currDose = curr.dose ? String(curr.dose).trim() : '';
+      const prevDose = prevVal.dose ? String(prevVal.dose).trim() : '';
+      if (currDose && prevDose && currDose.toLowerCase() !== prevDose.toLowerCase()) {
+        const currNum = parseFloat(currDose);
+        const prevNum = parseFloat(prevDose);
+        const status =
+          !isNaN(currNum) && !isNaN(prevNum)
+            ? (currNum > prevNum ? 'dose-up' : currNum < prevNum ? 'dose-down' : 'dose-changed')
+            : 'dose-changed';
+        diffItems.push({ text: formatItem(curr), status, fromDose: prevDose, toDose: currDose });
+      } else {
+        diffItems.push({ text: formatItem(curr), status: 'existing' });
+      }
+    } else {
+      diffItems.push({ text: formatItem(curr), status: 'added' });
+    }
+  }
+
+  for (let i = 0; i < previous.length; i++) {
+    if (!matchedPrevIndices.has(i)) {
+      diffItems.push({ text: formatItem(previous[i]), status: 'removed' });
     }
   }
 
@@ -142,6 +214,20 @@ export function mapNoteToTimelineView(
           }).filter(Boolean)
       : [];
 
+    const medicationsDetailed = Array.isArray(initialNote.medicationSnapshot)
+      ? initialNote.medicationSnapshot
+          .filter((med: any) => !med || typeof med !== 'object' || med.source !== 'past')
+          .map((med: any) => {
+            if (typeof med === 'string') return { name: med };
+            if (med && typeof med === 'object') {
+              const doseStr = med.dose != null ? String(med.dose).trim() : '';
+              const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+              return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
+            }
+            return { name: '' };
+          }).filter((m: any) => m.name)
+      : [];
+
     const author = initialNote.author;
     const lastEditor = (initialNote as any).lastEditor;
     const lastEditorName = lastEditor 
@@ -181,6 +267,7 @@ export function mapNoteToTimelineView(
         pharm: initialNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(initialNote.diagnostics) ? initialNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
+        medicationsDetailed: medicationsDetailed.length > 0 ? medicationsDetailed : undefined,
       }
     };
   } else {
@@ -211,6 +298,18 @@ export function mapNoteToTimelineView(
           }
           return '';
         }).filter(Boolean)
+      : [];
+
+    const medicationsDetailed = Array.isArray(progressNote.medicationSnapshot)
+      ? progressNote.medicationSnapshot.map((med: any) => {
+          if (typeof med === 'string') return { name: med };
+          if (med && typeof med === 'object') {
+            const doseStr = med.dose != null ? String(med.dose).trim() : '';
+            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+            return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
+          }
+          return { name: '' };
+        }).filter((m: any) => m.name)
       : [];
 
     const author = progressNote.author;
@@ -254,6 +353,7 @@ export function mapNoteToTimelineView(
         pharm: progressNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(progressNote.diagnostics) ? progressNote.diagnostics : undefined,
         medications: medicationList.length > 0 ? medicationList : undefined,
+        medicationsDetailed: medicationsDetailed.length > 0 ? medicationsDetailed : undefined,
       }
     };
   }

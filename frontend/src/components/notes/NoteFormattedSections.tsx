@@ -10,7 +10,7 @@ import {
   Paperclip,
   Download
 } from 'lucide-react';
-import { TimelineNoteView, diffListItems } from '@/lib/notes-utils';
+import { TimelineNoteView, diffListItems, diffMedicationItems } from '@/lib/notes-utils';
 import { Badge } from '@/components/ui/badge';
 import { useAttachmentsByNote, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
 
@@ -83,10 +83,10 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const prevDiags = previousNote?.sections.diagnostics || null;
   const diagDiff = diffListItems(currentDiags, prevDiags);
 
-  // Diff medications
-  const currentMeds = note.sections.medications || [];
-  const prevMeds = previousNote?.sections.medications || null;
-  const medDiff = diffListItems(currentMeds, prevMeds);
+  // Diff medications (dose-aware — flags dose increases/decreases, not just add/remove)
+  const currentMedsDetailed = note.sections.medicationsDetailed || [];
+  const prevMedsDetailed = previousNote?.sections.medicationsDetailed || null;
+  const medDiff = diffMedicationItems(currentMedsDetailed, prevMedsDetailed);
 
   // Diff assessment
   const currentAssessment = note.sections.assessment || [];
@@ -238,7 +238,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Medications */}
-      {((note.sections.medications && note.sections.medications.length > 0) || medDiff.length > 0) && (
+      {((note.sections.medicationsDetailed && note.sections.medicationsDetailed.length > 0) || medDiff.length > 0) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
             <Pill className="w-3.5 h-3.5" />
@@ -257,6 +257,22 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                     <span>{item.text}</span>
                     <Badge variant="saved" className="ml-1 px-1 py-0 h-3 text-[8px]">New</Badge>
                   </Badge>
+                ) : item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed' ? (
+                  <>
+                    <Badge
+                      variant="resolved"
+                      className="shadow-sm"
+                      title={item.fromDose && item.toDose ? `Dose changed from ${item.fromDose} to ${item.toDose}` : undefined}
+                    >
+                      <span>{item.text}</span>
+                    </Badge>
+                    <Badge
+                      variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
+                      className="shadow-sm"
+                    >
+                      {item.status === 'dose-up' ? '↑ Dose' : item.status === 'dose-down' ? '↓ Dose' : 'Dose Changed'}
+                    </Badge>
+                  </>
                 ) : (
                   <Badge variant="resolved" className="shadow-sm">
                     <span>{item.text}</span>

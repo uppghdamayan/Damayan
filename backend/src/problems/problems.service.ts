@@ -343,7 +343,7 @@ export class ProblemsService {
 
   async upsertFromAssessment(
     patientId: string,
-    assessmentItems: { title: string }[],
+    assessmentItems: { id?: string; title: string }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
@@ -363,13 +363,24 @@ export class ProblemsService {
         },
       },
     });
+    const existingById = new Map(existing.map((p) => [p.id, p]));
 
-    // Map by title to avoid duplicates and keep first occurrence
-    const uniqueItems = new Map<string, { title: string }>();
+    // De-dupe, preferring identity (Problem.id) over title text: a snapshot
+    // item that already points at a master Problem row must never be
+    // re-matched by title, since the title itself may be exactly what
+    // changed (renamed in the Problem List module, or edited in-note). Items
+    // without an id (freshly added in this note, no master row yet) still
+    // dedupe/match by title so we don't create sibling duplicates of an
+    // existing problem the clinician just retyped.
+    const uniqueItems = new Map<string, { id?: string; title: string }>();
     for (const item of validItems) {
-      const key = item.title.trim().toLowerCase();
+      const key =
+        item.id && existingById.has(item.id)
+          ? `id:${item.id}`
+          : `title:${item.title.trim().toLowerCase()}`;
       if (!uniqueItems.has(key)) {
         uniqueItems.set(key, {
+          id: item.id && existingById.has(item.id) ? item.id : undefined,
           title: item.title.trim(),
         });
       }
@@ -378,66 +389,98 @@ export class ProblemsService {
     let currentSortOrder = await this.getNextSortOrder(patientId, client);
     const promises: Promise<any>[] = [];
 
-    for (const [key, item] of uniqueItems.entries()) {
-      const match = existing.find((p) => p.title.toLowerCase() === key);
+    for (const item of uniqueItems.values()) {
+      const match = item.id
+        ? existingById.get(item.id)
+        : existing.find(
+            (p) => p.title.toLowerCase() === item.title.toLowerCase(),
+          );
 
-      if (match && match.status === ProblemStatus.ACTIVE) {
-        keptIds.add(match.id);
-        continue;
-      }
+      if (match) {
+        const renamed = match.title.trim() !== item.title.trim();
 
-      if (match && match.status === ProblemStatus.RESOLVED) {
-        keptIds.add(match.id);
-        const sortOrder = currentSortOrder++;
-        promises.push(
-          client.problem
-            .update({
-              where: { id: match.id },
-              data: {
-                status: ProblemStatus.ACTIVE,
-                sortOrder,
-                updatedByUser: { connect: { id: userId } },
-              },
-            })
-            .then(() =>
-              this.logAction(
-                patientId,
-                userId,
-                'Reactivated',
-                `Reactivated problem '${match.title}' from ${sourceNote}`,
-                client,
-                match.id,
+        if (match.status === ProblemStatus.ACTIVE) {
+          keptIds.add(match.id);
+          if (renamed) {
+            promises.push(
+              client.problem
+                .update({
+                  where: { id: match.id },
+                  data: {
+                    title: item.title,
+                    updatedByUser: { connect: { id: userId } },
+                  },
+                })
+                .then(() =>
+                  this.logAction(
+                    patientId,
+                    userId,
+                    'Renamed',
+                    `Renamed problem '${match.title}' to '${item.title}' from ${sourceNote}`,
+                    client,
+                    match.id,
+                  ),
+                ),
+            );
+          }
+          continue;
+        }
+
+        if (match.status === ProblemStatus.RESOLVED) {
+          keptIds.add(match.id);
+          const sortOrder = currentSortOrder++;
+          promises.push(
+            client.problem
+              .update({
+                where: { id: match.id },
+                data: {
+                  title: item.title,
+                  status: ProblemStatus.ACTIVE,
+                  sortOrder,
+                  updatedByUser: { connect: { id: userId } },
+                },
+              })
+              .then(() =>
+                this.logAction(
+                  patientId,
+                  userId,
+                  'Reactivated',
+                  `Reactivated problem '${match.title}' from ${sourceNote}`,
+                  client,
+                  match.id,
+                ),
               ),
-            ),
-        );
-        continue;
-      }
+          );
+          continue;
+        }
 
-      if (match && match.status === ProblemStatus.REMOVED) {
-        keptIds.add(match.id);
-        const sortOrder = currentSortOrder++;
-        promises.push(
-          client.problem
-            .update({
-              where: { id: match.id },
-              data: {
-                status: ProblemStatus.ACTIVE,
-                sortOrder,
-                updatedByUser: { connect: { id: userId } },
-              },
-            })
-            .then(() =>
-              this.logAction(
-                patientId,
-                userId,
-                'Restored',
-                `Restored removed problem '${match.title}' from ${sourceNote}`,
-                client,
-                match.id,
+        if (match.status === ProblemStatus.REMOVED) {
+          keptIds.add(match.id);
+          const sortOrder = currentSortOrder++;
+          promises.push(
+            client.problem
+              .update({
+                where: { id: match.id },
+                data: {
+                  title: item.title,
+                  status: ProblemStatus.ACTIVE,
+                  sortOrder,
+                  updatedByUser: { connect: { id: userId } },
+                },
+              })
+              .then(() =>
+                this.logAction(
+                  patientId,
+                  userId,
+                  'Restored',
+                  `Restored removed problem '${match.title}' from ${sourceNote}`,
+                  client,
+                  match.id,
+                ),
               ),
-            ),
-        );
-        continue;
+          );
+          continue;
+        }
       }
 
       const sortOrder = currentSortOrder++;

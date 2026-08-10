@@ -11,6 +11,14 @@ import {
 import { Type } from 'class-transformer';
 
 class AssessmentItemDto {
+  // Stable Problem.id this snapshot entry represents, when it already exists
+  // as a master Problem record. See progress-notes AssessmentItemDto for why
+  // this matters — matching on title text alone causes duplicate problems
+  // whenever a title is edited.
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @IsString()
   @IsNotEmpty()
   title: string;

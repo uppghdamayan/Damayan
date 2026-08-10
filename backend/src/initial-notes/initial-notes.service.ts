@@ -186,6 +186,7 @@ export class InitialNotesService {
             const assessmentItems = ((updateData.assessment as any[]) || [])
               .filter((a) => a && a.title && String(a.title).trim() !== '')
               .map((a) => ({
+                id: a.id ? String(a.id) : undefined,
                 title: String(a.title).trim(),
               }));
             await this.problemsService.upsertFromAssessment(
@@ -292,6 +293,7 @@ export class InitialNotesService {
         const assessmentItems = ((note.assessment as any[]) || [])
           .filter((a) => a && a.title && String(a.title).trim() !== '')
           .map((a) => ({
+            id: a.id ? String(a.id) : undefined,
             title: String(a.title).trim(),
           }));
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
@@ -375,7 +377,7 @@ export class InitialNotesService {
     }
 
     const progressNotesCount = await this.prisma.progressNote.count({
-      where: { visit: { patientId } },
+      where: { visit: { patientId }, isDeleted: false },
     });
 
     if (progressNotesCount > 0) {

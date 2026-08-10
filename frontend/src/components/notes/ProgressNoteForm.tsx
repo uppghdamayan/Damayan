@@ -170,6 +170,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return list;
   }, [copyForward?.activeProblems]);
 
+  // Baseline dose per medication name, taken from the patient's current active
+  // medications (unaffected by this draft's edits — meds only get upserted on
+  // publish). Used to flag dose increases/decreases made within this note.
+  const originalDoseByMedName = useMemo(() => {
+    const map = new Map<string, string>();
+    (copyForward?.activeMedications || []).forEach((m: any) => {
+      if (m?.name) map.set(String(m.name).trim().toLowerCase(), String(m.dose ?? '').trim());
+    });
+    return map;
+  }, [copyForward?.activeMedications]);
+
   const activeDepthMap = useMemo(() => {
     const map = new Map<string, number>();
     activeProblemTree.forEach(item => {
@@ -190,18 +201,82 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     };
     traverse(tree, 0);
 
-    const existing = [...existingProblems];
-    const existingTitles = new Set(existing.map((p: any) => (typeof p === 'string' ? p : p.title)?.trim().toLowerCase()));
+    const activeIds = new Set(
+      flatActive.map(({ problem }) => problem.id).filter(Boolean),
+    );
+    const activeTitles = new Set(
+      flatActive.map(({ problem }) => problem.title?.trim().toLowerCase()).filter(Boolean),
+    );
+    // Drop any snapshot entry that is tied to a master Problem (has an id)
+    // which is no longer in the active list — resolved or removed via the
+    // Problem List module (or a prior note). Without this, a draft note's
+    // snapshot only ever grows: a problem deleted from the Master Problem
+    // List stayed "stuck" in every open progress note forever.
+    //
+    // Id-less entries need their own rule: entries the clinician typed fresh
+    // in this note (`isNew`) are always kept — the Problem List has no say
+    // over them yet. But id-less entries that AREN'T `isNew` are leftover
+    // snapshots saved before ids were tracked on assessment items at all
+    // (localStorage drafts, older DB drafts). Those are only trustworthy if
+    // their title still matches something currently active; otherwise
+    // they're exactly the kind of stale, disconnected entry this is meant to
+    // clear (a resolved/removed/renamed problem whose old snapshot lacks the
+    // id needed to detect that directly).
+    let existing = existingProblems.filter((p: any) => {
+      if (!p || typeof p !== 'object') return true;
+      if (p.id) return activeIds.has(p.id);
+      if (p.isNew) return true;
+      const title = p.title?.trim().toLowerCase();
+      return !!title && activeTitles.has(title);
+    });
+
+    // Match by stable Problem.id first — falling back to title text only for
+    // legacy/id-less entries. Matching by title alone means a title edited
+    // elsewhere (Problem List module) or in-note no longer matches its own
+    // prior snapshot entry, so both the stale and the fresh title get kept,
+    // producing a visible duplicate before the note is even published.
+    const existingById = new Map<string, number>();
+    const existingTitles = new Map<string, number>();
+    existing.forEach((p: any, idx: number) => {
+      if (p && typeof p === 'object' && p.id) existingById.set(p.id, idx);
+      const title = (typeof p === 'string' ? p : p?.title)?.trim().toLowerCase();
+      if (title) existingTitles.set(title, idx);
+    });
 
     for (const item of flatActive) {
       const p = item.problem;
-      if (p.title && !existingTitles.has(p.title.trim().toLowerCase())) {
+      if (!p.title) continue;
+      const titleKey = p.title.trim().toLowerCase();
+
+      const matchIdx = (p.id && existingById.has(p.id))
+        ? existingById.get(p.id)!
+        : existingTitles.has(titleKey)
+          ? existingTitles.get(titleKey)!
+          : undefined;
+
+      if (matchIdx !== undefined) {
+        // Same problem, possibly renamed since this snapshot was taken (id
+        // match), or a legacy id-less entry now healed with its id (title
+        // match) — sync in place instead of adding a second entry.
+        const prev = existing[matchIdx];
+        existing[matchIdx] = {
+          ...(typeof prev === 'object' ? prev : {}),
+          id: p.id,
+          title: p.title,
+          parentId: p.parentId || undefined,
+          depth: item.depth,
+        };
+        continue;
+      }
+
+      if (!existingTitles.has(titleKey)) {
         existing.push({
+          id: p.id || undefined,
           title: p.title,
           parentId: p.parentId || undefined,
           depth: item.depth,
         });
-        existingTitles.add(p.title.trim().toLowerCase());
+        existingTitles.set(titleKey, existing.length - 1);
       }
     }
     return existing;
@@ -317,6 +392,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         mgmtPharm: copyForward?.latestMgmtPharm || '',
         diagnostics: copyForward?.latestDiagnostics || [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
+          id: p.id || undefined,
           title: p.title,
           parentId: p.parentId || undefined,
           depth,
@@ -374,14 +450,72 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const formValues = form.watch();
 
+  const scrollToError = (fieldName?: string) => {
+    if (!fieldName) return;
+    setTimeout(() => {
+      const element =
+        document.getElementsByName(fieldName)[0] ||
+        document.getElementById(`field-${fieldName}`) ||
+        document.getElementById(fieldName) ||
+        document.getElementById(`${fieldName}-section`);
+
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (element as HTMLElement).focus?.();
+      }
+    }, 50);
+  };
+
+  const validateForPublish = (): { isValid: boolean; firstErrorField?: string; errorMessage?: string } => {
+    const subjectiveMissing = !formValues.subjective || !formValues.subjective.trim();
+    const objectiveMissing = !isNonDoctor && (!formValues.objective || !formValues.objective.trim());
+
+    if (subjectiveMissing && objectiveMissing) {
+      return {
+        isValid: false,
+        firstErrorField: 'subjective',
+        errorMessage: 'Please fill out Subjective and Objective fields.',
+      };
+    }
+
+    if (subjectiveMissing) {
+      return {
+        isValid: false,
+        firstErrorField: 'subjective',
+        errorMessage: isNonDoctor ? 'Please fill out Note Details.' : 'Subjective is required to publish this note.',
+      };
+    }
+
+    if (objectiveMissing) {
+      return {
+        isValid: false,
+        firstErrorField: 'objective',
+        errorMessage: 'Objective is required to publish this note.',
+      };
+    }
+
+    const publishCheck = progressNotePublishSchema.safeParse(formValues);
+    if (!publishCheck.success) {
+      const firstIssue = publishCheck.error.issues[0];
+      const fieldName = firstIssue?.path[0]?.toString() || 'subjective';
+      return {
+        isValid: false,
+        firstErrorField: fieldName,
+        errorMessage: firstIssue?.message || 'Please fill out all required fields.',
+      };
+    }
+
+    return { isValid: true };
+  };
+
   const publishAndSwitchRef = useRef<() => Promise<boolean>>(undefined);
 
   publishAndSwitchRef.current = async (): Promise<boolean> => {
-    const publishCheck = progressNotePublishSchema.safeParse(formValues);
-    if (!publishCheck.success || (!isNonDoctor && (!formValues.objective || !formValues.objective.trim()))) {
-      setPublishError(isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields.");
-      const el = document.getElementById('notes-workspace-container');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    setPublishError(null);
+    const validation = validateForPublish();
+    if (!validation.isValid) {
+      setPublishError(validation.errorMessage || (isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields."));
+      scrollToError(validation.firstErrorField);
       return false;
     }
     
@@ -684,9 +818,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     
     const proceedWithPublish = () => {
       setPublishError(null);
-      const publishCheck = progressNotePublishSchema.safeParse(formValues);
-      if (!publishCheck.success || (!isNonDoctor && (!formValues.objective || !formValues.objective.trim()))) {
-        setPublishError(isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields.");
+      const validation = validateForPublish();
+      if (!validation.isValid) {
+        setPublishError(validation.errorMessage || (isNonDoctor ? "Please fill out Note Details." : "Please fill out Subjective and Objective fields."));
+        scrollToError(validation.firstErrorField);
         return;
       }
       executePublish();
@@ -844,6 +979,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 <Button 
                   onClick={() => {
                     const defaultProblems = (copyForward?.activeProblems || []).map((p: any) => ({
+                      id: p.id || undefined,
                       title: p.title,
                     }));
                     const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
@@ -946,7 +1082,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           <div className="flex flex-col gap-4">
 
             {/* SUBJECTIVE (or Note Details for Non-Doctors) */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div id="subjective-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💬</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
@@ -956,6 +1092,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <div className="p-[14px]">
                 <textarea
                   {...form.register('subjective')}
+                  id="field-subjective"
                   className={`w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed ${(!formValues.subjective || !formValues.subjective.trim()) && !isPublished ? 'border-red focus:border-red' : 'border-border-strong focus:border-accent'}`}
                   placeholder={isNonDoctor ? "Enter note details..." : "Enter subjective findings..."}
                   disabled={isDisabled}
@@ -969,7 +1106,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             {!isNonDoctor && (
               <>
             {/* OBJECTIVE */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+            <div id="objective-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
               <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
                 <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🔬</div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
@@ -979,6 +1116,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               <div className="p-[14px]">
                 <textarea
                   {...form.register('objective')}
+                  id="field-objective"
                   className={`w-full min-h-[100px] px-2.5 py-1.5 bg-white border-[1.5px] rounded-[6px] text-[13px] text-text-primary outline-none transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-border-strong/70 disabled:opacity-50 disabled:cursor-not-allowed ${(!formValues.objective || !formValues.objective.trim()) && !isPublished ? 'border-red focus:border-red' : 'border-border-strong focus:border-accent'}`}
                   placeholder="Enter objective findings..."
                   disabled={isDisabled}
@@ -1238,6 +1376,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                             const isNewMed = typeof med !== 'string' && med.isNew;
                             const isFromPast = typeof med !== 'string' && med.fromPast;
 
+                            const originalDose = !isNewMed && medName
+                              ? originalDoseByMedName.get(String(medName).trim().toLowerCase())
+                              : undefined;
+                            const doseChanged = !isNewMed && originalDose !== undefined && medDose
+                              && String(medDose).trim() !== originalDose && originalDose !== '';
+                            const originalDoseNum = doseChanged ? parseFloat(originalDose!) : NaN;
+                            const newDoseNum = doseChanged ? parseFloat(String(medDose)) : NaN;
+                            const doseDirection = !isNaN(originalDoseNum) && !isNaN(newDoseNum)
+                              ? (newDoseNum > originalDoseNum ? 'up' : newDoseNum < originalDoseNum ? 'down' : null)
+                              : null;
+
                             return (
                               <div
                                 key={idx}
@@ -1262,6 +1411,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     {medDose && (
                                       <span className="font-mono text-[11px] font-semibold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-md shrink-0">
                                         {medDose}
+                                      </span>
+                                    )}
+                                    {doseChanged && (
+                                      <span
+                                        className={
+                                          "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 border " +
+                                          (doseDirection === 'up'
+                                            ? "text-blue bg-blue-bg border-blue-border/40"
+                                            : doseDirection === 'down'
+                                              ? "text-purple bg-purple-bg border-purple-border/40"
+                                              : "text-amber-700 bg-amber-50 border-amber-600/30")
+                                        }
+                                        title={`Dose changed from ${originalDose}`}
+                                      >
+                                        {doseDirection === 'up' ? '↑ Dose' : doseDirection === 'down' ? '↓ Dose' : 'Dose Changed'}
                                       </span>
                                     )}
                                     {medForm && (

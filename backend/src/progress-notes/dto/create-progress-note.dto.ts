@@ -11,6 +11,16 @@ import {
 import { Type } from 'class-transformer';
 
 class AssessmentItemDto {
+  // Stable Problem.id this snapshot entry represents, when it already exists
+  // as a master Problem record. Required for upsertFromAssessment to match by
+  // identity instead of by title text — without it, a title edited elsewhere
+  // (or in-note) is indistinguishable from a brand-new problem and gets
+  // duplicated instead of updated. Absent only for items freshly added within
+  // this note that don't have a master Problem row yet.
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @IsString()
   @IsNotEmpty()
   title: string;

@@ -425,7 +425,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           physicalExam: note.physicalExam || '',
           assessment: validProblems.length > 0
             ? validProblems
-            : (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
+            : (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
           medicationSnapshot: validMeds.length > 0
             ? validMeds
             : (copyForward?.activeMedications || []).map((m: any) => ({
@@ -459,7 +459,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           });
 
           if (validProblems.length === 0) {
-            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title }));
+            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title }));
           } else {
             parsed.assessment = validProblems;
           }
@@ -492,7 +492,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         obHistory: '',
         psychosocialHistory: '',
         physicalExam: '',
-        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
+        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
@@ -2166,7 +2166,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             obHistory: '',
             psychosocialHistory: '',
             physicalExam: '',
-            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ title: p.title })),
+            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
             medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
               dose: m.dose || undefined,
