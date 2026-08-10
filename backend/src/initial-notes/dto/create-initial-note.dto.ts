@@ -45,6 +45,9 @@ class MedicationItemDto {
   @IsOptional()
   @IsIn(['past', 'prescribed'])
   source?: 'past' | 'prescribed';
+
+  @IsOptional()
+  fromPast?: boolean;
 }
 
 export class CreateInitialNoteDto {

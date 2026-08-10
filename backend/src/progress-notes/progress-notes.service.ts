@@ -144,11 +144,19 @@ export class ProgressNotesService {
   ): Promise<string | null> {
     const client = tx ?? this.prisma;
     const initial = await client.initialNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      where: {
+        visit: { patientId },
+        status: NoteStatus.PUBLISHED,
+        isDeleted: false,
+      },
       select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
     });
     const latestProgress = await client.progressNote.findFirst({
-      where: { visit: { patientId }, status: NoteStatus.PUBLISHED, isDeleted: false },
+      where: {
+        visit: { patientId },
+        status: NoteStatus.PUBLISHED,
+        isDeleted: false,
+      },
       orderBy: { visit: { visitDatetime: 'desc' } },
       select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
     });
@@ -198,10 +206,7 @@ export class ProgressNotesService {
           tx,
         );
 
-        const priorMgmtPharm = await this.getLatestPharmMgmt(
-          patientId,
-          tx,
-        );
+        const priorMgmtPharm = await this.getLatestPharmMgmt(patientId, tx);
 
         const visit = await this.visitsService.createForNote(
           patientId,
@@ -322,7 +327,13 @@ export class ProgressNotesService {
             }));
 
           const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
-            .filter((m) => m && m.name && String(m.name).trim() !== '')
+            .filter(
+              (m) =>
+                m &&
+                m.name &&
+                String(m.name).trim() !== '' &&
+                m.source !== 'past',
+            )
             .map((m) => ({
               name: String(m.name).trim(),
               dose:
@@ -335,6 +346,7 @@ export class ProgressNotesService {
                   ? Number(m.quantity)
                   : undefined,
               instructions: m.instructions,
+              fromPast: m.fromPast || false,
             }));
 
           await Promise.all([
@@ -453,7 +465,13 @@ export class ProgressNotesService {
           .map((p) => ({ title: String(p.title).trim() }));
 
         const validMeds = prevSnapshotMeds
-          .filter((m) => m && m.name && String(m.name).trim() !== '')
+          .filter(
+            (m) =>
+              m &&
+              m.name &&
+              String(m.name).trim() !== '' &&
+              m.source !== 'past',
+          )
           .map((m) => ({
             name: String(m.name).trim(),
             dose:
@@ -466,6 +484,7 @@ export class ProgressNotesService {
                 ? Number(m.quantity)
                 : undefined,
             instructions: m.instructions,
+            fromPast: m.fromPast || false,
           }));
 
         await this.problemsService.upsertFromAssessment(

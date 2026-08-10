@@ -259,6 +259,7 @@ export class MedicationsService {
       formulation?: string;
       instructions?: string;
       quantity?: number;
+      fromPast?: boolean;
     }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
@@ -316,6 +317,7 @@ export class MedicationsService {
             instructions: item.instructions?.trim() || null,
             quantity: item.quantity ?? null,
             isActive: true,
+            fromPast: item.fromPast || false,
             addedBy: userId,
           },
         }),

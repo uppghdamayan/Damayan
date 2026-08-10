@@ -286,6 +286,7 @@ model Medication {
   instructions String?  @db.VarChar(50)
   quantity     Int?
   isActive     Boolean  @default(true) @map("is_active")
+  fromPast     Boolean  @default(false) @map("from_past")
   addedBy      String?  @map("added_by") @db.Uuid
   updatedBy    String?  @map("updated_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")

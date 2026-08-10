@@ -1215,6 +1215,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                             const medQty = typeof med !== 'string' ? med.quantity : undefined;
                             const medSig = typeof med !== 'string' ? med.instructions : undefined;
                             const isNewMed = typeof med !== 'string' && med.isNew;
+                            const isFromPast = typeof med !== 'string' && med.fromPast;
 
                             return (
                               <div
@@ -1230,6 +1231,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     {isNewMed && (
                                       <span className="text-[8px] font-bold text-green bg-green-bg border border-green-border px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
                                         New
+                                      </span>
+                                    )}
+                                    {isFromPast && (
+                                      <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-600/30 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0" title="Carried over from past medications">
+                                        From Past
                                       </span>
                                     )}
                                     {medDose && (

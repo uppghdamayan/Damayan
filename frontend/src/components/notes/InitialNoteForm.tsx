@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { cn } from '@/lib/utils';
+import { formatErrorMessage } from '@/lib/error-utils';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useUiStore } from '@/stores/uiStore';
@@ -512,14 +513,11 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const appendMedication = (values: MedicationSnapshotValues, source: MedSource, fromPast?: boolean) => {
     const current = form.getValues('medicationSnapshot') || [];
     if (source === 'past') {
-      // One-way reflection: adding a past medication adds it to past medications
-      // AND reflects/copies it into prescribed medications as an independent entry with `fromPast: true`.
       form.setValue(
         'medicationSnapshot',
         [
           ...current,
           { ...values, source: 'past' },
-          { ...values, source: 'prescribed', fromPast: true },
         ],
         { shouldDirty: true, shouldTouch: true }
       );
@@ -578,13 +576,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 resolve(true);
               },
               onError: (err: any) => {
-                setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+                setPublishError(formatErrorMessage(err, 'Failed to publish note'));
                 resolve(false);
               }
             });
           },
           onError: (err: any) => {
-            setPublishError(err?.response?.data?.message || err.message || 'Failed to save draft before publishing');
+            setPublishError(formatErrorMessage(err, 'Failed to save draft before publishing'));
             resolve(false);
           }
         });
@@ -603,13 +601,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 resolve(true);
               },
               onError: (err: any) => {
-                setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+                setPublishError(formatErrorMessage(err, 'Failed to publish note'));
                 resolve(false);
               }
             });
           },
           onError: (err: any) => {
-            setPublishError(err?.response?.data?.message || err.message || 'Failed to create draft before publishing');
+            setPublishError(formatErrorMessage(err, 'Failed to create draft before publishing'));
             resolve(false);
           }
         });
@@ -753,14 +751,14 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             },
             onError: (err: any) => {
               setShowPublishModal(false);
-              setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+              setPublishError(formatErrorMessage(err, 'Failed to publish note'));
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }
           });
         },
         onError: (err: any) => {
           setShowPublishModal(false);
-          setPublishError(err?.response?.data?.message || err.message || 'Failed to save draft before publishing');
+          setPublishError(formatErrorMessage(err, 'Failed to save draft before publishing'));
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
@@ -797,13 +795,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             },
             onError: (err: any) => {
               setShowPublishModal(false);
-              setPublishError(err?.response?.data?.message || err.message || 'Failed to publish note');
+              setPublishError(formatErrorMessage(err, 'Failed to publish note'));
             }
           });
         },
         onError: (err: any) => {
           setShowPublishModal(false);
-          setPublishError(err?.response?.data?.message || err.message || 'Failed to create draft before publishing');
+          setPublishError(formatErrorMessage(err, 'Failed to create draft before publishing'));
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
@@ -1681,7 +1679,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 >
                   <div className="flex flex-col gap-1.5">
                     <p className="text-[11px] text-text-muted -mt-0.5 mb-1">
-                      Medications recorded here also appear under Prescribed Medications and are saved to the patient's cumulative medication list when this note is published.
+                      Medications recorded here are kept as past history. Use the '+' button to reflect them to the Prescribed Medications list.
                     </p>
                     {pastMedEntries.length === 0 ? (
                       <div className="text-[11px] text-text-muted">No past medications recorded.</div>

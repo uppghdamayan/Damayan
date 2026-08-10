@@ -201,7 +201,13 @@ export class InitialNotesService {
             const medicationItems = (
               (updateData.medicationSnapshot as any[]) || []
             )
-              .filter((m) => m && m.name && String(m.name).trim() !== '')
+              .filter(
+                (m) =>
+                  m &&
+                  m.name &&
+                  String(m.name).trim() !== '' &&
+                  m.source !== 'past',
+              )
               .map((m) => ({
                 name: String(m.name).trim(),
                 dose:
@@ -289,7 +295,13 @@ export class InitialNotesService {
             title: String(a.title).trim(),
           }));
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
-          .filter((m) => m && m.name && String(m.name).trim() !== '')
+          .filter(
+            (m) =>
+              m &&
+              m.name &&
+              String(m.name).trim() !== '' &&
+              m.source !== 'past',
+          )
           .map((m) => ({
             name: String(m.name).trim(),
             dose:
@@ -302,6 +314,7 @@ export class InitialNotesService {
                 ? Number(m.quantity)
                 : undefined,
             instructions: m.instructions,
+            fromPast: m.fromPast || false,
           }));
 
         await Promise.all([
