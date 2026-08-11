@@ -47,7 +47,7 @@ export class ProgressNotesService {
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { visit: { visitDatetime: 'desc' } },
+        orderBy: [{ visit: { visitDatetime: 'desc' } }, { createdAt: 'desc' }],
         include: {
           visit: true,
           author: { select: { firstName: true, lastName: true, role: true } },
@@ -132,81 +132,109 @@ export class ProgressNotesService {
     });
   }
 
-  private async getLatestNonpharmMgmt(
+  // ─────────────────────────────────────────────
+  // The single source of truth for "what does the next progress note carry
+  // forward from". Used by create() (server-side default), the
+  // /carry-forward endpoint (frontend prefill + timeline "Inherited by
+  // today's note" pin), and deleteDraft()'s revert path — all four used to
+  // compute "latest" differently (different filters, different orderBy keys,
+  // one missing the DOCTOR-author filter its sibling had), which is how a
+  // note could end up silently inheriting from the wrong ancestor.
+  //
+  // Candidates are PUBLISHED, not soft-deleted, and authored by a DOCTOR or
+  // by nobody (null authorId) — mirrors the `authorRole === 'DOCTOR' ||
+  // !authorRole` branch in publish() that actually updates the problem/med
+  // snapshots, and excludes NURSE/PHARMACIST notes which don't carry a
+  // clinical management plan. `excludeNoteId` lets the caller exclude the
+  // note currently being edited (e.g. the author's own open draft) so a note
+  // can never inherit from itself.
+  //
+  // "Latest" is strictly the newest single note by visit.visitDatetime, tied
+  // on createdAt — not a field-by-field walk back through older notes. If
+  // that note left a field blank, the blank is returned as-is: clearing a
+  // field is a deliberate clinical decision, not a gap to paper over with an
+  // older value.
+  // ─────────────────────────────────────────────
+  async resolveCarryForwardSource(
     patientId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<string | null> {
-    const latestProgress = await tx.progressNote.findFirst({
-      where: {
-        visit: { patientId },
-        status: NoteStatus.PUBLISHED,
-        isDeleted: false,
-        author: {
-          role: 'DOCTOR',
-        },
-      },
-      orderBy: { visit: { visitDatetime: 'desc' } },
-      select: {
-        mgmtNonpharm: true,
-        visit: { select: { visitDatetime: true } },
-      },
-    });
-
-    const initial = await tx.initialNote.findFirst({
-      where: {
-        visit: { patientId },
-        status: NoteStatus.PUBLISHED,
-        isDeleted: false,
-      },
-      select: {
-        mgmtNonpharm: true,
-        visit: { select: { visitDatetime: true } },
-      },
-    });
-
-    if (latestProgress && initial) {
-      return latestProgress.visit.visitDatetime > initial.visit.visitDatetime
-        ? latestProgress.mgmtNonpharm
-        : initial.mgmtNonpharm;
-    }
-
-    if (latestProgress) return latestProgress.mgmtNonpharm;
-    if (initial) return initial.mgmtNonpharm;
-    return null;
-  }
-
-  private async getLatestPharmMgmt(
-    patientId: string,
+    excludeNoteId?: string | null,
     tx?: Prisma.TransactionClient,
-  ): Promise<string | null> {
+  ): Promise<{
+    sourceNoteId: string | null;
+    sourceKind: 'progress' | 'initial' | null;
+    sourceVisitDatetime: Date | null;
+    mgmtNonpharm: string;
+    mgmtPharm: string;
+    diagnostics: string[];
+  }> {
     const client = tx ?? this.prisma;
-    const initial = await client.initialNote.findFirst({
-      where: {
-        visit: { patientId },
-        status: NoteStatus.PUBLISHED,
-        isDeleted: false,
-      },
-      select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
-    });
-    const latestProgress = await client.progressNote.findFirst({
-      where: {
-        visit: { patientId },
-        status: NoteStatus.PUBLISHED,
-        isDeleted: false,
-      },
-      orderBy: { visit: { visitDatetime: 'desc' } },
-      select: { mgmtPharm: true, visit: { select: { visitDatetime: true } } },
-    });
 
-    if (latestProgress && initial) {
-      return latestProgress.visit.visitDatetime > initial.visit.visitDatetime
-        ? latestProgress.mgmtPharm
-        : initial.mgmtPharm;
+    const [latestProgress, latestInitial] = await Promise.all([
+      client.progressNote.findFirst({
+        where: {
+          visit: { patientId },
+          status: NoteStatus.PUBLISHED,
+          isDeleted: false,
+          ...(excludeNoteId ? { id: { not: excludeNoteId } } : {}),
+          OR: [{ author: { role: 'DOCTOR' } }, { authorId: null }],
+        },
+        orderBy: [{ visit: { visitDatetime: 'desc' } }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          mgmtNonpharm: true,
+          mgmtPharm: true,
+          diagnostics: true,
+          createdAt: true,
+          visit: { select: { visitDatetime: true } },
+        },
+      }),
+      client.initialNote.findFirst({
+        where: {
+          visit: { patientId },
+          status: NoteStatus.PUBLISHED,
+          isDeleted: false,
+        },
+        select: {
+          id: true,
+          mgmtNonpharm: true,
+          mgmtPharm: true,
+          diagnostics: true,
+          createdAt: true,
+          visit: { select: { visitDatetime: true } },
+        },
+      }),
+    ]);
+
+    const pickProgress =
+      !!latestProgress &&
+      (!latestInitial ||
+        latestProgress.visit.visitDatetime >
+          latestInitial.visit.visitDatetime ||
+        (latestProgress.visit.visitDatetime.getTime() ===
+          latestInitial.visit.visitDatetime.getTime() &&
+          latestProgress.createdAt >= latestInitial.createdAt));
+
+    const source = pickProgress ? latestProgress : latestInitial;
+
+    if (!source) {
+      return {
+        sourceNoteId: null,
+        sourceKind: null,
+        sourceVisitDatetime: null,
+        mgmtNonpharm: '',
+        mgmtPharm: '',
+        diagnostics: [],
+      };
     }
 
-    if (latestProgress) return latestProgress.mgmtPharm;
-    if (initial) return initial.mgmtPharm;
-    return null;
+    return {
+      sourceNoteId: source.id,
+      sourceKind: pickProgress ? 'progress' : 'initial',
+      sourceVisitDatetime: source.visit.visitDatetime,
+      mgmtNonpharm: source.mgmtNonpharm ?? '',
+      mgmtPharm: source.mgmtPharm ?? '',
+      diagnostics: (source.diagnostics as string[]) || [],
+    };
   }
 
   async create(patientId: string, dto: CreateProgressNoteDto, userId: string) {
@@ -238,12 +266,11 @@ export class ProgressNotesService {
             this.vitalsService.findLatestForPatient(patientId, tx),
           ]);
 
-        const priorMgmtNonpharm = await this.getLatestNonpharmMgmt(
+        const carryForward = await this.resolveCarryForwardSource(
           patientId,
+          null,
           tx,
         );
-
-        const priorMgmtPharm = await this.getLatestPharmMgmt(patientId, tx);
 
         const reconciledMedicationSnapshot =
           await this.reconcileMedicationSnapshot(
@@ -252,11 +279,24 @@ export class ProgressNotesService {
             tx,
           );
 
+        // Progress notes have no user-facing visit-date input — the client
+        // sends a submit-time stamp, but we don't trust it as the source of
+        // truth (a stale/duplicate value is how two notes can tie or invert
+        // in every visitDatetime-ordered query). Fall back to `now()`
+        // whenever it's missing or unparsable.
+        const parsedVisitDatetime = dto.visitDatetime
+          ? new Date(dto.visitDatetime)
+          : null;
+        const visitDatetime =
+          parsedVisitDatetime && !isNaN(parsedVisitDatetime.getTime())
+            ? parsedVisitDatetime
+            : new Date();
+
         const visit = await this.visitsService.createForNote(
           patientId,
           userId,
           VisitType.PROGRESS,
-          new Date(dto.visitDatetime),
+          visitDatetime,
           tx,
         );
 
@@ -266,8 +306,12 @@ export class ProgressNotesService {
             authorId: userId,
             subjective: dto.subjective ?? '',
             objective: dto.objective ?? '',
-            mgmtNonpharm: dto.mgmtNonpharm ?? priorMgmtNonpharm ?? '',
-            mgmtPharm: dto.mgmtPharm ?? priorMgmtPharm ?? '',
+            // `??` only falls back when the client omits the field entirely
+            // (undefined/null) — an intentionally blank '' from the form is
+            // preserved as-is. Non-UI callers that omit these fields still
+            // get the resolved carry-forward value.
+            mgmtNonpharm: dto.mgmtNonpharm ?? carryForward.mgmtNonpharm,
+            mgmtPharm: dto.mgmtPharm ?? carryForward.mgmtPharm,
             diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
             problemListSnapshot: dto.problemListSnapshot
               ? (dto.problemListSnapshot as any)
@@ -312,7 +356,7 @@ export class ProgressNotesService {
     ) {
       updateData.medicationSnapshot = await this.reconcileMedicationSnapshot(
         note.visit.patientId,
-        updateData.medicationSnapshot as any[],
+        updateData.medicationSnapshot,
         this.prisma,
       );
     }
@@ -480,12 +524,24 @@ export class ProgressNotesService {
         throw new BadRequestException('Note does not belong to this patient');
 
       if (note.status !== NoteStatus.DRAFT) {
-        // Ensure there are no newer progress notes
+        // Ensure there are no newer progress notes — "newer" keyed the same
+        // way as everywhere else: visit.visitDatetime, tied on createdAt.
         const newerNote = await tx.progressNote.findFirst({
           where: {
-            visit: { patientId },
-            createdAt: { gt: note.createdAt },
+            id: { not: id },
             isDeleted: false,
+            OR: [
+              {
+                visit: {
+                  patientId,
+                  visitDatetime: { gt: note.visit.visitDatetime },
+                },
+              },
+              {
+                visit: { patientId, visitDatetime: note.visit.visitDatetime },
+                createdAt: { gt: note.createdAt },
+              },
+            ],
           },
         });
         if (newerNote) {
@@ -494,27 +550,37 @@ export class ProgressNotesService {
           );
         }
 
-        // Revert global lists to previous state
+        // Revert global lists to previous state — reuses the same
+        // "what's the previous note" resolution as note creation, so
+        // deleting the latest note always reverts to exactly what the next
+        // note would otherwise have inherited from.
         let prevSnapshotProblems: any[] = [];
         let prevSnapshotMeds: any[] = [];
 
-        const prevProgress = await tx.progressNote.findFirst({
-          where: {
-            visit: { patientId },
-            status: NoteStatus.PUBLISHED,
-            id: { not: id },
-            isDeleted: false,
-          },
-          orderBy: { createdAt: 'desc' },
-        });
+        const carryForward = await this.resolveCarryForwardSource(
+          patientId,
+          id,
+          tx,
+        );
 
-        if (prevProgress) {
+        if (
+          carryForward.sourceKind === 'progress' &&
+          carryForward.sourceNoteId
+        ) {
+          const prevProgress = await tx.progressNote.findUnique({
+            where: { id: carryForward.sourceNoteId },
+            select: { problemListSnapshot: true, medicationSnapshot: true },
+          });
           prevSnapshotProblems =
-            (prevProgress.problemListSnapshot as any[]) || [];
-          prevSnapshotMeds = (prevProgress.medicationSnapshot as any[]) || [];
-        } else {
-          const initialNote = await tx.initialNote.findFirst({
-            where: { visit: { patientId }, isDeleted: false },
+            (prevProgress?.problemListSnapshot as any[]) || [];
+          prevSnapshotMeds = (prevProgress?.medicationSnapshot as any[]) || [];
+        } else if (
+          carryForward.sourceKind === 'initial' &&
+          carryForward.sourceNoteId
+        ) {
+          const initialNote = await tx.initialNote.findUnique({
+            where: { id: carryForward.sourceNoteId },
+            select: { assessment: true, medicationSnapshot: true },
           });
           if (initialNote) {
             prevSnapshotProblems = (initialNote.assessment as any[]) || [];

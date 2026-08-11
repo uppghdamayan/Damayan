@@ -1,5 +1,5 @@
-import { useProgressNotes } from '@/hooks/useProgressNotes';
-import { useInitialNote, useInitialNotes, useDeleteInitialNote } from '@/hooks/useInitialNote';
+import { useProgressNotes, useCarryForwardSource, ProgressNote } from '@/hooks/useProgressNotes';
+import { useInitialNote, useInitialNotes, useDeleteInitialNote, InitialNote } from '@/hooks/useInitialNote';
 import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
@@ -23,7 +23,15 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const router = useRouter();
   const { data: initialNotes, isLoading: initialLoading } = useInitialNotes(patientId);
   const { data: activeInitialNote } = useInitialNote(patientId);
-  const { data: progressNotesResponse, isLoading: progressLoading } = useProgressNotes(patientId);
+  // limit=100: at the previous default of 10, the timeline silently lost
+  // every note past the 10th (and #10 lost its diff baseline). This args
+  // tuple is part of the TanStack query key, so DocumentationPanel's
+  // useProgressNotes(patientId) call must stay in sync with it — otherwise
+  // the two hold divergent caches for the same patient.
+  const { data: progressNotesResponse, isLoading: progressLoading } = useProgressNotes(patientId, 1, 100);
+  // What a *new* note would inherit from — same resolver the backend uses to
+  // build that note, so the pin below points at exactly the right note.
+  const { data: carryForwardSource } = useCarryForwardSource(patientId);
   const { openExistingProgressNote, activeNoteEditor } = useUiStore();
   const { triggerNewNote, isLoading: actionLoading } = useNewProgressNoteAction(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
@@ -53,33 +61,45 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   };
 
   const progressNotes = progressNotesResponse?.data || [];
-  
+
   // Combine and sort
-  const allNotesRaw = [...progressNotes];
-  if (initialNotes && initialNotes.length > 0) {
-    allNotesRaw.push(...initialNotes as any[]);
-  }
+  const allNotesRaw: (ProgressNote | InitialNote)[] = useMemo(() => {
+    const combined: (ProgressNote | InitialNote)[] = [...progressNotes];
+    if (initialNotes && initialNotes.length > 0) {
+      combined.push(...initialNotes);
+    }
+    return combined;
+  }, [progressNotes, initialNotes]);
 
   const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
+
+  // Sort by visit.visitDatetime (falling back to createdAt when the visit
+  // relation is missing), tied on createdAt — the exact same key and
+  // tiebreaker the backend orders by, so the order shown here always matches
+  // what a new note actually inherits from. Sorts a copy: the previous
+  // `.sort()` mutated `allNotesRaw` in place while living inside a useMemo
+  // that never actually memoized (a fresh array every render), and
+  // `onClickEdit` below indexed into that same mutated array.
+  const sortedRaw = useMemo(() => {
+    return [...allNotesRaw].sort((a, b) => {
+      const aTime = new Date(a.visit?.visitDatetime || a.createdAt).getTime();
+      const bTime = new Date(b.visit?.visitDatetime || b.createdAt).getTime();
+      if (bTime !== aTime) return bTime - aTime;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [allNotesRaw]);
 
   // Map to TimelineNoteView and identify latest
   const mappedNotes = useMemo(() => {
     const initialNoteAuthorId = activeInitialNote?.authorId;
-    return allNotesRaw.sort((a, b) => {
-      const aTime = new Date((a as any).visitDatetime || a.createdAt).getTime();
-      const bTime = new Date((b as any).visitDatetime || b.createdAt).getTime();
-      return bTime - aTime;
-    }).map((note, index) => {
+    return sortedRaw.map((note, index) => {
       // The latest note is the first one in the sorted list (since newest first)
       const isLatest = index === 0;
       return mapNoteToTimelineView(note, isLatest, initialNoteAuthorId);
     });
-  }, [allNotesRaw, activeInitialNote]);
+  }, [sortedRaw, activeInitialNote]);
 
-  const inheritedSourceId = useMemo(() => {
-    const latestPublished = mappedNotes.find(n => n.status === 'PUBLISHED' && !n.isDeleted && (!n.authorRole || n.authorRole === 'DOCTOR'));
-    return latestPublished?.id;
-  }, [mappedNotes]);
+  const inheritedSourceId = carryForwardSource?.sourceNoteId ?? undefined;
 
   // Only show skeleton on initial load when there's no data yet.
   // This prevents brief loading flashes when queries are invalidated after mutations.
@@ -278,13 +298,17 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                   isOpen={isOpenNote}
                   onToggle={() => handleToggleNote(note.id)}
                   onClickEdit={() => {
-                    const rawNote = allNotesRaw[index];
-                    if (rawNote.visitId && (!rawNote.visit || rawNote.visit.visitType === 'INITIAL') && 'chiefComplaint' in rawNote) {
+                    // Branches on the mapped view model instead of indexing
+                    // back into the raw array by position — that indexing
+                    // only worked because the old sort mutated the array in
+                    // place, tying correctness to sort order never changing
+                    // between render and click.
+                    if (note.kind === 'initial') {
                       router.push(`/dashboard/${patientId}/initial-note`);
                     } else {
                       openExistingProgressNote(patientId, note.id);
                     }
-                  }} 
+                  }}
                   onDelete={
                     !note.isDeleted && note.authorId === user?.id && note.kind === 'initial' && !hasActiveProgressNotes
                       ? () => setDeleteNoteId(note.id)

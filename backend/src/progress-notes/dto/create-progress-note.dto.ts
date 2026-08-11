@@ -94,9 +94,13 @@ export class CreateProgressNoteDto {
   @IsOptional()
   diagnostics?: string[];
 
+  // Optional: progress notes have no user-facing visit-date input, unlike
+  // the initial note. The server stamps `now()` when this is omitted or
+  // unparsable (see ProgressNotesService.create) rather than trusting a
+  // client-supplied form-mount timestamp as the ordering key.
   @IsDateString()
-  @IsNotEmpty()
-  visitDatetime: string;
+  @IsOptional()
+  visitDatetime?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

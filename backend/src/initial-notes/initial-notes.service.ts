@@ -45,6 +45,7 @@ export class InitialNotesService {
     return this.prisma.initialNote.findMany({
       where: { visit: { patientId } },
       include: {
+        visit: true,
         author: { select: { firstName: true, lastName: true, role: true } },
         lastEditor: { select: { firstName: true, lastName: true, role: true } },
       },

@@ -57,6 +57,21 @@ export class ProgressNotesController {
     };
   }
 
+  // Must stay above `@Get(':id')` — otherwise Nest matches this path as
+  // `:id = 'carry-forward'` and this handler never runs (same reason
+  // `@Delete('drafts')` sits above `@Delete(':id')` below).
+  @Get('carry-forward')
+  @Roles(Role.DOCTOR, Role.ADMIN, Role.NURSE, Role.PHARMACIST)
+  getCarryForwardSource(
+    @Param('patientId') patientId: string,
+    @Query('excludeNoteId') excludeNoteId?: string,
+  ) {
+    return this.progressNotesService.resolveCarryForwardSource(
+      patientId,
+      excludeNoteId,
+    );
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
     const note = await this.progressNotesService.findOne(id);

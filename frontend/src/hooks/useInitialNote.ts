@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
+import type { NoteVisit } from './useProgressNotes';
 
 export interface InitialNote {
   id: string;
@@ -26,6 +27,7 @@ export interface InitialNote {
   lastEditedAt?: string;
   createdAt: string;
   updatedAt: string;
+  visit?: NoteVisit;
   author?: {
     firstName: string;
     lastName: string;

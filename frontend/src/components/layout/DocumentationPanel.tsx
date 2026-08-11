@@ -22,7 +22,11 @@ export function DocumentationPanel() {
   const params = useParams();
   const patientId = params?.patientId as string | undefined;
   const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId || null);
-  const { data: progressNotesResponse } = useProgressNotes(patientId || null);
+  // Args must match NoteTimeline's useProgressNotes(patientId, 1, 100) call —
+  // they're part of the TanStack query key, so a mismatch means this and the
+  // timeline hold divergent caches for the same patient and `dbDraft` below
+  // can go stale relative to what the timeline shows.
+  const { data: progressNotesResponse } = useProgressNotes(patientId || null, 1, 100);
   const dbDraft = progressNotesResponse?.data?.find(n => n.status === 'DRAFT');
   const hasNoInitialNote = patientId && !initialNoteLoading && (!initialNote || initialNote.status !== 'PUBLISHED');
 

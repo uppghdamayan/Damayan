@@ -34,12 +34,14 @@ export function TimelineEntry({
 }: TimelineEntryProps) {
   const { user } = useAuthStore();
   const isInitial = note.kind === 'initial';
-  const formattedDate = new Date(note.createdAt).toLocaleDateString(undefined, {
+  // visitDatetime, not createdAt — it's the date that actually orders the
+  // timeline and drives inheritance, so the date shown here must match it.
+  const formattedDate = new Date(note.visitDatetime).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-  const formattedTime = new Date(note.createdAt).toLocaleTimeString([], {
+  const formattedTime = new Date(note.visitDatetime).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   });

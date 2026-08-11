@@ -3,7 +3,13 @@ import { useMemo } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
 import { useMedications } from './useMedications';
-import { useInitialNote } from './useInitialNote';
+
+export interface NoteVisit {
+  id: string;
+  visitDatetime: string;
+  visitType: 'INITIAL' | 'PROGRESS';
+  status: 'DRAFT' | 'PUBLISHED';
+}
 
 export interface ProgressNote {
   id: string;
@@ -22,7 +28,7 @@ export interface ProgressNote {
   lastEditedAt?: string;
   createdAt: string;
   updatedAt: string;
-  visit?: any;
+  visit?: NoteVisit;
   author?: {
     firstName: string;
     lastName: string;
@@ -56,44 +62,61 @@ export function useProgressNote(noteId: string | null) {
   });
 }
 
-export function useCopyForwardData(patientId: string | null) {
+export interface CarryForwardSource {
+  sourceNoteId: string | null;
+  sourceKind: 'progress' | 'initial' | null;
+  sourceVisitDatetime: string | null;
+  mgmtNonpharm: string;
+  mgmtPharm: string;
+  diagnostics: string[];
+}
+
+// The single source of truth for "what would the next progress note inherit
+// from" — resolved server-side (ProgressNotesService.resolveCarryForwardSource)
+// so the form's prefill, the timeline's "Inherited by today's note" pin, and
+// the note actually created by POST /progress-notes can never disagree.
+// `excludeNoteId` must be passed when prefilling an already-existing draft
+// (the note being edited), so it can never resolve to itself.
+export function useCarryForwardSource(patientId: string | null, excludeNoteId?: string | null) {
+  return useQuery({
+    queryKey: ['carry-forward', patientId, excludeNoteId ?? null],
+    queryFn: () => apiRequest<CarryForwardSource>(
+      `/patients/${patientId}/progress-notes/carry-forward${excludeNoteId ? `?excludeNoteId=${excludeNoteId}` : ''}`
+    ),
+    enabled: !!patientId,
+    staleTime: 1000 * 20,
+  });
+}
+
+export function useCopyForwardData(patientId: string | null, excludeNoteId?: string | null) {
   const { data: problemsData, isLoading: problemsLoading, isFetching: problemsFetching, refetch: refetchProblems } = useProblems(patientId);
   const { data: medicationsData, isLoading: medicationsLoading, isFetching: medicationsFetching, refetch: refetchMedications } = useMedications(patientId);
-  const { data: notesData, isLoading: notesLoading, isFetching: notesFetching, refetch: refetchNotes } = useProgressNotes(patientId, 1, 1, true);
-  const { data: initialNoteData, isLoading: initialNoteLoading, isFetching: initialNoteFetching, refetch: refetchInitialNote } = useInitialNote(patientId);
+  const { data: carryForwardData, isLoading: carryForwardLoading, isFetching: carryForwardFetching, refetch: refetchCarryForward } = useCarryForwardSource(patientId, excludeNoteId);
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
     const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
-    
-    const latestProgressNote = notesData?.data?.[0];
-    
-    const latestDiagnostics = latestProgressNote?.diagnostics?.length 
-      ? latestProgressNote.diagnostics 
-      : (initialNoteData?.diagnostics || []);
-      
-    const latestMgmtPharm = latestProgressNote?.mgmtPharm 
-      ? latestProgressNote.mgmtPharm 
-      : (initialNoteData?.mgmtPharm || '');
 
-    const latestMgmtNonpharm = latestProgressNote?.mgmtNonpharm 
-      ? latestProgressNote.mgmtNonpharm 
-      : (initialNoteData?.mgmtNonpharm || '');
-
-    return { activeProblems, activeMedications, latestDiagnostics, latestMgmtPharm, latestMgmtNonpharm };
-  }, [problemsData, medicationsData, notesData, initialNoteData]);
+    return {
+      activeProblems,
+      activeMedications,
+      sourceNoteId: carryForwardData?.sourceNoteId ?? null,
+      inheritedDiagnostics: carryForwardData?.diagnostics || [],
+      inheritedMgmtPharm: carryForwardData?.mgmtPharm || '',
+      inheritedMgmtNonpharm: carryForwardData?.mgmtNonpharm || '',
+    };
+  }, [problemsData, medicationsData, carryForwardData]);
 
   const refetch = useMemo(() => () => {
     refetchProblems();
     refetchMedications();
-    refetchNotes();
-    refetchInitialNote();
-  }, [refetchProblems, refetchMedications, refetchNotes, refetchInitialNote]);
+    refetchCarryForward();
+  }, [refetchProblems, refetchMedications, refetchCarryForward]);
 
   return {
     data,
-    isLoading: problemsLoading || medicationsLoading || notesLoading || initialNoteLoading,
-    isFetching: problemsFetching || medicationsFetching || notesFetching || initialNoteFetching,
+    isLoading: problemsLoading || medicationsLoading || carryForwardLoading,
+    isFetching: problemsFetching || medicationsFetching || carryForwardFetching,
     refetch,
   };
 }
@@ -108,6 +131,7 @@ export function useCreateProgressNote(patientId: string) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
@@ -119,13 +143,14 @@ export function useCreateProgressNote(patientId: string) {
 export function useCreateAndPublishProgressNote(patientId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<ProgressNote>) => 
+    mutationFn: (data: Partial<ProgressNote>) =>
       apiRequest<ProgressNote>(`/patients/${patientId}/progress-notes/create-and-publish`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits', patientId] });
       queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
@@ -148,6 +173,7 @@ export function useUpdateProgressNote(patientId: string) {
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
@@ -185,6 +211,7 @@ export function usePublishProgressNote(patientId: string) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
@@ -198,12 +225,13 @@ export function usePublishProgressNote(patientId: string) {
 export function useDeleteAllDraftProgressNotes(patientId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => 
+    mutationFn: () =>
       apiRequest<{ count: number }>(`/patients/${patientId}/progress-notes/drafts`, {
         method: 'DELETE',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
@@ -216,12 +244,13 @@ export function useDeleteAllDraftProgressNotes(patientId: string) {
 export function useDeleteProgressNote(patientId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => 
+    mutationFn: (id: string) =>
       apiRequest<{ success: boolean }>(`/patients/${patientId}/progress-notes/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });

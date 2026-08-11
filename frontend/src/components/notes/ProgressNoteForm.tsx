@@ -88,7 +88,10 @@ function PatientContextBlock({ patientId, copyForward }: { patientId: string; co
 export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFormProps) {
   const queryClient = useQueryClient();
   const { data: note, isLoading: noteLoading, isFetching: noteFetching } = useProgressNote(noteId || null);
-  const { data: copyForward, isLoading: copyLoading, isFetching: copyFetching, refetch: refetchCopyForward } = useCopyForwardData(patientId);
+  // Exclude the note currently being edited from its own carry-forward
+  // source — otherwise an open draft can resolve to itself and "inherit"
+  // its own (possibly still-blank) fields, skipping the real previous note.
+  const { data: copyForward, isLoading: copyLoading, isFetching: copyFetching, refetch: refetchCopyForward } = useCopyForwardData(patientId, noteId);
 
   const hasLocalDraft = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -330,14 +333,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             fromPast: m.fromPast || false,
           }));
 
-      const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished 
-        ? copyForward?.latestDiagnostics || [] 
+      const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished
+        ? copyForward?.inheritedDiagnostics || []
         : note.diagnostics || [];
-      const finalMgmtPharm = !note.mgmtPharm && !isPublished 
-        ? copyForward?.latestMgmtPharm || '' 
+      const finalMgmtPharm = !note.mgmtPharm && !isPublished
+        ? copyForward?.inheritedMgmtPharm || ''
         : note.mgmtPharm || '';
-      const finalMgmtNonpharm = !note.mgmtNonpharm && !isPublished 
-        ? copyForward?.latestMgmtNonpharm || '' 
+      const finalMgmtNonpharm = !note.mgmtNonpharm && !isPublished
+        ? copyForward?.inheritedMgmtNonpharm || ''
         : note.mgmtNonpharm || '';
 
       form.reset({
@@ -349,7 +352,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         diagnostics: finalDiagnostics,
         problemListSnapshot: finalProblems,
         medicationSnapshot: finalMeds,
-        visitDatetime: note.createdAt,
+        visitDatetime: note.visit?.visitDatetime || note.createdAt,
       });
     } else if (!noteId && !copyLoading) {
       const draft = localStorage.getItem(`damayan:draft:${patientId}:progress`);
@@ -371,15 +374,20 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           }));
           
           if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
-            parsed.diagnostics = copyForward?.latestDiagnostics || [];
+            parsed.diagnostics = copyForward?.inheritedDiagnostics || [];
           }
           if (!parsed.mgmtPharm) {
-            parsed.mgmtPharm = copyForward?.latestMgmtPharm || '';
+            parsed.mgmtPharm = copyForward?.inheritedMgmtPharm || '';
           }
           if (!parsed.mgmtNonpharm) {
-            parsed.mgmtNonpharm = copyForward?.latestMgmtNonpharm || '';
+            parsed.mgmtNonpharm = copyForward?.inheritedMgmtNonpharm || '';
           }
-          
+
+          // Never trust a visitDatetime restored from a previous session —
+          // it's how a stale stamp bleeds from one draft into the next and
+          // silently inverts ordering. Always re-stamp to now.
+          parsed.visitDatetime = new Date().toISOString();
+
           form.reset(parsed);
           return;
         } catch (e) {}
@@ -388,9 +396,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         subjective: '',
         objective: '',
         labs: '',
-        mgmtNonpharm: copyForward?.latestMgmtNonpharm || '',
-        mgmtPharm: copyForward?.latestMgmtPharm || '',
-        diagnostics: copyForward?.latestDiagnostics || [],
+        mgmtNonpharm: copyForward?.inheritedMgmtNonpharm || '',
+        mgmtPharm: copyForward?.inheritedMgmtPharm || '',
+        diagnostics: copyForward?.inheritedDiagnostics || [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           id: p.id || undefined,
           title: p.title,
@@ -598,6 +606,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       ...values,
       subjective: values.subjective ?? '',
       objective: values.objective ?? '',
+      // Stamp at submit time rather than trusting the mount-time/localStorage
+      // value already sitting in form state — a stale stamp is how two
+      // notes end up tied or inverted in every visitDatetime-ordered query.
+      // Harmless on updates: the backend discards visitDatetime there.
+      visitDatetime: new Date().toISOString(),
       problemListSnapshot: values.problemListSnapshot?.map((p: any) => {
         if (typeof p === 'object' && p !== null) {
           const { isNew, ...rest } = p;
@@ -687,6 +700,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             setLocalAttachments([]);
           }
 
+          // Every other terminal path (publish, delete, revert) already
+          // clears this — without it, a stale draft's body and visitDatetime
+          // leak into the very next new note opened for this patient.
+          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');

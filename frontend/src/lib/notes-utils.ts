@@ -8,6 +8,12 @@ export interface TimelineNoteView {
   kind: 'initial' | 'progress';
   status: 'DRAFT' | 'PUBLISHED';
   createdAt: string;
+  // The date/time that actually drives ordering and inheritance server-side
+  // (visit.visitDatetime), falling back to createdAt when the visit relation
+  // is unavailable. Timeline sort/display must key off this, not createdAt,
+  // or the visible order can disagree with what a new note inherits from.
+  visitDatetime: string;
+  visitId?: string;
   authorId?: string | null;
   authorName: string;
   authorRole?: string;
@@ -238,6 +244,8 @@ export function mapNoteToTimelineView(
       kind: 'initial',
       status: initialNote.status,
       createdAt: initialNote.createdAt,
+      visitDatetime: initialNote.visit?.visitDatetime || initialNote.createdAt,
+      visitId: initialNote.visitId,
       authorId: initialNote.authorId,
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
@@ -324,6 +332,8 @@ export function mapNoteToTimelineView(
       kind: 'progress',
       status: progressNote.status,
       createdAt: progressNote.createdAt,
+      visitDatetime: progressNote.visit?.visitDatetime || progressNote.createdAt,
+      visitId: progressNote.visitId,
       authorId: progressNote.authorId,
       authorName,
       authorRole: displayUser?.role || 'DOCTOR',
