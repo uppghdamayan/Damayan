@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { calcAge, initials } from '@/lib/patient-utils';
+import { calcAge, initials, splitAllergyList } from '@/lib/patient-utils';
 import { useAuthStore } from '@/stores/authStore';
 import { usePatientStore } from '@/stores/patientStore';
 import { EditPatientModal } from './EditPatientModal';
@@ -18,9 +18,7 @@ export function PatientBanner({ patient }: { patient: Patient }) {
   const dob = new Date(patient.dateOfBirth).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
   const ini = initials(patient.firstName, patient.lastName);
   
-  const allergyList = patient.allergies
-    ? patient.allergies.split(',').map((a) => a.trim()).filter(Boolean)
-    : [];
+  const allergyList = splitAllergyList(patient.allergies);
 
   const addressParts = [
     patient.addressStreet,
@@ -84,8 +82,8 @@ export function PatientBanner({ patient }: { patient: Patient }) {
             <span className="text-[11px] font-medium text-text-muted">Allergies:</span>
             {allergyList.length > 0 ? (
               <div className="flex gap-1.5 flex-wrap">
-                {allergyList.map((a) => (
-                  <span key={a} className="text-[9px] font-bold bg-red-bg text-red border border-red-border px-[7px] py-[2px] rounded-[4px] inline-flex items-center gap-[3px]" title={`Allergy: ${a}`}>
+                {allergyList.map((a, idx) => (
+                  <span key={`${idx}-${a}`} className="text-[9px] font-bold bg-red-bg text-red border border-red-border px-[7px] py-[2px] rounded-[4px] inline-flex items-center gap-[3px] max-w-full break-words" title={`Allergy: ${a}`}>
                     ⚠ {a}
                   </span>
                 ))}

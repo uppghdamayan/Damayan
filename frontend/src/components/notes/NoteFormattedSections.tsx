@@ -1,21 +1,25 @@
-import React from 'react';
-import { 
-  MessageSquare, 
-  Microscope, 
-  FlaskConical, 
-  ClipboardList, 
-  Stethoscope, 
-  Search, 
+import React, { useState } from 'react';
+import {
+  MessageSquare,
+  Microscope,
+  FlaskConical,
+  ClipboardList,
+  Stethoscope,
+  Search,
   Pill,
-  Paperclip,
-  Download
+  Download,
+  Eye
 } from 'lucide-react';
 import { TimelineNoteView, diffListItems, diffMedicationItems } from '@/lib/notes-utils';
 import { Badge } from '@/components/ui/badge';
 import { useAttachmentsByNote, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
+import { AttachmentPeekModal } from './AttachmentPeekModal';
 
 function NoteAttachmentItem({ att }: { att: any }) {
-  const { refetch: getDownloadUrl } = useAttachmentDownloadUrl(att.id);
+  const { refetch: getDownloadUrl, isFetching } = useAttachmentDownloadUrl(att.id);
+  const [peekOpen, setPeekOpen] = useState(false);
+  const [peekUrl, setPeekUrl] = useState<string | null>(null);
+  const [peekError, setPeekError] = useState(false);
 
   const handleDownload = async () => {
     if (!att.storageKey) return;
@@ -29,25 +33,66 @@ function NoteAttachmentItem({ att }: { att: any }) {
     }
   };
 
+  const handlePeek = async () => {
+    if (!att.storageKey) return;
+    setPeekOpen(true);
+    setPeekUrl(null);
+    setPeekError(false);
+    try {
+      const { data: url } = await getDownloadUrl();
+      if (url) {
+        setPeekUrl(url);
+      } else {
+        setPeekError(true);
+      }
+    } catch (err) {
+      console.error('Failed to get preview URL', err);
+      setPeekError(true);
+    }
+  };
+
   return (
-    <div className="flex items-center justify-between py-1.5 px-2.5 bg-surface-2 border border-border rounded-[4px] w-fit min-w-[200px] max-w-sm gap-4">
-      <div className="flex items-center gap-2">
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">{att.tag}</span>
-        {att.textResult && (
-          <span className="text-[11px] text-[var(--text-secondary)] italic">"{att.textResult}"</span>
+    <>
+      <div className="flex items-center justify-between py-1.5 px-2.5 bg-surface-2 border border-border rounded-[4px] w-fit min-w-[200px] max-w-sm gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">{att.tag}</span>
+          {att.textResult && (
+            <span className="text-[11px] text-[var(--text-secondary)] italic">"{att.textResult}"</span>
+          )}
+        </div>
+        {att.storageKey && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handlePeek}
+              disabled={isFetching}
+              className="text-[var(--text-muted)] hover:text-accent transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Peek File"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isFetching}
+              className="text-[var(--text-muted)] hover:text-accent transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Download File"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
-      {att.storageKey && (
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="text-[var(--text-muted)] hover:text-accent transition-colors flex items-center justify-center cursor-pointer shrink-0"
-          title="Download File"
-        >
-          <Download className="w-3.5 h-3.5" />
-        </button>
-      )}
-    </div>
+      <AttachmentPeekModal
+        open={peekOpen}
+        onClose={() => setPeekOpen(false)}
+        tag={att.tag}
+        mimeType={att.mimeType}
+        url={peekUrl}
+        isLoading={peekOpen && !peekUrl && !peekError}
+        isError={peekError}
+      />
+    </>
   );
 }
 
@@ -59,9 +104,9 @@ function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--border-strong)] pb-1 w-full text-[var(--text-secondary)] font-bold">
-        <Paperclip className="w-3.5 h-3.5" />
-        <span className="text-[11.5px] uppercase tracking-[0.6px]">Attachments & Labs</span>
+      <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--purple)] pb-1 w-full text-[var(--purple)] font-bold">
+        <FlaskConical className="w-3.5 h-3.5" />
+        <span className="text-[11.5px] uppercase tracking-[0.6px]">Labs / Imaging</span>
       </div>
       <div className="flex flex-wrap gap-2 mt-1 pl-2">
         {attachments.map((att) => (
@@ -141,16 +186,8 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
         </div>
       )}
 
-      {/* Labs / Imaging */}
-      {note.sections.labs && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--purple)] pb-1 w-full text-[var(--purple)] font-bold">
-            <FlaskConical className="w-3.5 h-3.5" />
-            <span className="text-[11.5px] uppercase tracking-[0.6px]">Labs / Imaging</span>
-          </div>
-          <p className="whitespace-pre-wrap mt-1 pl-2">{note.sections.labs}</p>
-        </div>
-      )}
+      {/* Labs / Imaging (attachment results) */}
+      <NoteAttachmentsSection note={note} />
 
       {/* Assessment */}
       {((note.sections.assessment && note.sections.assessment.length > 0) || assessmentDiff.length > 0) && (
@@ -283,9 +320,6 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
           </div>
         </div>
       )}
-
-      {/* Attachments Section */}
-      <NoteAttachmentsSection note={note} />
     </div>
   );
 }

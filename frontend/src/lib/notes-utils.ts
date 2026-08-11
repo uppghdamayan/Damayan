@@ -19,7 +19,6 @@ export interface TimelineNoteView {
   sections: {
     subjective?: { label: string; body: string }[];   // e.g. [{label: 'Chief Complaint', body: ...}, {label: 'HPI', body: ...}] for initial; [{label: 'Subjective', body}] for progress
     objective?: string;
-    labs?: string;
     assessment?: string[];          // problem titles
     nonPharm?: string;
     pharm?: string;
@@ -31,8 +30,8 @@ export interface TimelineNoteView {
 }
 
 /**
- * Performs same-name case-insensitive fuzzy matching between consecutive notes'
- * medications and diagnostics to tag items as existing, added, or removed.
+ * Performs same-name case-insensitive matching between consecutive notes'
+ * diagnostics/assessment items to tag items as existing, added, or removed.
  */
 export function diffListItems(
   current: string[],
@@ -42,18 +41,8 @@ export function diffListItems(
     return current.map(item => ({ text: item, status: 'existing' }));
   }
 
-  const isMatch = (item1: string, item2: string): boolean => {
-    const norm = (str: string) => str.toLowerCase().trim();
-    const n1 = norm(item1);
-    const n2 = norm(item2);
-    const getDrugName = (s: string) => {
-      const match = s.match(/^[a-z0-9]+/i);
-      return match ? match[0] : s;
-    };
-    const d1 = getDrugName(n1);
-    const d2 = getDrugName(n2);
-    return d1 === d2 || d1.includes(d2) || d2.includes(d1);
-  };
+  const isMatch = (item1: string, item2: string): boolean =>
+    item1.trim().toLowerCase() === item2.trim().toLowerCase();
 
   const matchedPrevIndices = new Set<number>();
   const diffItems: { text: string; status: 'existing' | 'added' | 'removed' }[] = [];
@@ -261,7 +250,6 @@ export function mapNoteToTimelineView(
       sections: {
         subjective: subjectiveSections,
         objective: initialNote.physicalExam || undefined,
-        labs: Array.isArray(initialNote.diagnostics) && initialNote.diagnostics.length > 0 ? initialNote.diagnostics.join(', ') : undefined,
         assessment: assessmentTitles,
         nonPharm: initialNote.mgmtNonpharm || undefined,
         pharm: initialNote.mgmtPharm || undefined,
