@@ -80,6 +80,8 @@ Rules when changing the schema:
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
+**Priority: graphify is the first tool for any codebase search — finding files, connections, callers/callees, or "what depends on X" — not grep.** Reach for grep/Grep only as a fallback when graphify doesn't surface what's needed (e.g. plain-text/string searches unrelated to code structure, or graphify-out/ is missing/stale).
+
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.

@@ -98,7 +98,7 @@ export class MedicationsService {
           patientId,
           medicationId: med.id,
           action: 'Created',
-          description: `Added medication: ${med.name}`,
+          description: `Added medication '${med.name}'`,
           editorId: userId,
         },
       });
@@ -212,7 +212,7 @@ export class MedicationsService {
           patientId,
           medicationId: null, // Medication is physically deleted
           action: 'Removed',
-          description: `Removed medication: ${med.name}`,
+          description: `Removed medication '${med.name}'`,
           editorId: userId,
         },
       });
@@ -246,10 +246,10 @@ export class MedicationsService {
   //   - name matches but dose/unit differs → treated as a NEW entry (dose
   //     changes are clinically significant; never silently overwrite a dose)
   //   - no match → create new active medication
-  // Medications removed from the note's list compared to the patient's current
-  // active list are NOT auto-deactivated here — deactivation is always an
-  // explicit clinician action via DELETE, performed by the calling module if
-  // its own business rules require it (Initial Note does not; see Section 2).
+  // Medications on the patient's current active list that are missing from
+  // the note's list ARE auto-deactivated here (see the "Deactivate missing
+  // items" loop below), mirroring ProblemsService#upsertFromAssessment's
+  // auto-resolve behavior for problems dropped from a note's assessment.
   // ─────────────────────────────────────────────
   async upsertFromNoteMedications(
     patientId: string,
@@ -308,19 +308,31 @@ export class MedicationsService {
       }
 
       promises.push(
-        client.medication.create({
-          data: {
-            patientId,
-            name: item.name.trim(),
-            dose: item.dose.trim(),
-            formulation: item.formulation?.trim() || null,
-            instructions: item.instructions?.trim() || null,
-            quantity: item.quantity ?? null,
-            isActive: true,
-            fromPast: item.fromPast || false,
-            addedBy: userId,
-          },
-        }),
+        client.medication
+          .create({
+            data: {
+              patientId,
+              name: item.name.trim(),
+              dose: item.dose.trim(),
+              formulation: item.formulation?.trim() || null,
+              instructions: item.instructions?.trim() || null,
+              quantity: item.quantity ?? null,
+              isActive: true,
+              fromPast: item.fromPast || false,
+              addedBy: userId,
+            },
+          })
+          .then((newMed) =>
+            client.medicationLog.create({
+              data: {
+                patientId,
+                medicationId: newMed.id,
+                action: 'Created',
+                description: `Added medication '${newMed.name}' from ${sourceNote}`,
+                editorId: userId,
+              },
+            }),
+          ),
       );
     }
 
@@ -339,7 +351,7 @@ export class MedicationsService {
                   patientId,
                   medicationId: ext.id,
                   action: 'Discontinued',
-                  description: `Discontinued medication '${ext.name}' automatically (not in ${sourceNote})`,
+                  description: `Discontinued medication '${ext.name}' — no longer listed in the ${sourceNote}`,
                   editorId: userId,
                 },
               }),

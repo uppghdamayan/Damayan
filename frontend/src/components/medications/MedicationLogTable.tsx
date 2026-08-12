@@ -12,7 +12,7 @@ const ITEMS_PER_PAGE = 10;
 
 const FormattedLogText = ({ text }: { text: string }) => {
   const processed = text.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note');
-  const pattern = /\b(renamed|dose|formulation|instructions|quantity|status|unnested|nested|set date of diagnosis)\b/gi;
+  const pattern = /\b(initial note|progress note|renamed|dose|formulation|instructions|quantity|status|unnested|nested|set date of diagnosis)\b/gi;
   const parts = processed.split(pattern);
 
   return (

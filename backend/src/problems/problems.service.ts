@@ -527,7 +527,7 @@ export class ProblemsService {
                 patientId,
                 userId,
                 'Resolved',
-                `Resolved problem '${ext.title}' automatically (not in ${sourceNote})`,
+                `Resolved problem '${ext.title}' — no longer listed in the ${sourceNote}`,
                 client,
                 ext.id,
               ),

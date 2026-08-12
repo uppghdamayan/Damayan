@@ -12,7 +12,7 @@ const ITEMS_PER_PAGE = 10;
 
 const FormattedLogText = ({ text }: { text: string }) => {
   const processed = text.replace(/Progress Note/g, 'Progress note').replace(/Initial Note/g, 'Initial note');
-  const pattern = /\b(renamed|dose|formulation|instructions|quantity|status|unnested|nested|set date of diagnosis)\b/gi;
+  const pattern = /\b(initial note|progress note|renamed|dose|formulation|instructions|quantity|status|unnested|nested|set date of diagnosis)\b/gi;
   const parts = processed.split(pattern);
 
   return (
@@ -35,6 +35,7 @@ const ACTIONS = [
   'Resolved',
   'Removed',
   'Reactivated',
+  'Restored',
   'Published'
 ];
 
@@ -220,7 +221,7 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
                           action === 'Updated' ? "bg-text-secondary" :
                           action === 'Resolved' ? "bg-accent-mid" :
                           action === 'Removed' ? "bg-red-border" :
-                          action === 'Reactivated' ? "bg-amber-border" :
+                          action === 'Reactivated' || action === 'Restored' ? "bg-amber-border" :
                           "bg-purple-border"
                         )} />
                         {action}
@@ -322,7 +323,7 @@ export function ProblemLogTable({ logs, isLoading }: ProblemLogTableProps) {
                     log.action === 'Updated' ? "bg-surface-3 text-text-secondary border-border" :
                     log.action === 'Resolved' ? "bg-accent-light text-accent border-accent/20" :
                     log.action === 'Removed' ? "bg-red-bg text-red border-red-border" :
-                    log.action === 'Reactivated' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:border-amber-900/30" :
+                    log.action === 'Reactivated' || log.action === 'Restored' ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:border-amber-900/30" :
                     log.action === 'Published' ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/20 dark:border-purple-900/30" :
                     "bg-surface-3 text-text-secondary border-border"
                   )}>
