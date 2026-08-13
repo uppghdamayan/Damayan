@@ -26,7 +26,8 @@ import {
   useProblemLogs,
 } from '@/hooks/useProblems';
 import { usePatient } from '@/hooks/usePatients';
-import { buildProblemTree, isDescendant } from '@/lib/problem-utils';
+import { buildProblemTree, isDescendant, getCreatorName } from '@/lib/problem-utils';
+import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
 import { ActiveProblemTable, ActiveProblemRow, type DragOverState } from './ActiveProblemTable';
@@ -40,8 +41,16 @@ import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 export function ProblemListScreen({ patientId }: { patientId: string }) {
   const { user } = useAuthStore();
   const uiScale = useUiStore((state) => state.uiScale);
+  const openExistingProgressNote = useUiStore((state) => state.openExistingProgressNote);
   const scale = uiScale / 100;
   const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+
+  // Mutual-exclusion lock vs. the Progress Note's in-note Assessment editor —
+  // see useProblemEditLock for the full rationale. While a note holds it,
+  // this list stays read-only (all edit/add/drag/status/delete affordances
+  // disabled) rather than risk a data mismatch between the two drafts.
+  const { isLockedByOther, lockNoteId, tryAcquire, release } = useProblemEditLock(patientId, 'master');
+  const effectiveCanManage = canManage && !isLockedByOther;
 
   const zoomModifier: Modifier = useMemo(() => {
     return ({ transform, activeNodeRect }) => {
@@ -78,6 +87,16 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const [draftDiagnosisDates, setDraftDiagnosisDates] = useState<Record<string, string | null> | null>(null);
   const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
 
+  // Acquires the edit lock (if not already held) before entering draft mode.
+  // Returns false — and leaves state untouched — if the note holds it, so
+  // every call site can bail out of its edit before mutating draft state.
+  const ensureEditMode = () => {
+    if (isEditMode) return true;
+    if (!tryAcquire()) return false;
+    setIsEditMode(true);
+    return true;
+  };
+
   // Ref to always hold the latest draft values for cleanup functions (avoids stale closures)
   const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null, draftTitles: Record<string, string> | null, draftDiagnosisDates: Record<string, string | null> | null }>({ isEditMode: false, draftOrder: null, draftParents: null, draftTitles: null, draftDiagnosisDates: null });
   // Ref to track which patient's draft has been restored (prevents double-restore)
@@ -109,11 +128,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   }, [problems]);
 
   const editorDisplayName = useMemo(() => {
-    if (!lastPublishedEdit || !lastPublishedEdit.editor) return 'System';
-    const user = lastPublishedEdit.editor;
-    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
-    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
-    return `${user.firstName} ${user.lastName}`;
+    if (!lastPublishedEdit) return 'System';
+    return getCreatorName(lastPublishedEdit.editor);
   }, [lastPublishedEdit]);
 
   const formattedLastEditedTime = useMemo(() => {
@@ -188,6 +204,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftOrder(null);
     setDraftParents(null);
     setDraftTitles(null);
+    setDraftDiagnosisDates(null);
     setLastAutoSaved(null);
     const saved = localStorage.getItem(`damayan_problem_draft_${patientId}`);
     if (!saved) return;
@@ -199,6 +216,11 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         setDraftTitles(parsed.titles || null);
         setDraftDiagnosisDates(parsed.diagnosisDates || null);
         setIsEditMode(true);
+        // Best-effort: a restored draft implies this side already held the
+        // lock before reload (the persisted lock should already reflect
+        // that), but re-acquiring here keeps it consistent even if the
+        // store's rehydration raced this effect.
+        tryAcquire();
         toast.info('Restored your unsaved draft order. Publish or revert when ready.', { duration: 5000 });
       }
     } catch {
@@ -260,6 +282,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   );
 
   const handleAdd = () => {
+    if (isLockedByOther) {
+      tryAcquire(); // surfaces the "locked by a note" toast
+      return;
+    }
     setEditing(null);
     setModalOpen(true);
   };
@@ -271,8 +297,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const handleSave = async (values: { title: string; parentId?: string | null; diagnosisDate?: string | null }) => {
     try {
       if (editing) {
-        if (!isEditMode) setIsEditMode(true);
-        
+        if (!ensureEditMode()) return;
+
         // If draftOrder hasn't been initialized yet, initialize it
         let currentOrder = draftOrder;
         if (!currentOrder) {
@@ -309,6 +335,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         
         toast.success(`Draft updated for '${values.title}'.`);
       } else {
+        if (isLockedByOther) {
+          tryAcquire(); // surfaces the "locked by a note" toast
+          return;
+        }
         await createProblem.mutateAsync({ title: values.title, parentId: values.parentId ?? undefined, diagnosisDate: values.diagnosisDate });
         toast.success(`'${values.title}' added to the list.`);
       }
@@ -319,6 +349,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleStatusChange = async (p: Problem, status: ProblemStatusValue) => {
+    if (isLockedByOther) {
+      tryAcquire(); // surfaces the "locked by a note" toast
+      return;
+    }
     try {
       await updateProblem.mutateAsync({ id: p.id, status });
       const messages: Record<ProblemStatusValue, string> = {
@@ -333,7 +367,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleParentChange = (p: Problem, newParentId: string | null) => {
-    if (!isEditMode) setIsEditMode(true);
+    if (!ensureEditMode()) return;
     setDraftParents(prev => ({ ...prev, [p.id]: newParentId }));
     
     // Also move it visually below its new parent
@@ -372,6 +406,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   const handleConfirmDelete = () => {
     if (!problemToDelete) return;
+    if (isLockedByOther) {
+      tryAcquire(); // surfaces the "locked by a note" toast
+      setDeleteModalOpen(false);
+      setProblemToDelete(null);
+      return;
+    }
     deleteProblem.mutate(problemToDelete.id, {
       onSuccess: () => {
         toast.success(`'${problemToDelete.title}' has been permanently deleted.`);
@@ -396,6 +436,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftDiagnosisDates(null);
     setLastAutoSaved(null);
     localStorage.removeItem(draftStorageKey);
+    release();
     toast.info('Changes reverted to original order and nesting.');
   };
 
@@ -425,6 +466,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         setDraftDiagnosisDates(null);
         setLastAutoSaved(null);
         localStorage.removeItem(draftStorageKey);
+        release();
         toast.success('Problem list changes published successfully.');
       },
       onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to publish changes.'),
@@ -591,8 +633,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       const oldIndex = displayFlatProblems.findIndex((p) => p.problem.id === active.id);
       const newIndex = displayFlatProblems.findIndex((p) => p.problem.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
+        if (!ensureEditMode()) return;
         const reorderedList = arrayMove(displayFlatProblems, oldIndex, newIndex);
-        if (!isEditMode) setIsEditMode(true);
         setDraftOrder(reorderedList.map(item => item.problem.id));
       }
     }
@@ -612,7 +654,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         <div className="flex justify-end -mb-2">
           <button
             onClick={handleAdd}
-            className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer"
+            disabled={isLockedByOther}
+            title={isLockedByOther ? 'Locked — a Progress Note draft is currently editing problems' : undefined}
+            className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Add Problem
           </button>
@@ -708,8 +752,12 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             activeDragItem={activeDragItem}
             dragOverState={dragOverState}
             allOptions={activeProblems}
-            canManage={canManage}
+            canManage={effectiveCanManage}
             isEditMode={isEditMode}
+            isLocked={isLockedByOther}
+            onJumpToLockOwner={
+              lockNoteId ? () => openExistingProgressNote(patientId, lockNoteId) : undefined
+            }
             onRevert={handleRevert}
             onSaveDraft={handleSaveDraft}
             onPublish={handlePublish}
@@ -756,7 +804,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
           <ResolvedProblemTable
             problems={resolvedProblems}
-            canManage={canManage}
+            canManage={effectiveCanManage}
             onReactivate={(p) => handleStatusChange(p, 'ACTIVE')}
             onDelete={handleDelete}
           />

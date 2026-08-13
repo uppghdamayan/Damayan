@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
+import { getCreatorName } from '@/lib/problem-utils';
 import type { Problem } from '@/types/problem';
 
 const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 150px';
@@ -33,13 +34,6 @@ export function ResolvedRow({
 }) {
   const creator = problem.addedByUser;
   const addedAt = problem.createdAt;
-
-  const getCreatorName = (user: typeof problem.addedByUser) => {
-    if (!user) return 'System';
-    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
-    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
-    return `${user.firstName} ${user.lastName}`;
-  };
   const creatorName = getCreatorName(creator);
 
   const formattedAddedDateTime = new Date(addedAt).toLocaleDateString('en-PH', {

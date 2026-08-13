@@ -343,7 +343,25 @@ export class ProblemsService {
 
   async upsertFromAssessment(
     patientId: string,
-    assessmentItems: { id?: string; title: string }[],
+    assessmentItems: {
+      id?: string;
+      // Client-generated key for a problem added within the same note that
+      // has no master Problem row yet — lets one freshly-added item nest
+      // under another before either has a real id. See create-progress-note
+      // AssessmentItemDto for the full rationale.
+      tempId?: string;
+      title: string;
+      // Deliberately `string | null | undefined` with runtime "key present?"
+      // semantics distinct from "value is undefined" (checked via
+      // `hasOwnProperty` below): omitting the key entirely means "this
+      // source doesn't carry nesting info, leave existing nesting alone" —
+      // required for backward compatibility with the Initial Note assessment
+      // and the delete-draft revert path, neither of which supply it (yet).
+      // An explicit `null` means "root level"; a string nests under that id
+      // or tempId.
+      parentId?: string | null;
+      diagnosisDate?: string | null;
+    }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
@@ -372,7 +390,17 @@ export class ProblemsService {
     // without an id (freshly added in this note, no master row yet) still
     // dedupe/match by title so we don't create sibling duplicates of an
     // existing problem the clinician just retyped.
-    const uniqueItems = new Map<string, { id?: string; title: string }>();
+    const uniqueItems = new Map<
+      string,
+      {
+        id?: string;
+        tempId?: string;
+        title: string;
+        parentId?: string | null;
+        hasParentId: boolean;
+        diagnosisDate?: string | null;
+      }
+    >();
     for (const item of validItems) {
       const key =
         item.id && existingById.has(item.id)
@@ -381,13 +409,33 @@ export class ProblemsService {
       if (!uniqueItems.has(key)) {
         uniqueItems.set(key, {
           id: item.id && existingById.has(item.id) ? item.id : undefined,
+          tempId: item.tempId,
           title: item.title.trim(),
+          parentId: item.parentId,
+          hasParentId: Object.prototype.hasOwnProperty.call(item, 'parentId'),
+          diagnosisDate: item.diagnosisDate,
         });
       }
     }
 
     let currentSortOrder = await this.getNextSortOrder(patientId, client);
     const promises: Promise<any>[] = [];
+
+    // Every incoming identity key (a real Problem.id or a client tempId)
+    // resolved to the real Problem.id it ends up as once the loop below has
+    // created/matched it. Seeded with every existing problem's own id so an
+    // item that ISN'T being re-parented this round still resolves as a valid
+    // nesting target in pass 2.
+    const resolvedIdByKey = new Map<string, string>();
+    for (const p of existing) resolvedIdByKey.set(p.id, p.id);
+
+    const toDateStr = (d: Date | string | null | undefined): string | null => {
+      if (!d) return null;
+      const date = typeof d === 'string' ? new Date(d) : d;
+      return Number.isNaN(date.getTime())
+        ? null
+        : date.toISOString().split('T')[0];
+    };
 
     for (const item of uniqueItems.values()) {
       const match = item.id
@@ -396,31 +444,58 @@ export class ProblemsService {
             (p) => p.title.toLowerCase() === item.title.toLowerCase(),
           );
 
+      const registerResolved = (realId: string) => {
+        if (item.id) resolvedIdByKey.set(item.id, realId);
+        if (item.tempId) resolvedIdByKey.set(item.tempId, realId);
+      };
+
       if (match) {
+        registerResolved(match.id);
         const renamed = match.title.trim() !== item.title.trim();
+        const dateHasChanged =
+          item.diagnosisDate !== undefined &&
+          toDateStr(item.diagnosisDate) !== toDateStr(match.diagnosisDate);
+        const newDiagnosisDate = item.diagnosisDate
+          ? new Date(item.diagnosisDate)
+          : null;
 
         if (match.status === ProblemStatus.ACTIVE) {
           keptIds.add(match.id);
-          if (renamed) {
+          if (renamed || dateHasChanged) {
             promises.push(
               client.problem
                 .update({
                   where: { id: match.id },
                   data: {
-                    title: item.title,
+                    ...(renamed && { title: item.title }),
+                    ...(dateHasChanged && {
+                      diagnosisDate: newDiagnosisDate,
+                    }),
                     updatedByUser: { connect: { id: userId } },
                   },
                 })
-                .then(() =>
-                  this.logAction(
-                    patientId,
-                    userId,
-                    'Renamed',
-                    `Renamed problem '${match.title}' to '${item.title}' from ${sourceNote}`,
-                    client,
-                    match.id,
-                  ),
-                ),
+                .then(async () => {
+                  if (renamed) {
+                    await this.logAction(
+                      patientId,
+                      userId,
+                      'Renamed',
+                      `Renamed problem '${match.title}' to '${item.title}' from ${sourceNote}`,
+                      client,
+                      match.id,
+                    );
+                  }
+                  if (dateHasChanged) {
+                    await this.logAction(
+                      patientId,
+                      userId,
+                      'Updated',
+                      `Changed Date of Diagnosis for '${item.title}' from ${sourceNote}`,
+                      client,
+                      match.id,
+                    );
+                  }
+                }),
             );
           }
           continue;
@@ -437,6 +512,7 @@ export class ProblemsService {
                   title: item.title,
                   status: ProblemStatus.ACTIVE,
                   sortOrder,
+                  ...(dateHasChanged && { diagnosisDate: newDiagnosisDate }),
                   updatedByUser: { connect: { id: userId } },
                 },
               })
@@ -465,6 +541,7 @@ export class ProblemsService {
                   title: item.title,
                   status: ProblemStatus.ACTIVE,
                   sortOrder,
+                  ...(dateHasChanged && { diagnosisDate: newDiagnosisDate }),
                   updatedByUser: { connect: { id: userId } },
                 },
               })
@@ -493,18 +570,22 @@ export class ProblemsService {
               status: ProblemStatus.ACTIVE,
               sortOrder,
               addedBy: userId,
+              ...(item.diagnosisDate && {
+                diagnosisDate: new Date(item.diagnosisDate),
+              }),
             },
           })
-          .then((newProb) =>
-            this.logAction(
+          .then((newProb) => {
+            registerResolved(newProb.id);
+            return this.logAction(
               patientId,
               userId,
               'Created',
               `Added problem '${newProb.title}' from ${sourceNote}`,
               client,
               newProb.id,
-            ),
-          ),
+            );
+          }),
       );
     }
 
@@ -537,6 +618,85 @@ export class ProblemsService {
     }
 
     await Promise.all(promises);
+
+    // ── Pass 2: re-parenting ────────────────────────────────────────────
+    // Only for items whose source explicitly supplied nesting info (the
+    // `parentId` key present on the item, even as `null` for "root") — see
+    // the `hasParentId` doc comment on the parameter above. Processed
+    // sequentially, not in parallel: two items swapping parents in the same
+    // batch could otherwise both pass a cycle check before either write
+    // lands, creating a real cycle.
+    for (const item of uniqueItems.values()) {
+      if (!item.hasParentId) continue;
+
+      const selfId =
+        (item.id && resolvedIdByKey.get(item.id)) ||
+        (item.tempId && resolvedIdByKey.get(item.tempId));
+      if (!selfId) continue;
+
+      const targetRealId = item.parentId
+        ? resolvedIdByKey.get(item.parentId)
+        : null;
+      // parentId pointed at something we couldn't resolve (e.g. a
+      // title-only legacy match that never got an id/tempId) — fall back to
+      // root rather than fail the whole publish over one bad reference.
+      const desiredParentId =
+        item.parentId && targetRealId ? targetRealId : null;
+
+      const current = await client.problem.findUnique({
+        where: { id: selfId },
+        select: { parentId: true, title: true },
+      });
+      if (!current || current.parentId === desiredParentId) continue;
+
+      if (desiredParentId) {
+        try {
+          await this.assertValidParent(
+            patientId,
+            desiredParentId,
+            client,
+            selfId,
+          );
+        } catch {
+          await client.problem.update({
+            where: { id: selfId },
+            data: {
+              parent: { disconnect: true },
+              updatedByUser: { connect: { id: userId } },
+            },
+          });
+          await this.logAction(
+            patientId,
+            userId,
+            'Updated',
+            `Could not nest '${current.title}' from ${sourceNote} — target would create a cycle, left at top level`,
+            client,
+            selfId,
+          );
+          continue;
+        }
+      }
+
+      await client.problem.update({
+        where: { id: selfId },
+        data: {
+          parent: desiredParentId
+            ? { connect: { id: desiredParentId } }
+            : { disconnect: true },
+          updatedByUser: { connect: { id: userId } },
+        },
+      });
+      await this.logAction(
+        patientId,
+        userId,
+        'Updated',
+        desiredParentId
+          ? `Nested '${current.title}' from ${sourceNote}`
+          : `Un-nested '${current.title}' from ${sourceNote}`,
+        client,
+        selfId,
+      );
+    }
   }
 
   // ─────────────────────────────────────────────

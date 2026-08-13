@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useProblems } from '@/hooks/useProblems';
+import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { isRecentlyUpdated, mostRecentUpdate, buildProblemTree } from '@/lib/problem-utils';
 import type { ProblemNode } from '@/types/problem';
 import { ProblemListCardEmpty } from './ProblemListCardEmpty';
@@ -20,6 +21,9 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const { data, isLoading } = useProblems(patientId);
+  // Passive read of the mutual edit lock — this card never acquires/releases
+  // it, just reflects whether a Progress Note draft currently holds it.
+  const { isLockedByOther } = useProblemEditLock(patientId, 'master');
 
   const allProblems = data?.data ?? [];
 
@@ -70,6 +74,14 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
             <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
               Problem List
             </span>
+            {isLockedByOther && (
+              <span
+                title="A Progress Note draft is currently editing problems"
+                className="text-[8px] font-bold uppercase tracking-[0.5px] px-1.5 py-[1px] rounded bg-slate-500/10 text-slate-600 border border-slate-400/30 inline-flex items-center gap-1"
+              >
+                🔒 Locked
+              </span>
+            )}
             {lastUpdated && (
               <span className={cn('font-mono text-[9px] normal-case font-normal', recent ? 'text-text-secondary' : 'text-text-muted')}>
                 {recent && <span className="w-2 h-2 rounded-full bg-accent-mid inline-block mr-1" />}
@@ -85,7 +97,9 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
         </div>
         <button
           onClick={() => router.push(`/dashboard/${patientId}/problems`)}
-          className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+          disabled={isLockedByOther}
+          title={isLockedByOther ? 'Locked — a Progress Note draft is currently editing problems' : undefined}
+          className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Manage
         </button>

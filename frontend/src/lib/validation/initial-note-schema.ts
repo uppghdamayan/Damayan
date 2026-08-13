@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
 export const assessmentItemSchema = z.object({
+  // Stable Problem.id this entry represents, once it exists as a master
+  // Problem record. Already written and relied on throughout the note forms
+  // (mergeActiveProblems, Revert) — added here to close a latent gap: the
+  // schema never actually declared it.
+  id: z.string().optional(),
+  // Client-generated key for a problem added within this note that has no
+  // master Problem row yet — lets one freshly-added item nest under another
+  // before either has a real id.
+  tempId: z.string().optional(),
   title: z.string().min(1, 'Title is required'),
   parentId: z.string().optional().nullable(),
   depth: z.number().optional(),
   isNew: z.boolean().optional(),
+  diagnosisDate: z.string().optional().nullable(),
 });
 
 export const initialNoteDraftSchema = z.object({

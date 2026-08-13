@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isDescendant } from '@/lib/problem-utils';
+import { getSelectableParents } from '@/lib/problem-utils';
 import type { Problem } from '@/types/problem';
 
 interface ProblemEditModalProps {
@@ -33,14 +33,7 @@ export function ProblemEditModal({ open, onClose, editing, allOptions, saving, o
   if (!open) return null;
 
   // Filter out the problem being edited itself, any of its descendants, and non-active problems.
-  const selectableParents = allOptions.filter((p) => {
-    if (p.status !== 'ACTIVE') return false;
-    if (editing) {
-      if (p.id === editing.id) return false;
-      if (isDescendant(allOptions, p.id, editing.id)) return false;
-    }
-    return true;
-  });
+  const selectableParents = getSelectableParents(allOptions, editing?.id);
 
   const handleSubmit = () => {
     if (!title.trim()) {

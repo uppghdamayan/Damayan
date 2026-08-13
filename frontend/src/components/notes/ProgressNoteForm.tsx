@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { buildProblemTree } from '@/lib/problem-utils';
+import { buildProblemTree, getCreatorName } from '@/lib/problem-utils';
 import { 
   progressNoteDraftSchema, 
   progressNotePublishSchema, 
@@ -26,6 +26,7 @@ import { VitalsSummaryRow } from './VitalsSummaryRow';
 import { TagInputField } from './TagInputField';
 import { NoteFormSkeleton } from './NoteFormSkeleton';
 import { MedicationSnapshotModal } from './MedicationSnapshotModal';
+import { NoteProblemListEditor } from './NoteProblemListEditor';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { TrashIcon, Trash2, FileText, RotateCcw, Check, Save, PanelRightClose, X, Loader2, Edit } from 'lucide-react';
 import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
@@ -34,6 +35,7 @@ import { ComboboxInput } from '@/components/ui/ComboboxInput';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { formatErrorMessage } from '@/lib/error-utils';
@@ -126,6 +128,28 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const [editMedIndex, setEditMedIndex] = useState<number | null>(null);
 
   const [newProbTitle, setNewProbTitle] = useState('');
+
+  // Mutual-exclusion lock vs. the Master Problem List — see
+  // useProblemEditLock. While the master list holds it, this section stays
+  // read-only; entering edit mode here locks the master list instead.
+  const {
+    isLockedByOther: problemListLockedByOther,
+    lockOwner: problemListLockOwner,
+    tryAcquire: tryAcquireProblemLock,
+    release: releaseProblemLock,
+  } = useProblemEditLock(patientId, 'note', { noteId, hasOpenDbDraft: !!noteId });
+  const [isProblemEditMode, setIsProblemEditMode] = useState(false);
+
+  // A persisted lock already held by this note (e.g. restored after reload,
+  // or the panel was closed mid-edit without Reverting/Saving) should put
+  // the section straight back into edit mode instead of showing it as idle.
+  useEffect(() => {
+    if (problemListLockOwner === 'note' && !isProblemEditMode) {
+      setIsProblemEditMode(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemListLockOwner]);
+
   const [diagnosticsInput, setDiagnosticsInput] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ hasFile: boolean; tag: string; textResult: string; fileName?: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -183,15 +207,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     });
     return map;
   }, [copyForward?.activeMedications]);
-
-  const activeDepthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    activeProblemTree.forEach(item => {
-      map.set(item.problem.title.trim().toLowerCase(), item.depth);
-      if (item.problem.id) map.set(item.problem.id, item.depth);
-    });
-    return map;
-  }, [activeProblemTree]);
 
   const mergeActiveProblems = (existingProblems: any[], activeProblems: any[]) => {
     const tree = buildProblemTree(activeProblems || []);
@@ -268,6 +283,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           parentId: p.parentId || undefined,
           depth: item.depth,
+          diagnosisDate: p.diagnosisDate ?? null,
         };
         continue;
       }
@@ -278,6 +294,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           parentId: p.parentId || undefined,
           depth: item.depth,
+          diagnosisDate: p.diagnosisDate ?? null,
         });
         existingTitles.set(titleKey, existing.length - 1);
       }
@@ -316,9 +333,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       const draftMeds = (note.medicationSnapshot as any[]) || [];
       const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
 
+      // While this section is in its own draft-edit mode, the mutual lock
+      // guarantees the Master Problem List can't be changing — keep
+      // whatever's currently in form state rather than re-merging from
+      // master, so a `note` refetch mid-edit never clobbers in-progress
+      // title/nesting/date edits.
+      const currentProblemsWhileEditing = isProblemEditMode ? form.getValues('problemListSnapshot') : undefined;
       const finalProblems = isPublished
         ? validProblems
-        : mergeActiveProblems(validProblems, activeProblems);
+        : currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
+          ? currentProblemsWhileEditing
+          : mergeActiveProblems(validProblems, activeProblems);
 
       // For unpublished (draft) notes, always use the authoritative active medications list
       // instead of merging with the stale snapshot to avoid duplicates.
@@ -361,8 +386,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           const parsed = JSON.parse(draft);
           const draftProblems = (parsed.problemListSnapshot as any[]) || [];
           const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
-          
-          parsed.problemListSnapshot = mergeActiveProblems(validProblems, activeProblems);
+
+          const currentProblemsWhileEditing = isProblemEditMode ? form.getValues('problemListSnapshot') : undefined;
+          parsed.problemListSnapshot = currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
+            ? currentProblemsWhileEditing
+            : mergeActiveProblems(validProblems, activeProblems);
           // Always replace with authoritative active medications — never merge stale draft meds
           parsed.medicationSnapshot = activeMeds.map((m: any) => ({
             name: m.name,
@@ -421,7 +449,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   useEffect(() => {
     if (!copyForward || copyLoading || note?.status === 'PUBLISHED') return;
-    
+
     // Sync newly added active problems or medications into form state live
     if (previousCopyForward.current) {
       const oldProblems = JSON.stringify(previousCopyForward.current.activeProblems);
@@ -431,7 +459,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
       if (oldProblems !== newProblems || oldMeds !== newMeds) {
         const currentValues = form.getValues();
-        const mergedProbs = mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
+        // While this section is in its own draft-edit mode, the mutual lock
+        // guarantees the Master Problem List can't be changing right now —
+        // skip the merge so a background refetch never clobbers in-progress
+        // title/nesting/date edits made in this note.
+        const mergedProbs = isProblemEditMode
+          ? currentValues.problemListSnapshot || []
+          : mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
         // Replace the baseline from active list, but preserve any medications the user added this session (isNew)
         const userAddedMeds = (currentValues.medicationSnapshot || []).filter((m: any) => m && m.isNew);
         const replacedMeds = [
@@ -458,6 +492,42 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const formValues = form.watch();
 
+  // Acquires the mutual edit lock (if not already held) before entering the
+  // Problem List's own draft-edit mode. No-ops (staying read-only) if the
+  // Master Problem List already holds it — tryAcquire surfaces the toast.
+  const enterProblemEditMode = () => {
+    if (isProblemEditMode) return;
+    if (!tryAcquireProblemLock()) return;
+    setIsProblemEditMode(true);
+  };
+
+  // Discards this session's in-note problem edits, resyncing the snapshot
+  // back to the master list's current state (same shape as the fresh-note
+  // seed below), then exits edit mode and releases the lock.
+  const handleRevertProblemList = () => {
+    form.setValue(
+      'problemListSnapshot',
+      activeProblemTree.map(({ problem: p, depth }) => ({
+        id: p.id || undefined,
+        title: p.title,
+        parentId: p.parentId || undefined,
+        depth,
+        diagnosisDate: p.diagnosisDate ?? null,
+      })),
+      { shouldDirty: true },
+    );
+    setIsProblemEditMode(false);
+    releaseProblemLock();
+  };
+
+  // Keeps this session's in-note edits (already persisted continuously via
+  // useAutoSave / the note's own Draft/Update Draft actions below) and just
+  // exits edit mode, releasing the lock so the Master Problem List unlocks.
+  const handleSaveDraftProblemList = () => {
+    setIsProblemEditMode(false);
+    releaseProblemLock();
+  };
+
   const scrollToError = (fieldName?: string) => {
     if (!fieldName) return;
     setTimeout(() => {
@@ -475,6 +545,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const validateForPublish = (): { isValid: boolean; firstErrorField?: string; errorMessage?: string } => {
+    if (isProblemEditMode) {
+      return {
+        isValid: false,
+        firstErrorField: 'problem-list',
+        errorMessage: 'Finish editing the Problem List — Save Draft or Revert — before publishing.',
+      };
+    }
+
     const subjectiveMissing = !formValues.subjective || !formValues.subjective.trim();
     const objectiveMissing = !isNonDoctor && (!formValues.objective || !formValues.objective.trim());
 
@@ -534,6 +612,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             publishMutation.mutate(noteId, {
               onSuccess: () => {
                 localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+                releaseProblemLock();
                 resolve(true);
               },
           onError: (err: any) => {
@@ -551,6 +630,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     createAndPublishMutation.mutate(cleanFormValues(formValues), {
       onSuccess: () => {
         localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+        releaseProblemLock();
         resolve(true);
       },
       onError: (err: any) => {
@@ -586,7 +666,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const getUnaddedSections = () => {
     const list: string[] = [];
-    if (newProbTitle.trim()) {
+    if (newProbTitle.trim() || isProblemEditMode) {
       list.push('Problem List');
     }
     if (newMedName.trim() || newMedDose.trim() || newMedFormulation.trim() || newMedInstructions.trim() || newMedQuantity.trim()) {
@@ -673,6 +753,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       deleteMutation.mutate(noteId, {
         onSuccess: () => {
           localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          releaseProblemLock();
           onClose();
         }
       });
@@ -784,6 +865,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 setLocalAttachments([]);
               }
               localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+              // Defensive — validateForPublish already blocks publishing
+              // while the section is mid-edit, so this is normally already
+              // released, but a published note has no further use for the
+              // lock either way.
+              releaseProblemLock();
               onClose();
               setDocumentationPanelOpen(false);
               setActiveScreen('note-timeline');
@@ -819,6 +905,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             setLocalAttachments([]);
           }
           localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          releaseProblemLock();
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');
@@ -995,9 +1082,12 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
               {(form.formState.isDirty || localAttachments.length > 0) && !noteId && (
                 <Button 
                   onClick={() => {
-                    const defaultProblems = (copyForward?.activeProblems || []).map((p: any) => ({
+                    const defaultProblems = activeProblemTree.map(({ problem: p, depth }) => ({
                       id: p.id || undefined,
                       title: p.title,
+                      parentId: p.parentId || undefined,
+                      depth,
+                      diagnosisDate: p.diagnosisDate ?? null,
                     }));
                     const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
                       name: m.name,
@@ -1032,9 +1122,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
                     // Clear temporary attachments
                     setLocalAttachments([]);
-                  }} 
+
+                    // A whole-note revert also discards any in-progress
+                    // Problem List edit — exit its draft mode and release
+                    // the mutual lock along with everything else.
+                    if (isProblemEditMode) {
+                      setIsProblemEditMode(false);
+                      releaseProblemLock();
+                    }
+                  }}
                   disabled={isDisabled}
-                  variant="outline" 
+                  variant="outline"
                   size="xs"
                   className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
                   title="Revert"
@@ -1174,106 +1272,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   control={form.control}
                   name="problemListSnapshot"
                   render={({ field }) => (
-                    <div className="flex flex-col gap-3">
-                      <div className="border border-border rounded-[6px] overflow-hidden bg-surface">
-                        {field.value?.map((prob: any, idx: number) => {
-                          const isLast = idx === (field.value?.length || 0) - 1;
-                          const titleStr = typeof prob === 'string' ? prob : prob.title;
-                          const isNewItem = typeof prob !== 'string' && prob.isNew;
-
-                          const titleKey = titleStr?.trim().toLowerCase();
-                          const depth = typeof prob !== 'string' && prob.depth !== undefined 
-                            ? prob.depth 
-                            : (titleKey && activeDepthMap.has(titleKey) 
-                                ? activeDepthMap.get(titleKey)! 
-                                : (typeof prob !== 'string' && prob.parentId ? 1 : 0));
-
-                          return (
-                            <div key={idx} className={`flex items-center gap-2.5 px-3 py-2 ${!isLast ? 'border-b border-border' : ''} hover:bg-surface-3/50 transition-colors`}>
-                              <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0" />
-                              <div 
-                                className="flex-1 min-w-0 flex flex-col"
-                                style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
-                              >
-                                <div className="flex items-center gap-2 truncate">
-                                  <span className="text-[12px] font-semibold text-text-primary truncate">
-                                    {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
-                                    {titleStr}
-                                  </span>
-                                </div>
-                              </div>
-                              {isNewItem ? (
-                                <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] bg-green-bg text-green border border-green-border shrink-0 blink-animation">
-                                  New
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-1.5 py-[2px] rounded-[4px] bg-accent-light text-accent-hover border border-accent shrink-0">
-                                  Active
-                                </span>
-                              )}
-                              {!isPublished && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                      const newProbs = [...(field.value || [])];
-                                      newProbs.splice(idx, 1);
-                                      field.onChange(newProbs);
-                                  }}
-                                  disabled={isDisabled}
-                                  className="p-1 text-text-muted hover:text-red hover:bg-red-bg rounded-md transition-colors shrink-0 cursor-pointer disabled:opacity-50"
-                                  title="Remove Problem"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {field.value?.length === 0 && (
-                          <div className="py-3 px-3 text-[12px] text-text-muted italic text-center">
-                            No problems added yet.
-                          </div>
-                        )}
-                      </div>
-                      {!isPublished && (
-                        <div className="flex flex-col gap-2 p-3 border border-border rounded-[8px] bg-surface-2/40">
-                          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">Add Problem</span>
-                          {/* Problem Title & Add Button */}
-                          <div className="flex items-center gap-2">
-                            <input
-                              id="newProbTitle"
-                              value={newProbTitle}
-                              onChange={(e) => setNewProbTitle(e.target.value)}
-                              disabled={isDisabled}
-                              placeholder="Problem Title (e.g. Hypertension)"
-                              className="flex-1 h-[32px] px-2.5 text-[12px] rounded-[6px] border border-border-strong/60 outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] bg-white transition-all disabled:bg-surface-2 disabled:cursor-not-allowed placeholder:text-border-strong/70"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  document.getElementById('addProbBtn')?.click();
-                                }
-                              }}
-                            />
-                            <Button
-                              id="addProbBtn"
-                              type="button"
-                              variant="default"
-                              disabled={isDisabled || !newProbTitle.trim()}
-                              onClick={() => {
-                                if (newProbTitle.trim()) {
-                                  const newProbs = [...(field.value || []), { title: newProbTitle.trim(), isNew: true }];
-                                  field.onChange(newProbs);
-                                  setNewProbTitle('');
-                                }
-                              }}
-                              className="h-[32px] px-4 bg-accent hover:bg-accent-hover text-white rounded-[6px] font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
-                            >
-                              + Add Problem
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <NoteProblemListEditor
+                      value={field.value || []}
+                      onChange={(next) => field.onChange(next)}
+                      activeProblems={copyForward?.activeProblems || []}
+                      isPublished={isPublished}
+                      isDisabled={isDisabled}
+                      isEditMode={isProblemEditMode}
+                      isLockedByOther={problemListLockedByOther}
+                      onEnterEditMode={enterProblemEditMode}
+                      onRevert={handleRevertProblemList}
+                      onSaveDraft={handleSaveDraftProblemList}
+                      currentUserLabel={user ? getCreatorName(user) : 'You'}
+                      newProbTitle={newProbTitle}
+                      setNewProbTitle={setNewProbTitle}
+                    />
                   )}
                 />
               </div>

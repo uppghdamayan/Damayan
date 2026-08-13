@@ -7,6 +7,7 @@ import {
   ValidateNested,
   IsInt,
   IsIn,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -21,6 +22,14 @@ class AssessmentItemDto {
   @IsOptional()
   id?: string;
 
+  // Client-generated key for a problem added within this note that has no
+  // master Problem row yet — lets another freshly-added item nest under it
+  // (as parentId) before either one has a real id. Never written to the DB;
+  // resolved to a real Problem.id server-side during upsertFromAssessment.
+  @IsString()
+  @IsOptional()
+  tempId?: string;
+
   @IsString()
   @IsNotEmpty()
   title: string;
@@ -32,6 +41,11 @@ class AssessmentItemDto {
   @IsInt()
   @IsOptional()
   depth?: number;
+
+  @ValidateIf((o) => o.diagnosisDate !== null)
+  @IsDateString()
+  @IsOptional()
+  diagnosisDate?: string | null;
 }
 
 class MedicationItemDto {

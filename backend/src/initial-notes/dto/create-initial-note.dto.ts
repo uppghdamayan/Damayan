@@ -8,6 +8,7 @@ import {
   IsDateString,
   IsInt,
   IsIn,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -19,6 +20,12 @@ class AssessmentItemDto {
   @IsString()
   @IsOptional()
   id?: string;
+
+  // Client-generated key for a problem added within this note that has no
+  // master Problem row yet. See progress-notes AssessmentItemDto for details.
+  @IsString()
+  @IsOptional()
+  tempId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -34,6 +41,11 @@ class AssessmentItemDto {
   @IsInt()
   @IsOptional()
   depth?: number;
+
+  @ValidateIf((o) => o.diagnosisDate !== null)
+  @IsDateString()
+  @IsOptional()
+  diagnosisDate?: string | null;
 }
 
 class MedicationItemDto {

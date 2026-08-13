@@ -22,6 +22,21 @@ interface ActiveNoteEditorState {
   mode: 'new' | 'edit' | null; // null = panel idle / nothing being edited
 }
 
+type ProblemEditOwner = 'master' | 'note';
+
+// Mutual-exclusion lock between the Master Problem List and a Progress
+// Note's in-note Assessment editor — only one may be in draft-edit mode at a
+// time, so a publish from one side never clobbers unpublished edits from the
+// other. Persisted (see partialize below) so a restored draft after reload
+// keeps the other side locked; scoped per-patient so switching patients
+// doesn't leave a stale lock behind.
+interface ProblemEditLock {
+  patientId: string;
+  owner: ProblemEditOwner;
+  noteId?: string;
+  acquiredAt: string;
+}
+
 interface UiState {
   sidebarCollapsed: boolean;
   documentationPanelOpen: boolean;
@@ -40,6 +55,15 @@ interface UiState {
   resetUiScale: () => void;
   onPublishAndSwitch: (() => Promise<boolean>) | null;
   registerPublishHandler: (handler: (() => Promise<boolean>) | null) => void;
+  problemEditLock: ProblemEditLock | null;
+  // Returns false (without acquiring) if the lock is already held by the
+  // *other* owner for this patient. Re-acquiring as the same owner (e.g. a
+  // restored draft) always succeeds and refreshes acquiredAt.
+  acquireProblemEditLock: (patientId: string, owner: ProblemEditOwner, noteId?: string) => boolean;
+  // No-ops if the lock isn't currently held by `owner` — a stale release
+  // (e.g. from an unmounting component that never actually held it) must
+  // never clear the other side's active lock.
+  releaseProblemEditLock: (owner: ProblemEditOwner) => void;
 }
 
 // Viewport-aware default: collapse on screens < 1440px
@@ -50,7 +74,7 @@ const getDefaultSidebarCollapsed = () => {
 
 export const useUiStore = create<UiState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sidebarCollapsed: getDefaultSidebarCollapsed(),
       documentationPanelOpen: false,
       activeScreen: 'dashboard',
@@ -123,12 +147,30 @@ export const useUiStore = create<UiState>()(
       }),
       onPublishAndSwitch: null,
       registerPublishHandler: (handler) => set({ onPublishAndSwitch: handler }),
+      problemEditLock: null,
+      acquireProblemEditLock: (patientId, owner, noteId) => {
+        const current = get().problemEditLock;
+        // A lock for a different patient is stale/irrelevant here — the
+        // caller only cares about contention on its own patient.
+        if (current && current.patientId === patientId && current.owner !== owner) {
+          return false;
+        }
+        set({
+          problemEditLock: { patientId, owner, noteId, acquiredAt: new Date().toISOString() },
+        });
+        return true;
+      },
+      releaseProblemEditLock: (owner) => set((state) => {
+        if (state.problemEditLock?.owner !== owner) return {};
+        return { problemEditLock: null };
+      }),
     }),
     {
       name: 'damayan-ui-sidebar',
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
-        uiScale: state.uiScale 
+        uiScale: state.uiScale,
+        problemEditLock: state.problemEditLock,
       }),
     },
   ),

@@ -96,6 +96,41 @@ export class ProgressNotesService {
   }
 
   // ─────────────────────────────────────────────
+  // Normalizes a raw problemListSnapshot JSON array into the shape
+  // ProblemsService#upsertFromAssessment expects. Preserves whether each item
+  // explicitly carried a `parentId` key (even set to `null`, meaning "root")
+  // versus omitting it entirely (meaning "this entry carries no nesting info
+  // — leave existing nesting alone"), since upsertFromAssessment relies on
+  // that distinction via `hasOwnProperty` to stay backward-compatible with
+  // older snapshots that never carried nesting at all.
+  // ─────────────────────────────────────────────
+  private mapAssessmentSnapshot(raw: any[] | null | undefined): {
+    id?: string;
+    tempId?: string;
+    title: string;
+    parentId?: string | null;
+    diagnosisDate?: string | null;
+  }[] {
+    return (raw || [])
+      .filter((p) => p && p.title && String(p.title).trim() !== '')
+      .map((p) => {
+        const hasParentId = Object.prototype.hasOwnProperty.call(
+          p,
+          'parentId',
+        );
+        return {
+          id: p.id ? String(p.id) : undefined,
+          tempId: p.tempId ? String(p.tempId) : undefined,
+          title: String(p.title).trim(),
+          diagnosisDate: p.diagnosisDate ?? undefined,
+          ...(hasParentId
+            ? { parentId: p.parentId === null ? null : String(p.parentId) }
+            : {}),
+        };
+      });
+  }
+
+  // ─────────────────────────────────────────────
   // Guards against stale medicationSnapshot payloads: the frontend keeps its
   // own copy of the patient's active medications in form state, and can lag
   // behind a deletion made concurrently in the Medications module (different
@@ -425,12 +460,9 @@ export class ProgressNotesService {
             this.medicationsService.findActiveForPatient(patientId, tx),
           ]);
 
-          const snapshotItems = ((note.problemListSnapshot as any[]) || [])
-            .filter((p) => p && p.title && String(p.title).trim() !== '')
-            .map((p) => ({
-              id: p.id ? String(p.id) : undefined,
-              title: String(p.title).trim(),
-            }));
+          const snapshotItems = this.mapAssessmentSnapshot(
+            note.problemListSnapshot as any[],
+          );
 
           const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
             .filter(
@@ -588,12 +620,7 @@ export class ProgressNotesService {
           }
         }
 
-        const validProblems = prevSnapshotProblems
-          .filter((p) => p && p.title && String(p.title).trim() !== '')
-          .map((p) => ({
-            id: p.id ? String(p.id) : undefined,
-            title: String(p.title).trim(),
-          }));
+        const validProblems = this.mapAssessmentSnapshot(prevSnapshotProblems);
 
         const validMeds = prevSnapshotMeds
           .filter(

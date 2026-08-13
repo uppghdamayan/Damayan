@@ -9,7 +9,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
-import { isDescendant } from '@/lib/problem-utils';
+import { getCreatorName, getSelectableParents } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 150px';
@@ -31,6 +31,11 @@ interface ActiveProblemTableProps {
   allOptions: Problem[];
   canManage: boolean;
   isEditMode: boolean;
+  // True while a Progress Note draft holds the mutual edit lock — see
+  // useProblemEditLock. The list stays read-only (canManage is already
+  // false from the caller in this state); this only controls the banner.
+  isLocked?: boolean;
+  onJumpToLockOwner?: () => void;
   onRevert: () => void;
   onSaveDraft: () => void;
   onPublish: () => void;
@@ -77,12 +82,7 @@ export function ActiveProblemRow({
   onDelete: () => void;
   onParentChange: (newParentId: string | null) => void;
 }) {
-  const selectableParents = allOptions.filter((p) => {
-    if (p.status !== 'ACTIVE') return false;
-    if (p.id === problem.id) return false;
-    if (isDescendant(allOptions, p.id, problem.id)) return false;
-    return true;
-  });
+  const selectableParents = getSelectableParents(allOptions, problem.id);
 
   const isCurrentTarget = dragOverState?.id === problem.id;
   const isNestHover = isCurrentTarget && dragOverState?.action === 'nest';
@@ -91,13 +91,6 @@ export function ActiveProblemRow({
 
   const creator = problem.addedByUser;
   const addedAt = problem.createdAt;
-
-  const getCreatorName = (user: typeof problem.addedByUser) => {
-    if (!user) return 'System';
-    if (user.role === 'DOCTOR') return `Dr. ${user.lastName}`;
-    if (user.role === 'NURSE') return `Nurse ${user.lastName}`;
-    return `${user.firstName} ${user.lastName}`;
-  };
   const creatorName = getCreatorName(creator);
 
   const formattedAddedDateTime =
@@ -347,6 +340,8 @@ export function ActiveProblemTable({
   allOptions,
   canManage,
   isEditMode,
+  isLocked,
+  onJumpToLockOwner,
   onRevert,
   onSaveDraft,
   onPublish,
@@ -365,8 +360,31 @@ export function ActiveProblemTable({
 
   return (
     <div ref={setNodeRef} className={cn("flex flex-col w-full relative rounded-b-lg transition-colors", isTableDragging ? "overflow-x-hidden" : "overflow-x-auto")}>
-      
 
+
+
+      {/* Locked-by-note Banner — takes priority over the (mutually
+          exclusive) edit-mode banner below, since this list can't be in its
+          own edit mode while locked by the other side. */}
+      {isLocked && (
+        <div className="flex items-center gap-3 px-[14px] py-[9px] bg-slate-500/10 border-b border-slate-400/25 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[13px]">🔒</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-slate-600">Locked</span>
+            <span className="text-[10px] text-slate-500 hidden @md:inline">
+              — Problem edits are in progress in a Progress Note draft.
+            </span>
+          </div>
+          {onJumpToLockOwner && (
+            <button
+              onClick={onJumpToLockOwner}
+              className="h-[24px] px-2.5 rounded text-[10px] font-semibold text-slate-700 border border-slate-400/50 hover:bg-slate-500/10 transition-all duration-150 cursor-pointer flex-shrink-0"
+            >
+              Open Note →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Edit Mode Banner */}
       {isEditMode && (
