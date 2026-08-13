@@ -1679,7 +1679,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   icon={<Pill className="w-3.5 h-3.5" />}
                 >
                   <div className="flex flex-col gap-1.5">
-                    <p className="text-[11px] text-text-muted -mt-0.5 mb-1">
+                    <p className="text-[11px] font-bold text-text-muted -mt-0.5 mb-1">
                       Medications recorded here are kept as past history. Use the '+' button to reflect them to the Prescribed Medications list.
                     </p>
                     {pastMedEntries.length === 0 ? (
@@ -1731,7 +1731,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                         toast.success(`Reflected "${medName}" to Prescribed Medications.`);
                                       }}
                                       title="Reflect to Prescribed Medications"
-                                      className="text-text-muted hover:text-green transition-colors w-6 h-6 rounded-md"
+                                      className="text-green hover:text-green animate-pulse hover:animate-none transition-colors w-6 h-6 rounded-md"
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                     </Button>

@@ -1080,7 +1080,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-surface-3">
         {isInitialLoading ? (
           <NoteFormSkeleton />
         ) : (
@@ -1099,10 +1099,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           <div className="flex flex-col gap-4">
 
             {/* SUBJECTIVE (or Note Details for Non-Doctors) */}
-            <div id="subjective-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💬</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+            <div id="subjective-section" className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">💬</div>
+                <span className="note-section-title">
                   {isNonDoctor ? 'Note Details' : 'Subjective'} <span className="text-red ml-0.5">*</span>
                 </span>
               </div>
@@ -1123,10 +1123,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             {!isNonDoctor && (
               <>
             {/* OBJECTIVE */}
-            <div id="objective-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🔬</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
+            <div id="objective-section" className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">🔬</div>
+                <span className="note-section-title">
                   Objective <span className="text-red ml-0.5">*</span>
                 </span>
               </div>
@@ -1164,10 +1164,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* PROBLEM LIST */}
-            <div id="problem-list-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">📊</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Assessment / Problem List</span>
+            <div id="problem-list-section" className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">📊</div>
+                <span className="note-section-title">Assessment / Problem List</span>
               </div>
               <div className="p-[14px]">
                 <Controller
@@ -1280,10 +1280,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* NON-PHARMACOLOGIC */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🏃</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Non-pharmacologic Management</span>
+            <div className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">🏃</div>
+                <span className="note-section-title">Non-pharmacologic Management</span>
               </div>
               <div className="p-[14px]">
                 <textarea
@@ -1296,10 +1296,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* DIAGNOSTICS */}
-            <div id="diagnostics-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden" style={{ overflow: 'visible' }}>
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🔍</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Diagnostics</span>
+            <div id="diagnostics-section" className="note-section" style={{ overflow: 'visible' }}>
+              <div className="note-section-header">
+                <div className="note-section-icon">🔍</div>
+                <span className="note-section-title">Diagnostics</span>
               </div>
               <div className="p-[14px]">
                 <Controller
@@ -1320,10 +1320,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* PHARMACOLOGIC TREATMENT REMARKS */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💊</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Pharmacologic Treatment Remarks</span>
+            <div className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">💊</div>
+                <span className="note-section-title">Pharmacologic Treatment Remarks</span>
               </div>
               <div className="p-[14px]">
                 <textarea
@@ -1336,10 +1336,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             </div>
 
             {/* MEDICATIONS */}
-            <div id="medications-section" className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">💊</div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">Current Medication List</span>
+            <div id="medications-section" className="note-section">
+              <div className="note-section-header">
+                <div className="note-section-icon">💊</div>
+                <span className="note-section-title">Current Medication List</span>
                 {formValues.medicationSnapshot && formValues.medicationSnapshot.length > 0 && (
                   <span className="text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-full">
                     {formValues.medicationSnapshot.length} {formValues.medicationSnapshot.length === 1 ? 'med' : 'meds'}
@@ -1391,7 +1391,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                             const medQty = typeof med !== 'string' ? med.quantity : undefined;
                             const medSig = typeof med !== 'string' ? med.instructions : undefined;
                             const isNewMed = typeof med !== 'string' && med.isNew;
-                            const isFromPast = typeof med !== 'string' && med.fromPast;
 
                             const originalDose = !isNewMed && medName
                               ? originalDoseByMedName.get(String(medName).trim().toLowerCase())
@@ -1418,11 +1417,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                                     {isNewMed && (
                                       <span className="text-[8px] font-bold text-green bg-green-bg border border-green-border px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
                                         New
-                                      </span>
-                                    )}
-                                    {isFromPast && (
-                                      <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-600/30 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0" title="Carried over from past medications">
-                                        From Past
                                       </span>
                                     )}
                                     {medDose && (

@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Button } from '../ui/button';
-import { FileText, UploadCloud, X, Eye, CheckCircle2, Image, Plus } from 'lucide-react';
+import { FileText, UploadCloud, X, CheckCircle2, Image, Plus } from 'lucide-react';
 import { PriorLabsTable } from '../notes/PriorLabsTable';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 
@@ -123,36 +122,37 @@ export function AttachmentsSection({
   };
 
   return (
-    <div className="bg-surface border border-border rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
-      <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface-2 border-b border-border rounded-t-[7px]">
-        <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-surface-3 shrink-0">🧪</div>
-        <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary flex-1">
-          Results of Labs or Imaging
-        </span>
+    <div className="note-section">
+      <div className="note-section-header">
+        <div className="note-section-icon">🧪</div>
+        <span className="note-section-title">Results of Labs or Imaging</span>
       </div>
-      
-      <div className="p-[14px] flex flex-col gap-4">
+
+      <div className="note-section-body flex flex-col gap-5">
         {/* Prior Labs Table Section */}
-        <div className="flex flex-col">
-          <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary mb-1.5 pb-1 border-b border-border">
-            Prior Labs & Attachments
+        <div className="flex flex-col gap-2">
+          <div className="note-subsection-title">
+            <span>Prior Labs &amp; Attachments</span>
+            <span className="font-normal normal-case tracking-normal text-[10px] text-text-muted">
+              — read-only history
+            </span>
           </div>
-          <PriorLabsTable 
-            patientId={patientId} 
+          <PriorLabsTable
+            patientId={patientId}
             noteId={noteId}
-            localAttachments={localAttachments} 
-            onRemoveLocalAttachment={onRemoveLocalAttachment} 
+            localAttachments={localAttachments}
+            onRemoveLocalAttachment={onRemoveLocalAttachment}
           />
         </div>
 
         {/* New Results Upload Section */}
-        <div className="flex flex-col">
-          <div className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary mb-2 pb-1 border-b border-border flex items-center gap-1">
-            New Lab / Imaging Result
+        <div className="flex flex-col gap-2">
+          <div className="note-subsection-title">
+            <span>New Lab / Imaging Result</span>
           </div>
 
           {/* Upload Form Container */}
-          <div className="flex flex-col gap-3 p-3.5 border border-border rounded-[8px] bg-surface-2/40">
+          <div className="flex flex-col gap-3 p-3.5 border border-border rounded-[8px] bg-surface-2">
             {/* Tag Selection */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-bold text-text-secondary uppercase tracking-[0.5px]">
@@ -249,7 +249,7 @@ export function AttachmentsSection({
                   {/* Positive status badge */}
                   <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/60 text-[11px] font-medium text-accent">
                     <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
-                    <span>File selected. Click "+ Add Result" below to attach to this note.</span>
+                    <span>File selected. Click &quot;Add Result&quot; below to attach it to this note.</span>
                   </div>
                 </div>
               )}

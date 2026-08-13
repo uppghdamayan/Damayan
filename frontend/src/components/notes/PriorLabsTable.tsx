@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
-import { usePriorLabs, useAttachmentDownloadUrl, useDeleteAttachment } from '@/hooks/useAttachments';
-import { Trash2, Eye } from 'lucide-react';
+import React from 'react';
+import { usePriorLabs, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
+import { Trash2, Eye, FileText, FlaskConical, Paperclip } from 'lucide-react';
 import { Button } from '../ui/button';
-import { useAuthStore } from '@/stores/authStore';
-import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 
 interface PriorLabsTableProps {
   patientId: string;
@@ -14,12 +12,6 @@ interface PriorLabsTableProps {
 
 export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRemoveLocalAttachment }: PriorLabsTableProps) {
   const { data: groupedLabs, isLoading } = usePriorLabs(patientId);
-  const deleteMutation = useDeleteAttachment();
-  const { user } = useAuthStore();
-  const role = user?.role;
-  const canDelete = role === 'DOCTOR' || role === 'ADMIN';
-
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string, tag: string, noteType: string, noteId: string } | null>(null);
 
   const latestCurrentNoteAttachmentId = React.useMemo(() => {
     if (!noteId) return null;
@@ -49,153 +41,127 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
     );
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteMutation.mutateAsync({
-        id: deleteTarget.id,
-        noteType: deleteTarget.noteType,
-        noteId: deleteTarget.noteId,
-      });
-      setDeleteTarget(null);
-    } catch (e: any) {
-      alert(e.message || 'Failed to delete attachment');
-      setDeleteTarget(null);
-    }
-  };
-
   return (
-    <div className="border border-border rounded-[6px] overflow-hidden my-1 w-full overflow-x-auto">
-      <table className="w-full border-collapse table-fixed text-left min-w-[290px]">
-        <colgroup>
-          <col className="w-[18%]" />
-          <col className="w-[26%]" />
-          <col className="w-[42%]" />
-          <col className="w-[14%]" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Tag</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Date</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1.5 py-2 text-left bg-surface-2 border-b border-border truncate">Result</th>
-            <th className="text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary px-1 py-2 text-center bg-surface-2 border-b border-border truncate">Act.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {localAttachments.map((att: any, idx: number) => (
-            <tr key={`local-${idx}`} className="bg-[rgba(10,110,95,0.04)] border-l-2 border-l-accent transition-colors">
-              <td className="px-1.5 py-2 text-[12px] text-text-primary font-semibold align-middle border-b border-border truncate" title={att.tag}>
-                {att.tag}
-              </td>
-              <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
-                <span className="text-[9px] font-bold text-accent bg-accent/10 px-1 py-0.5 rounded uppercase tracking-[0.5px] whitespace-nowrap inline-block">Just Now</span>
-              </td>
-              <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
-                {att.textResult ? (
-                  <span className="italic text-text-secondary truncate block" title={att.textResult}>"{att.textResult}"</span>
-                ) : att.file ? (
-                  <span className="text-[12px] font-medium text-accent truncate block" title={att.file.name}>{att.file.name}</span>
-                ) : null}
-              </td>
-              <td className="px-1 py-2 text-[12px] text-text-secondary align-middle border-b border-border text-center">
-                <div className="flex items-center justify-center gap-0.5">
+    <div className="flex flex-col gap-2 w-full">
+      {/* Attachments staged in the current, unsaved note — removable until save */}
+      {localAttachments.length > 0 && (
+        <div className="border border-accent/40 rounded-[6px] overflow-hidden bg-accent/[0.04]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/10 border-b border-accent/25">
+            <Paperclip className="w-3 h-3 text-accent shrink-0" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.6px] text-accent-hover">
+              Attaching to this note ({localAttachments.length})
+            </span>
+          </div>
+          <ul className="divide-y divide-accent/15">
+            {localAttachments.map((att: any, idx: number) => (
+              <li key={`local-${idx}`} className="flex items-center gap-2 px-2.5 py-2">
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span className="text-[12px] font-semibold text-text-primary truncate" title={att.tag}>
+                    {att.tag}
+                  </span>
+                  <span className="text-[11px] text-text-muted truncate" title={att.textResult || att.file?.name}>
+                    {att.textResult ? `"${att.textResult}"` : att.file?.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-0.5 shrink-0">
                   {att.file && (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => {
-                        const url = URL.createObjectURL(att.file);
-                        window.open(url, '_blank');
-                      }}
-                      className="text-text-muted hover:text-accent hover:bg-surface-2 border border-transparent hover:border-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
-                      title="View File"
+                    <IconAction
+                      label="View file"
+                      onClick={() => window.open(URL.createObjectURL(att.file), '_blank')}
                     >
                       <Eye size={13} />
-                    </Button>
+                    </IconAction>
                   )}
                   {onRemoveLocalAttachment && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon-xs" 
+                    <IconAction
+                      label="Remove before saving"
+                      danger
                       onClick={() => onRemoveLocalAttachment(idx)}
-                      className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
-                      title="Remove Attachment"
                     >
                       <Trash2 size={13} />
-                    </Button>
+                    </IconAction>
                   )}
                 </div>
-              </td>
-            </tr>
-          ))}
-          {groupedLabs?.map((group: any) => (
-            <React.Fragment key={group.tag}>
-              {group.attachments.map((att: any, idx: number) => (
-                <tr key={att.id} className="hover:bg-surface-3 transition-colors">
-                  {idx === 0 ? (
-                    <td className="px-1.5 py-2 text-[12px] text-text-primary font-semibold align-middle border-b border-border truncate" rowSpan={group.attachments.length} title={group.tag}>
-                      {group.tag}
-                    </td>
-                  ) : null}
-                  <td className="px-1.5 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden truncate">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="whitespace-nowrap text-[11px] font-mono">{new Date(att.uploadedAt).toLocaleDateString()}</span>
-                      {att.id === latestCurrentNoteAttachmentId && (
-                        <span className="text-[8px] font-bold text-accent bg-accent/10 px-1 py-0.5 rounded uppercase tracking-[0.5px] whitespace-nowrap inline-block">
-                          Latest
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-2 text-[12px] text-text-secondary align-middle border-b border-border overflow-hidden">
-                    {att.textResult ? (
-                      <span className="italic text-text-secondary truncate block" title={att.textResult}>"{att.textResult}"</span>
-                    ) : (
-                      <span className="text-text-muted text-[10px] uppercase tracking-[0.5px] whitespace-nowrap">File only</span>
-                    )}
-                  </td>
-                  <td className="px-1 py-2 text-[12px] text-text-secondary align-middle border-b border-border text-center">
-                    <div className="flex items-center justify-center gap-0.5">
-                      <DownloadButton attachmentId={att.id} storageKey={att.storageKey} />
-                      {canDelete && (
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteTarget({
-                              id: att.id,
-                              tag: att.tag,
-                              noteType: att.noteType,
-                              noteId: att.noteId,
-                            });
-                          }}
-                          className="text-text-muted hover:text-red hover:bg-red-bg border border-transparent hover:border-red-border transition-all cursor-pointer h-6 w-6 flex items-center justify-center p-0"
-                          title="Delete Attachment"
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
-
-      {deleteTarget && (
-        <DeleteConfirmModal
-          open={!!deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={handleDelete}
-          title="Delete Attachment"
-          message={`Are you sure you want to delete the attachment for "${deleteTarget.tag}"? This action cannot be undone.`}
-          isDeleting={deleteMutation.isPending}
-        />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
+
+      {/* Saved history — grouped by tag, view-only */}
+      {groupedLabs?.map((group: any) => (
+        <div key={group.tag} className="border border-border rounded-[6px] overflow-hidden bg-surface">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-surface-2 border-b border-border">
+            <FlaskConical className="w-3 h-3 text-text-muted shrink-0" />
+            <span className="text-[11px] font-bold text-text-primary truncate" title={group.tag}>
+              {group.tag}
+            </span>
+            <span className="text-[9px] font-bold text-text-muted bg-surface-3 border border-border px-1.5 py-[1px] rounded-full shrink-0">
+              {group.attachments.length}
+            </span>
+          </div>
+          <ul className="divide-y divide-border">
+            {group.attachments.map((att: any) => (
+              <li key={att.id} className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-surface-2/70 transition-colors">
+                <span className="text-[11px] font-mono text-text-secondary whitespace-nowrap shrink-0 w-[72px]">
+                  {new Date(att.uploadedAt).toLocaleDateString()}
+                </span>
+                {att.id === latestCurrentNoteAttachmentId && (
+                  <span className="text-[8px] font-bold text-accent bg-accent/10 border border-accent/30 px-1 py-[1px] rounded uppercase tracking-[0.5px] shrink-0">
+                    Latest
+                  </span>
+                )}
+                <span className="flex-1 min-w-0 text-[12px] text-text-secondary truncate" title={att.textResult || undefined}>
+                  {att.textResult ? (
+                    <span className="italic">&quot;{att.textResult}&quot;</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-text-muted">
+                      <FileText className="w-3 h-3 shrink-0" />
+                      <span className="text-[11px]">File only</span>
+                    </span>
+                  )}
+                </span>
+                <div className="shrink-0">
+                  <DownloadButton attachmentId={att.id} storageKey={att.storageKey} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
+  );
+}
+
+function IconAction({
+  children,
+  label,
+  onClick,
+  danger,
+  disabled,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={`h-6 w-6 p-0 flex items-center justify-center border border-transparent transition-all cursor-pointer text-text-muted ${
+        danger
+          ? 'hover:text-red hover:bg-red-bg hover:border-red-border'
+          : 'hover:text-accent hover:bg-surface-2 hover:border-border'
+      }`}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -217,19 +183,12 @@ function DownloadButton({ attachmentId, storageKey }: { attachmentId: string, st
   };
 
   return (
-    <Button 
-      variant="ghost" 
-      size="icon-xs" 
-      onClick={handleDownload}
-      disabled={isFetching}
-      title="Download/View File"
-      className="text-text-muted hover:text-accent hover:bg-surface-2 border border-transparent hover:border-border transition-all cursor-pointer h-7 w-7 flex items-center justify-center"
-    >
+    <IconAction label="View file" onClick={handleDownload} disabled={isFetching}>
       {isFetching ? (
         <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       ) : (
         <Eye size={13} />
       )}
-    </Button>
+    </IconAction>
   );
 }
