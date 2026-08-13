@@ -162,9 +162,16 @@ export class InitialNotesService {
       ...(updateData.physicalExam !== undefined && {
         physicalExam: updateData.physicalExam,
       }),
-      ...(updateData.assessment !== undefined && {
-        assessment: updateData.assessment as any,
-      }),
+      // Assessment is locked once published (Subjective/Objective/Assessment/
+      // Plan are permanent records — only the History module and Past
+      // Medications stay editable). Silently ignoring it here — rather than
+      // persisting whatever the form last happened to submit — keeps a
+      // published note's Assessment out of the version diff entirely, since
+      // it never actually changes post-publish.
+      ...(updateData.assessment !== undefined &&
+        note.status !== NoteStatus.PUBLISHED && {
+          assessment: updateData.assessment as any,
+        }),
       ...(updateData.mgmtNonpharm !== undefined && {
         mgmtNonpharm: updateData.mgmtNonpharm,
       }),
@@ -228,21 +235,9 @@ export class InitialNotesService {
             tx,
           );
 
-          if (updateData.assessment) {
-            const assessmentItems = ((updateData.assessment as any[]) || [])
-              .filter((a) => a && a.title && String(a.title).trim() !== '')
-              .map((a) => ({
-                id: a.id ? String(a.id) : undefined,
-                title: String(a.title).trim(),
-              }));
-            await this.problemsService.upsertFromAssessment(
-              patientId,
-              assessmentItems,
-              userId,
-              'Initial Note',
-              tx,
-            );
-          }
+          // Assessment is locked post-publish (see the `data` construction
+          // above) — never re-syncs Problem records from here. Problem
+          // changes on a published patient go through the Problems module.
 
           if (updateData.medicationSnapshot) {
             const medicationItems = (

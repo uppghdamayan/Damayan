@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   MessageSquare,
   Microscope,
@@ -239,25 +239,23 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <Search className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Diagnostics</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 mt-1 pl-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-1 pl-2">
             {diagDiff.map((item, idx) => (
-              <React.Fragment key={idx}>
+              <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
                 {item.status === 'removed' ? (
-                  <Badge variant="removed" className="border-dashed line-through opacity-70">
-                    <span>{item.text}</span>
-                    <Badge variant="critical" className="ml-1 px-1 py-0 h-3 text-[8px]">Removed</Badge>
-                  </Badge>
+                  <Badge variant="removed" className="border-dashed line-through opacity-70">{item.text}</Badge>
                 ) : item.status === 'added' ? (
-                  <Badge variant="active" className="shadow-sm">
-                    <span>{item.text}</span>
-                    <Badge variant="saved" className="ml-1 px-1 py-0 h-3 text-[8px]">New</Badge>
-                  </Badge>
+                  <Badge variant="active" className="shadow-sm">{item.text}</Badge>
                 ) : (
-                  <Badge variant="resolved" className="shadow-sm">
-                    <span>{item.text}</span>
-                  </Badge>
+                  <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
                 )}
-              </React.Fragment>
+                {item.status === 'removed' && (
+                  <Badge variant="critical" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
+                )}
+                {item.status === 'added' && (
+                  <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -281,41 +279,39 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <Pill className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Medications</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 mt-1 pl-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-1 pl-2">
             {medDiff.map((item, idx) => (
-              <React.Fragment key={idx}>
+              <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
                 {item.status === 'removed' ? (
-                  <Badge variant="removed" className="border-dashed line-through opacity-70">
-                    <span>{item.text}</span>
-                    <Badge variant="critical" className="ml-1 px-1 py-0 h-3 text-[8px]">Removed</Badge>
-                  </Badge>
+                  <Badge variant="removed" className="border-dashed line-through opacity-70">{item.text}</Badge>
                 ) : item.status === 'added' ? (
-                  <Badge variant="active" className="shadow-sm">
-                    <span>{item.text}</span>
-                    <Badge variant="saved" className="ml-1 px-1 py-0 h-3 text-[8px]">New</Badge>
-                  </Badge>
+                  <Badge variant="active" className="shadow-sm">{item.text}</Badge>
                 ) : item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed' ? (
-                  <>
-                    <Badge
-                      variant="resolved"
-                      className="shadow-sm"
-                      title={item.fromDose && item.toDose ? `Dose changed from ${item.fromDose} to ${item.toDose}` : undefined}
-                    >
-                      <span>{item.text}</span>
-                    </Badge>
-                    <Badge
-                      variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
-                      className="shadow-sm"
-                    >
-                      {item.status === 'dose-up' ? '↑ Dose' : item.status === 'dose-down' ? '↓ Dose' : 'Dose Changed'}
-                    </Badge>
-                  </>
+                  <Badge
+                    variant="resolved"
+                    className="shadow-sm"
+                    title={item.fromDose && item.toDose ? `Dose changed from ${item.fromDose} to ${item.toDose}` : undefined}
+                  >
+                    {item.text}
+                  </Badge>
                 ) : (
-                  <Badge variant="resolved" className="shadow-sm">
-                    <span>{item.text}</span>
+                  <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
+                )}
+                {item.status === 'removed' && (
+                  <Badge variant="critical" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
+                )}
+                {item.status === 'added' && (
+                  <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
+                )}
+                {(item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed') && (
+                  <Badge
+                    variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
+                    className="px-1 py-0 h-3 text-[8px]"
+                  >
+                    {item.status === 'dose-up' ? '↑ Dose' : item.status === 'dose-down' ? '↓ Dose' : 'Dose Changed'}
                   </Badge>
                 )}
-              </React.Fragment>
+              </div>
             ))}
           </div>
         </div>

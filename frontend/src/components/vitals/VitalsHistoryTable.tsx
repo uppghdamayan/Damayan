@@ -3,9 +3,8 @@
 import { useMemo } from 'react';
 import { 
   formatTemperature, 
-  formatBloodPressure, 
-  classifyBloodPressure, 
-  classifyHeartRate, 
+  formatBloodPressure,
+  classifyHeartRate,
   classifyRespiratoryRate, 
   classifyTemperature, 
   classifyOxygenSaturation 
@@ -87,7 +86,6 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                 const dateStr = dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
                 
-                const bpClass = getColorClass(classifyBloodPressure(v.sbp, v.dbp));
                 const hrClass = getColorClass(classifyHeartRate(v.heartRate));
                 const rrClass = getColorClass(classifyRespiratoryRate(v.respiratoryRate));
                 const tempClass = getColorClass(classifyTemperature(v.temperature));
@@ -107,7 +105,7 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                       <div className="font-mono">{dateStr}</div>
                       <div className="font-mono text-[10px] text-text-muted">{timeStr}</div>
                     </td>
-                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : bpClass}`}>{formatBloodPressure(v.sbp, v.dbp)}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>{formatBloodPressure(v.sbp, v.dbp)}</td>
                     <td className={`py-2.5 px-4 ${isGhost ? strikeClass : hrClass}`}>{v.heartRate ?? '—'}</td>
                     <td className={`py-2.5 px-4 ${isGhost ? strikeClass : rrClass}`}>{v.respiratoryRate ?? '—'}</td>
                     <td className={`py-2.5 px-4 ${isGhost ? strikeClass : tempClass}`}>{formatTemperature(v.temperature)}</td>
