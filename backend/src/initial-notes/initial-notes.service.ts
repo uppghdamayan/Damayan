@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInitialNoteDto } from './dto/create-initial-note.dto';
 import { UpdateInitialNoteDto } from './dto/update-initial-note.dto';
-import { NoteStatus, VisitType, Prisma } from '@prisma/client';
+import { NoteStatus, VisitType, Prisma, InitialNote } from '@prisma/client';
 import { VisitsService } from '../visits/visits.service';
 import { ProblemsService } from '../problems/problems.service';
 import { MedicationsService } from '../medications/medications.service';
@@ -16,6 +16,9 @@ import {
   diffByTitle,
   diffByNameDoseUnit,
 } from '../progress-notes/progress-notes.utils';
+import { buildSnapshot, diffNoteFields } from './initial-notes.utils';
+
+type PrismaTx = Prisma.TransactionClient;
 
 @Injectable()
 export class InitialNotesService {
@@ -70,7 +73,7 @@ export class InitialNotesService {
         tx,
       );
 
-      return tx.initialNote.create({
+      const created = await tx.initialNote.create({
         data: {
           visitId: visit.id,
           authorId: userId,
@@ -95,6 +98,17 @@ export class InitialNotesService {
           status: NoteStatus.DRAFT,
         },
       });
+
+      await this.logAction(
+        patientId,
+        userId,
+        'Created',
+        'Created Initial Note draft',
+        tx,
+        created.id,
+      );
+
+      return created;
     });
   }
 
@@ -171,10 +185,41 @@ export class InitialNotesService {
 
       return this.prisma.$transaction(
         async (tx) => {
+          // v1 must always be the note as published. Notes published before
+          // version history existed have no baseline, so capture the pre-edit
+          // state as v1 first — this edit then correctly lands as v2.
+          await this.ensureBaselineVersion(patientId, note, tx, userId);
+
           const updatedNote = await tx.initialNote.update({
             where: { id },
             data,
           });
+
+          // Version + log the edit. A save that changed nothing records
+          // neither, so the history stays free of no-op entries.
+          const { changedFields, summary } = diffNoteFields(
+            note as unknown as Record<string, unknown>,
+            updatedNote as unknown as Record<string, unknown>,
+          );
+          if (changedFields.length > 0) {
+            const version = await this.snapshotVersion(
+              patientId,
+              updatedNote,
+              changedFields,
+              summary,
+              userId,
+              tx,
+            );
+            await this.logAction(
+              patientId,
+              userId,
+              'Revised',
+              `Revised published Initial Note (v${version.versionNumber}): ${summary}`,
+              tx,
+              id,
+              version.id,
+            );
+          }
 
           const beforeProblems =
             await this.problemsService.findActiveForPatient(patientId, tx);
@@ -259,7 +304,28 @@ export class InitialNotesService {
       );
     }
 
-    return this.prisma.initialNote.update({ where: { id }, data });
+    // DRAFT: no version snapshot (nothing is clinically committed yet), but the
+    // save is still logged for transparency when it actually changed something.
+    return this.prisma.$transaction(async (tx) => {
+      const updatedNote = await tx.initialNote.update({ where: { id }, data });
+
+      const { changedFields, summary } = diffNoteFields(
+        note as unknown as Record<string, unknown>,
+        updatedNote as unknown as Record<string, unknown>,
+      );
+      if (changedFields.length > 0) {
+        await this.logAction(
+          patientId,
+          userId,
+          'Updated',
+          `Updated Initial Note draft: ${summary}`,
+          tx,
+          id,
+        );
+      }
+
+      return updatedNote;
+    });
   }
 
   async publish(patientId: string, id: string, userId: string) {
@@ -290,6 +356,26 @@ export class InitialNotesService {
           this.problemsService.findActiveForPatient(patientId, tx),
           this.medicationsService.findActiveForPatient(patientId, tx),
         ]);
+
+        // v1 — the note exactly as first published. No changedFields: there is
+        // no earlier version to have changed from.
+        const version = await this.snapshotVersion(
+          patientId,
+          published,
+          [],
+          null,
+          userId,
+          tx,
+        );
+        await this.logAction(
+          patientId,
+          userId,
+          'Published',
+          `Published Initial Note (v${version.versionNumber})`,
+          tx,
+          id,
+          version.id,
+        );
 
         const assessmentItems = ((note.assessment as any[]) || [])
           .filter((a) => a && a.title && String(a.title).trim() !== '')
@@ -393,6 +479,15 @@ export class InitialNotesService {
           where: { id },
           data: { isDeleted: true },
         });
+        // Soft delete — versions and log entries are retained.
+        await this.logAction(
+          patientId,
+          userId,
+          'Deleted',
+          'Archived published Initial Note',
+          tx,
+          id,
+        );
         return { success: true, ...note, isDeleted: true };
       }
 
@@ -416,12 +511,187 @@ export class InitialNotesService {
         where: { noteId: id },
       });
 
+      // Defensive: a DRAFT should never have versions (they are only written on
+      // publish), but the FK is RESTRICT, so clear any before deleting the note.
+      await tx.initialNoteVersion.deleteMany({ where: { initialNoteId: id } });
+
+      // Detach existing log rows rather than deleting them — the change history
+      // survives the note, matching how ProblemLog handles a hard-deleted problem.
+      await tx.initialNoteLog.updateMany({
+        where: { initialNoteId: id },
+        data: { initialNoteId: null, versionId: null },
+      });
+
       await tx.initialNote.delete({ where: { id } });
 
       // Delete the visit since an Initial Note is 1:1 with its visit
       await tx.visit.delete({ where: { id: note.visitId } });
 
+      await this.logAction(
+        patientId,
+        userId,
+        'Deleted',
+        'Deleted Initial Note draft',
+        tx,
+      );
+
       return { success: true, ...note };
     });
+  }
+
+  // ─────────────────────────────────────────────
+  // INITIAL NOTE LOGS
+  // ─────────────────────────────────────────────
+  // Patient-scoped master change log, mirroring ProblemsService.getLogs — but
+  // with NO retention cleanup. Unlike problem logs (purged after 14 days),
+  // initial-note entries are kept indefinitely.
+
+  async getLogs(patientId: string) {
+    return this.prisma.initialNoteLog.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        editor: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // VERSION HISTORY
+  // ─────────────────────────────────────────────
+
+  /** Version metadata for the history rail — deliberately omits `snapshot`. */
+  async getVersions(patientId: string, noteId: string) {
+    await this.assertNoteBelongsToPatient(noteId, patientId);
+
+    return this.prisma.initialNoteVersion.findMany({
+      where: { initialNoteId: noteId },
+      orderBy: { versionNumber: 'desc' },
+      select: {
+        id: true,
+        initialNoteId: true,
+        patientId: true,
+        versionNumber: true,
+        changedFields: true,
+        changeSummary: true,
+        editorId: true,
+        createdAt: true,
+        editor: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+  }
+
+  /** A single version including its full snapshot payload. */
+  async getVersion(patientId: string, noteId: string, versionId: string) {
+    await this.assertNoteBelongsToPatient(noteId, patientId);
+
+    const version = await this.prisma.initialNoteVersion.findFirst({
+      where: { id: versionId, initialNoteId: noteId, patientId },
+      include: {
+        editor: { select: { firstName: true, lastName: true, role: true } },
+      },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    return version;
+  }
+
+  private async assertNoteBelongsToPatient(noteId: string, patientId: string) {
+    const note = await this.prisma.initialNote.findFirst({
+      where: { id: noteId, visit: { patientId } },
+      select: { id: true },
+    });
+    if (!note) throw new NotFoundException('Note not found for this patient');
+    return note;
+  }
+
+  // ─────────────────────────────────────────────
+  // LOG / VERSION WRITERS
+  // ─────────────────────────────────────────────
+
+  private async logAction(
+    patientId: string,
+    editorId: string,
+    action: string,
+    description: string,
+    client: PrismaTx | PrismaService = this.prisma,
+    initialNoteId?: string,
+    versionId?: string,
+  ) {
+    await client.initialNoteLog.create({
+      data: {
+        patientId,
+        editorId,
+        action,
+        description,
+        initialNoteId: initialNoteId ?? null,
+        versionId: versionId ?? null,
+      },
+    });
+  }
+
+  /**
+   * Writes an immutable snapshot of `note` as the next version. Must be called
+   * inside a transaction: the version number is derived from the current max,
+   * and the @@unique([initialNoteId, versionNumber]) constraint is the backstop
+   * if two saves ever race.
+   */
+  private async snapshotVersion(
+    patientId: string,
+    note: InitialNote,
+    changedFields: string[],
+    changeSummary: string | null,
+    editorId: string,
+    client: PrismaTx,
+    createdAt?: Date,
+  ) {
+    const { _max } = await client.initialNoteVersion.aggregate({
+      where: { initialNoteId: note.id },
+      _max: { versionNumber: true },
+    });
+
+    return client.initialNoteVersion.create({
+      data: {
+        initialNoteId: note.id,
+        patientId,
+        versionNumber: (_max.versionNumber ?? 0) + 1,
+        snapshot: buildSnapshot(note) as Prisma.InputJsonValue,
+        changedFields,
+        changeSummary,
+        editorId,
+        ...(createdAt && { createdAt }),
+      },
+    });
+  }
+
+  /**
+   * Guarantees a published note has a v1 baseline before any edit is versioned.
+   *
+   * Only fires for notes published before version history shipped — `publish()`
+   * writes v1 for everything since. Without it the first post-deploy edit would
+   * become "v1", presenting edited content as the original. The snapshot is the
+   * pre-edit state and is dated to when that state came into being, not to now.
+   */
+  private async ensureBaselineVersion(
+    patientId: string,
+    note: InitialNote,
+    client: PrismaTx,
+    fallbackEditorId: string,
+  ) {
+    const existing = await client.initialNoteVersion.count({
+      where: { initialNoteId: note.id },
+    });
+    if (existing > 0) return null;
+
+    return this.snapshotVersion(
+      patientId,
+      note,
+      [],
+      null,
+      // Attribute the baseline to whoever authored the note; editorId is a
+      // non-null FK, so fall back to the current user for authorless legacy rows.
+      note.authorId ?? note.lastEditedBy ?? fallbackEditorId,
+      client,
+      note.lastEditedAt ?? note.createdAt,
+    );
   }
 }

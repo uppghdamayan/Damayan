@@ -100,6 +100,8 @@ model User {
   auditLogs       AuditLog[]   @relation("AuditLogUser")
   problemLogs     ProblemLog[] @relation("ProblemLogEditor")
   medicationLogs  MedicationLog[] @relation("MedicationLogEditor")
+  initialNoteLogs     InitialNoteLog[]     @relation("InitialNoteLogEditor")
+  initialNoteVersions InitialNoteVersion[] @relation("InitialNoteVersionEditor")
 
   @@index([role, isActive])  // AccountsService.findAll / DocumentsService candidate-doctor lookup / last-admin guard
   @@map("users")
@@ -139,6 +141,8 @@ model Patient {
   auditLogs   AuditLog[]   @relation("AuditLogPatient")
   problemLogs ProblemLog[] @relation("ProblemLogPatient")
   medicationLogs MedicationLog[] @relation("MedicationLogPatient")
+  initialNoteLogs     InitialNoteLog[]     @relation("InitialNoteLogPatient")
+  initialNoteVersions InitialNoteVersion[] @relation("InitialNoteVersionPatient")
 
   @@index([lastName, firstName])
   @@index([isActive, lastName, firstName])  // default list/search: WHERE isActive=true ORDER BY lastName, firstName
@@ -208,6 +212,7 @@ model InitialNote {
   visit       Visit        @relation(fields: [visitId], references: [id])
   author      User?        @relation("InitialNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("InitialNoteEditor", fields: [lastEditedBy], references: [id])
+  versions    InitialNoteVersion[]
 
   @@map("initial_notes")
 }
@@ -443,4 +448,54 @@ model MedicationLog {
 
   @@index([patientId, createdAt(sort: Desc)])
   @@map("medication_logs")
+}
+
+// ─────────────────────────────────────────────
+// INITIAL NOTE LOG
+// ─────────────────────────────────────────────
+
+model InitialNoteLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  patientId     String   @map("patient_id") @db.Uuid
+  initialNoteId String?  @map("initial_note_id") @db.Uuid // nullable: survives the hard-delete of a draft note
+  versionId     String?  @map("version_id") @db.Uuid      // set when this entry produced a version snapshot
+  action        String   @db.VarChar(50)
+  description   String
+  editorId      String   @map("editor_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  editor  User    @relation("InitialNoteLogEditor", fields: [editorId], references: [id])
+  patient Patient @relation("InitialNoteLogPatient", fields: [patientId], references: [id])
+
+  @@index([patientId, createdAt(sort: Desc)])
+  @@map("initial_note_logs")
+}
+
+// ─────────────────────────────────────────────
+// INITIAL NOTE VERSION
+// ─────────────────────────────────────────────
+// Immutable snapshot of an Initial Note. v1 is written on publish; every
+// subsequent post-publish save writes the next version. Never purged — these
+// are the medico-legal record of what was documented at each point in time.
+
+model InitialNoteVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  initialNoteId String   @map("initial_note_id") @db.Uuid
+  patientId     String   @map("patient_id") @db.Uuid
+  versionNumber Int      @map("version_number")
+  snapshot      Json
+  changedFields String[] @map("changed_fields") // empty on v1
+  changeSummary String?  @map("change_summary")
+  editorId      String   @map("editor_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // No onDelete: Cascade — publishing then deleting a note is a SOFT delete,
+  // so its versions must outlive the note row's isDeleted flag.
+  initialNote InitialNote @relation(fields: [initialNoteId], references: [id])
+  editor      User        @relation("InitialNoteVersionEditor", fields: [editorId], references: [id])
+  patient     Patient     @relation("InitialNoteVersionPatient", fields: [patientId], references: [id])
+
+  @@unique([initialNoteId, versionNumber])
+  @@index([initialNoteId, versionNumber(sort: Desc)])
+  @@map("initial_note_versions")
 }

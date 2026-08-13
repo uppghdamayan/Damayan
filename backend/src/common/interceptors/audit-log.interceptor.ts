@@ -67,6 +67,13 @@ export class AuditLogInterceptor implements NestInterceptor {
       method === 'POST'
     )
       return { action: 'CREATE', tableName: 'initial_notes' };
+    if (path.match(/^\/patients\/[^/]+\/initial-note$/) && method === 'POST')
+      return { action: 'CREATE', tableName: 'initial_notes' };
+    if (
+      path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+$/) &&
+      method === 'PATCH'
+    )
+      return { action: 'UPDATE', tableName: 'initial_notes' };
     if (
       path.match(/^\/patients\/[^/]+\/initial-note\/[^/]+\/publish$/) &&
       method === 'POST'

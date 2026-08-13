@@ -7,12 +7,14 @@ import {
   initialNotePublishSchema, 
   InitialNoteDraftValues 
 } from '@/lib/validation/initial-note-schema';
-import { 
-  useInitialNote, 
-  useCreateInitialNote, 
-  useUpdateInitialNote, 
+import {
+  useInitialNote,
+  useCreateInitialNote,
+  useUpdateInitialNote,
   usePublishInitialNote,
-  useDeleteInitialNote
+  useDeleteInitialNote,
+  useInitialNoteLogs,
+  useInitialNoteVersions
 } from '@/hooks/useInitialNote';
 import { useCopyForwardData, useProgressNotes } from '@/hooks/useProgressNotes';
 import { useLatestVitals } from '@/hooks/useVitals';
@@ -23,8 +25,11 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUploadAttachment } from '@/hooks/useAttachments';
 import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
+import { MedicationSnapshotModal, MedicationSnapshotValues } from './MedicationSnapshotModal';
+import { InitialNoteLogTable } from './InitialNoteLogTable';
+import { InitialNoteVersionHistoryModal } from './InitialNoteVersionHistoryModal';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
-import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
+import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
@@ -35,7 +40,6 @@ import { toast } from 'sonner';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { MedicationSnapshotModal, type MedicationSnapshotValues } from './MedicationSnapshotModal';
 import { 
   classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
   classifyTemperature, classifyRespiratoryRate,
@@ -313,9 +317,19 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const publishMutation = usePublishInitialNote(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
   const { data: copyForward, isLoading: copyLoading } = useCopyForwardData(patientId);
+  const { data: initialNoteLogsResponse, isLoading: logsLoading } = useInitialNoteLogs(patientId);
+  const initialNoteLogs = initialNoteLogsResponse?.data || [];
   const { registerPublishHandler } = useUiStore();
+  const currentUser = useAuthStore((s) => s.user);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [historyVersionId, setHistoryVersionId] = useState<string | null>(null);
+
+  const openVersionHistory = (versionId: string) => {
+    setHistoryVersionId(versionId);
+    setShowVersionHistory(true);
+  };
   const [publishError, setPublishError] = useState<string | null>(null);
   const [localAttachments, setLocalAttachments] = useState<{ tag: string, textResult: string, file: File | null }[]>([]);
   const uploadAttachment = useUploadAttachment();
@@ -324,21 +338,19 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const isDoctorOrAdmin = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
   const isNonDoctor = user?.role === 'NURSE' || user?.role === 'PHARMACIST';
 
-  const hasProgressNotes = progressResponse?.data && progressResponse.data.length > 0;
   const isPublished = note?.status === 'PUBLISHED';
-  const canEditAll = !isPublished && isDoctorOrAdmin;
-  const isHistoryEditableOnly = false;
+  const canEditAll = !isPublished;
+  const isHistoryEditableOnly = isPublished;
+  const canEditHistory = true;
+
+  const historyInputClass = cn(
+    "h-[36px] w-full px-3 field-input placeholder:text-[#9BA3B5] transition-all",
+    isHistoryEditableOnly && "border-amber/70 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+  );
 
   const historyTextareaClass = cn(
     "w-full px-3 py-2.5 field-input resize-y min-h-[90px] leading-[1.65] transition-all",
-    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
-  );
-
-  // Shorter than historyTextareaClass (min-h-[90px]) — four of those in a 2x2
-  // grid would roughly double the PMH section's height. ~68px ≈ 2 lines.
-  const pmhTextareaClass = cn(
-    "w-full px-3 py-2.5 field-input resize-y min-h-[68px] leading-[1.65] transition-all",
-    isHistoryEditableOnly && "border-amber/60 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
+    isHistoryEditableOnly && "border-amber/70 bg-[#FEFDF0] focus:border-amber focus:shadow-[0_0_0_2px_rgba(245,158,11,0.2)] font-medium text-text-primary"
   );
   const [showClearModal, setShowClearModal] = useState(false);
   const [showUnsaveModal, setShowUnsaveModal] = useState(false);
@@ -984,6 +996,14 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   </span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setShowVersionHistory(true)}
+                className="h-[32px] px-3.5 rounded-btn text-[11px] font-semibold bg-surface-2 border border-border text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Version History</span>
+              </button>
               {isDoctorOrAdmin && (
                 <button
                   type="button"
@@ -1439,17 +1459,13 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           )}
 
           {isPublished && (
-            <div className={cn(
-              "p-3 rounded-card text-[12px] font-medium border flex items-center justify-between",
-              isHistoryEditableOnly 
-                ? "bg-amber-bg border-amber-border text-amber"
-                : "bg-green-bg border-green-border text-green"
-            )}>
-              <span>
-                {isHistoryEditableOnly 
-                  ? "⚠ Note is published and has subsequent progress notes. You can only edit the history sections (Medical, Family, Personal, OB, Psychosocial)."
-                  : "ℹ Note is published but has no progress notes. You can edit any part of the note."}
-              </span>
+            <div className="p-3 rounded-card text-[12px] font-medium border flex items-center justify-between gap-3 bg-amber-bg/50 border-amber-border text-amber-900 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber shrink-0 animate-pulse" />
+                <span>
+                  <strong>Editing Published Note:</strong> History module is editable. Subjective, Objective, Assessment, and Plan sections are locked as permanent records.
+                </span>
+              </div>
             </div>
           )}
 
@@ -1462,6 +1478,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             onUnsave={note && note.status === 'DRAFT' ? () => setShowUnsaveModal(true) : undefined}
             showPublish={false}
             showSaveAndClear={!isPublished}
+            saveLabel={isPublished ? "Save History Changes" : undefined}
           />
 
           <form className="flex flex-col gap-5 w-full" onSubmit={(e) => e.preventDefault()}>
@@ -1531,21 +1548,22 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 1. Subjective Card */}
-            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-85 bg-surface-2/40")}>
               {/* Card Header */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-blue-bg/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
                   <MessageSquare className="w-3.5 h-3.5 text-blue" />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-blue flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
                   Subjective
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
+                {isHistoryEditableOnly ? (
+                  <Badge variant="outline" className="text-[9.5px] uppercase tracking-wider text-text-muted bg-surface-2 border-border">
+                    Locked
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-text-muted font-medium">Patient's reported complaints and history</span>
                 )}
-                <span className="text-[10px] text-blue/70 font-medium">Patient's reported complaints and history</span>
               </div>
               {/* Card Body */}
               <div className="p-4 flex flex-col gap-4 bg-surface">
@@ -1601,19 +1619,20 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 escape this card's bottom edge (see Plan/Management card for precedent). */}
             <div className="bg-surface border border-border rounded-card shadow-card">
               {/* Card Header */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-bg/40 border-b border-border rounded-t-[7px]">
-                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border rounded-t-[7px]">
+                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
                   <History className="w-3.5 h-3.5 text-amber" />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-amber flex-1">
-                  History
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
+                  History Module
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-bold bg-[#FEF3C7] text-[#D97706] border border-[#FCD34D] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0 animate-pulse">
-                    ✏️ Editable
-                  </span>
+                {isHistoryEditableOnly ? (
+                  <Badge variant="secondary" className="text-[9.5px] uppercase tracking-wider">
+                    Editable
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-text-muted font-medium">Medical, family, personal, and social background</span>
                 )}
-                <span className="text-[10px] text-amber/70 font-medium">Medical, family, personal, and social background</span>
               </div>
               {/* Card Body */}
               <div className="divide-y divide-border bg-surface">
@@ -1632,7 +1651,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhComorbidities')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Diabetes Mellitus (2018), Asthma"
                       />
                     </div>
@@ -1643,7 +1662,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhSurgeries')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Appendectomy (2015)"
                       />
                     </div>
@@ -1654,7 +1673,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('pmhHospitalizations')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Dengue (2022)"
                       />
                     </div>
@@ -1665,7 +1684,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                       <textarea
                         {...form.register('allergies')}
                         rows={2}
-                        className={pmhTextareaClass}
+                        className={historyTextareaClass}
                         placeholder="e.g. Penicillin (rash), Sulfa"
                       />
                     </div>
@@ -1710,9 +1729,9 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                   <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
                                 )}
                               </div>
-                              {canEditAll && (
+                              {canEditHistory && (
                                 <div className="flex items-center gap-1 shrink-0">
-                                  {!isAlreadyReflected && (
+                                  {canEditAll && !isAlreadyReflected && (
                                     <Button
                                       type="button"
                                       variant="ghost"
@@ -1761,7 +1780,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         })}
                       </div>
                     )}
-                    {canEditAll && (
+                    {canEditHistory && (
                       <MedicationAddForm
                         nameOptions={nameOptions}
                         onAdd={(values) => appendMedication(values, 'past')}
@@ -1788,7 +1807,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
  
                 <CollapsibleSection 
                   title="Personal & Social History" 
-                  variant="row"
+                  variant="row" 
                   theme="amber"
                   icon={<User className="w-3.5 h-3.5" />}
                 >
@@ -1804,7 +1823,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                 {isFemale && (
                   <CollapsibleSection 
                     title="OB / Menstrual History" 
-                    variant="row"
+                    variant="row" 
                     theme="amber"
                     icon={<Calendar className="w-3.5 h-3.5" />}
                   >
@@ -1820,7 +1839,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
  
                 <CollapsibleSection 
                   title="Psychosocial History" 
-                  variant="row"
+                  variant="row" 
                   theme="amber"
                   icon={<Brain className="w-3.5 h-3.5" />}
                 >
@@ -1836,21 +1855,22 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 3. Objective Card */}
-            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
+            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-85 bg-surface-2/40")}>
               {/* Card Header */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-purple-bg/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
                   <Microscope className="w-3.5 h-3.5 text-purple" />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-purple flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
                   Objective
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
+                {isHistoryEditableOnly ? (
+                  <Badge variant="outline" className="text-[9.5px] uppercase tracking-wider text-text-muted bg-surface-2 border-border">
+                    Locked
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-text-muted font-medium">Physical exam and diagnostic results</span>
                 )}
-                <span className="text-[10px] text-purple/70 font-medium">Physical exam and diagnostic results</span>
               </div>
               <div className="p-4 flex flex-col gap-4 bg-surface">
                 {/* Physical Examination textarea */}
@@ -1894,20 +1914,21 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 4. Assessment Card */}
-            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-accent-light/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-[6px] flex items-center justify-center text-[12px] bg-white/60 shrink-0">
+            <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-85 bg-surface-2/40")}>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border">
+                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
                   <ClipboardList size={14} className="text-accent" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-accent-hover flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
+                {isHistoryEditableOnly ? (
+                  <Badge variant="outline" className="text-[9.5px] uppercase tracking-wider text-text-muted bg-surface-2 border-border">
+                    Locked
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-text-muted font-medium">Required to publish</span>
                 )}
-                <span className="text-[10px] text-accent-hover/70 font-medium">Required to publish</span>
               </div>
               <div className="p-4 flex flex-col gap-3 bg-surface">
                 <p className="text-[11px] text-text-secondary leading-relaxed">
@@ -1930,7 +1951,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
                           return (
                             <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                              <div className="w-2 h-2 rounded-full bg-accent-mid shrink-0"></div>
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></div>
                               <div 
                                 className="flex-1 min-w-0 truncate"
                                 style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
@@ -2002,20 +2023,21 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             </div>
 
             {/* 5. Management Plan Card */}
-            <div className={cn("bg-surface border border-border rounded-card shadow-card transition-all", isHistoryEditableOnly && "opacity-90 bg-surface-2 border-border/80")}>
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-green-bg/40 border-b border-border">
-                <div className="w-[26px] h-[26px] rounded-icon bg-white/60 flex items-center justify-center flex-shrink-0">
+            <div className={cn("bg-surface border border-border rounded-card shadow-card transition-all", isHistoryEditableOnly && "opacity-85 bg-surface-2/40")}>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border rounded-t-[7px]">
+                <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
                   <Stethoscope className="w-3.5 h-3.5 text-green" />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-green flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
                   Plan / Management
                 </span>
-                {isHistoryEditableOnly && (
-                  <span className="text-[9px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB] px-2 py-0.5 rounded-full flex items-center gap-1 mr-2 shrink-0">
-                    🔒 Read-Only
-                  </span>
+                {isHistoryEditableOnly ? (
+                  <Badge variant="outline" className="text-[9.5px] uppercase tracking-wider text-text-muted bg-surface-2 border-border">
+                    Locked
+                  </Badge>
+                ) : (
+                  <span className="text-[10px] text-text-muted font-medium">Non-pharmacologic and pharmacologic treatment</span>
                 )}
-                <span className="text-[10px] text-green/70 font-medium">Non-pharmacologic and pharmacologic treatment</span>
               </div>
               <div className="p-4 grid grid-cols-1 @min-[1024px]:grid-cols-2 gap-6 bg-surface">
                 {/* Left: Non-Pharmacologic & Diagnostics */}
@@ -2145,9 +2167,46 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               onCancel={isPublished ? () => setIsEditing(false) : undefined}
               showSaveAndClear={false}
               showPublish={!isPublished}
+              saveLabel={isPublished ? "Save History Changes" : undefined}
             />
           </div>
         </>
+      )}
+
+      {/* MASTER INITIAL NOTE LOGS — patient-scoped change history, the Initial
+          Note counterpart of the Master Problem List / Medication logs. */}
+      {note && (
+        <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]">
+          <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 rounded-t-lg border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-3 flex items-center justify-center flex-shrink-0 shadow-sm border border-border">
+                <FileClock className="w-3.5 h-3.5 text-text-secondary" />
+              </div>
+              <h3 className="text-[13px] font-bold tracking-[0.3px] text-text-primary">
+                Master Initial Note Logs
+              </h3>
+              <span className="ch-badge text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-3">
+                {initialNoteLogs.length} {initialNoteLogs.length === 1 ? 'Entry' : 'Entries'}
+              </span>
+            </div>
+          </div>
+
+          <InitialNoteLogTable
+            logs={initialNoteLogs}
+            isLoading={logsLoading}
+            onViewVersion={openVersionHistory}
+          />
+        </div>
+      )}
+
+      {note && (
+        <InitialNoteVersionHistoryModal
+          open={showVersionHistory}
+          onClose={() => setShowVersionHistory(false)}
+          patientId={patientId}
+          noteId={note.id}
+          initialVersionId={historyVersionId}
+        />
       )}
 
       <DeleteConfirmModal

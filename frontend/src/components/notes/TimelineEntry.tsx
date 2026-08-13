@@ -45,7 +45,15 @@ export function TimelineEntry({
     hour: '2-digit',
     minute: '2-digit',
   });
-  const showEditActions = note.status === 'DRAFT';
+  // A published Initial Note stays editable for its author (or an ADMIN) —
+  // mirrors the backend AuthorGuard on PATCH .../initial-note/:id.
+  const canEditPublishedInitial =
+    isInitial &&
+    note.status === 'PUBLISHED' &&
+    !note.isDeleted &&
+    !!user &&
+    (user.role === 'ADMIN' || user.id === note.authorId);
+  const showEditActions = note.status === 'DRAFT' || canEditPublishedInitial;
 
   return (
     <div 
@@ -150,7 +158,7 @@ export function TimelineEntry({
                     onClickEdit();
                   }}
                   className="h-6 w-6 rounded-btn border border-border bg-surface-2 hover:bg-surface-3 text-[var(--text-secondary)] flex items-center justify-center transition-all cursor-pointer"
-                  title={note.status === 'PUBLISHED' ? 'View Full Note' : 'Edit Draft'}
+                  title={note.status === 'PUBLISHED' ? 'Edit Note' : 'Edit Draft'}
                 >
                   <Edit className="w-3.5 h-3.5" />
                 </button>
@@ -207,7 +215,7 @@ export function TimelineEntry({
                 onClick={onClickEdit}
                 className="h-[26px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-[var(--text-secondary)] border border-border hover:bg-surface-3 hover:text-[var(--text-primary)] transition-all cursor-pointer"
               >
-                {note.status === 'PUBLISHED' ? 'View Full Note ↗' : 'Edit Draft ↗'}
+                {note.status === 'PUBLISHED' ? 'Edit Note ↗' : 'Edit Draft ↗'}
               </button>
             )}
           </div>
