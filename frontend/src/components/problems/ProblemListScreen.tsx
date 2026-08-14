@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ClipboardList, ArrowRight } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -25,6 +27,7 @@ import {
   useReorderProblems,
   useProblemLogs,
 } from '@/hooks/useProblems';
+import { useInitialNote } from '@/hooks/useInitialNote';
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant, getCreatorName } from '@/lib/problem-utils';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
@@ -39,18 +42,22 @@ import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 export function ProblemListScreen({ patientId }: { patientId: string }) {
+  const router = useRouter();
   const { user } = useAuthStore();
   const uiScale = useUiStore((state) => state.uiScale);
   const openExistingProgressNote = useUiStore((state) => state.openExistingProgressNote);
   const scale = uiScale / 100;
   const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
 
+  const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
+  const hasPublishedInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
+
   // Mutual-exclusion lock vs. the Progress Note's in-note Assessment editor —
   // see useProblemEditLock for the full rationale. While a note holds it,
   // this list stays read-only (all edit/add/drag/status/delete affordances
   // disabled) rather than risk a data mismatch between the two drafts.
   const { isLockedByOther, lockNoteId, tryAcquire, release } = useProblemEditLock(patientId, 'master');
-  const effectiveCanManage = canManage && !isLockedByOther;
+  const effectiveCanManage = canManage && !isLockedByOther && hasPublishedInitialNote;
 
   const zoomModifier: Modifier = useMemo(() => {
     return ({ transform, activeNodeRect }) => {
@@ -91,6 +98,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // Returns false — and leaves state untouched — if the note holds it, so
   // every call site can bail out of its edit before mutating draft state.
   const ensureEditMode = () => {
+    if (!hasPublishedInitialNote) return false;
     if (isEditMode) return true;
     if (!tryAcquire()) return false;
     setIsEditMode(true);
@@ -282,6 +290,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   );
 
   const handleAdd = () => {
+    if (!hasPublishedInitialNote) {
+      toast.error('An Initial Note must be created and published first.');
+      return;
+    }
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       return;
@@ -290,11 +302,13 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setModalOpen(true);
   };
   const handleEdit = (p: Problem) => {
+    if (!hasPublishedInitialNote) return;
     setEditing(p);
     setModalOpen(true);
   };
 
   const handleSave = async (values: { title: string; parentId?: string | null; diagnosisDate?: string | null }) => {
+    if (!hasPublishedInitialNote) return;
     try {
       if (editing) {
         if (!ensureEditMode()) return;
@@ -349,6 +363,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleStatusChange = async (p: Problem, status: ProblemStatusValue) => {
+    if (!hasPublishedInitialNote) return;
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       return;
@@ -367,7 +382,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleParentChange = (p: Problem, newParentId: string | null) => {
-    if (!ensureEditMode()) return;
+    if (!hasPublishedInitialNote || !ensureEditMode()) return;
     setDraftParents(prev => ({ ...prev, [p.id]: newParentId }));
     
     // Also move it visually below its new parent
@@ -400,12 +415,13 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (p: Problem) => {
+    if (!hasPublishedInitialNote) return;
     setProblemToDelete(p);
     setDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (!problemToDelete) return;
+    if (!problemToDelete || !hasPublishedInitialNote) return;
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       setDeleteModalOpen(false);
@@ -425,6 +441,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleReorder = (items: { id: string; sortOrder: number }[]) => {
+    if (!hasPublishedInitialNote) return;
     reorderProblems.mutate({ items });
   };
 
@@ -443,13 +460,14 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // Save Draft: persists to localStorage only — does NOT call the API
   // so other co-doctors never see unpublished edits
   const handleSaveDraft = () => {
-    if (!draftOrder) return;
+    if (!hasPublishedInitialNote || !draftOrder) return;
     localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() }));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
 
   const handlePublish = () => {
+    if (!hasPublishedInitialNote) return;
     const items = displayFlatProblems.map((item, index) => ({ 
       id: item.problem.id, 
       sortOrder: index,
@@ -483,6 +501,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDragStart = (event: any) => {
+    if (!effectiveCanManage) return;
     setIsTableDragging(true);
     const { active } = event;
     const activeData = active.data.current;
@@ -554,6 +573,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (!effectiveCanManage) return;
     setIsTableDragging(false);
     setActiveDragItem(null);
     setActiveResolvedDragItem(null);
@@ -640,7 +660,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
   };
 
-  if (isLoading) return <ProblemListSkeleton />;
+  if (isLoading || initialNoteLoading) return <ProblemListSkeleton />;
 
   const isOverResolvedTableOrItem = currentOverId === 'resolved-table' || resolvedProblems.some(p => p.id === currentOverId);
   const showResolvedDropOverlay = isOverResolvedTableOrItem && activeDragItem !== null;
@@ -650,12 +670,45 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {!hasPublishedInitialNote && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface border border-accent/20 bg-accent-light shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent flex-shrink-0">
+              <ClipboardList className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-text-primary">Initial Note Required</h4>
+              <p className="text-[12px] text-text-secondary mt-0.5">
+                {canManage
+                  ? 'An Initial Consultation Note must be created and published before problems can be added or edited.'
+                  : 'An Initial Consultation Note must be created and published by a doctor before problems can be added or edited.'}
+              </p>
+            </div>
+          </div>
+          {canManage && (
+            <button
+              onClick={() => router.push(`/dashboard/${patientId}/initial-note`)}
+              className="h-[32px] px-3.5 rounded-btn text-[11px] font-bold bg-accent hover:bg-accent-hover text-white flex items-center gap-1.5 whitespace-nowrap shadow-btn-primary transition-all flex-shrink-0 cursor-pointer"
+            >
+              Create Initial Note
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
       {canManage && (
         <div className="flex justify-end -mb-2">
           <button
             onClick={handleAdd}
-            disabled={isLockedByOther}
-            title={isLockedByOther ? 'Locked — a Progress Note draft is currently editing problems' : undefined}
+            disabled={!effectiveCanManage}
+            title={
+              !hasPublishedInitialNote
+                ? 'An Initial Note must be published before adding problems'
+                : isLockedByOther
+                ? 'Locked — a Progress Note draft is currently editing problems'
+                : undefined
+            }
             className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Add Problem
@@ -684,6 +737,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           className={cn(
             "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
             isEditMode ? 'border-l-amber-500' : 'border-l-accent',
+            !hasPublishedInitialNote && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
             showActiveDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
@@ -733,6 +787,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                   </span>
                   Draft Mode (Unpublished)
                 </span>
+              ) : !hasPublishedInitialNote ? (
+                <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                  🔒 Read Only
+                </span>
               ) : (
                 <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1.5 select-none">
                   <span>⇄ Drag to reorder</span>
@@ -753,6 +811,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             dragOverState={dragOverState}
             allOptions={activeProblems}
             canManage={effectiveCanManage}
+            hasInitialNote={hasPublishedInitialNote}
             isEditMode={isEditMode}
             isLocked={isLockedByOther}
             onJumpToLockOwner={
@@ -774,6 +833,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         <div 
           className={cn(
             "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
+            !hasPublishedInitialNote && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
             showResolvedDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
@@ -799,6 +859,15 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
               <span className="ch-badge badge-resolved text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-green-border text-green bg-green-bg">
                 {resolvedProblems.length} Resolved
               </span>
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-2">
+              {!hasPublishedInitialNote && (
+                <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                  🔒 Read Only
+                </span>
+              )}
             </div>
           </div>
 

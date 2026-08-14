@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useProblems } from '@/hooks/useProblems';
+import { useInitialNote } from '@/hooks/useInitialNote';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { isRecentlyUpdated, mostRecentUpdate, buildProblemTree } from '@/lib/problem-utils';
 import type { ProblemNode } from '@/types/problem';
@@ -21,6 +22,9 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const { data, isLoading } = useProblems(patientId);
+  const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
+  const hasInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
+
   // Passive read of the mutual edit lock — this card never acquires/releases
   // it, just reflects whether a Progress Note draft currently holds it.
   const { isLockedByOther } = useProblemEditLock(patientId, 'master');
@@ -50,8 +54,8 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
     , listToCheck[0]);
   }, [listToCheck]);
 
-  if (isLoading) return <ProblemListSkeleton />;
-  if (allProblems.length === 0) return <ProblemListCardEmpty />;
+  if (isLoading || initialNoteLoading) return <ProblemListSkeleton />;
+  if (allProblems.length === 0) return <ProblemListCardEmpty patientId={patientId} hasInitialNote={hasInitialNote} />;
 
 
 
@@ -74,6 +78,14 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
             <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
               Problem List
             </span>
+            {!hasInitialNote && (
+              <span
+                title="An Initial Consultation Note is required before managing problems"
+                className="text-[8px] font-bold uppercase tracking-[0.5px] px-1.5 py-[1px] rounded bg-slate-500/10 text-slate-600 border border-slate-400/30 inline-flex items-center gap-1"
+              >
+                🔒 Read Only
+              </span>
+            )}
             {isLockedByOther && (
               <span
                 title="A Progress Note draft is currently editing problems"

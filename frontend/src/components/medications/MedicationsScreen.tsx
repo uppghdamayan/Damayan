@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ClipboardList, ArrowRight } from 'lucide-react';
 import {
   useMedications,
   useCreateMedication,
@@ -10,6 +12,7 @@ import {
   useDeleteMedication,
   useMedicationLogs,
 } from '@/hooks/useMedications';
+import { useInitialNote } from '@/hooks/useInitialNote';
 import { useAuthStore } from '@/stores/authStore';
 import { MedicationEntry, MED_COLUMN_LAYOUT } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
@@ -32,8 +35,11 @@ type PendingChanges = {
 };
 
 export function MedicationsScreen({ patientId }: { patientId: string }) {
+  const router = useRouter();
   const { user } = useAuthStore();
-  const canManage = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+  const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
+  const hasPublishedInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
+  const canManage = (user?.role === 'DOCTOR' || user?.role === 'ADMIN') && hasPublishedInitialNote;
 
   const { data, isLoading } = useMedications(patientId, true);
   const createMedication = useCreateMedication(patientId);
@@ -182,10 +188,22 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     });
   }, [lastPublishedEdit]);
 
-  const handleAdd = () => { setEditing(null); setModalOpen(true); };
-  const handleEdit = (m: Medication) => { setEditing(m); setModalOpen(true); };
+  const handleAdd = () => {
+    if (!hasPublishedInitialNote) {
+      toast.error('An Initial Note must be created and published first.');
+      return;
+    }
+    setEditing(null);
+    setModalOpen(true);
+  };
+  const handleEdit = (m: Medication) => {
+    if (!hasPublishedInitialNote) return;
+    setEditing(m);
+    setModalOpen(true);
+  };
 
   const handleSave = async (values: { name: string; dose: string; formulation: string; instructions: string; quantity: number }) => {
+    if (!hasPublishedInitialNote) return;
     if (editing) {
       if (editing.id.startsWith('temp-')) {
         setPendingChanges(prev => ({
@@ -209,6 +227,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleStatusChange = async (m: Medication, isActive: boolean) => {
+    if (!hasPublishedInitialNote) return;
     if (m.id.startsWith('temp-')) {
       setPendingChanges(prev => ({
         ...prev,
@@ -223,12 +242,13 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (m: Medication) => {
+    if (!hasPublishedInitialNote) return;
     setMedicationToDelete(m);
     setDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (!medicationToDelete) return;
+    if (!medicationToDelete || !hasPublishedInitialNote) return;
     const targetId = medicationToDelete.id;
 
     if (targetId.startsWith('temp-')) {
@@ -259,12 +279,14 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleSaveDraft = () => {
+    if (!hasPublishedInitialNote) return;
     localStorage.setItem(draftStorageKey, JSON.stringify(pendingChanges));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
 
   const handlePublish = async () => {
+    if (!hasPublishedInitialNote) return;
     setIsPublishing(true);
     try {
       const publishedChanges: Record<string, string[]> = {};
@@ -330,7 +352,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     }
   };
 
-  if (isLoading) return <MedicationListSkeleton />;
+  if (isLoading || initialNoteLoading) return <MedicationListSkeleton />;
 
   const getDraftChanges = (m: Medication) => {
     if (m.id.startsWith('temp-')) {
@@ -372,11 +394,40 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           animation: highlight-pill-pulse 1.5s ease-in-out infinite;
         }
       `}</style>
-      {canManage && (
+      {!hasPublishedInitialNote && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface border border-accent/20 bg-accent-light shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent flex-shrink-0">
+              <ClipboardList className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-text-primary">Initial Note Required</h4>
+              <p className="text-[12px] text-text-secondary mt-0.5">
+                {user?.role === 'DOCTOR' || user?.role === 'ADMIN'
+                  ? 'An Initial Consultation Note must be created and published before medications can be added or edited.'
+                  : 'An Initial Consultation Note must be created and published by a doctor before medications can be added or edited.'}
+              </p>
+            </div>
+          </div>
+          {(user?.role === 'DOCTOR' || user?.role === 'ADMIN') && (
+            <button
+              onClick={() => router.push(`/dashboard/${patientId}/initial-note`)}
+              className="h-[32px] px-3.5 rounded-btn text-[11px] font-bold bg-accent hover:bg-accent-hover text-white flex items-center gap-1.5 whitespace-nowrap shadow-btn-primary transition-all flex-shrink-0 cursor-pointer"
+            >
+              Create Initial Note
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {(user?.role === 'DOCTOR' || user?.role === 'ADMIN') && (
         <div className="flex justify-end -mb-2">
           <button
             onClick={handleAdd}
-            className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer"
+            disabled={!hasPublishedInitialNote}
+            title={!hasPublishedInitialNote ? 'An Initial Note must be published before adding medications' : undefined}
+            className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Add Medication
           </button>
@@ -385,7 +436,8 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
       <div className={cn(
         "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all duration-200",
-        isEditMode ? "border-l-amber-500" : "border-l-accent"
+        isEditMode ? "border-l-amber-500" : "border-l-accent",
+        !hasPublishedInitialNote && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
       )}>
         <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 border-b border-border">
           {/* Left side */}
@@ -414,6 +466,11 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {!hasPublishedInitialNote && (
+              <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                🔒 Read Only
+              </span>
+            )}
           </div>
         </div>
 
@@ -480,7 +537,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
         {active.length === 0 ? (
           <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic">
-            No active medications recorded.
+            {!hasPublishedInitialNote
+              ? 'No active medications recorded. Create and publish an Initial Note to begin tracking medications.'
+              : 'No active medications recorded.'}
           </div>
         ) : (
           <div className="flex flex-col">
@@ -502,13 +561,23 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         )}
       </div>
 
-      <div className="bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+      <div className={cn(
+        "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden",
+        !hasPublishedInitialNote && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
+      )}>
         <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
           <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
           <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2 ml-auto">
-            {inactive.length} Discontinued
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {!hasPublishedInitialNote && (
+              <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                🔒 Read Only
+              </span>
+            )}
+            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2">
+              {inactive.length} Discontinued
+            </span>
+          </div>
         </div>
 
         {inactive.length > 0 && (

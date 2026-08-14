@@ -30,6 +30,7 @@ interface ActiveProblemTableProps {
   dragOverState: DragOverState | null;
   allOptions: Problem[];
   canManage: boolean;
+  hasInitialNote?: boolean;
   isEditMode: boolean;
   // True while a Progress Note draft holds the mutual edit lock — see
   // useProblemEditLock. The list stays read-only (canManage is already
@@ -339,6 +340,7 @@ export function ActiveProblemTable({
   dragOverState,
   allOptions,
   canManage,
+  hasInitialNote,
   isEditMode,
   isLocked,
   onJumpToLockOwner,
@@ -434,7 +436,9 @@ export function ActiveProblemTable({
 
       {flatProblems.length === 0 ? (
         <div className="py-8 px-[14px] text-center text-[13px] text-text-muted italic bg-surface rounded-b-lg">
-          No active problems recorded.
+          {hasInitialNote === false
+            ? 'No active problems recorded. Create and publish an Initial Note to begin tracking problems.'
+            : 'No active problems recorded.'}
         </div>
       ) : (
         <>

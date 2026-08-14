@@ -2,7 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 
-export function MedicationListCardEmpty({ patientId }: { patientId: string }) {
+export function MedicationListCardEmpty({
+  patientId,
+  hasInitialNote,
+}: {
+  patientId: string;
+  hasInitialNote?: boolean;
+}) {
   const router = useRouter();
   return (
     <div className="bg-surface border border-border rounded-lg shadow-card overflow-hidden">
@@ -19,7 +25,9 @@ export function MedicationListCardEmpty({ patientId }: { patientId: string }) {
         </button>
       </div>
       <div className="py-5 px-3.5 text-xs text-text-muted text-center">
-        No medications recorded yet.
+        {hasInitialNote === false
+          ? 'No medications recorded. Create and publish an Initial Note to add medications.'
+          : 'No medications recorded yet.'}
       </div>
     </div>
   );

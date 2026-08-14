@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useMedications } from '@/hooks/useMedications';
+import { useInitialNote } from '@/hooks/useInitialNote';
 import { isRecentlyUpdated, mostRecentMedicationUpdate } from '@/lib/medication-utils';
 import { MedicationListCardEmpty } from './MedicationListCardEmpty';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
@@ -13,6 +14,8 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const { data, isLoading } = useMedications(patientId);
+  const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
+  const hasInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
 
   const active = data?.data ?? [];
 
@@ -23,8 +26,8 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
     , active[0]);
   }, [active]);
 
-  if (isLoading) return <MedicationListSkeleton />;
-  if (active.length === 0) return <MedicationListCardEmpty patientId={patientId} />;
+  if (isLoading || initialNoteLoading) return <MedicationListSkeleton />;
+  if (active.length === 0) return <MedicationListCardEmpty patientId={patientId} hasInitialNote={hasInitialNote} />;
 
 
 
@@ -44,6 +47,14 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
             <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">
               Medications
             </span>
+            {!hasInitialNote && (
+              <span
+                title="An Initial Consultation Note is required before managing medications"
+                className="text-[8px] font-bold uppercase tracking-[0.5px] px-1.5 py-[1px] rounded bg-slate-500/10 text-slate-600 border border-slate-400/30 inline-flex items-center gap-1"
+              >
+                🔒 Read Only
+              </span>
+            )}
             {lastUpdated && (
               <span className={cn('font-mono text-[9px] normal-case font-normal', recent ? 'text-text-secondary' : 'text-text-muted')}>
                 {recent && <span className="w-2 h-2 rounded-full bg-accent-mid inline-block mr-1" />}

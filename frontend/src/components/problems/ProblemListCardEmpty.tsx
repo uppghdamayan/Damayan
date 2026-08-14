@@ -1,4 +1,16 @@
-export function ProblemListCardEmpty() {
+'use client';
+
+import { useRouter } from 'next/navigation';
+
+export function ProblemListCardEmpty({
+  patientId,
+  hasInitialNote,
+}: {
+  patientId?: string;
+  hasInitialNote?: boolean;
+}) {
+  const router = useRouter();
+
   return (
     <div className="bg-surface border border-border rounded-lg shadow-card overflow-hidden">
       <div className="bg-surface-2 border-b border-border px-3.5 py-2.5 flex justify-between items-center">
@@ -6,12 +18,19 @@ export function ProblemListCardEmpty() {
           <div className="w-[26px] h-[26px] bg-surface-3 rounded-md flex items-center justify-center text-[13px]">📋</div>
           <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-secondary">Problem List</span>
         </div>
-        <button className="h-7 px-3 bg-surface-2 text-text-secondary border border-border rounded-md text-[11px] font-semibold cursor-pointer hover:bg-surface-3 hover:text-text-primary transition-colors">
-          Manage
-        </button>
+        {patientId && (
+          <button
+            onClick={() => router.push(`/dashboard/${patientId}/problems`)}
+            className="h-7 px-3 bg-surface-2 text-text-secondary border border-border rounded-md text-[11px] font-semibold cursor-pointer hover:bg-surface-3 hover:text-text-primary transition-colors"
+          >
+            Manage
+          </button>
+        )}
       </div>
       <div className="py-5 px-3.5 text-xs text-text-muted text-center">
-        No problems recorded. Problems are added when the Initial Note assessment is published.
+        {hasInitialNote === false
+          ? 'No problems recorded. Create and publish an Initial Note to add problems.'
+          : 'No problems recorded. Problems are added when the Initial Note assessment is published.'}
       </div>
     </div>
   );
