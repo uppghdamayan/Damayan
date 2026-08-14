@@ -13,7 +13,10 @@ import {
   useMedicationLogs,
 } from '@/hooks/useMedications';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 import { useAuthStore } from '@/stores/authStore';
+import { useUiStore } from '@/stores/uiStore';
+import { Lock } from 'lucide-react';
 import { MedicationEntry, MED_COLUMN_LAYOUT } from './MedicationEntry';
 import { MedicationFormModal } from './MedicationForm';
 import { MedicationLogTable } from './MedicationLogTable';
@@ -40,6 +43,13 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
   const hasPublishedInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
   const canManage = (user?.role === 'DOCTOR' || user?.role === 'ADMIN') && hasPublishedInitialNote;
+
+  const openExistingProgressNote = useUiStore((state) => state.openExistingProgressNote);
+  // Mutual-exclusion lock vs. the Progress Note's in-note medication editor —
+  // see useMedicationEditLock. While a note holds it, this list stays
+  // read-only rather than risk a data mismatch between the two drafts.
+  const { isLockedByOther, lockNoteId, tryAcquire, release } = useMedicationEditLock(patientId, 'master');
+  const effectiveCanManage = canManage && !isLockedByOther;
 
   const { data, isLoading } = useMedications(patientId, true);
   const createMedication = useCreateMedication(patientId);
@@ -188,9 +198,21 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     });
   }, [lastPublishedEdit]);
 
+  // Acquires the edit lock (if not already held) before entering draft mode.
+  // Returns false — and leaves pendingChanges untouched — if the note holds
+  // it, so every call site can bail out of its edit before mutating state.
+  const ensureEditMode = () => {
+    if (isEditMode) return true;
+    return tryAcquire();
+  };
+
   const handleAdd = () => {
     if (!hasPublishedInitialNote) {
       toast.error('An Initial Note must be created and published first.');
+      return;
+    }
+    if (isLockedByOther) {
+      tryAcquire(); // surfaces the "locked by a note" toast
       return;
     }
     setEditing(null);
@@ -198,12 +220,17 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
   const handleEdit = (m: Medication) => {
     if (!hasPublishedInitialNote) return;
+    if (isLockedByOther) {
+      tryAcquire();
+      return;
+    }
     setEditing(m);
     setModalOpen(true);
   };
 
   const handleSave = async (values: { name: string; dose: string; formulation: string; instructions: string; quantity: number }) => {
     if (!hasPublishedInitialNote) return;
+    if (!ensureEditMode()) return;
     if (editing) {
       if (editing.id.startsWith('temp-')) {
         setPendingChanges(prev => ({
@@ -228,6 +255,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
   const handleStatusChange = async (m: Medication, isActive: boolean) => {
     if (!hasPublishedInitialNote) return;
+    if (!ensureEditMode()) return;
     if (m.id.startsWith('temp-')) {
       setPendingChanges(prev => ({
         ...prev,
@@ -243,12 +271,21 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
   const handleDelete = (m: Medication) => {
     if (!hasPublishedInitialNote) return;
+    if (isLockedByOther) {
+      tryAcquire();
+      return;
+    }
     setMedicationToDelete(m);
     setDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
     if (!medicationToDelete || !hasPublishedInitialNote) return;
+    if (!ensureEditMode()) {
+      setDeleteModalOpen(false);
+      setMedicationToDelete(null);
+      return;
+    }
     const targetId = medicationToDelete.id;
 
     if (targetId.startsWith('temp-')) {
@@ -275,6 +312,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     setPendingChanges({ creates: [], updates: {}, deletes: [] });
     setLastAutoSaved(null);
     localStorage.removeItem(draftStorageKey);
+    release();
     toast.info('Changes reverted.');
   };
 
@@ -339,6 +377,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       setPendingChanges({ creates: [], updates: {}, deletes: [] });
       setLastAutoSaved(null);
       localStorage.removeItem(draftStorageKey);
+      release();
       setRecentlyPublished(publishedChanges);
       localStorage.setItem(publishedStorageKey, JSON.stringify(publishedChanges));
       setTimeout(() => {
@@ -425,8 +464,14 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         <div className="flex justify-end -mb-2">
           <button
             onClick={handleAdd}
-            disabled={!hasPublishedInitialNote}
-            title={!hasPublishedInitialNote ? 'An Initial Note must be published before adding medications' : undefined}
+            disabled={!hasPublishedInitialNote || isLockedByOther}
+            title={
+              !hasPublishedInitialNote
+                ? 'An Initial Note must be published before adding medications'
+                : isLockedByOther
+                  ? 'Locked — a Progress Note draft is currently editing medications'
+                  : undefined
+            }
             className="h-8 px-4 rounded-btn text-[12px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             + Add Medication
@@ -473,6 +518,29 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
             )}
           </div>
         </div>
+
+        {/* Locked-by-note Banner — takes priority over the (mutually
+            exclusive) edit-mode banner below, since this list can't be in its
+            own edit mode while locked by the other side. */}
+        {isLockedByOther && (
+          <div className="flex items-center gap-3 px-[14px] py-[9px] bg-slate-500/10 border-b border-slate-400/25 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Lock className="w-3.5 h-3.5 shrink-0 text-slate-600" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-slate-600">Locked</span>
+              <span className="text-[10px] text-slate-500 hidden @md:inline">
+                — Medication edits are in progress in a Progress Note draft.
+              </span>
+            </div>
+            {lockNoteId && (
+              <button
+                onClick={() => openExistingProgressNote(patientId, lockNoteId)}
+                className="h-[24px] px-2.5 rounded text-[10px] font-semibold text-slate-700 border border-slate-400/50 hover:bg-slate-500/10 transition-all duration-150 cursor-pointer flex-shrink-0"
+              >
+                Open Note →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Edit Mode Banner inside the card */}
         {isEditMode && (
@@ -550,7 +618,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
                   medication={m}
                   recentlyPublishedFields={recentlyPublished[m.id]}
                   draftChangedFields={getDraftChanges(m)}
-                  canManage={canManage}
+                  canManage={effectiveCanManage}
                   onEdit={() => handleEdit(m)}
                   onDelete={() => handleDelete(m)}
                   onStatusChange={(isActive) => handleStatusChange(m, isActive)}
@@ -608,7 +676,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
                   medication={m}
                   recentlyPublishedFields={recentlyPublished[m.id]}
                   draftChangedFields={getDraftChanges(m)}
-                  canManage={canManage}
+                  canManage={effectiveCanManage}
                   onEdit={() => handleEdit(m)}
                   onDelete={() => handleDelete(m)}
                   onStatusChange={(isActive) => handleStatusChange(m, isActive)}

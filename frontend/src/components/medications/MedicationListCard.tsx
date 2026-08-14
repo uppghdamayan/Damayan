@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useMedications } from '@/hooks/useMedications';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 import { isRecentlyUpdated, mostRecentMedicationUpdate } from '@/lib/medication-utils';
 import { MedicationListCardEmpty } from './MedicationListCardEmpty';
 import { MedicationListSkeleton } from './MedicationListSkeleton';
@@ -16,6 +17,10 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
   const { data, isLoading } = useMedications(patientId);
   const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
   const hasInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
+
+  // Passive read of the mutual edit lock — this card never acquires/releases
+  // it, just reflects whether a Progress Note draft currently holds it.
+  const { isLockedByOther } = useMedicationEditLock(patientId, 'master');
 
   const active = data?.data ?? [];
 
@@ -55,6 +60,14 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
                 🔒 Read Only
               </span>
             )}
+            {isLockedByOther && (
+              <span
+                title="A Progress Note draft is currently editing medications"
+                className="text-[8px] font-bold uppercase tracking-[0.5px] px-1.5 py-[1px] rounded bg-slate-500/10 text-slate-600 border border-slate-400/30 inline-flex items-center gap-1"
+              >
+                🔒 Locked
+              </span>
+            )}
             {lastUpdated && (
               <span className={cn('font-mono text-[9px] normal-case font-normal', recent ? 'text-text-secondary' : 'text-text-muted')}>
                 {recent && <span className="w-2 h-2 rounded-full bg-accent-mid inline-block mr-1" />}
@@ -70,7 +83,9 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
         </div>
         <button
           onClick={() => router.push(`/dashboard/${patientId}/medications`)}
-          className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+          disabled={isLockedByOther}
+          title={isLockedByOther ? 'Locked — a Progress Note draft is currently editing medications' : undefined}
+          className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Manage
         </button>

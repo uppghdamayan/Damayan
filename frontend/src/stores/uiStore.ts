@@ -37,6 +37,20 @@ interface ProblemEditLock {
   acquiredAt: string;
 }
 
+// Same mutual-exclusion lock, mirrored for the Master Medications List vs. a
+// Progress Note's in-note "Current Medication List" editor — kept as its own
+// independent lock (not shared with ProblemEditLock) since a doctor editing
+// medications shouldn't be blocked by an unrelated problem-list edit, and
+// vice versa.
+type MedicationEditOwner = 'master' | 'note';
+
+interface MedicationEditLock {
+  patientId: string;
+  owner: MedicationEditOwner;
+  noteId?: string;
+  acquiredAt: string;
+}
+
 interface UiState {
   sidebarCollapsed: boolean;
   documentationPanelOpen: boolean;
@@ -64,6 +78,9 @@ interface UiState {
   // (e.g. from an unmounting component that never actually held it) must
   // never clear the other side's active lock.
   releaseProblemEditLock: (owner: ProblemEditOwner) => void;
+  medicationEditLock: MedicationEditLock | null;
+  acquireMedicationEditLock: (patientId: string, owner: MedicationEditOwner, noteId?: string) => boolean;
+  releaseMedicationEditLock: (owner: MedicationEditOwner) => void;
 }
 
 // Viewport-aware default: collapse on screens < 1440px
@@ -164,6 +181,21 @@ export const useUiStore = create<UiState>()(
         if (state.problemEditLock?.owner !== owner) return {};
         return { problemEditLock: null };
       }),
+      medicationEditLock: null,
+      acquireMedicationEditLock: (patientId, owner, noteId) => {
+        const current = get().medicationEditLock;
+        if (current && current.patientId === patientId && current.owner !== owner) {
+          return false;
+        }
+        set({
+          medicationEditLock: { patientId, owner, noteId, acquiredAt: new Date().toISOString() },
+        });
+        return true;
+      },
+      releaseMedicationEditLock: (owner) => set((state) => {
+        if (state.medicationEditLock?.owner !== owner) return {};
+        return { medicationEditLock: null };
+      }),
     }),
     {
       name: 'damayan-ui-sidebar',
@@ -171,6 +203,7 @@ export const useUiStore = create<UiState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         uiScale: state.uiScale,
         problemEditLock: state.problemEditLock,
+        medicationEditLock: state.medicationEditLock,
       }),
     },
   ),
