@@ -9,9 +9,11 @@ function buildService(existing: any[]) {
     const med = existing.find((m) => m.id === where.id);
     return Promise.resolve({ ...med, ...data });
   });
-  const medicationCreate = jest.fn().mockImplementation(({ data }) =>
-    Promise.resolve({ id: `new-${data.name}`, ...data }),
-  );
+  const medicationCreate = jest
+    .fn()
+    .mockImplementation(({ data }) =>
+      Promise.resolve({ id: `new-${data.name}`, ...data }),
+    );
   const medicationLogCreate = jest.fn().mockResolvedValue({});
 
   const client = {
@@ -28,9 +30,18 @@ function buildService(existing: any[]) {
     },
   };
 
-  const service = new MedicationsService({} as any, { create: jest.fn() } as any);
+  const service = new MedicationsService(
+    {} as any,
+    { create: jest.fn() } as any,
+  );
 
-  return { service, client, medicationUpdate, medicationCreate, medicationLogCreate };
+  return {
+    service,
+    client,
+    medicationUpdate,
+    medicationCreate,
+    medicationLogCreate,
+  };
 }
 
 function med(overrides: Partial<Record<string, any>> = {}) {
@@ -49,7 +60,8 @@ function med(overrides: Partial<Record<string, any>> = {}) {
 describe('MedicationsService.upsertFromNoteMedications', () => {
   it('updates formulation/instructions/quantity and stamps updatedBy on a name+dose match', async () => {
     const existing = [med()];
-    const { service, client, medicationUpdate, medicationLogCreate } = buildService(existing);
+    const { service, client, medicationUpdate, medicationLogCreate } =
+      buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',
@@ -85,7 +97,8 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
 
   it('leaves fields untouched when the item omits them (undefined ≠ clear)', async () => {
     const existing = [med()];
-    const { service, client, medicationUpdate, medicationLogCreate } = buildService(existing);
+    const { service, client, medicationUpdate, medicationLogCreate } =
+      buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',
@@ -102,7 +115,8 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
 
   it('creates a new row and deactivates the old one when only the dose differs', async () => {
     const existing = [med()];
-    const { service, client, medicationCreate, medicationUpdate } = buildService(existing);
+    const { service, client, medicationCreate, medicationUpdate } =
+      buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',
@@ -113,17 +127,23 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
     );
 
     expect(medicationCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ dose: '5 mg' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ dose: '5 mg' }),
+      }),
     );
     // The old 10mg row is deactivated, not updated in place.
     expect(medicationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'med-1' }, data: { isActive: false } }),
+      expect.objectContaining({
+        where: { id: 'med-1' },
+        data: { isActive: false },
+      }),
     );
   });
 
   it('reactivates an inactive exact match without creating a duplicate', async () => {
     const existing = [med({ isActive: false })];
-    const { service, client, medicationCreate, medicationUpdate } = buildService(existing);
+    const { service, client, medicationCreate, medicationUpdate } =
+      buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',
@@ -143,7 +163,10 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
   });
 
   it('deactivates an existing active med absent from the note list', async () => {
-    const existing = [med(), med({ id: 'med-2', name: 'Losartan', dose: '50 mg' })];
+    const existing = [
+      med(),
+      med({ id: 'med-2', name: 'Losartan', dose: '50 mg' }),
+    ];
     const { service, client, medicationUpdate } = buildService(existing);
 
     await service.upsertFromNoteMedications(
@@ -155,13 +178,17 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
     );
 
     expect(medicationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'med-2' }, data: { isActive: false } }),
+      expect.objectContaining({
+        where: { id: 'med-2' },
+        data: { isActive: false },
+      }),
     );
   });
 
   it('writes no MedicationLog when nothing changed', async () => {
     const existing = [med()];
-    const { service, client, medicationUpdate, medicationLogCreate } = buildService(existing);
+    const { service, client, medicationUpdate, medicationLogCreate } =
+      buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',

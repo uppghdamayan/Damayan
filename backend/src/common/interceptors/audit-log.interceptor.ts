@@ -54,10 +54,7 @@ export class AuditLogInterceptor implements NestInterceptor {
       return { action: 'CREATE', tableName: 'vitals' };
     if (path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) && method === 'PATCH')
       return { action: 'UPDATE', tableName: 'vitals' };
-    if (
-      path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) &&
-      method === 'DELETE'
-    )
+    if (path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) && method === 'DELETE')
       return { action: 'DELETE', tableName: 'vitals' };
 
     // Visits

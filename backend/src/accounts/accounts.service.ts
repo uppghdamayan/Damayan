@@ -284,9 +284,29 @@ export class AccountsService implements OnModuleInit {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'
       ) {
-        throw new ConflictException(
-          'Cannot delete account because it is referenced by existing medical records.',
-        );
+        // Bug Fix: Instead of throwing a ConflictException, anonymize the user
+        // record to preserve medical record integrity but permanently remove access/PII.
+        const anonymizedUser = await this.prisma.user.update({
+          where: { id },
+          data: {
+            email: `deleted_${id}@damayan.local`,
+            firstName: 'Deleted',
+            lastName: 'Account',
+            middleName: null,
+            licenseNumber: null,
+            isActive: false,
+          },
+        });
+
+        const { error: supabaseError } =
+          await this.supabase.auth.admin.deleteUser(id);
+        if (supabaseError) {
+          this.logger.error(
+            `Failed to delete Supabase user ${id} during anonymization: ${supabaseError.message}`,
+          );
+        }
+
+        return anonymizedUser;
       }
       throw error;
     }

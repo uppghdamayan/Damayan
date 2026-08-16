@@ -590,7 +590,7 @@ export default function AccountsPage() {
   }, [fetchAccounts]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this account? This action cannot be undone.')) return;
+    if (!confirm('Permanently delete this account? If they have created medical records, their data will be anonymized to preserve integrity. This action cannot be undone.')) return;
     setDeletingId(id);
     try {
       await apiRequest(`/accounts/${id}`, { method: 'DELETE' });

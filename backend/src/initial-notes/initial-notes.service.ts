@@ -488,7 +488,25 @@ export class InitialNotesService {
           where: { id },
           data: { isDeleted: true },
         });
+
         // Soft delete — versions and log entries are retained.
+        // Bug Fix: clear problems and medications on initial note deletion.
+        await tx.problem.updateMany({
+          where: {
+            patientId,
+            status: { in: ['ACTIVE', 'RESOLVED'] },
+          },
+          data: { status: 'REMOVED' },
+        });
+
+        await tx.medication.updateMany({
+          where: {
+            patientId,
+            isActive: true,
+          },
+          data: { isActive: false },
+        });
+
         await this.logAction(
           patientId,
           userId,

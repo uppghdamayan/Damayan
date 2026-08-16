@@ -32,24 +32,26 @@ export type InitialNoteContentField =
  * log descriptions, so no abbreviations. Mirrored on the frontend in
  * `lib/initial-note-log-utils.tsx`; keep both in sync.
  */
-export const INITIAL_NOTE_FIELD_LABELS: Record<InitialNoteContentField, string> =
-  {
-    chiefComplaint: 'Chief Complaint',
-    hpi: 'History of Present Illness',
-    pmhComorbidities: 'Past Medical History (Comorbidities)',
-    pmhSurgeries: 'Past Medical History (Surgeries)',
-    pmhHospitalizations: 'Past Medical History (Hospitalizations)',
-    allergies: 'Allergies',
-    familyHistory: 'Family History',
-    socialHistory: 'Social History',
-    obHistory: 'Obstetric History',
-    psychosocialHistory: 'Psychosocial History',
-    physicalExam: 'Physical Exam',
-    assessment: 'Assessment',
-    medicationSnapshot: 'Medications',
-    mgmtNonpharm: 'Non-pharmacologic Management',
-    diagnostics: 'Diagnostics',
-  };
+export const INITIAL_NOTE_FIELD_LABELS: Record<
+  InitialNoteContentField,
+  string
+> = {
+  chiefComplaint: 'Chief Complaint',
+  hpi: 'History of Present Illness',
+  pmhComorbidities: 'Past Medical History (Comorbidities)',
+  pmhSurgeries: 'Past Medical History (Surgeries)',
+  pmhHospitalizations: 'Past Medical History (Hospitalizations)',
+  allergies: 'Allergies',
+  familyHistory: 'Family History',
+  socialHistory: 'Social History',
+  obHistory: 'Obstetric History',
+  psychosocialHistory: 'Psychosocial History',
+  physicalExam: 'Physical Exam',
+  assessment: 'Assessment',
+  medicationSnapshot: 'Medications',
+  mgmtNonpharm: 'Non-pharmacologic Management',
+  diagnostics: 'Diagnostics',
+};
 
 /**
  * Order-stable, noise-free serialisation used to compare two field values.
@@ -93,7 +95,8 @@ export type InitialNoteSnapshot = Record<string, unknown>;
 export function buildSnapshot(note: InitialNote): InitialNoteSnapshot {
   const snapshot: InitialNoteSnapshot = { status: note.status };
   for (const field of INITIAL_NOTE_CONTENT_FIELDS) {
-    snapshot[field] = (note as unknown as Record<string, unknown>)[field] ?? null;
+    snapshot[field] =
+      (note as unknown as Record<string, unknown>)[field] ?? null;
   }
   return snapshot;
 }

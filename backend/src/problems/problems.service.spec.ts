@@ -15,12 +15,16 @@ function makeClient(seed: any[]) {
   const client = {
     problem: {
       findMany: jest.fn(({ where }: any) =>
-        Promise.resolve(problems.filter((p) => p.patientId === where.patientId)),
+        Promise.resolve(
+          problems.filter((p) => p.patientId === where.patientId),
+        ),
       ),
       findFirst: jest.fn(({ where }: any) => {
         if (where?.id) {
           return Promise.resolve(
-            problems.find((p) => p.id === where.id && p.patientId === where.patientId) || null,
+            problems.find(
+              (p) => p.id === where.id && p.patientId === where.patientId,
+            ) || null,
           );
         }
         // getNextSortOrder's "highest sortOrder" query
@@ -207,6 +211,8 @@ describe('ProblemsService#upsertFromAssessment', () => {
       { resolveMissing: false },
     );
 
-    expect(problems.find((p) => p.id === 'p1')!.diagnosisDate).toEqual(originalDate);
+    expect(problems.find((p) => p.id === 'p1')!.diagnosisDate).toEqual(
+      originalDate,
+    );
   });
 });

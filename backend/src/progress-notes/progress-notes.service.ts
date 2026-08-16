@@ -234,7 +234,9 @@ export class ProgressNotesService {
       sourceVisitDatetime: source.visit.visitDatetime,
       mgmtNonpharm: source.mgmtNonpharm ?? '',
       mgmtPharm: source.mgmtPharm ?? '',
-      diagnostics: [],
+      diagnostics: Array.isArray(source.diagnostics)
+        ? (source.diagnostics as string[])
+        : [],
     };
   }
 
@@ -532,201 +534,215 @@ export class ProgressNotesService {
   }
 
   async deleteDraft(patientId: string, id: string, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const note = await tx.progressNote.findUnique({
-        where: { id },
-        include: { visit: true },
-      });
-
-      if (!note) throw new NotFoundException('Note not found');
-      if (note.authorId !== userId && userId !== 'admin')
-        throw new ForbiddenException('Not authorized to delete this note');
-      if (note.visit.patientId !== patientId)
-        throw new BadRequestException('Note does not belong to this patient');
-
-      if (note.status !== NoteStatus.DRAFT) {
-        // Ensure there are no newer progress notes — "newer" keyed the same
-        // way as everywhere else: visit.visitDatetime, tied on createdAt.
-        const newerNote = await tx.progressNote.findFirst({
-          where: {
-            id: { not: id },
-            isDeleted: false,
-            OR: [
-              {
-                visit: {
-                  patientId,
-                  visitDatetime: { gt: note.visit.visitDatetime },
-                },
-              },
-              {
-                visit: { patientId, visitDatetime: note.visit.visitDatetime },
-                createdAt: { gt: note.createdAt },
-              },
-            ],
-          },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const note = await tx.progressNote.findUnique({
+          where: { id },
+          include: { visit: true },
         });
-        if (newerNote) {
-          throw new BadRequestException(
-            'Only the latest progress note can be deleted',
+
+        if (!note) throw new NotFoundException('Note not found');
+        if (note.authorId !== userId && userId !== 'admin')
+          throw new ForbiddenException('Not authorized to delete this note');
+        if (note.visit.patientId !== patientId)
+          throw new BadRequestException('Note does not belong to this patient');
+
+        if (note.status !== NoteStatus.DRAFT) {
+          // Ensure there are no newer progress notes — "newer" keyed the same
+          // way as everywhere else: visit.visitDatetime, tied on createdAt.
+          const newerNote = await tx.progressNote.findFirst({
+            where: {
+              id: { not: id },
+              isDeleted: false,
+              OR: [
+                {
+                  visit: {
+                    patientId,
+                    visitDatetime: { gt: note.visit.visitDatetime },
+                  },
+                },
+                {
+                  visit: { patientId, visitDatetime: note.visit.visitDatetime },
+                  createdAt: { gt: note.createdAt },
+                },
+              ],
+            },
+          });
+          if (newerNote) {
+            throw new BadRequestException(
+              'Only the latest progress note can be deleted',
+            );
+          }
+
+          // Revert global lists to previous state — reuses the same
+          // "what's the previous note" resolution as note creation, so
+          // deleting the latest note always reverts to exactly what the next
+          // note would otherwise have inherited from.
+          let prevSnapshotProblems: any[] = [];
+          let prevSnapshotMeds: any[] = [];
+
+          const carryForward = await this.resolveCarryForwardSource(
+            patientId,
+            id,
+            tx,
           );
+
+          if (
+            carryForward.sourceKind === 'progress' &&
+            carryForward.sourceNoteId
+          ) {
+            const prevProgress = await tx.progressNote.findUnique({
+              where: { id: carryForward.sourceNoteId },
+              select: { problemListSnapshot: true, medicationSnapshot: true },
+            });
+            prevSnapshotProblems =
+              (prevProgress?.problemListSnapshot as any[]) || [];
+            prevSnapshotMeds =
+              (prevProgress?.medicationSnapshot as any[]) || [];
+          } else if (
+            carryForward.sourceKind === 'initial' &&
+            carryForward.sourceNoteId
+          ) {
+            const initialNote = await tx.initialNote.findUnique({
+              where: { id: carryForward.sourceNoteId },
+              select: { assessment: true, medicationSnapshot: true },
+            });
+            if (initialNote) {
+              prevSnapshotProblems = (initialNote.assessment as any[]) || [];
+              prevSnapshotMeds =
+                (initialNote.medicationSnapshot as any[]) || [];
+            }
+          }
+
+          const validProblems = mapAssessmentSnapshot(prevSnapshotProblems);
+
+          const validMeds = prevSnapshotMeds
+            .filter(
+              (m) =>
+                m &&
+                m.name &&
+                String(m.name).trim() !== '' &&
+                m.source !== 'past',
+            )
+            .map((m) => ({
+              name: String(m.name).trim(),
+              dose:
+                m.dose !== undefined && m.dose !== null
+                  ? String(m.dose).trim()
+                  : '',
+              formulation: m.formulation,
+              quantity:
+                m.quantity !== undefined && m.quantity !== null
+                  ? Number(m.quantity)
+                  : undefined,
+              instructions: m.instructions,
+              fromPast: m.fromPast || false,
+            }));
+
+          await this.problemsService.upsertFromAssessment(
+            patientId,
+            validProblems,
+            userId,
+            'Progress Note',
+            tx,
+          );
+          await this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            validMeds,
+            userId,
+            'Progress Note',
+            tx,
+          );
+
+          await tx.progressNote.update({
+            where: { id },
+            data: { isDeleted: true },
+          });
+          return { success: true, ...note, isDeleted: true };
         }
 
-        // Revert global lists to previous state — reuses the same
-        // "what's the previous note" resolution as note creation, so
-        // deleting the latest note always reverts to exactly what the next
-        // note would otherwise have inherited from.
-        let prevSnapshotProblems: any[] = [];
-        let prevSnapshotMeds: any[] = [];
+        // Hard delete for DRAFT
+        const attachments = await tx.attachment.findMany({
+          where: { noteId: id },
+        });
 
-        const carryForward = await this.resolveCarryForwardSource(
-          patientId,
-          id,
-          tx,
-        );
-
-        if (
-          carryForward.sourceKind === 'progress' &&
-          carryForward.sourceNoteId
-        ) {
-          const prevProgress = await tx.progressNote.findUnique({
-            where: { id: carryForward.sourceNoteId },
-            select: { problemListSnapshot: true, medicationSnapshot: true },
-          });
-          prevSnapshotProblems =
-            (prevProgress?.problemListSnapshot as any[]) || [];
-          prevSnapshotMeds = (prevProgress?.medicationSnapshot as any[]) || [];
-        } else if (
-          carryForward.sourceKind === 'initial' &&
-          carryForward.sourceNoteId
-        ) {
-          const initialNote = await tx.initialNote.findUnique({
-            where: { id: carryForward.sourceNoteId },
-            select: { assessment: true, medicationSnapshot: true },
-          });
-          if (initialNote) {
-            prevSnapshotProblems = (initialNote.assessment as any[]) || [];
-            prevSnapshotMeds = (initialNote.medicationSnapshot as any[]) || [];
+        for (const att of attachments) {
+          if (att.storageKey) {
+            await this.storageService
+              .delete(att.storageKey)
+              .catch((e) =>
+                console.error('Failed to delete attachment from storage', e),
+              );
           }
         }
 
-        const validProblems = mapAssessmentSnapshot(prevSnapshotProblems);
-
-        const validMeds = prevSnapshotMeds
-          .filter(
-            (m) =>
-              m &&
-              m.name &&
-              String(m.name).trim() !== '' &&
-              m.source !== 'past',
-          )
-          .map((m) => ({
-            name: String(m.name).trim(),
-            dose:
-              m.dose !== undefined && m.dose !== null
-                ? String(m.dose).trim()
-                : '',
-            formulation: m.formulation,
-            quantity:
-              m.quantity !== undefined && m.quantity !== null
-                ? Number(m.quantity)
-                : undefined,
-            instructions: m.instructions,
-            fromPast: m.fromPast || false,
-          }));
-
-        await this.problemsService.upsertFromAssessment(
-          patientId,
-          validProblems,
-          userId,
-          'Progress Note',
-          tx,
-        );
-        await this.medicationsService.upsertFromNoteMedications(
-          patientId,
-          validMeds,
-          userId,
-          'Progress Note',
-          tx,
-        );
-
-        await tx.progressNote.update({
-          where: { id },
-          data: { isDeleted: true },
+        await tx.attachment.deleteMany({
+          where: { noteId: id },
         });
-        return { success: true, ...note, isDeleted: true };
-      }
 
-      // Hard delete for DRAFT
-      const attachments = await tx.attachment.findMany({
-        where: { noteId: id },
-      });
+        await tx.progressNote.delete({ where: { id } });
+        await tx.visit.delete({ where: { id: note.visitId } });
 
-      for (const att of attachments) {
-        if (att.storageKey) {
-          await this.storageService
-            .delete(att.storageKey)
-            .catch((e) =>
-              console.error('Failed to delete attachment from storage', e),
-            );
-        }
-      }
-
-      await tx.attachment.deleteMany({
-        where: { noteId: id },
-      });
-
-      await tx.progressNote.delete({ where: { id } });
-      await tx.visit.delete({ where: { id: note.visitId } });
-
-      return { success: true, ...note };
-    });
+        return { success: true, ...note };
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
   async deleteAllDrafts(patientId: string, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const drafts = await tx.progressNote.findMany({
-        where: {
-          authorId: userId,
-          status: NoteStatus.DRAFT,
-          visit: {
-            patientId,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const drafts = await tx.progressNote.findMany({
+          where: {
+            authorId: userId,
+            status: NoteStatus.DRAFT,
+            visit: {
+              patientId,
+            },
           },
-        },
-        select: { id: true, visitId: true },
-      });
+          select: { id: true, visitId: true },
+        });
 
-      if (drafts.length === 0) return { count: 0 };
+        if (drafts.length === 0) return { count: 0 };
 
-      const noteIds = drafts.map((d) => d.id);
-      const visitIds = drafts.map((d) => d.visitId);
+        const noteIds = drafts.map((d) => d.id);
+        const visitIds = drafts.map((d) => d.visitId);
 
-      const attachments = await tx.attachment.findMany({
-        where: { noteId: { in: noteIds } },
-      });
+        const attachments = await tx.attachment.findMany({
+          where: { noteId: { in: noteIds } },
+        });
 
-      for (const att of attachments) {
-        if (att.storageKey) {
-          await this.storageService
-            .delete(att.storageKey)
-            .catch((e) =>
-              console.error('Failed to delete attachment from storage', e),
-            );
+        for (const att of attachments) {
+          if (att.storageKey) {
+            await this.storageService
+              .delete(att.storageKey)
+              .catch((e) =>
+                console.error('Failed to delete attachment from storage', e),
+              );
+          }
         }
-      }
 
-      await tx.attachment.deleteMany({
-        where: { noteId: { in: noteIds } },
-      });
+        await tx.attachment.deleteMany({
+          where: { noteId: { in: noteIds } },
+        });
 
-      const count = await tx.progressNote.deleteMany({
-        where: { id: { in: noteIds } },
-      });
+        const count = await tx.progressNote.deleteMany({
+          where: { id: { in: noteIds } },
+        });
 
-      await tx.visit.deleteMany({
-        where: { id: { in: visitIds } },
-      });
+        await tx.visit.deleteMany({
+          where: { id: { in: visitIds } },
+        });
 
-      return { count: count.count };
-    });
+        return { count: count.count };
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 }

@@ -142,10 +142,10 @@ describe('initial-notes.utils', () => {
 
     it('ignores whitespace-only and empty-vs-null differences', () => {
       const { changedFields } = diffNoteFields(
-        makeNote({ allergies: null, mgmtNonpharm: 'Hydration' }) as unknown as Record<
-          string,
-          unknown
-        >,
+        makeNote({
+          allergies: null,
+          mgmtNonpharm: 'Hydration',
+        }) as unknown as Record<string, unknown>,
         makeNote({
           allergies: '',
           mgmtNonpharm: '  Hydration  ',

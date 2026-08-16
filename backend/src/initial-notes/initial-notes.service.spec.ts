@@ -54,9 +54,13 @@ describe('InitialNotesService — logs and version history', () => {
         delete: jest.fn(),
       },
       initialNoteVersion: {
-        aggregate: jest.fn().mockResolvedValue({ _max: { versionNumber: null } }),
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _max: { versionNumber: null } }),
         count: jest.fn().mockResolvedValue(0),
-        create: jest.fn(({ data }: any) => Promise.resolve({ id: 'version-1', ...data })),
+        create: jest.fn(({ data }: any) =>
+          Promise.resolve({ id: 'version-1', ...data }),
+        ),
         deleteMany: jest.fn(),
       },
       initialNoteLog: {
@@ -64,7 +68,12 @@ describe('InitialNotesService — logs and version history', () => {
         updateMany: jest.fn(),
       },
       visit: { update: jest.fn(), delete: jest.fn() },
-      attachment: { findMany: jest.fn().mockResolvedValue([]), deleteMany: jest.fn() },
+      attachment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn(),
+      },
+      problem: { updateMany: jest.fn() },
+      medication: { updateMany: jest.fn() },
     };
 
     prisma = {
@@ -113,7 +122,9 @@ describe('InitialNotesService — logs and version history', () => {
     it('writes v1 with no changed fields and a Published log', async () => {
       const note = makeNote({ status: 'DRAFT' });
       prisma.initialNote.findUnique.mockResolvedValue(note);
-      tx.initialNote.update.mockResolvedValue(makeNote({ status: 'PUBLISHED' }));
+      tx.initialNote.update.mockResolvedValue(
+        makeNote({ status: 'PUBLISHED' }),
+      );
 
       await service.publish(PATIENT_ID, NOTE_ID, USER_ID);
 
@@ -139,7 +150,9 @@ describe('InitialNotesService — logs and version history', () => {
         ],
       });
       prisma.initialNote.findUnique.mockResolvedValue(note);
-      tx.initialNote.update.mockResolvedValue(makeNote({ status: 'PUBLISHED' }));
+      tx.initialNote.update.mockResolvedValue(
+        makeNote({ status: 'PUBLISHED' }),
+      );
 
       const upsertSpy = (service as any).problemsService
         .upsertFromAssessment as jest.Mock;
@@ -180,7 +193,9 @@ describe('InitialNotesService — logs and version history', () => {
         assessment: [{ id: 'p1', title: 'Migraine' }],
       });
       prisma.initialNote.findUnique.mockResolvedValue(note);
-      tx.initialNote.update.mockResolvedValue(makeNote({ status: 'PUBLISHED' }));
+      tx.initialNote.update.mockResolvedValue(
+        makeNote({ status: 'PUBLISHED' }),
+      );
 
       const upsertSpy = (service as any).problemsService
         .upsertFromAssessment as jest.Mock;
@@ -230,7 +245,9 @@ describe('InitialNotesService — logs and version history', () => {
 
     it('numbers versions contiguously from the current maximum', async () => {
       prisma.initialNote.findUnique.mockResolvedValue(makeNote());
-      tx.initialNote.update.mockResolvedValue(makeNote({ chiefComplaint: 'X' }));
+      tx.initialNote.update.mockResolvedValue(
+        makeNote({ chiefComplaint: 'X' }),
+      );
       tx.initialNoteVersion.aggregate.mockResolvedValue({
         _max: { versionNumber: 4 },
       });
@@ -242,7 +259,9 @@ describe('InitialNotesService — logs and version history', () => {
         USER_ID,
       );
 
-      expect(tx.initialNoteVersion.create.mock.calls[0][0].data.versionNumber).toBe(5);
+      expect(
+        tx.initialNoteVersion.create.mock.calls[0][0].data.versionNumber,
+      ).toBe(5);
     });
 
     it('records neither a version nor a log when nothing actually changed', async () => {
@@ -274,7 +293,10 @@ describe('InitialNotesService — logs and version history', () => {
       );
       tx.initialNoteVersion.create.mockImplementation(({ data }: any) => {
         nextNumber = data.versionNumber;
-        return Promise.resolve({ id: `version-${data.versionNumber}`, ...data });
+        return Promise.resolve({
+          id: `version-${data.versionNumber}`,
+          ...data,
+        });
       });
 
       await service.update(
@@ -308,7 +330,9 @@ describe('InitialNotesService — logs and version history', () => {
 
   describe('update — draft note', () => {
     it('logs the save but does not snapshot a version, not even a baseline', async () => {
-      prisma.initialNote.findUnique.mockResolvedValue(makeNote({ status: 'DRAFT' }));
+      prisma.initialNote.findUnique.mockResolvedValue(
+        makeNote({ status: 'DRAFT' }),
+      );
       tx.initialNote.update.mockResolvedValue(
         makeNote({ status: 'DRAFT', hpi: 'Revised draft HPI.' }),
       );
@@ -362,7 +386,9 @@ describe('InitialNotesService — logs and version history', () => {
         data: { isDeleted: true },
       });
       expect(tx.initialNoteVersion.deleteMany).not.toHaveBeenCalled();
-      expect(tx.initialNoteLog.create.mock.calls[0][0].data.action).toBe('Deleted');
+      expect(tx.initialNoteLog.create.mock.calls[0][0].data.action).toBe(
+        'Deleted',
+      );
     });
 
     it('detaches log rows before hard-deleting a draft', async () => {
@@ -380,7 +406,9 @@ describe('InitialNotesService — logs and version history', () => {
         where: { initialNoteId: NOTE_ID },
         data: { initialNoteId: null, versionId: null },
       });
-      expect(tx.initialNote.delete).toHaveBeenCalledWith({ where: { id: NOTE_ID } });
+      expect(tx.initialNote.delete).toHaveBeenCalledWith({
+        where: { id: NOTE_ID },
+      });
     });
   });
 

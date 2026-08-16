@@ -60,9 +60,7 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
       visit: { visitDatetime: new Date('2026-02-01T00:00:00Z') },
     });
     const progressNoteFindFirst = jest.fn().mockResolvedValue(note2);
-    const initialNoteFindFirst = jest
-      .fn()
-      .mockResolvedValue(initialNote());
+    const initialNoteFindFirst = jest.fn().mockResolvedValue(initialNote());
 
     const service = buildService({
       progressNoteFindFirst,
@@ -89,9 +87,7 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
           progressNote({ id: 'note-2', mgmtPharm: 'note-2-pharm' }),
         );
       }
-      return Promise.resolve(
-        progressNote({ id: 'note-3', mgmtPharm: '' }),
-      );
+      return Promise.resolve(progressNote({ id: 'note-3', mgmtPharm: '' }));
     });
     const initialNoteFindFirst = jest.fn().mockResolvedValue(initialNote());
 
@@ -257,9 +253,9 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
 
   it('drops a non-isNew entry that is absent from the active medication list', async () => {
     const mockMedicationsService = {
-      findActiveForPatient: jest.fn().mockResolvedValue([
-        { name: 'Amlodipine', dose: '10 mg' },
-      ]),
+      findActiveForPatient: jest
+        .fn()
+        .mockResolvedValue([{ name: 'Amlodipine', dose: '10 mg' }]),
     };
 
     const service = new ProgressNotesService(
@@ -291,9 +287,9 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
 
   it('matches on name only, so an in-note dose edit survives reconcile', async () => {
     const mockMedicationsService = {
-      findActiveForPatient: jest.fn().mockResolvedValue([
-        { name: 'Amlodipine', dose: '10 mg' },
-      ]),
+      findActiveForPatient: jest
+        .fn()
+        .mockResolvedValue([{ name: 'Amlodipine', dose: '10 mg' }]),
     };
 
     const service = new ProgressNotesService(
@@ -322,4 +318,3 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     expect(result[0].dose).toBe('5 mg');
   });
 });
-
