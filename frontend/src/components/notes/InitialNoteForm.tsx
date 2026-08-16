@@ -1,7 +1,13 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { buildProblemTree } from '@/lib/problem-utils';
+import {
+  buildProblemTree,
+  getCreatorName,
+  buildAssessmentFlatOrder,
+  formatDiagnosisDate,
+  type NoteAssessmentItem,
+} from '@/lib/problem-utils';
 import { 
   initialNoteDraftSchema, 
   initialNotePublishSchema, 
@@ -27,6 +33,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { TagInputField } from './TagInputField';
 import { MedicationSnapshotModal, MedicationSnapshotValues } from './MedicationSnapshotModal';
 import { InitialNoteLogTable } from './InitialNoteLogTable';
+import { NoteProblemListEditor } from './NoteProblemListEditor';
 import { InitialNoteVersionHistoryModal } from './InitialNoteVersionHistoryModal';
 import { AttachmentsSection } from '../attachments/AttachmentsSection';
 import { SaveIcon, SendIcon, Heart, History, MessageSquare, Microscope, ClipboardList, Stethoscope, Users, User, UserCheck, Calendar, Brain, Loader2, TrashIcon, Edit, Pencil, FileClock, Pill, Sparkles, FlaskConical, HeartPulse, Activity, CheckCircle2, AlertTriangle, Download, Plus, Search, Paperclip, ShieldAlert, FileText, Check, ArrowRight } from 'lucide-react';
@@ -360,8 +367,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const [deleteMedIndex, setDeleteMedIndex] = useState<number | null>(null);
   const [editMedIndex, setEditMedIndex] = useState<number | null>(null);
 
-  const [probError, setProbError] = useState('');
-  const [addingProb, setAddingProb] = useState(false);
+  const [newProbTitle, setNewProbTitle] = useState('');
 
   const patientMedications = patientMedicationsResponse?.data || [];
   const nameOptions = buildMedicationSuggestions(patientMedications);
@@ -437,7 +443,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           physicalExam: note.physicalExam || '',
           assessment: validProblems.length > 0
             ? validProblems
-            : (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
+            : (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null })),
           medicationSnapshot: validMeds.length > 0
             ? validMeds
             : (copyForward?.activeMedications || []).map((m: any) => ({
@@ -471,7 +477,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           });
 
           if (validProblems.length === 0) {
-            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title }));
+            parsed.assessment = (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null }));
           } else {
             parsed.assessment = validProblems;
           }
@@ -504,7 +510,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         obHistory: '',
         psychosocialHistory: '',
         physicalExam: '',
-        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
+        assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null })),
         medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
@@ -1288,37 +1294,52 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   )}
                 </div>
                 <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
-                  {note.assessment && Array.isArray(note.assessment) && note.assessment.length > 0 ? (
-                    note.assessment.map((item: any, idx: number) => {
-                      const titleStr = typeof item === 'string' ? item : item.title;
-                      const titleKey = titleStr?.trim().toLowerCase();
-                      const depth = typeof item !== 'string' && item.depth !== undefined
-                        ? item.depth
-                        : (titleKey && activeDepthMap.has(titleKey)
-                            ? activeDepthMap.get(titleKey)!
-                            : (typeof item !== 'string' && item.parentId ? 1 : 0));
+                  {(() => {
+                    // Frozen snapshot — always reads note.assessment as published/saved,
+                    // never the live master Problem list (see InitialNoteForm plan §7).
+                    const raw = (Array.isArray(note.assessment) ? note.assessment : [])
+                      .map((i: any) => (typeof i === 'string' ? { title: i } : i))
+                      .filter((i: any) => i && i.title);
+                    if (raw.length === 0) {
+                      return <div className="p-4 text-[12px] text-text-muted text-center">No active problems registered.</div>;
+                    }
+                    // Snapshots written after nesting shipped carry a parentId key on
+                    // every item, so tree order is authoritative. Legacy snapshots carry
+                    // none — every row lands at depth 0 and the per-row activeDepthMap
+                    // fallback (matched against the current master list) supplies the
+                    // indentation instead.
+                    const carriesNesting = raw.some((i: any) => Object.prototype.hasOwnProperty.call(i, 'parentId'));
+                    const rows = buildAssessmentFlatOrder(raw);
+                    return rows.map(({ item, depth, key, originalIndex }) => {
+                      const titleKey = item.title?.trim().toLowerCase();
+                      const effectiveDepth: number = carriesNesting
+                        ? depth
+                        : (item.depth ?? (titleKey ? activeDepthMap.get(titleKey) : undefined) ?? (item.parentId ? 1 : 0));
 
                       return (
-                        <div key={idx} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-surface-2/60 transition-colors">
+                        <div key={key || originalIndex} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-surface-2/60 transition-colors">
                           <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
-                          <div 
+                          <div
                             className="flex-1 min-w-0"
-                            style={depth > 0 ? { paddingLeft: `${depth * 18}px` } : undefined}
+                            style={effectiveDepth > 0 ? { paddingLeft: `${effectiveDepth * 18}px` } : undefined}
                           >
                             <span className="text-[13px] text-text-primary font-semibold">
-                              {depth > 0 && <span className="font-mono text-text-muted mr-1.5 select-none">↳</span>}
-                              {titleStr}
+                              {effectiveDepth > 0 && <span className="font-mono text-text-muted mr-1.5 select-none">↳</span>}
+                              {item.title}
                             </span>
                           </div>
+                          {item.diagnosisDate && (
+                            <span className="text-[10px] font-mono text-text-muted shrink-0">
+                              Dx {formatDiagnosisDate(item.diagnosisDate)}
+                            </span>
+                          )}
                           <span className="text-[9px] font-bold uppercase tracking-wider text-accent bg-accent-light/50 border border-accent/20 px-1.5 py-0.5 rounded">
                             Active
                           </span>
                         </div>
                       );
-                    })
-                  ) : (
-                    <div className="p-4 text-[12px] text-text-muted text-center">No active problems registered.</div>
-                  )}
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -1917,21 +1938,21 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             <div className={cn("bg-surface border border-border rounded-card shadow-card overflow-hidden transition-all", isHistoryEditableOnly && "opacity-85 bg-surface-2/40")}>
               <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-surface-2/60 border-b border-border">
                 <div className="w-[26px] h-[26px] rounded-icon bg-surface-3 flex items-center justify-center flex-shrink-0 border border-border/50">
-                  <ClipboardList size={14} className="text-accent" strokeWidth={2.5} />
+                  <ClipboardList size={15} className="text-accent" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
+                <span className="text-[12px] font-bold uppercase tracking-[0.6px] text-text-primary flex-1">
                   Assessment (Active Problems) {(!formValues.assessment || formValues.assessment.length === 0) && <span className="text-red font-bold ml-[2px] align-top">*</span>}
                 </span>
                 {isHistoryEditableOnly ? (
-                  <Badge variant="outline" className="text-[9.5px] uppercase tracking-wider text-text-muted bg-surface-2 border-border">
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-text-secondary bg-surface-2 border-border font-semibold">
                     Locked
                   </Badge>
                 ) : (
-                  <span className="text-[10px] text-text-muted font-medium">Required to publish</span>
+                  <span className="text-[11px] text-text-secondary font-semibold">Required to publish</span>
                 )}
               </div>
               <div className="p-4 flex flex-col gap-3 bg-surface">
-                <p className="text-[11px] text-text-secondary leading-relaxed">
+                <p className="text-[13px] text-text-secondary leading-relaxed font-normal">
                   Add the active problems or diagnoses for this visit. These will be automatically synced with the patient's global Problem List.
                 </p>
                 <Controller
@@ -1939,80 +1960,26 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   name="assessment"
                   render={({ field }) => (
                     <div className="flex flex-col gap-1.5" id="field-assessment">
-                      <div className="flex flex-col gap-1">
-                        {field.value?.map((prob: any, idx: number) => {
-                          const titleStr = typeof prob === 'string' ? prob : prob.title;
-                          const titleKey = titleStr?.trim().toLowerCase();
-                          const depth = typeof prob !== 'string' && prob.depth !== undefined
-                            ? prob.depth
-                            : (titleKey && activeDepthMap.has(titleKey)
-                                ? activeDepthMap.get(titleKey)!
-                                : (typeof prob !== 'string' && prob.parentId ? 1 : 0));
-
-                          return (
-                            <div key={idx} className="flex items-center gap-2 py-1.5 border-b border-border last:border-b-0 text-[12px] text-text-primary">
-                              <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></div>
-                              <div 
-                                className="flex-1 min-w-0 truncate"
-                                style={depth > 0 ? { paddingLeft: `${depth * 20}px` } : undefined}
-                              >
-                                {depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
-                                {titleStr}
-                              </div>
-                            {canEditAll && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-xs"
-                                onClick={() => setDeleteProblemIndex(idx)}
-                                className="text-text-muted hover:text-red transition-colors w-6 h-6 rounded-md"
-                              >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                        {canEditAll && (
-                          <div className="grid grid-cols-12 gap-2.5 mt-3 pt-3 border-t border-border bg-surface-2 p-3 rounded-[8px]">
-                            <div className="col-span-12 flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-text-secondary uppercase">Problem Title <span className="text-red">*</span></label>
-                              <input id="newProbTitle" placeholder="e.g. Hypertension" className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]" />
-                            </div>
-                            <div className="col-span-12 flex justify-between items-center mt-1">
-                              {probError ? (
-                                <span className="text-red font-medium text-[10px]">{probError}</span>
-                              ) : <span />}
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="xs"
-                                disabled={addingProb}
-                                onClick={() => {
-                                  const titleEl = document.getElementById('newProbTitle') as HTMLInputElement;
-                                  if (!titleEl.value.trim()) {
-                                    setProbError('Problem title is required');
-                                    return;
-                                  }
-                                  setProbError('');
-                                  setAddingProb(true);
-                                  setTimeout(() => {
-                                    const newProbs = [...(field.value || []), { title: titleEl.value.trim() }];
-                                    field.onChange(newProbs);
-                                    titleEl.value = '';
-                                    setAddingProb(false);
-                                  }, 400);
-                                }}
-                                className="h-[28px] px-3.5 bg-surface border border-border text-text-secondary hover:bg-surface-3 hover:text-text-primary rounded font-medium text-[11px] flex items-center gap-1 transition-all"
-                              >
-                                {addingProb ? 'Adding...' : '+ Add Problem'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      {/* No mutual-exclusion lock here: nothing else can be editing
+                          this patient's problems while the Initial Note is a DRAFT —
+                          the Master Problem List is inert until publish
+                          (ProblemListScreen.hasPublishedInitialNote) and a Progress
+                          Note cannot be created (assertInitialNotePublished). */}
+                      <NoteProblemListEditor
+                        value={(field.value as NoteAssessmentItem[]) || []}
+                        onChange={field.onChange}
+                        activeProblems={copyForward?.activeProblems || []}
+                        isPublished={isPublished}
+                        isDisabled={!canEditAll}
+                        isEditMode={canEditAll}
+                        onRequestRemove={(idx) => setDeleteProblemIndex(idx)}
+                        currentUserLabel={currentUser ? getCreatorName(currentUser as any) : 'You'}
+                        newProbTitle={newProbTitle}
+                        setNewProbTitle={setNewProbTitle}
+                        emptyLabel="No problems added yet — at least one is required to publish."
+                      />
                       {form.formState.errors.assessment && (
-                        <p className="text-[10px] text-red font-medium">
+                        <p className="text-xs text-red font-medium">
                           {form.formState.errors.assessment.message}
                         </p>
                       )}
@@ -2225,7 +2192,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
             obHistory: '',
             psychosocialHistory: '',
             physicalExam: '',
-            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title })),
+            assessment: (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null })),
             medicationSnapshot: (copyForward?.activeMedications || []).map((m: any) => ({
               name: m.name,
               dose: m.dose || undefined,

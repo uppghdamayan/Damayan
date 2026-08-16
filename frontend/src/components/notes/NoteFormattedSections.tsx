@@ -123,19 +123,23 @@ interface NoteFormattedSectionsProps {
 }
 
 export function NoteFormattedSections({ note, previousNote }: NoteFormattedSectionsProps) {
+  // An Initial Note is the patient's baseline note — it should never diff against a "previous" note.
+  const isInitial = note.kind === 'initial';
+  const effectivePreviousNote = isInitial ? null : previousNote;
+
   // Diff diagnostics
   const currentDiags = note.sections.diagnostics || [];
-  const prevDiags = previousNote?.sections.diagnostics || null;
+  const prevDiags = effectivePreviousNote?.sections.diagnostics || null;
   const diagDiff = diffListItems(currentDiags, prevDiags);
 
   // Diff medications (dose-aware — flags dose increases/decreases, not just add/remove)
   const currentMedsDetailed = note.sections.medicationsDetailed || [];
-  const prevMedsDetailed = previousNote?.sections.medicationsDetailed || null;
+  const prevMedsDetailed = effectivePreviousNote?.sections.medicationsDetailed || null;
   const medDiff = diffMedicationItems(currentMedsDetailed, prevMedsDetailed);
 
   // Diff assessment
   const currentAssessment = note.sections.assessment || [];
-  const prevAssessment = previousNote?.sections.assessment || null;
+  const prevAssessment = effectivePreviousNote?.sections.assessment || null;
   const assessmentDiff = diffListItems(currentAssessment, prevAssessment);
 
   const isNonDoctor = note.authorRole === 'NURSE' || note.authorRole === 'PHARMACIST';

@@ -740,6 +740,47 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const cleanFormValues = (values: any) => {
+    const rawProblems = (values.problemListSnapshot || []) as any[];
+    const withKeys = rawProblems.map((item: any, originalIndex: number) => ({
+      item,
+      originalIndex,
+      key: item?.id || item?.tempId || `__idx_${originalIndex}`,
+    }));
+    const byKey = new Map(withKeys.map((w) => [w.key, w]));
+    const childrenByParent = new Map<string, typeof withKeys>();
+    const roots: typeof withKeys = [];
+
+    withKeys.forEach((w) => {
+      const parentKey = w.item?.parentId ? String(w.item.parentId) : undefined;
+      if (parentKey && byKey.has(parentKey) && parentKey !== w.key) {
+        const arr = childrenByParent.get(parentKey) || [];
+        arr.push(w);
+        childrenByParent.set(parentKey, arr);
+      } else {
+        roots.push(w);
+      }
+    });
+
+    const cleanProblems: any[] = [];
+    const traverse = (nodes: typeof withKeys, depth: number) => {
+      nodes.forEach((n) => {
+        const p = n.item;
+        if (typeof p === 'object' && p !== null) {
+          const { isNew, ...rest } = p;
+          cleanProblems.push({
+            ...rest,
+            parentId: p.parentId || null,
+            depth,
+          });
+        } else {
+          cleanProblems.push(p);
+        }
+        const kids = childrenByParent.get(n.key);
+        if (kids) traverse(kids, depth + 1);
+      });
+    };
+    traverse(roots, 0);
+
     return {
       ...values,
       subjective: values.subjective ?? '',
@@ -749,13 +790,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       // notes end up tied or inverted in every visitDatetime-ordered query.
       // Harmless on updates: the backend discards visitDatetime there.
       visitDatetime: new Date().toISOString(),
-      problemListSnapshot: values.problemListSnapshot?.map((p: any) => {
-        if (typeof p === 'object' && p !== null) {
-          const { isNew, ...rest } = p;
-          return rest;
-        }
-        return p;
-      }),
+      problemListSnapshot: cleanProblems,
       medicationSnapshot: values.medicationSnapshot?.map((m: any) => {
         if (typeof m === 'object' && m !== null) {
           const { isNew, ...rest } = m;
@@ -1317,10 +1352,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 localAttachments={localAttachments}
                 onAddLocalAttachment={(att) => {
                   setLocalAttachments(prev => [...prev, att]);
-                  const currentTags = form.getValues('diagnostics') || [];
-                  if (att.tag && !currentTags.includes(att.tag)) {
-                    form.setValue('diagnostics', [...currentTags, att.tag], { shouldDirty: true });
-                  }
                 }}
                 onRemoveLocalAttachment={(idx) => setLocalAttachments(prev => prev.filter((_, i) => i !== idx))}
                 onPendingChange={setPendingAttachment}

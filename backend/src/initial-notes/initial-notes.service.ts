@@ -17,6 +17,7 @@ import {
   diffByNameDoseUnit,
 } from '../progress-notes/progress-notes.utils';
 import { buildSnapshot, diffNoteFields } from './initial-notes.utils';
+import { mapAssessmentSnapshot } from '../problems/problems.utils';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -372,12 +373,9 @@ export class InitialNotesService {
           version.id,
         );
 
-        const assessmentItems = ((note.assessment as any[]) || [])
-          .filter((a) => a && a.title && String(a.title).trim() !== '')
-          .map((a) => ({
-            id: a.id ? String(a.id) : undefined,
-            title: String(a.title).trim(),
-          }));
+        const assessmentItems = mapAssessmentSnapshot(
+          note.assessment as any[],
+        );
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
           .filter(
             (m) =>
@@ -408,6 +406,7 @@ export class InitialNotesService {
             userId,
             'Initial Note',
             tx,
+            { resolveMissing: false },
           ),
           this.medicationsService.upsertFromNoteMedications(
             patientId,

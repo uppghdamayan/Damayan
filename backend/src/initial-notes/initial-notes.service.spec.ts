@@ -129,6 +129,67 @@ describe('InitialNotesService — logs and version history', () => {
       expect(logData.description).toBe('Published Initial Note (v1)');
       expect(logData.versionId).toBe('version-1');
     });
+
+    it('passes nesting and diagnosis date through to upsertFromAssessment, opting out of auto-resolve', async () => {
+      const note = makeNote({
+        status: 'DRAFT',
+        assessment: [
+          { id: 'p1', title: 'Hypertension', diagnosisDate: '2023-05-10' },
+          { tempId: 't1', title: 'Proteinuria', parentId: 'p1' },
+        ],
+      });
+      prisma.initialNote.findUnique.mockResolvedValue(note);
+      tx.initialNote.update.mockResolvedValue(makeNote({ status: 'PUBLISHED' }));
+
+      const upsertSpy = (service as any).problemsService
+        .upsertFromAssessment as jest.Mock;
+
+      await service.publish(PATIENT_ID, NOTE_ID, USER_ID);
+
+      expect(upsertSpy).toHaveBeenCalledTimes(1);
+      const [calledPatientId, items, calledUserId, sourceNote, , options] =
+        upsertSpy.mock.calls[0];
+      expect(calledPatientId).toBe(PATIENT_ID);
+      expect(calledUserId).toBe(USER_ID);
+      expect(sourceNote).toBe('Initial Note');
+      expect(options).toEqual({ resolveMissing: false });
+
+      expect(items[0]).toEqual(
+        expect.objectContaining({
+          id: 'p1',
+          title: 'Hypertension',
+          diagnosisDate: '2023-05-10',
+        }),
+      );
+      // Legacy-safety: an item with no parentId key in the raw snapshot must
+      // not gain one — that would flatten existing nesting on publish.
+      expect(items[0]).not.toHaveProperty('parentId');
+
+      expect(items[1]).toEqual(
+        expect.objectContaining({
+          tempId: 't1',
+          title: 'Proteinuria',
+          parentId: 'p1',
+        }),
+      );
+    });
+
+    it('omits parentId for legacy assessment items so existing nesting is preserved', async () => {
+      const note = makeNote({
+        status: 'DRAFT',
+        assessment: [{ id: 'p1', title: 'Migraine' }],
+      });
+      prisma.initialNote.findUnique.mockResolvedValue(note);
+      tx.initialNote.update.mockResolvedValue(makeNote({ status: 'PUBLISHED' }));
+
+      const upsertSpy = (service as any).problemsService
+        .upsertFromAssessment as jest.Mock;
+
+      await service.publish(PATIENT_ID, NOTE_ID, USER_ID);
+
+      const items = upsertSpy.mock.calls[0][1];
+      expect(items[0]).not.toHaveProperty('parentId');
+    });
   });
 
   describe('update — published note', () => {

@@ -168,7 +168,8 @@ export function InitialNoteVersionView({
         {assessment.length > 0 ? (
           <div className="flex flex-col gap-1.5 pt-0.5">
             {assessment.map((item, i) => {
-              const depth = item.depth ?? 0;
+              const itemAny = item as any;
+              const depth = itemAny.parentId ? (itemAny.depth || 1) : (itemAny.parentId === null ? 0 : (item.depth ?? 0));
               return (
                 <div
                   key={`${item.title}-${i}`}

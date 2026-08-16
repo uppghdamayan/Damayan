@@ -38,6 +38,9 @@ export interface TimelineNoteView {
 /**
  * Performs same-name case-insensitive matching between consecutive notes'
  * diagnostics/assessment items to tag items as existing, added, or removed.
+ * Normalizes items by stripping leading tree/nesting indicators (e.g. '↳ ')
+ * so nesting or un-nesting a problem does not falsely flag it as removed/resolved
+ * or added/new.
  */
 export function diffListItems(
   current: string[],
@@ -47,8 +50,17 @@ export function diffListItems(
     return current.map(item => ({ text: item, status: 'existing' }));
   }
 
-  const isMatch = (item1: string, item2: string): boolean =>
-    item1.trim().toLowerCase() === item2.trim().toLowerCase();
+  const normalize = (item: string): string =>
+    item.replace(/^[↳\u21b3\->\s]+/u, '').trim().toLowerCase();
+
+  const isMatch = (item1: string, item2: string): boolean => {
+    const n1 = normalize(item1);
+    const n2 = normalize(item2);
+    if (!n1 || !n2) {
+      return item1.trim().toLowerCase() === item2.trim().toLowerCase();
+    }
+    return n1 === n2;
+  };
 
   const matchedPrevIndices = new Set<number>();
   const diffItems: { text: string; status: 'existing' | 'added' | 'removed' }[] = [];
@@ -146,6 +158,82 @@ export function diffMedicationItems(
 /**
  * Maps an InitialNote or ProgressNote into a TimelineNoteView.
  */
+/**
+ * Formats an array of assessment items or snapshot problems into display titles.
+ * Traverses parent-child relationships so nested sub-problems always appear
+ * beneath their parent with a '↳ ' prefix, while top-level problems (no parentId)
+ * have no prefix.
+ */
+export function formatAssessmentTitles(rawItems: any[] | null | undefined): string[] {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
+
+  // Check if items are all plain strings
+  if (rawItems.every((item) => typeof item === 'string')) {
+    return rawItems.filter(Boolean);
+  }
+
+  // Normalize objects
+  const items = rawItems
+    .filter((item) => item && (typeof item === 'string' || item.title))
+    .map((item, idx) => {
+      if (typeof item === 'string') {
+        return { key: `__str_${idx}`, id: undefined, title: item, parentId: undefined, explicitDepth: 0 };
+      }
+      const key = item.id ? String(item.id) : (item.tempId ? String(item.tempId) : `__idx_${idx}`);
+      return {
+        key,
+        id: item.id ? String(item.id) : undefined,
+        title: String(item.title).trim(),
+        parentId: item.parentId ? String(item.parentId) : undefined,
+        explicitDepth: typeof item.depth === 'number' ? item.depth : undefined,
+      };
+    });
+
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  const byId = new Map(items.filter((i) => i.id).map((i) => [i.id!, i]));
+
+  const childrenByParent = new Map<string, typeof items>();
+  const roots: typeof items = [];
+
+  let hasAnyParentId = false;
+
+  items.forEach((item) => {
+    let parentKey = item.parentId;
+    if (parentKey && !byKey.has(parentKey) && byId.has(parentKey)) {
+      parentKey = byId.get(parentKey)!.key;
+    }
+
+    if (parentKey && byKey.has(parentKey) && parentKey !== item.key) {
+      hasAnyParentId = true;
+      const arr = childrenByParent.get(parentKey) || [];
+      arr.push(item);
+      childrenByParent.set(parentKey, arr);
+    } else {
+      roots.push(item);
+    }
+  });
+
+  if (hasAnyParentId) {
+    const result: string[] = [];
+    const traverse = (nodes: typeof items, depth: number) => {
+      nodes.forEach((n) => {
+        const prefix = depth > 0 ? '↳ ' : '';
+        result.push(prefix + n.title);
+        const kids = childrenByParent.get(n.key);
+        if (kids) traverse(kids, depth + 1);
+      });
+    };
+    traverse(roots, 0);
+    return result;
+  }
+
+  // Fallback for snapshots where parentId was not tracked but explicitDepth was
+  return items.map((item) => {
+    const prefix = (item.explicitDepth && item.explicitDepth > 0) ? '↳ ' : '';
+    return prefix + item.title;
+  });
+}
+
 export function mapNoteToTimelineView(
   note: InitialNote | ProgressNote,
   isLatest: boolean,
@@ -183,16 +271,7 @@ export function mapNoteToTimelineView(
       subjectiveSections.push({ label: 'Psychosocial History', body: initialNote.psychosocialHistory });
     }
 
-    const assessmentTitles = Array.isArray(initialNote.assessment)
-      ? initialNote.assessment.map((item: any) => {
-          if (typeof item === 'string') return item;
-          if (item && typeof item === 'object') {
-            const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title;
-          }
-          return '';
-        }).filter(Boolean)
-      : [];
+    const assessmentTitles = formatAssessmentTitles(initialNote.assessment);
 
     const medicationList = Array.isArray(initialNote.medicationSnapshot)
       ? initialNote.medicationSnapshot
@@ -272,16 +351,7 @@ export function mapNoteToTimelineView(
       { label: 'Subjective', body: progressNote.subjective }
     ];
 
-    const assessmentTitles = Array.isArray(progressNote.problemListSnapshot)
-      ? progressNote.problemListSnapshot.map((item: any) => {
-          if (typeof item === 'string') return item;
-          if (item && typeof item === 'object') {
-            const prefix = (item.depth > 0 || item.parentId) ? '↳ ' : '';
-            return prefix + item.title;
-          }
-          return '';
-        }).filter(Boolean)
-      : [];
+    const assessmentTitles = formatAssessmentTitles(progressNote.problemListSnapshot);
 
     const medicationList = Array.isArray(progressNote.medicationSnapshot)
       ? progressNote.medicationSnapshot.map((med: any) => {

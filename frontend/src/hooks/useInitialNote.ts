@@ -72,7 +72,7 @@ function invalidateInitialNote(
 }
 
 /** Client-only assessment keys the API does not whitelist. */
-const TRANSIENT_ASSESSMENT_KEYS = ['isNew', 'id'];
+const TRANSIENT_ASSESSMENT_KEYS = ['isNew'];
 
 /**
  * Strips transient client-only keys before the request. The API runs
@@ -240,6 +240,8 @@ export function useDeleteInitialNote(patientId: string) {
         method: 'DELETE',
       }),
     onSuccess: () => {
+      localStorage.removeItem(`damayan:draft:${patientId}:initial`);
+      localStorage.removeItem(`damayan:draft:${patientId}:progress`);
       queryClient.setQueryData(['initial-note', patientId], null);
       invalidateInitialNote(queryClient, patientId);
     },

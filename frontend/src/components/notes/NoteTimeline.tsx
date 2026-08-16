@@ -239,7 +239,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           mappedNotes.map((note, index) => {
             // Diff baseline: chronologically diff against the next note older in sorted order that is authored by a DOCTOR.
             // Decided per fix.md §6.3, and updated to skip NURSE/PHARMACIST notes which lack clinical snapshots.
-            const previousNote = mappedNotes.slice(index + 1).find(n => !n.authorRole || n.authorRole === 'DOCTOR') || null;
+            // Initial notes are the baseline and have no previous note.
+            const previousNote = note.kind === 'initial' ? null : (mappedNotes.slice(index + 1).find(n => !n.authorRole || n.authorRole === 'DOCTOR') || null);
             const isOpenNote = expandedNotes.has(note.id);
 
             return (
@@ -330,7 +331,13 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         onConfirm={() => {
           if (deleteNoteId) {
             deleteMutation.mutate(deleteNoteId, {
-              onSuccess: () => setDeleteNoteId(null),
+              onSuccess: () => {
+                useUiStore.getState().closeNoteEditor();
+                useUiStore.getState().setDocumentationPanelOpen(false);
+                useUiStore.getState().releaseProblemEditLock('note');
+                useUiStore.getState().releaseMedicationEditLock('note');
+                setDeleteNoteId(null);
+              },
             });
           }
         }}
@@ -348,10 +355,10 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           if (deleteDraftNoteId) {
             deleteProgressNoteMutation.mutate(deleteDraftNoteId, {
               onSuccess: () => {
-                if (activeNoteEditor.noteId === deleteDraftNoteId) {
-                  useUiStore.getState().closeNoteEditor();
-                  useUiStore.getState().setDocumentationPanelOpen(false);
-                }
+                useUiStore.getState().closeNoteEditor();
+                useUiStore.getState().setDocumentationPanelOpen(false);
+                useUiStore.getState().releaseProblemEditLock('note');
+                useUiStore.getState().releaseMedicationEditLock('note');
                 setDeleteDraftNoteId(null);
               },
             });

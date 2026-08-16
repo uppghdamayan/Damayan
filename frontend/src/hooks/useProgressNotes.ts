@@ -249,11 +249,13 @@ export function useDeleteProgressNote(patientId: string) {
         method: 'DELETE',
       }),
     onSuccess: (_, deletedId) => {
+      localStorage.removeItem(`damayan:draft:${patientId}:progress`);
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },

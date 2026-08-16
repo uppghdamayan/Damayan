@@ -355,16 +355,23 @@ export class ProblemsService {
       // semantics distinct from "value is undefined" (checked via
       // `hasOwnProperty` below): omitting the key entirely means "this
       // source doesn't carry nesting info, leave existing nesting alone" —
-      // required for backward compatibility with the Initial Note assessment
-      // and the delete-draft revert path, neither of which supply it (yet).
-      // An explicit `null` means "root level"; a string nests under that id
-      // or tempId.
+      // required for backward compatibility with legacy Initial Note/Progress
+      // Note snapshots saved before nesting was captured, and with the
+      // delete-draft revert path when it reads one of those. An explicit
+      // `null` means "root level"; a string nests under that id or tempId.
       parentId?: string | null;
       diagnosisDate?: string | null;
     }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
+    // When false, an existing ACTIVE problem absent from `assessmentItems` is
+    // left alone instead of being auto-RESOLVED (see the "Mark missing items
+    // as RESOLVED" pass below). Used by the Initial Note's publish: its
+    // assessment is a first-visit snapshot, not a reconciliation of a list
+    // the clinician has reviewed, so absence must not be read as "resolved".
+    // Defaults true — the Progress Note keeps today's behaviour.
+    options: { resolveMissing?: boolean } = {},
   ): Promise<void> {
     const validItems = assessmentItems.filter((i) => i.title?.trim());
     const keptIds = new Set<string>();
@@ -590,30 +597,32 @@ export class ProblemsService {
     }
 
     // Mark missing items as RESOLVED
-    for (const ext of existing) {
-      if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
-        const sortOrder = currentSortOrder++;
-        promises.push(
-          client.problem
-            .update({
-              where: { id: ext.id },
-              data: {
-                status: ProblemStatus.RESOLVED,
-                sortOrder,
-                updatedByUser: { connect: { id: userId } },
-              },
-            })
-            .then(() =>
-              this.logAction(
-                patientId,
-                userId,
-                'Resolved',
-                `Resolved problem '${ext.title}' — no longer listed in the ${sourceNote}`,
-                client,
-                ext.id,
+    if (options.resolveMissing !== false) {
+      for (const ext of existing) {
+        if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
+          const sortOrder = currentSortOrder++;
+          promises.push(
+            client.problem
+              .update({
+                where: { id: ext.id },
+                data: {
+                  status: ProblemStatus.RESOLVED,
+                  sortOrder,
+                  updatedByUser: { connect: { id: userId } },
+                },
+              })
+              .then(() =>
+                this.logAction(
+                  patientId,
+                  userId,
+                  'Resolved',
+                  `Resolved problem '${ext.title}' — no longer listed in the ${sourceNote}`,
+                  client,
+                  ext.id,
+                ),
               ),
-            ),
-        );
+          );
+        }
       }
     }
 
