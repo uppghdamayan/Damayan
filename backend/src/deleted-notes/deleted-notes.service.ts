@@ -12,6 +12,7 @@ export class DeletedNotesService {
       include: {
         author: { select: { id: true, firstName: true, lastName: true, role: true } },
         deletedByUser: { select: { id: true, firstName: true, lastName: true, role: true } },
+        visit: true,
       },
     });
   }

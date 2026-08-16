@@ -11,4 +11,5 @@ export interface DeletedNote {
   originalCreatedAt: string;
   author: { id: string; firstName: string; lastName: string; role: string } | null;
   deletedByUser: { id: string; firstName: string; lastName: string; role: string } | null;
+  visit?: { id: string; visitDatetime: string } | null;
 }

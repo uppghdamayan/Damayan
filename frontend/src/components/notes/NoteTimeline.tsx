@@ -259,9 +259,14 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           mappedNotes.map((note, index) => {
             // Diff baseline: chronologically diff against the next note older in sorted order that is authored by a DOCTOR.
             // Decided per fix.md §6.3, and updated to skip NURSE/PHARMACIST notes which lack clinical snapshots.
-            const previousNote = note.kind === 'initial' 
-              ? null 
-              : (mappedNotes.slice(index + 1).find(n => n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id) : null) || null);
+            // Strict linear guard: deleted notes (soft-deleted or hard-deleted-but-tracked via
+            // DeletedNote) must never be picked as a diff baseline. They can still appear in
+            // `mappedNotes` (struck-through, for audit visibility) sitting chronologically between
+            // two live notes, but their snapshot is a ghost of a reverted state — diffing against
+            // it fragments the "Inherited by today's note" chain instead of the linear live history.
+            const previousNote = note.kind === 'initial'
+              ? null
+              : (mappedNotes.slice(index + 1).find(n => !n.isDeleted && n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id && !n.isDeleted) : null) || null);
             const isOpenNote = expandedNotes.has(note.id);
 
             return (

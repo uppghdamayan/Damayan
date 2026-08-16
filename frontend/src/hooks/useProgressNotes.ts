@@ -264,6 +264,7 @@ export function useDeleteProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['deleted-notes', patientId] });
     },
   });
 }

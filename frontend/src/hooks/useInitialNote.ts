@@ -244,6 +244,7 @@ export function useDeleteInitialNote(patientId: string) {
       localStorage.removeItem(`damayan:draft:${patientId}:progress`);
       queryClient.setQueryData(['initial-note', patientId], null);
       invalidateInitialNote(queryClient, patientId);
+      queryClient.invalidateQueries({ queryKey: ['deleted-notes', patientId] });
     },
   });
 }
