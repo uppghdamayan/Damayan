@@ -32,7 +32,6 @@ function makeNote(overrides: Partial<InitialNote> = {}): InitialNote {
     mgmtNonpharm: null,
     diagnostics: [],
     status: 'PUBLISHED',
-    isDeleted: false,
     lastEditedBy: null,
     lastEditedAt: null,
     createdAt: new Date('2026-07-20T02:00:00Z'),
@@ -63,11 +62,18 @@ describe('InitialNotesService — logs and version history', () => {
         ),
         deleteMany: jest.fn(),
       },
+      deletedNote: {
+        create: jest.fn(),
+      },
+      visit: {
+        findUnique: jest.fn(),
+        delete: jest.fn(),
+        update: jest.fn(),
+      },
       initialNoteLog: {
         create: jest.fn(),
         updateMany: jest.fn(),
       },
-      visit: { update: jest.fn(), delete: jest.fn() },
       attachment: {
         findMany: jest.fn().mockResolvedValue([]),
         deleteMany: jest.fn(),
@@ -373,7 +379,7 @@ describe('InitialNotesService — logs and version history', () => {
   });
 
   describe('remove', () => {
-    it('logs an archive and keeps versions when soft-deleting a published note', async () => {
+    it('logs an archive and hard-deletes when deleting a published note', async () => {
       prisma.initialNote.findUnique.mockResolvedValue({
         ...makeNote(),
         visit: { patientId: PATIENT_ID },
@@ -381,11 +387,10 @@ describe('InitialNotesService — logs and version history', () => {
 
       await service.remove(PATIENT_ID, NOTE_ID, USER_ID);
 
-      expect(tx.initialNote.update).toHaveBeenCalledWith({
+      expect(tx.deletedNote.create).toHaveBeenCalled();
+      expect(tx.initialNote.delete).toHaveBeenCalledWith({
         where: { id: NOTE_ID },
-        data: { isDeleted: true },
       });
-      expect(tx.initialNoteVersion.deleteMany).not.toHaveBeenCalled();
       expect(tx.initialNoteLog.create.mock.calls[0][0].data.action).toBe(
         'Deleted',
       );

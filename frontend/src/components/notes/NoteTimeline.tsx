@@ -4,6 +4,8 @@ import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
+import { useDeletedNotes } from '@/hooks/useDeletedNotes';
+import { DeletedNote } from '@/types/deleted-note';
 import { useState, useMemo } from 'react';
 import { mapNoteToTimelineView } from '@/lib/notes-utils';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const { openExistingProgressNote, activeNoteEditor } = useUiStore();
   const { triggerNewNote, isLoading: actionLoading } = useNewProgressNoteAction(patientId);
   const deleteMutation = useDeleteInitialNote(patientId);
+  const { data: deletedNotes = [], isLoading: deletedLoading } = useDeletedNotes(patientId);
   const { user } = useAuthStore();
 
   // Set to track expanded notes (intentional: multiple notes can be open at once)
@@ -63,8 +66,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const progressNotes = progressNotesResponse?.data || [];
 
   // Combine and sort
-  const allNotesRaw: (ProgressNote | InitialNote)[] = useMemo(() => {
-    const combined: (ProgressNote | InitialNote)[] = [...progressNotes];
+  const allNotesRaw = useMemo(() => {
+    const combined: any[] = [...progressNotes];
     const initialList = (initialNotes && initialNotes.length > 0)
       ? initialNotes
       : (activeInitialNote ? [activeInitialNote] : []);
@@ -76,8 +79,14 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         existingIds.add(initNote.id);
       }
     }
+    for (const delNote of deletedNotes) {
+      if (!existingIds.has(delNote.id)) {
+        combined.push(delNote);
+        existingIds.add(delNote.id);
+      }
+    }
     return combined;
-  }, [progressNotes, initialNotes, activeInitialNote]);
+  }, [progressNotes, initialNotes, activeInitialNote, deletedNotes]);
 
   const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
 
@@ -90,10 +99,12 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   // `onClickEdit` below indexed into that same mutated array.
   const sortedRaw = useMemo(() => {
     return [...allNotesRaw].sort((a, b) => {
-      const aTime = new Date(a.visit?.visitDatetime || a.createdAt).getTime();
-      const bTime = new Date(b.visit?.visitDatetime || b.createdAt).getTime();
+      const aTime = new Date(a.visit?.visitDatetime || (a.deletedAt ? a.originalCreatedAt : a.createdAt)).getTime();
+      const bTime = new Date(b.visit?.visitDatetime || (b.deletedAt ? b.originalCreatedAt : b.createdAt)).getTime();
       if (bTime !== aTime) return bTime - aTime;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const aCreated = new Date(a.deletedAt ? a.originalCreatedAt : a.createdAt).getTime();
+      const bCreated = new Date(b.deletedAt ? b.originalCreatedAt : b.createdAt).getTime();
+      return bCreated - aCreated;
     });
   }, [allNotesRaw]);
 
@@ -114,8 +125,9 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const isInitialLoading = initialLoading && initialNotes === undefined;
   const isProgressLoading = progressLoading && progressNotesResponse === undefined;
   const isActionLoading = actionLoading && activeInitialNote === undefined;
+  const isDeletedLoading = deletedLoading && deletedNotes.length === 0;
 
-  if (isInitialLoading || isProgressLoading || isActionLoading) {
+  if (isInitialLoading || isProgressLoading || isActionLoading || isDeletedLoading) {
     return (
       <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">

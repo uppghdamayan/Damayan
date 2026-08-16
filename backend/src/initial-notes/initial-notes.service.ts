@@ -33,7 +33,7 @@ export class InitialNotesService {
 
   async findOne(patientId: string) {
     const note = await this.prisma.initialNote.findFirst({
-      where: { visit: { patientId }, isDeleted: false },
+      where: { visit: { patientId } },
       include: {
         author: { select: { firstName: true, lastName: true, role: true } },
         lastEditor: { select: { firstName: true, lastName: true, role: true } },
@@ -59,7 +59,7 @@ export class InitialNotesService {
 
   async create(patientId: string, dto: CreateInitialNoteDto, userId: string) {
     const existing = await this.prisma.initialNote.findFirst({
-      where: { visit: { patientId }, isDeleted: false },
+      where: { visit: { patientId } },
     });
     if (existing) {
       throw new ConflictException('Patient already has an Initial Note.');
@@ -473,7 +473,7 @@ export class InitialNotesService {
     }
 
     const progressNotesCount = await this.prisma.progressNote.count({
-      where: { visit: { patientId }, isDeleted: false },
+      where: { visit: { patientId } },
     });
 
     if (progressNotesCount > 0) {
@@ -484,12 +484,19 @@ export class InitialNotesService {
 
     return this.prisma.$transaction(async (tx) => {
       if (note.status === NoteStatus.PUBLISHED) {
-        await tx.initialNote.update({
-          where: { id },
-          data: { isDeleted: true },
+        await tx.deletedNote.create({
+          data: {
+            patientId,
+            originalNoteId: id,
+            noteType: 'INITIAL_NOTE',
+            content: note as any,
+            authorId: note.authorId,
+            deletedBy: userId,
+            originalCreatedAt: note.createdAt,
+            visitId: note.visitId,
+          }
         });
 
-        // Soft delete — versions and log entries are retained.
         // Bug Fix: clear problems and medications on initial note deletion.
         await tx.problem.updateMany({
           where: {
@@ -515,10 +522,9 @@ export class InitialNotesService {
           tx,
           id,
         );
-        return { success: true, ...note, isDeleted: true };
       }
 
-      // Hard delete for DRAFT
+      // Hard delete for DRAFT and PUBLISHED
       // Delete attachments first if there are any
       const attachments = await tx.attachment.findMany({
         where: { noteId: id },
@@ -538,8 +544,7 @@ export class InitialNotesService {
         where: { noteId: id },
       });
 
-      // Defensive: a DRAFT should never have versions (they are only written on
-      // publish), but the FK is RESTRICT, so clear any before deleting the note.
+      // Clear any versions before deleting the note.
       await tx.initialNoteVersion.deleteMany({ where: { initialNoteId: id } });
 
       // Detach existing log rows rather than deleting them — the change history
@@ -551,18 +556,27 @@ export class InitialNotesService {
 
       await tx.initialNote.delete({ where: { id } });
 
-      // Delete the visit since an Initial Note is 1:1 with its visit
-      await tx.visit.delete({ where: { id: note.visitId } });
+      // Check if visit is now empty and can be deleted
+      const visitDetails = await tx.visit.findUnique({
+        where: { id: note.visitId },
+        include: { vitalSigns: true, documents: true, progressNote: true }
+      });
 
-      await this.logAction(
-        patientId,
-        userId,
-        'Deleted',
-        'Deleted Initial Note draft',
-        tx,
-      );
+      if (visitDetails && visitDetails.vitalSigns.length === 0 && visitDetails.documents.length === 0 && !visitDetails.progressNote) {
+        await tx.visit.delete({ where: { id: note.visitId } });
+      }
 
-      return { success: true, ...note };
+      if (note.status === NoteStatus.DRAFT) {
+        await this.logAction(
+          patientId,
+          userId,
+          'Deleted',
+          'Deleted Initial Note draft',
+          tx,
+        );
+      }
+
+      return { success: true, ...note, isDeleted: true };
     });
   }
 

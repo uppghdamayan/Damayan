@@ -102,6 +102,8 @@ model User {
   medicationLogs  MedicationLog[] @relation("MedicationLogEditor")
   initialNoteLogs     InitialNoteLog[]     @relation("InitialNoteLogEditor")
   initialNoteVersions InitialNoteVersion[] @relation("InitialNoteVersionEditor")
+  deletedNotes        DeletedNote[]        @relation("DeletedNoteAuthor")
+  deletedNotesByMe    DeletedNote[]        @relation("DeletedNoteDeleter")
 
   @@index([role, isActive])  // AccountsService.findAll / DocumentsService candidate-doctor lookup / last-admin guard
   @@map("users")
@@ -143,6 +145,7 @@ model Patient {
   medicationLogs MedicationLog[] @relation("MedicationLogPatient")
   initialNoteLogs     InitialNoteLog[]     @relation("InitialNoteLogPatient")
   initialNoteVersions InitialNoteVersion[] @relation("InitialNoteVersionPatient")
+  deletedNotes        DeletedNote[]
 
   @@index([lastName, firstName])
   @@index([isActive, lastName, firstName])  // default list/search: WHERE isActive=true ORDER BY lastName, firstName
@@ -172,6 +175,7 @@ model Visit {
   progressNote ProgressNote?
   vitalSigns   VitalSign[]
   documents    Document[]
+  deletedNotes DeletedNote[]
 
   @@index([patientId, visitDatetime(sort: Desc)])
   @@map("visits")
@@ -202,7 +206,6 @@ model InitialNote {
   mgmtPharm            String?    @map("mgmt_pharm")
   diagnostics          Json?
   status               NoteStatus @default(DRAFT)
-  isDeleted            Boolean    @default(false) @map("is_deleted")
   lastEditedBy         String?    @map("last_edited_by") @db.Uuid
   lastEditedAt         DateTime?  @map("last_edited_at")
   createdAt            DateTime   @default(now()) @map("created_at")
@@ -234,7 +237,6 @@ model ProgressNote {
   problemListSnapshot  Json?      @map("problem_list_snapshot")
   medicationSnapshot   Json?      @map("medication_snapshot")
   status               NoteStatus @default(DRAFT)
-  isDeleted            Boolean    @default(false) @map("is_deleted")
   lastEditedBy         String?    @map("last_edited_by") @db.Uuid
   lastEditedAt         DateTime?  @map("last_edited_at")
   createdAt            DateTime   @default(now()) @map("created_at")
@@ -480,7 +482,7 @@ model InitialNoteLog {
 
 model InitialNoteVersion {
   id            String   @id @default(uuid()) @db.Uuid
-  initialNoteId String   @map("initial_note_id") @db.Uuid
+  initialNoteId String?  @map("initial_note_id") @db.Uuid
   patientId     String   @map("patient_id") @db.Uuid
   versionNumber Int      @map("version_number")
   snapshot      Json
@@ -489,13 +491,37 @@ model InitialNoteVersion {
   editorId      String   @map("editor_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
 
-  // No onDelete: Cascade — publishing then deleting a note is a SOFT delete,
-  // so its versions must outlive the note row's isDeleted flag.
-  initialNote InitialNote @relation(fields: [initialNoteId], references: [id])
+  // Note: initialNoteId is nullable so versions survive hard-deletion.
+  initialNote InitialNote? @relation(fields: [initialNoteId], references: [id], onDelete: SetNull)
   editor      User        @relation("InitialNoteVersionEditor", fields: [editorId], references: [id])
   patient     Patient     @relation("InitialNoteVersionPatient", fields: [patientId], references: [id])
 
   @@unique([initialNoteId, versionNumber])
   @@index([initialNoteId, versionNumber(sort: Desc)])
   @@map("initial_note_versions")
+}
+
+// ─────────────────────────────────────────────
+// DELETED NOTE
+// ─────────────────────────────────────────────
+
+model DeletedNote {
+  id                   String     @id @default(uuid()) @db.Uuid
+  patientId            String     @map("patient_id") @db.Uuid
+  visitId              String?    @map("visit_id") @db.Uuid
+  originalNoteId       String     @map("original_note_id") @db.Uuid
+  noteType             NoteType   @map("note_type")
+  content              Json
+  authorId             String?    @map("author_id") @db.Uuid
+  deletedBy            String?    @map("deleted_by") @db.Uuid
+  deletedAt            DateTime   @default(now()) @map("deleted_at")
+  originalCreatedAt    DateTime   @map("original_created_at")
+
+  patient       Patient @relation(fields: [patientId], references: [id])
+  visit         Visit?  @relation(fields: [visitId], references: [id])
+  author        User?   @relation("DeletedNoteAuthor", fields: [authorId], references: [id])
+  deletedByUser User?   @relation("DeletedNoteDeleter", fields: [deletedBy], references: [id])
+
+  @@index([patientId, deletedAt(sort: Desc)])
+  @@map("deleted_notes")
 }

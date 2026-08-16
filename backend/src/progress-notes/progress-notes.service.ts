@@ -40,7 +40,6 @@ export class ProgressNotesService {
 
     const whereClause: Prisma.ProgressNoteWhereInput = {
       visit: { patientId },
-      ...(excludeDeleted ? { isDeleted: false } : {}),
     };
 
     const [data, total] = await Promise.all([
@@ -175,7 +174,6 @@ export class ProgressNotesService {
         where: {
           visit: { patientId },
           status: NoteStatus.PUBLISHED,
-          isDeleted: false,
           ...(excludeNoteId ? { id: { not: excludeNoteId } } : {}),
           OR: [{ author: { role: 'DOCTOR' } }, { authorId: null }],
         },
@@ -193,7 +191,6 @@ export class ProgressNotesService {
         where: {
           visit: { patientId },
           status: NoteStatus.PUBLISHED,
-          isDeleted: false,
         },
         select: {
           id: true,
@@ -234,9 +231,7 @@ export class ProgressNotesService {
       sourceVisitDatetime: source.visit.visitDatetime,
       mgmtNonpharm: source.mgmtNonpharm ?? '',
       mgmtPharm: source.mgmtPharm ?? '',
-      diagnostics: Array.isArray(source.diagnostics)
-        ? (source.diagnostics as string[])
-        : [],
+      diagnostics: [],
     };
   }
 
@@ -247,7 +242,6 @@ export class ProgressNotesService {
       where: {
         authorId: userId,
         status: NoteStatus.DRAFT,
-        isDeleted: false,
         visit: {
           patientId,
         },
@@ -553,7 +547,6 @@ export class ProgressNotesService {
           const newerNote = await tx.progressNote.findFirst({
             where: {
               id: { not: id },
-              isDeleted: false,
               OR: [
                 {
                   visit: {
@@ -654,10 +647,52 @@ export class ProgressNotesService {
             tx,
           );
 
-          await tx.progressNote.update({
-            where: { id },
-            data: { isDeleted: true },
+          await tx.deletedNote.create({
+            data: {
+              patientId,
+              originalNoteId: id,
+              noteType: 'PROGRESS_NOTE',
+              content: note as any,
+              authorId: note.authorId,
+              deletedBy: userId,
+              originalCreatedAt: note.createdAt,
+              visitId: note.visitId,
+            }
           });
+
+          // Also delete attachments since we are hard-deleting the note
+          const attachments = await tx.attachment.findMany({
+            where: { noteId: id },
+          });
+
+          for (const att of attachments) {
+            if (att.storageKey) {
+              await this.storageService
+                .delete(att.storageKey)
+                .catch((e) =>
+                  console.error('Failed to delete attachment from storage', e),
+                );
+            }
+          }
+
+          await tx.attachment.deleteMany({
+            where: { noteId: id },
+          });
+
+          await tx.progressNote.delete({
+            where: { id },
+          });
+
+          // Check if visit is now empty and can be deleted
+          const visitDetails = await tx.visit.findUnique({
+            where: { id: note.visitId },
+            include: { vitalSigns: true, documents: true, initialNote: true }
+          });
+
+          if (visitDetails && visitDetails.vitalSigns.length === 0 && visitDetails.documents.length === 0 && !visitDetails.initialNote) {
+            await tx.visit.delete({ where: { id: note.visitId } });
+          }
+
           return { success: true, ...note, isDeleted: true };
         }
 

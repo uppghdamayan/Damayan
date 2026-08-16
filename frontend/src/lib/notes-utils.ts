@@ -349,6 +349,57 @@ export function mapNoteToTimelineView(
   isLatest: boolean,
   initialNoteAuthorId?: string | null
 ): TimelineNoteView {
+  const isDeletedNote = 'originalNoteId' in note;
+  
+  if (isDeletedNote) {
+    const deletedNote = note as any; // Type as DeletedNote locally
+    const originalContent = deletedNote.content;
+    const isInitial = deletedNote.noteType === 'INITIAL_NOTE';
+    
+    // The migration stored the row using row_to_json, so the keys are in snake_case.
+    // Convert the necessary keys to camelCase for the mapping function to work.
+    const camelCasedContent = { ...originalContent };
+    
+    // Initial Note keys
+    if ('chief_complaint' in camelCasedContent) camelCasedContent.chiefComplaint = camelCasedContent.chief_complaint;
+    if ('pmh_comorbidities' in camelCasedContent) camelCasedContent.pmhComorbidities = camelCasedContent.pmh_comorbidities;
+    if ('pmh_surgeries' in camelCasedContent) camelCasedContent.pmhSurgeries = camelCasedContent.pmh_surgeries;
+    if ('pmh_hospitalizations' in camelCasedContent) camelCasedContent.pmhHospitalizations = camelCasedContent.pmh_hospitalizations;
+    if ('family_history' in camelCasedContent) camelCasedContent.familyHistory = camelCasedContent.family_history;
+    if ('social_history' in camelCasedContent) camelCasedContent.socialHistory = camelCasedContent.social_history;
+    if ('ob_history' in camelCasedContent) camelCasedContent.obHistory = camelCasedContent.ob_history;
+    if ('psychosocial_history' in camelCasedContent) camelCasedContent.psychosocialHistory = camelCasedContent.psychosocial_history;
+    if ('physical_exam' in camelCasedContent) camelCasedContent.physicalExam = camelCasedContent.physical_exam;
+    
+    // Progress Note & Initial Note shared keys
+    if ('mgmt_nonpharm' in camelCasedContent) camelCasedContent.mgmtNonpharm = camelCasedContent.mgmt_nonpharm;
+    if ('mgmt_pharm' in camelCasedContent) camelCasedContent.mgmtPharm = camelCasedContent.mgmt_pharm;
+    if ('problem_list_snapshot' in camelCasedContent) camelCasedContent.problemListSnapshot = camelCasedContent.problem_list_snapshot;
+    if ('medication_snapshot' in camelCasedContent) camelCasedContent.medicationSnapshot = camelCasedContent.medication_snapshot;
+    
+    // Standard keys
+    if ('author_id' in camelCasedContent) camelCasedContent.authorId = camelCasedContent.author_id;
+    if ('visit_id' in camelCasedContent) camelCasedContent.visitId = camelCasedContent.visit_id;
+    if ('created_at' in camelCasedContent) camelCasedContent.createdAt = camelCasedContent.created_at;
+    if ('updated_at' in camelCasedContent) camelCasedContent.updatedAt = camelCasedContent.updated_at;
+
+    // Recursively map the camel-cased content to get the timeline view
+    // Then override the necessary fields to mark it as deleted
+    const timelineView = mapNoteToTimelineView(camelCasedContent, isLatest, initialNoteAuthorId);
+    
+    return {
+      ...timelineView,
+      isDeleted: true,
+      id: deletedNote.originalNoteId, // Important: use original note id so toggling/keys work
+      createdAt: deletedNote.originalCreatedAt,
+      visitDatetime: deletedNote.visit?.visitDatetime || deletedNote.originalCreatedAt,
+      authorName: deletedNote.author 
+        ? `${deletedNote.author.role === 'DOCTOR' ? 'Dr. ' : ''}${deletedNote.author.lastName}, ${deletedNote.author.firstName}`
+        : timelineView.authorName,
+      authorRole: deletedNote.author?.role || timelineView.authorRole,
+    };
+  }
+
   const isInitial = 'chiefComplaint' in note;
   
   if (isInitial) {

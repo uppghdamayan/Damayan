@@ -12,8 +12,8 @@ export class VisitsService {
     const whereClause: Prisma.VisitWhereInput = {
       patientId,
       OR: [
-        { initialNote: { is: { isDeleted: false } } },
-        { progressNote: { is: { isDeleted: false } } },
+        { initialNote: { isNot: null } },
+        { progressNote: { isNot: null } },
       ],
     };
 
@@ -28,10 +28,10 @@ export class VisitsService {
             select: { firstName: true, lastName: true, middleName: true },
           },
           initialNote: {
-            select: { status: true, chiefComplaint: true, isDeleted: true },
+            select: { status: true, chiefComplaint: true },
           },
           progressNote: {
-            select: { status: true, subjective: true, isDeleted: true },
+            select: { status: true, subjective: true },
           },
         },
       }),

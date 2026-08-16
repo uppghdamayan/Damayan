@@ -6,6 +6,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { PatientsModule } from './patients/patients.module';
 import { VisitsModule } from './visits/visits.module';
 import { InitialNotesModule } from './initial-notes/initial-notes.module';
+import { DeletedNotesModule } from './deleted-notes/deleted-notes.module';
 import { ProgressNotesModule } from './progress-notes/progress-notes.module';
 import { ProblemsModule } from './problems/problems.module';
 import { MedicationsModule } from './medications/medications.module';
@@ -28,6 +29,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     PatientsModule,
     VisitsModule,
     InitialNotesModule,
+    DeletedNotesModule,
     ProgressNotesModule,
     ProblemsModule,
     MedicationsModule,
