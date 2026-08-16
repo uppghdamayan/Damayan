@@ -52,7 +52,8 @@ export default function PatientAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ type: 'deactivate' | 'reactivate'; patient: Patient } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'deactivate' | 'reactivate' | 'delete'; patient: Patient } | null>(null);
 
   // Only show the full-table skeleton on the very first load. Pagination and
   // post-action refetches keep the current rows visible instead of blanking the
@@ -94,7 +95,7 @@ export default function PatientAccountsPage() {
         setDeactivatingId(null);
         setConfirmAction(null);
       }
-    } else {
+    } else if (type === 'reactivate') {
       setReactivatingId(patient.id);
       try {
         await apiRequest(`/patients/${patient.id}/reactivate`, { method: 'PATCH' });
@@ -104,6 +105,18 @@ export default function PatientAccountsPage() {
         toast.error(e.message || 'Failed to reactivate patient');
       } finally {
         setReactivatingId(null);
+        setConfirmAction(null);
+      }
+    } else if (type === 'delete') {
+      setDeletingId(patient.id);
+      try {
+        await apiRequest(`/patients/${patient.id}`, { method: 'DELETE' });
+        toast.success('Patient deleted successfully');
+        fetchPatients(meta.page);
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to delete patient');
+      } finally {
+        setDeletingId(null);
         setConfirmAction(null);
       }
     }
@@ -220,6 +233,14 @@ export default function PatientAccountsPage() {
                           {reactivatingId === patient.id ? 'Reactivating…' : 'Reactivate'}
                         </SecBtn>
                       )}
+                      {!patient.isActive && (
+                        <SecBtn
+                          onClick={() => setConfirmAction({ type: 'delete', patient })}
+                          danger
+                        >
+                          {deletingId === patient.id ? 'Deleting…' : 'Delete'}
+                        </SecBtn>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -253,17 +274,31 @@ export default function PatientAccountsPage() {
         open={!!confirmAction}
         onClose={() => setConfirmAction(null)}
         onConfirm={executeConfirmAction}
-        title={confirmAction?.type === 'deactivate' ? 'Confirm Deactivate' : 'Confirm Reactivate'}
+        title={
+          confirmAction?.type === 'deactivate' ? 'Confirm Deactivate' :
+          confirmAction?.type === 'reactivate' ? 'Confirm Reactivate' :
+          'Confirm Delete'
+        }
         message={
           confirmAction?.type === 'deactivate'
             ? 'Are you sure you want to deactivate this patient record? They will no longer be visible in standard searches.'
-            : 'Are you sure you want to reactivate this patient record? They will be visible again in standard searches.'
+            : confirmAction?.type === 'reactivate'
+            ? 'Are you sure you want to reactivate this patient record? They will be visible again in standard searches.'
+            : 'Are you sure you want to permanently delete this patient record? If they have existing medical records, their PII will be anonymized instead. This action cannot be undone.'
         }
-        confirmLabel={confirmAction?.type === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+        confirmLabel={
+          confirmAction?.type === 'deactivate' ? 'Deactivate' :
+          confirmAction?.type === 'reactivate' ? 'Reactivate' :
+          'Delete'
+        }
         cancelLabel="Cancel"
-        isDeleting={!!deactivatingId || !!reactivatingId}
-        intent={confirmAction?.type === 'deactivate' ? 'destructive' : 'primary'}
-        loadingLabel={confirmAction?.type === 'deactivate' ? 'Deactivating...' : 'Reactivating...'}
+        isDeleting={!!deactivatingId || !!reactivatingId || !!deletingId}
+        intent={confirmAction?.type === 'reactivate' ? 'primary' : 'destructive'}
+        loadingLabel={
+          confirmAction?.type === 'deactivate' ? 'Deactivating...' :
+          confirmAction?.type === 'reactivate' ? 'Reactivating...' :
+          'Deleting...'
+        }
       />
     </>
   );

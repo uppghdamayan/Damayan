@@ -721,31 +721,67 @@ export default function AccountsPage() {
                     {new Date(account.createdAt).toLocaleDateString('en-PH')}
                   </td>
                   <td className="px-2.5 py-2">
-                    {account.isActive && account.role !== 'ADMIN' && (
+                    {account.role !== 'ADMIN' && (
                       <div className="flex gap-1.5 flex-wrap">
-                        <SecBtn onClick={() => setEditAccount(account)}>
-                          Edit
-                        </SecBtn>
-                        <SecBtn
-                          onClick={() => handleResetPassword(account.id)}
-                        >
-                          {resettingId === account.id ? 'Resetting…' : 'Reset Password'}
-                        </SecBtn>
-                        <SecBtn
-                          onClick={() => handleDelete(account.id)}
-                          danger
-                        >
-                          {deletingId === account.id ? 'Deleting…' : 'Delete'}
-                        </SecBtn>
-                        {account.requiresPasswordChange && account.temporaryPassword && (
-                          <SecBtn
-                            onClick={() => {
-                              navigator.clipboard.writeText(account.temporaryPassword!);
-                              toast.success(`Copied temp password: ${account.temporaryPassword}`);
-                            }}
-                          >
-                            Copy Temp PW
-                          </SecBtn>
+                        {account.isActive ? (
+                          <>
+                            <SecBtn onClick={() => setEditAccount(account)}>
+                              Edit
+                            </SecBtn>
+                            <SecBtn
+                              onClick={() => handleResetPassword(account.id)}
+                            >
+                              {resettingId === account.id ? 'Resetting…' : 'Reset Password'}
+                            </SecBtn>
+                            <SecBtn
+                              onClick={async () => {
+                                if (!confirm('Are you sure you want to deactivate this account? They will lose access to the system.')) return;
+                                try {
+                                  await apiRequest(`/accounts/${account.id}/deactivate`, { method: 'PATCH' });
+                                  toast.success('Account deactivated');
+                                  fetchAccounts(meta.page);
+                                } catch(e:any) {
+                                  toast.error(e.message || 'Failed to deactivate account');
+                                }
+                              }}
+                              danger
+                            >
+                              Deactivate
+                            </SecBtn>
+                            {account.requiresPasswordChange && account.temporaryPassword && (
+                              <SecBtn
+                                onClick={() => {
+                                  navigator.clipboard.writeText(account.temporaryPassword!);
+                                  toast.success(`Copied temp password: ${account.temporaryPassword}`);
+                                }}
+                              >
+                                Copy Temp PW
+                              </SecBtn>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <SecBtn
+                              onClick={async () => {
+                                if (!confirm('Are you sure you want to reactivate this account? They will regain access.')) return;
+                                try {
+                                  await apiRequest(`/accounts/${account.id}/reactivate`, { method: 'PATCH' });
+                                  toast.success('Account reactivated');
+                                  fetchAccounts(meta.page);
+                                } catch(e:any) {
+                                  toast.error(e.message || 'Failed to reactivate account');
+                                }
+                              }}
+                            >
+                              Reactivate
+                            </SecBtn>
+                            <SecBtn
+                              onClick={() => handleDelete(account.id)}
+                              danger
+                            >
+                              {deletingId === account.id ? 'Deleting…' : 'Delete'}
+                            </SecBtn>
+                          </>
                         )}
                       </div>
                     )}

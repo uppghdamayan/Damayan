@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -89,5 +90,13 @@ export class PatientsController {
   @ApiOperation({ summary: 'Reactivate patient record (Admin only)' })
   async reactivate(@Param('id') id: string) {
     return this.patientsService.reactivate(id);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Delete or anonymize patient record (Admin only)' })
+  async remove(@Param('id') id: string) {
+    return this.patientsService.remove(id);
   }
 }

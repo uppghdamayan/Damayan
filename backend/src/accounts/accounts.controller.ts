@@ -68,6 +68,18 @@ export class AccountsController {
     return this.accountsService.update(id, dto);
   }
 
+  @Patch(':id/deactivate')
+  @ApiOperation({ summary: 'Deactivate user account (Admin only)' })
+  async deactivate(@Param('id') id: string) {
+    return this.accountsService.deactivate(id);
+  }
+
+  @Patch(':id/reactivate')
+  @ApiOperation({ summary: 'Reactivate user account (Admin only)' })
+  async reactivate(@Param('id') id: string) {
+    return this.accountsService.reactivate(id);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete account (Admin only)' })

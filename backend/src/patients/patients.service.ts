@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -170,8 +174,6 @@ export class PatientsService {
     });
   }
 
-  // ── Reactivate ─────────────────────────────────────────────────────────────
-
   async reactivate(id: string) {
     // we use prisma directly because findOne might check isActive if we modify it in the future
     const patient = await this.prisma.patient.findUnique({ where: { id } });
@@ -180,5 +182,39 @@ export class PatientsService {
       where: { id },
       data: { isActive: true },
     });
+  }
+
+  // ── Remove (Delete / Anonymize) ────────────────────────────────────────────
+
+  async remove(id: string) {
+    const patient = await this.findOne(id); // throws if not found
+    if (patient.isActive) {
+      throw new BadRequestException('Can only delete deactivated patients.');
+    }
+    try {
+      return await this.prisma.patient.delete({ where: { id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        // Anonymize the patient record to preserve medical record integrity but permanently remove PII.
+        return this.prisma.patient.update({
+          where: { id },
+          data: {
+            firstName: 'Deleted',
+            lastName: 'Patient',
+            middleName: null,
+            extension: null,
+            addressStreet: null,
+            addressBarangay: null,
+            addressCity: null,
+            addressRegion: null,
+            isActive: false,
+          },
+        });
+      }
+      throw error;
+    }
   }
 }

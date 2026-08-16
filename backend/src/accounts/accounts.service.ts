@@ -254,8 +254,37 @@ export class AccountsService implements OnModuleInit {
     });
   }
 
+  async deactivate(id: string) {
+    const user = await this.findOne(id);
+    if (user.role === Role.ADMIN) {
+      const adminCount = await this.prisma.user.count({
+        where: { role: Role.ADMIN, isActive: true },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException(
+          'Cannot deactivate the last active Admin account.',
+        );
+      }
+    }
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  async reactivate(id: string) {
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: true },
+    });
+  }
+
   async remove(id: string) {
     const user = await this.findOne(id);
+    if (user.isActive) {
+      throw new BadRequestException('Can only delete deactivated accounts.');
+    }
     if (user.role === Role.ADMIN) {
       // Prevent deleting the last Admin
       const adminCount = await this.prisma.user.count({

@@ -305,6 +305,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         };
         continue;
       }
+
+      // Not found in existing — this problem was added to the Master List
+      // since the snapshot was last updated. Add it now.
+      existing.push({
+        id: p.id || undefined,
+        title: p.title,
+        parentId: p.parentId || undefined,
+        depth: item.depth,
+        diagnosisDate: p.diagnosisDate ?? null,
+      });
     }
     return existing;
   };
@@ -320,6 +330,25 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
       return !!name && activeNames.has(name);
     });
+
+    const existingNames = new Set(
+      existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean)
+    );
+
+    for (const m of activeMedications || []) {
+      const name = m.name?.trim().toLowerCase();
+      if (!name) continue;
+      if (!existingNames.has(name)) {
+        existing.push({
+          name: m.name,
+          dose: m.dose || undefined,
+          formulation: m.formulation || undefined,
+          quantity: m.quantity || undefined,
+          instructions: m.instructions || undefined,
+          fromPast: m.fromPast || false,
+        });
+      }
+    }
 
     return existing;
   };
