@@ -284,13 +284,47 @@ export class MedicationsService {
       );
       if (match) {
         keptIds.add(match.id);
+
+        const data: Prisma.MedicationUncheckedUpdateInput = {};
+        const changes: string[] = [];
+
+        if (!match.isActive) {
+          data.isActive = true;
+        }
+
+        // Update non-dose fields on a name+dose match — the dose itself is
+        // deliberately never overwritten here (a dose change is handled by
+        // the no-match branch below, which creates a new row instead).
+        // `undefined` on `item` means "this snapshot didn't carry the field"
+        // (e.g. a legacy snapshot predating it) and must leave the existing
+        // value alone — treating it as "clear" would silently wipe
+        // production medication data on every publish.
+        if (item.formulation !== undefined) {
+          const next = item.formulation?.trim() || null;
+          if (next !== match.formulation) {
+            data.formulation = next;
+            changes.push(`formulation → '${next ?? 'none'}'`);
+          }
+        }
+        if (item.instructions !== undefined) {
+          const next = item.instructions?.trim() || null;
+          if (next !== match.instructions) {
+            data.instructions = next;
+            changes.push(`instructions → '${next ?? 'none'}'`);
+          }
+        }
+        if (item.quantity !== undefined) {
+          const next = item.quantity ?? null;
+          if (next !== match.quantity) {
+            data.quantity = next;
+            changes.push(`quantity → '${next ?? 'none'}'`);
+          }
+        }
+
         if (!match.isActive) {
           promises.push(
             client.medication
-              .update({
-                where: { id: match.id },
-                data: { isActive: true },
-              })
+              .update({ where: { id: match.id }, data })
               .then(() =>
                 client.medicationLog.create({
                   data: {
@@ -298,6 +332,23 @@ export class MedicationsService {
                     medicationId: match.id,
                     action: 'Reactivated',
                     description: `Reactivated medication '${match.name}' from ${sourceNote}`,
+                    editorId: userId,
+                  },
+                }),
+              ),
+          );
+        } else if (changes.length > 0) {
+          data.updatedBy = userId;
+          promises.push(
+            client.medication
+              .update({ where: { id: match.id }, data })
+              .then(() =>
+                client.medicationLog.create({
+                  data: {
+                    patientId,
+                    medicationId: match.id,
+                    action: 'Updated',
+                    description: `Updated '${match.name}' from ${sourceNote}: ${changes.join(', ')}`,
                     editorId: userId,
                   },
                 }),

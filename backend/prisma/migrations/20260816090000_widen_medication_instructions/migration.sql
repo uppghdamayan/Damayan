@@ -1,0 +1,14 @@
+-- Additive-only: widening a varchar column is metadata-only in Postgres
+-- (no table rewrite since PG 9.2), so this is safe to run against the live
+-- Supabase database. A 50-character Sig/instructions field is too short for
+-- normal clinical text (e.g. "Take 1 tablet by mouth twice daily after
+-- meals for 7 days" is 56 characters) and currently makes progress-note /
+-- initial-note publish fail outright when a clinician's Sig exceeds it,
+-- since medication.create runs inside the publish transaction.
+--
+-- Do NOT run `prisma migrate dev` or `prisma db push` in this repo — the
+-- migrations/ history is known to be out of sync with the live database.
+-- This file is written by hand and must be applied manually
+-- (`prisma migrate deploy`, run by the user) once the paired application
+-- code (schema.prisma, DTO @MaxLength, frontend maxLength) is deployed.
+ALTER TABLE "medications" ALTER COLUMN "instructions" TYPE VARCHAR(255);

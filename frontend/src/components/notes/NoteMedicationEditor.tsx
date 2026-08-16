@@ -279,6 +279,7 @@ export function NoteMedicationEditor({
               }}
               options={nameOptions}
               placeholder="Medication Name (e.g. Lisinopril, Metformin)"
+              maxLength={255}
               disabled={isDisabled}
               className="h-[34px] px-3 text-[13px] rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 text-text-primary shadow-xs"
             />
@@ -301,6 +302,7 @@ export function NoteMedicationEditor({
                   }
                 }}
                 placeholder="Dose (e.g. 10 mg)"
+                maxLength={255}
                 disabled={isDisabled}
                 className="w-full min-w-0 h-[34px] px-3 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
@@ -317,6 +319,7 @@ export function NoteMedicationEditor({
                   }
                 }}
                 placeholder="Form (e.g. Tablet)"
+                maxLength={50}
                 disabled={isDisabled}
                 className="w-full min-w-0 h-[34px] px-3 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
@@ -354,6 +357,7 @@ export function NoteMedicationEditor({
                 }
               }}
               placeholder="Sig / Instructions (e.g. Take 1 tab daily with meals)"
+              maxLength={50}
               disabled={isDisabled}
               className="w-full min-w-0 h-[34px] px-3 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
             />

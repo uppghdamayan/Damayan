@@ -9,6 +9,7 @@ import {
   IsIn,
   ValidateIf,
   IsBoolean,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -54,20 +55,19 @@ export class AssessmentItemDto {
 }
 
 export class MedicationItemDto {
-  @IsString()
-  @IsOptional()
-  id?: string;
-
-  @IsString()
-  @IsOptional()
-  tempId?: string;
-
+  // No stable identity field here (unlike AssessmentItemDto): a dose edit
+  // made within a note deliberately creates a NEW Medication row on publish
+  // (see MedicationsService#upsertFromNoteMedications) rather than updating
+  // the old one in place, so Medication.id would go stale across a dose
+  // change anyway. Matching happens by (name, dose) at publish time.
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   name: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
   dose?: string;
 
   @IsString()
@@ -76,6 +76,7 @@ export class MedicationItemDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
   formulation?: string;
 
   @Type(() => Number)
@@ -84,6 +85,7 @@ export class MedicationItemDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
   instructions?: string;
 
   @IsString()

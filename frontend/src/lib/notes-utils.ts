@@ -395,29 +395,37 @@ export function mapNoteToTimelineView(
 
     const assessmentTitles = formatAssessmentTitles(progressNote.problemListSnapshot);
 
+    // Mirror the INITIAL branch's `source !== 'past'` filter: publish()
+    // drops 'past' entries for both note types before they reach the master
+    // Medication table, so the timeline should never show a chip for one
+    // that publish would have discarded.
     const medicationList = Array.isArray(progressNote.medicationSnapshot)
-      ? progressNote.medicationSnapshot.map((med: any) => {
-          if (typeof med === 'string') return med;
-          if (med && typeof med === 'object') {
-            const doseStr = med.dose != null ? String(med.dose).trim() : '';
-            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
-            const fullDose = `${doseStr}${unitStr}`.trim();
-            return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
-          }
-          return '';
-        }).filter(Boolean)
+      ? progressNote.medicationSnapshot
+          .filter((med: any) => !med || typeof med !== 'object' || med.source !== 'past')
+          .map((med: any) => {
+            if (typeof med === 'string') return med;
+            if (med && typeof med === 'object') {
+              const doseStr = med.dose != null ? String(med.dose).trim() : '';
+              const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+              const fullDose = `${doseStr}${unitStr}`.trim();
+              return `${med.name}${fullDose ? ` ${fullDose}` : ''}`;
+            }
+            return '';
+          }).filter(Boolean)
       : [];
 
     const medicationsDetailed = Array.isArray(progressNote.medicationSnapshot)
-      ? progressNote.medicationSnapshot.map((med: any) => {
-          if (typeof med === 'string') return { name: med };
-          if (med && typeof med === 'object') {
-            const doseStr = med.dose != null ? String(med.dose).trim() : '';
-            const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
-            return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
-          }
-          return { name: '' };
-        }).filter((m: any) => m.name)
+      ? progressNote.medicationSnapshot
+          .filter((med: any) => !med || typeof med !== 'object' || med.source !== 'past')
+          .map((med: any) => {
+            if (typeof med === 'string') return { name: med };
+            if (med && typeof med === 'object') {
+              const doseStr = med.dose != null ? String(med.dose).trim() : '';
+              const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
+              return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
+            }
+            return { name: '' };
+          }).filter((m: any) => m.name)
       : [];
 
     const author = progressNote.author;

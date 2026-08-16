@@ -342,6 +342,28 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return existing;
   };
 
+  // A medication added within this note via the "Add Medication" sub-form
+  // carries `isNew: true` and exists only in local form state until it's
+  // persisted (Save Draft, Update Draft, or Publish). If a `note`/
+  // `copyForward` refetch reruns the hydration effect in that window, the
+  // recomputed snapshot is built from the server + master list — sources
+  // that don't have this medication yet — and it would otherwise vanish.
+  // Union any such medication still present in current form state back into
+  // `base`, deduped by name so it isn't doubled once it does land server-side.
+  const reuniteLocallyAddedMeds = (base: any[]) => {
+    const localOnlyNew = (form.getValues('medicationSnapshot') || []).filter(
+      (m: any) => m && typeof m === 'object' && m.isNew && m.name,
+    );
+    if (localOnlyNew.length === 0) return base;
+    const seen = new Set(
+      base.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean),
+    );
+    const additions = localOnlyNew.filter(
+      (m: any) => !seen.has(String(m.name).trim().toLowerCase()),
+    );
+    return additions.length > 0 ? [...base, ...additions] : base;
+  };
+
   useEffect(() => {
     const activeProblems = copyForward?.activeProblems || [];
     const activeMeds = copyForward?.activeMedications || [];
@@ -367,7 +389,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           : mergeActiveProblems(validProblems, activeProblems);
 
       const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
-      const finalMeds = isPublished
+      const baseMeds = isPublished
         ? validMeds
         : currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
           ? currentMedicationsWhileEditing
@@ -381,6 +403,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 instructions: m.instructions || undefined,
                 fromPast: m.fromPast || false,
               }));
+      // A med added in-note but not yet persisted to the server lives only
+      // in current form state (neither the server snapshot nor the master
+      // list carries it yet). A refetch of `note`/`copyForward` between
+      // adding it and it actually landing in the DB would otherwise
+      // recompute `baseMeds` from stale sources and silently drop it — union
+      // it back in here, sourced from live form state so a deliberate
+      // deletion isn't resurrected.
+      const finalMeds = isPublished ? baseMeds : reuniteLocallyAddedMeds(baseMeds);
 
       const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished
         ? copyForward?.inheritedDiagnostics || []
@@ -419,7 +449,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           const draftMeds = (parsed.medicationSnapshot as any[]) || [];
           const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
           const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
-          parsed.medicationSnapshot = currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
+          const baseDraftMeds = currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
             ? currentMedicationsWhileEditing
             : validMeds.length > 0
               ? mergeActiveMedications(validMeds, activeMeds)
@@ -431,6 +461,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   instructions: m.instructions || undefined,
                   fromPast: m.fromPast || false,
                 }));
+          parsed.medicationSnapshot = isMedicationEditMode ? baseDraftMeds : reuniteLocallyAddedMeds(baseDraftMeds);
           
           if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
             parsed.diagnostics = copyForward?.inheritedDiagnostics || [];
@@ -543,12 +574,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     releaseProblemLock();
   };
 
-  // Keeps this session's in-note edits (already persisted continuously via
-  // useAutoSave / the note's own Draft/Update Draft actions below) and just
-  // exits edit mode, releasing the lock so the Master Problem List unlocks.
+  // Persists this session's in-note edits — useAutoSave only writes to
+  // localStorage on a 5s debounce, so without an explicit flush here a
+  // refetch of `note`/`copyForward` between now and the next autosave tick
+  // (or the note's own Draft/Update Draft action) can re-hydrate the form
+  // from the stale server snapshot and silently drop what was just added.
+  // Then exits edit mode, releasing the lock so the Master Problem List
+  // unlocks.
   const handleSaveDraftProblemList = () => {
     setIsProblemEditMode(false);
     releaseProblemLock();
+    persistDraftSnapshot();
   };
 
   // Mirrors enterProblemEditMode/handleRevertProblemList/
@@ -579,6 +615,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const handleSaveDraftMedications = () => {
     setIsMedicationEditMode(false);
     releaseMedicationLock();
+    persistDraftSnapshot();
   };
 
   const scrollToError = (fieldName?: string) => {
@@ -772,9 +809,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         const p = n.item;
         if (typeof p === 'object' && p !== null) {
           cleanProblems.push({
-            ...p,
+            id: p.id,
+            tempId: p.tempId,
+            title: p.title,
             parentId: p.parentId || null,
             depth,
+            isNew: p.isNew,
+            diagnosisDate: p.diagnosisDate,
           });
         } else {
           cleanProblems.push(p);
@@ -795,9 +836,24 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       // Harmless on updates: the backend discards visitDatetime there.
       visitDatetime: new Date().toISOString(),
       problemListSnapshot: cleanProblems,
+      // Project explicitly to the DTO shape rather than spreading — a legacy
+      // draft (saved back when UpdateProgressNoteDto had no nested
+      // validation at all) can carry stray keys that would now trip
+      // forbidNonWhitelisted on PATCH. Whitelisting here keeps the payload
+      // deterministic and immune to junk in old snapshots.
       medicationSnapshot: values.medicationSnapshot?.map((m: any) => {
         if (typeof m === 'object' && m !== null) {
-          return { ...m };
+          return {
+            name: m.name,
+            dose: m.dose,
+            unit: m.unit,
+            formulation: m.formulation,
+            quantity: m.quantity,
+            instructions: m.instructions,
+            source: m.source,
+            isNew: m.isNew,
+            fromPast: m.fromPast,
+          };
         }
         return m;
       }),
@@ -899,6 +955,30 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       }
     }
     executeDraftToggle();
+  };
+
+  // Flushes the current form state so a section's "Save Draft" action is
+  // durable, not just in-memory. For an existing DB draft, PATCH it (skipped
+  // if a save is already in flight — the in-flight one will carry the same
+  // form state). For a brand-new note with no DB row yet, write straight to
+  // localStorage rather than going through `createMutation` — creating a row
+  // as a side effect of a sub-section button would flip `noteId` mid-render
+  // and change what the header Draft/Undraft toggle and the medication/
+  // problem edit locks (keyed off `hasOpenDbDraft: !!noteId`) mean.
+  const persistDraftSnapshot = () => {
+    if (noteId) {
+      if (updateMutation.isPending) return;
+      updateMutation.mutate(
+        { id: noteId, data: cleanFormValues(form.getValues()) },
+        { onSuccess: () => setLastSaved(new Date()) },
+      );
+    } else {
+      localStorage.setItem(
+        `damayan:draft:${patientId}:progress`,
+        JSON.stringify(form.getValues()),
+      );
+      setLastSaved(new Date());
+    }
   };
 
   const executeUpdateDraft = () => {

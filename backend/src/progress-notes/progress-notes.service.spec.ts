@@ -253,5 +253,72 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     expect(result[1].name).toBe('Sodium Bicarbonate');
     expect(result[1].isNew).toBe(true);
   });
+
+  it('drops a non-isNew entry that is absent from the active medication list', async () => {
+    const mockMedicationsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([
+        { name: 'Amlodipine', dose: '10 mg' },
+      ]),
+    };
+
+    const service = new ProgressNotesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    // Stale carried-over entry for a medication deleted concurrently on the
+    // Master Medications List — not flagged isNew, so it must be dropped.
+    const snapshot = [
+      { name: 'Amlodipine', dose: '10 mg' },
+      { name: 'Discontinued Drug', dose: '5 mg' },
+    ];
+
+    const result = await (service as any).reconcileMedicationSnapshot(
+      'patient-1',
+      snapshot,
+      {} as any,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Amlodipine');
+  });
+
+  it('matches on name only, so an in-note dose edit survives reconcile', async () => {
+    const mockMedicationsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([
+        { name: 'Amlodipine', dose: '10 mg' },
+      ]),
+    };
+
+    const service = new ProgressNotesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    // The clinician edited the dose within the note; the active record's
+    // dose hasn't been updated yet (that only happens on publish). Matching
+    // on name alone (not name+dose) must keep this entry, not treat the
+    // dose mismatch as "no longer active".
+    const snapshot = [{ name: 'Amlodipine', dose: '5 mg' }];
+
+    const result = await (service as any).reconcileMedicationSnapshot(
+      'patient-1',
+      snapshot,
+      {} as any,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].dose).toBe('5 mg');
+  });
 });
 
