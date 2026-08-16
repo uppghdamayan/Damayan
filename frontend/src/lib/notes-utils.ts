@@ -85,11 +85,64 @@ export function diffListItems(
 }
 
 /**
- * Same-name fuzzy matching between consecutive notes' medication lists, but
- * dose-aware: a name match with a differing dose is tagged 'dose-up' /
- * 'dose-down' / 'dose-changed' instead of being collapsed into 'existing'
- * (plain diffListItems bakes name+dose into one string, so a name-only match
- * on the leading drug name silently hides dose-only edits).
+ * Compares two dose strings and determines if they differ and whether it is a dose increase, decrease, or change.
+ */
+export function compareDoses(
+  currDoseRaw?: string,
+  prevDoseRaw?: string
+): { isDifferent: boolean; status: 'existing' | 'dose-up' | 'dose-down' | 'dose-changed' } {
+  const curr = (currDoseRaw ? String(currDoseRaw) : '').trim();
+  const prev = (prevDoseRaw ? String(prevDoseRaw) : '').trim();
+
+  // Normalize spacing and case for exact comparison (e.g. "10mg" === "10 mg")
+  const normCurr = curr.toLowerCase().replace(/\s+/g, '');
+  const normPrev = prev.toLowerCase().replace(/\s+/g, '');
+
+  if (normCurr === normPrev) {
+    return { isDifferent: false, status: 'existing' };
+  }
+
+  // If one is empty and the other is present
+  if (!curr && prev) {
+    return { isDifferent: true, status: 'dose-down' };
+  }
+  if (curr && !prev) {
+    return { isDifferent: true, status: 'dose-up' };
+  }
+
+  // Numerical comparison (e.g. "10 units" vs "6 units", "10 mg" vs "5 mg")
+  const currNum = parseFloat(curr);
+  const prevNum = parseFloat(prev);
+
+  if (!isNaN(currNum) && !isNaN(prevNum)) {
+    if (currNum > prevNum) {
+      return { isDifferent: true, status: 'dose-up' };
+    }
+    if (currNum < prevNum) {
+      return { isDifferent: true, status: 'dose-down' };
+    }
+  }
+
+  return { isDifferent: true, status: 'dose-changed' };
+}
+
+/**
+ * Normalizes a medication name for accurate matching between notes.
+ * Preserves the full drug name (e.g. "Insulin Lispro" vs "Insulin Glargine")
+ * while forgiving minor spacing and separator differences.
+ */
+export function normalizeMedicationName(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([+/&-])\s*/g, '$1');
+}
+
+/**
+ * Medication diffing between consecutive notes:
+ * Uses full normalized medication name matching so distinct drugs (e.g. Insulin Lispro vs Insulin Glargine)
+ * are never falsely matched against each other.
  */
 export function diffMedicationItems(
   current: { name: string; dose?: string }[],
@@ -108,14 +161,7 @@ export function diffMedicationItems(
   }
 
   const isMatch = (n1: string, n2: string): boolean => {
-    const norm = (str: string) => str.toLowerCase().trim();
-    const getDrugName = (s: string) => {
-      const match = norm(s).match(/^[a-z0-9]+/i);
-      return match ? match[0] : norm(s);
-    };
-    const d1 = getDrugName(n1);
-    const d2 = getDrugName(n2);
-    return d1 === d2 || d1.includes(d2) || d2.includes(d1);
+    return normalizeMedicationName(n1) === normalizeMedicationName(n2);
   };
 
   const matchedPrevIndices = new Set<number>();
@@ -130,14 +176,10 @@ export function diffMedicationItems(
       const prevVal = previous[prevIdx];
       const currDose = curr.dose ? String(curr.dose).trim() : '';
       const prevDose = prevVal.dose ? String(prevVal.dose).trim() : '';
-      if (currDose && prevDose && currDose.toLowerCase() !== prevDose.toLowerCase()) {
-        const currNum = parseFloat(currDose);
-        const prevNum = parseFloat(prevDose);
-        const status =
-          !isNaN(currNum) && !isNaN(prevNum)
-            ? (currNum > prevNum ? 'dose-up' : currNum < prevNum ? 'dose-down' : 'dose-changed')
-            : 'dose-changed';
-        diffItems.push({ text: formatItem(curr), status, fromDose: prevDose, toDose: currDose });
+      const { isDifferent, status } = compareDoses(currDose, prevDose);
+
+      if (isDifferent) {
+        diffItems.push({ text: formatItem(curr), status, fromDose: prevDose || undefined, toDose: currDose || undefined });
       } else {
         diffItems.push({ text: formatItem(curr), status: 'existing' });
       }

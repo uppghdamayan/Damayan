@@ -3,6 +3,7 @@
 import { Lock, Pencil, Edit as EditIcon, TrashIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
+import { compareDoses } from '@/lib/notes-utils';
 
 // Shape of one medicationSnapshot entry as it lives in form state.
 export interface NoteMedicationItem {
@@ -23,9 +24,9 @@ interface NoteMedicationEditorProps {
   isEditMode: boolean;
   isLockedByOther: boolean;
   onEnterEditMode: () => void;
-  onRevert: () => void;
-  onSaveDraft: () => void;
-  onEditMedication: (idx: number) => void;
+  onRevert?: () => void;
+  onSaveDraft?: () => void;
+  onEditMedication: (index: number) => void;
   originalDoseByMedName: Map<string, string>;
   nameOptions: string[];
   newMedName: string;
@@ -148,13 +149,12 @@ export function NoteMedicationEditor({
           const originalDose = !isNewMed && medName
             ? originalDoseByMedName.get(String(medName).trim().toLowerCase())
             : undefined;
-          const doseChanged = !isNewMed && originalDose !== undefined && medDose
-            && String(medDose).trim() !== originalDose && originalDose !== '';
-          const originalDoseNum = doseChanged ? parseFloat(originalDose!) : NaN;
-          const newDoseNum = doseChanged ? parseFloat(String(medDose)) : NaN;
-          const doseDirection = !isNaN(originalDoseNum) && !isNaN(newDoseNum)
-            ? (newDoseNum > originalDoseNum ? 'up' : newDoseNum < originalDoseNum ? 'down' : null)
-            : null;
+          const { isDifferent: doseChanged, status: doseStatus } =
+            !isNewMed && originalDose !== undefined && medDose
+              ? compareDoses(String(medDose), originalDose)
+              : { isDifferent: false, status: 'existing' as const };
+          const doseDirection =
+            doseStatus === 'dose-up' ? 'up' : doseStatus === 'dose-down' ? 'down' : doseStatus === 'dose-changed' ? 'changed' : null;
 
           return (
             <div
