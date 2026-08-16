@@ -139,7 +139,6 @@ export function AttachmentsSection({
           </div>
           <PriorLabsTable
             patientId={patientId}
-            noteId={noteId}
             localAttachments={localAttachments}
             onRemoveLocalAttachment={onRemoveLocalAttachment}
           />

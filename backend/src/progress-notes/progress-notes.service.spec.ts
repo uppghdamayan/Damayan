@@ -74,6 +74,7 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
     expect(result.sourceNoteId).toBe('note-2');
     expect(result.sourceKind).toBe('progress');
     expect(result.mgmtPharm).toBe('note-2-pharm');
+    expect(result.diagnostics).toEqual([]);
   });
 
   it('excludes the note being edited, so a draft can never inherit from itself', async () => {

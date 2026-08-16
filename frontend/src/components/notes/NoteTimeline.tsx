@@ -65,11 +65,19 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   // Combine and sort
   const allNotesRaw: (ProgressNote | InitialNote)[] = useMemo(() => {
     const combined: (ProgressNote | InitialNote)[] = [...progressNotes];
-    if (initialNotes && initialNotes.length > 0) {
-      combined.push(...initialNotes);
+    const initialList = (initialNotes && initialNotes.length > 0)
+      ? initialNotes
+      : (activeInitialNote ? [activeInitialNote] : []);
+
+    const existingIds = new Set(combined.map((n) => n.id));
+    for (const initNote of initialList) {
+      if (!existingIds.has(initNote.id)) {
+        combined.push(initNote);
+        existingIds.add(initNote.id);
+      }
     }
     return combined;
-  }, [progressNotes, initialNotes]);
+  }, [progressNotes, initialNotes, activeInitialNote]);
 
   const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
 
@@ -239,8 +247,9 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           mappedNotes.map((note, index) => {
             // Diff baseline: chronologically diff against the next note older in sorted order that is authored by a DOCTOR.
             // Decided per fix.md §6.3, and updated to skip NURSE/PHARMACIST notes which lack clinical snapshots.
-            // Initial notes are the baseline and have no previous note.
-            const previousNote = note.kind === 'initial' ? null : (mappedNotes.slice(index + 1).find(n => !n.authorRole || n.authorRole === 'DOCTOR') || null);
+            const previousNote = note.kind === 'initial' 
+              ? null 
+              : (mappedNotes.slice(index + 1).find(n => n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id) : null) || null);
             const isOpenNote = expandedNotes.has(note.id);
 
             return (

@@ -305,40 +305,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         };
         continue;
       }
-
-      if (!existingTitles.has(titleKey)) {
-        existing.push({
-          id: p.id || undefined,
-          title: p.title,
-          parentId: p.parentId || undefined,
-          depth: item.depth,
-          diagnosisDate: p.diagnosisDate ?? null,
-        });
-        existingTitles.set(titleKey, existing.length - 1);
-      }
     }
     return existing;
   };
 
   const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
-    const existing = [...existingMeds];
-    const existingNames = new Set(
-      existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean)
+    const activeNames = new Set(
+      (activeMedications || []).map((m: any) => m.name?.trim().toLowerCase()).filter(Boolean)
     );
 
-    for (const m of activeMedications) {
-      if (m.name && !existingNames.has(m.name.trim().toLowerCase())) {
-        existing.push({
-          name: m.name,
-          dose: m.dose || undefined,
-          formulation: m.formulation || undefined,
-          quantity: m.quantity || undefined,
-          instructions: m.instructions || undefined,
-          fromPast: m.fromPast || false,
-        });
-        existingNames.add(m.name.trim().toLowerCase());
-      }
-    }
+    const existing = existingMeds.filter((m: any) => {
+      if (!m || typeof m !== 'object') return true;
+      if (m.isNew) return true;
+      const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
+      return !!name && activeNames.has(name);
+    });
+
     return existing;
   };
 
@@ -370,11 +352,13 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
     if (noteId && note) {
       const isPublished = note.status === 'PUBLISHED';
-      const draftProblems = (note.problemListSnapshot as any[]) || [];
-      const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
+      const draftProblems = note.problemListSnapshot as any[] | null | undefined;
+      const hasProblemSnapshot = Array.isArray(draftProblems);
+      const validProblems = (draftProblems || []).filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
 
-      const draftMeds = (note.medicationSnapshot as any[]) || [];
-      const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
+      const draftMeds = note.medicationSnapshot as any[] | null | undefined;
+      const hasMedSnapshot = Array.isArray(draftMeds);
+      const validMeds = (draftMeds || []).filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
 
       // While this section is in its own draft-edit mode, the mutual lock
       // guarantees the Master Problem List can't be changing — keep
@@ -386,14 +370,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         ? validProblems
         : currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
           ? currentProblemsWhileEditing
-          : mergeActiveProblems(validProblems, activeProblems);
+          : hasProblemSnapshot
+            ? mergeActiveProblems(validProblems, activeProblems)
+            : activeProblemTree.map(({ problem: p, depth }) => ({
+                id: p.id || undefined,
+                title: p.title,
+                parentId: p.parentId || undefined,
+                depth,
+                diagnosisDate: p.diagnosisDate ?? null,
+              }));
 
       const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
       const baseMeds = isPublished
         ? validMeds
         : currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
           ? currentMedicationsWhileEditing
-          : validMeds.length > 0
+          : hasMedSnapshot
             ? mergeActiveMedications(validMeds, activeMeds)
             : activeMeds.map((m: any) => ({
                 name: m.name,
@@ -412,9 +404,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       // deletion isn't resurrected.
       const finalMeds = isPublished ? baseMeds : reuniteLocallyAddedMeds(baseMeds);
 
-      const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished
-        ? copyForward?.inheritedDiagnostics || []
-        : note.diagnostics || [];
+      const finalDiagnostics = note.diagnostics || [];
       const finalMgmtPharm = !note.mgmtPharm && !isPublished
         ? copyForward?.inheritedMgmtPharm || ''
         : note.mgmtPharm || '';
@@ -438,20 +428,30 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       if (draft) {
         try {
           const parsed = JSON.parse(draft);
-          const draftProblems = (parsed.problemListSnapshot as any[]) || [];
-          const validProblems = draftProblems.filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
+          const draftProblems = parsed.problemListSnapshot as any[] | null | undefined;
+          const hasProblemSnapshot = Array.isArray(draftProblems);
+          const validProblems = (draftProblems || []).filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
 
           const currentProblemsWhileEditing = isProblemEditMode ? form.getValues('problemListSnapshot') : undefined;
           parsed.problemListSnapshot = currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
             ? currentProblemsWhileEditing
-            : mergeActiveProblems(validProblems, activeProblems);
+            : hasProblemSnapshot
+              ? mergeActiveProblems(validProblems, activeProblems)
+              : activeProblemTree.map(({ problem: p, depth }) => ({
+                  id: p.id || undefined,
+                  title: p.title,
+                  parentId: p.parentId || undefined,
+                  depth,
+                  diagnosisDate: p.diagnosisDate ?? null,
+                }));
 
-          const draftMeds = (parsed.medicationSnapshot as any[]) || [];
-          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
+          const draftMeds = parsed.medicationSnapshot as any[] | null | undefined;
+          const hasMedSnapshot = Array.isArray(draftMeds);
+          const validMeds = (draftMeds || []).filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
           const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
           const baseDraftMeds = currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
             ? currentMedicationsWhileEditing
-            : validMeds.length > 0
+            : hasMedSnapshot
               ? mergeActiveMedications(validMeds, activeMeds)
               : activeMeds.map((m: any) => ({
                   name: m.name,
@@ -463,8 +463,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 }));
           parsed.medicationSnapshot = isMedicationEditMode ? baseDraftMeds : reuniteLocallyAddedMeds(baseDraftMeds);
           
-          if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
-            parsed.diagnostics = copyForward?.inheritedDiagnostics || [];
+          if (!parsed.diagnostics) {
+            parsed.diagnostics = [];
           }
           if (!parsed.mgmtPharm) {
             parsed.mgmtPharm = copyForward?.inheritedMgmtPharm || '';
@@ -488,7 +488,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         labs: '',
         mgmtNonpharm: copyForward?.inheritedMgmtNonpharm || '',
         mgmtPharm: copyForward?.inheritedMgmtPharm || '',
-        diagnostics: copyForward?.inheritedDiagnostics || [],
+        diagnostics: [],
         problemListSnapshot: activeProblemTree.map(({ problem: p, depth }) => ({
           id: p.id || undefined,
           title: p.title,

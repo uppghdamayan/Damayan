@@ -234,7 +234,7 @@ export class ProgressNotesService {
       sourceVisitDatetime: source.visit.visitDatetime,
       mgmtNonpharm: source.mgmtNonpharm ?? '',
       mgmtPharm: source.mgmtPharm ?? '',
-      diagnostics: (source.diagnostics as string[]) || [],
+      diagnostics: [],
     };
   }
 
@@ -314,12 +314,14 @@ export class ProgressNotesService {
             mgmtNonpharm: dto.mgmtNonpharm ?? carryForward.mgmtNonpharm,
             mgmtPharm: dto.mgmtPharm ?? carryForward.mgmtPharm,
             diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
-            problemListSnapshot: dto.problemListSnapshot
-              ? (dto.problemListSnapshot as any)
-              : (activeProblems as any),
-            medicationSnapshot: reconciledMedicationSnapshot
-              ? (reconciledMedicationSnapshot as any)
-              : (activeMedications as any),
+            problemListSnapshot:
+              dto.problemListSnapshot !== undefined
+                ? (dto.problemListSnapshot as any)
+                : (activeProblems as any),
+            medicationSnapshot:
+              dto.medicationSnapshot !== undefined
+                ? (reconciledMedicationSnapshot as any)
+                : (activeMedications as any),
             status: NoteStatus.DRAFT,
           },
         });

@@ -101,7 +101,7 @@ export function useCopyForwardData(patientId: string | null, excludeNoteId?: str
       activeProblems,
       activeMedications,
       sourceNoteId: carryForwardData?.sourceNoteId ?? null,
-      inheritedDiagnostics: carryForwardData?.diagnostics || [],
+      inheritedDiagnostics: [],
       inheritedMgmtPharm: carryForwardData?.mgmtPharm || '',
       inheritedMgmtNonpharm: carryForwardData?.mgmtNonpharm || '',
     };
@@ -150,6 +150,8 @@ export function useCreateAndPublishProgressNote(patientId: string) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-notes-all', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits', patientId] });
       queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
@@ -173,6 +175,8 @@ export function useUpdateProgressNote(patientId: string) {
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-notes-all', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
@@ -211,6 +215,8 @@ export function usePublishProgressNote(patientId: string) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-notes-all', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });

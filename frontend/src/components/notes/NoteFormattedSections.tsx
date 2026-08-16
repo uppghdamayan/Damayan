@@ -127,10 +127,6 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const isInitial = note.kind === 'initial';
   const effectivePreviousNote = isInitial ? null : previousNote;
 
-  // Diff diagnostics
-  const currentDiags = note.sections.diagnostics || [];
-  const prevDiags = effectivePreviousNote?.sections.diagnostics || null;
-  const diagDiff = diffListItems(currentDiags, prevDiags);
 
   // Diff medications (dose-aware — flags dose increases/decreases, not just add/remove)
   const currentMedsDetailed = note.sections.medicationsDetailed || [];
@@ -213,10 +209,10 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                     {item.text}
                   </span>
                   {item.status === 'removed' && (
-                    <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">Resolved</Badge>
+                    <Badge variant="saved" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">RESOLVED</Badge>
                   )}
                   {item.status === 'added' && (
-                    <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
+                    <Badge variant="active" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">NEW</Badge>
                   )}
                 </div>
               </div>
@@ -237,28 +233,16 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Diagnostics */}
-      {((note.sections.diagnostics && note.sections.diagnostics.length > 0) || diagDiff.length > 0) && (
+      {note.sections.diagnostics && note.sections.diagnostics.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
             <Search className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Diagnostics</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-1 pl-2">
-            {diagDiff.map((item, idx) => (
+            {note.sections.diagnostics.map((diag, idx) => (
               <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
-                {item.status === 'removed' ? (
-                  <Badge variant="removed" className="border-dashed line-through opacity-70">{item.text}</Badge>
-                ) : item.status === 'added' ? (
-                  <Badge variant="active" className="shadow-sm">{item.text}</Badge>
-                ) : (
-                  <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
-                )}
-                {item.status === 'removed' && (
-                  <Badge variant="critical" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
-                )}
-                {item.status === 'added' && (
-                  <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
-                )}
+                <Badge variant="active" className="shadow-sm">{diag}</Badge>
               </div>
             ))}
           </div>
@@ -302,17 +286,17 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                   <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
                 )}
                 {item.status === 'removed' && (
-                  <Badge variant="critical" className="px-1 py-0 h-3 text-[8px]">Removed</Badge>
+                  <Badge variant="critical" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">REMOVED</Badge>
                 )}
                 {item.status === 'added' && (
-                  <Badge variant="saved" className="px-1 py-0 h-3 text-[8px]">New</Badge>
+                  <Badge variant="saved" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">NEW</Badge>
                 )}
                 {(item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed') && (
                   <Badge
                     variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
-                    className="px-1 py-0 h-3 text-[8px]"
+                    className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]"
                   >
-                    {item.status === 'dose-up' ? '↑ Dose' : item.status === 'dose-down' ? '↓ Dose' : 'Dose Changed'}
+                    {item.status === 'dose-up' ? '↑ DOSE' : item.status === 'dose-down' ? '↓ DOSE' : 'DOSE CHANGED'}
                   </Badge>
                 )}
               </div>

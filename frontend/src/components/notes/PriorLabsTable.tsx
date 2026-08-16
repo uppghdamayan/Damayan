@@ -1,33 +1,15 @@
-import React from 'react';
 import { usePriorLabs, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
 import { Trash2, Eye, FileText, FlaskConical, Paperclip } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface PriorLabsTableProps {
   patientId: string;
-  noteId?: string;
   localAttachments?: any[];
   onRemoveLocalAttachment?: (index: number) => void;
 }
 
-export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRemoveLocalAttachment }: PriorLabsTableProps) {
+export function PriorLabsTable({ patientId, localAttachments = [], onRemoveLocalAttachment }: PriorLabsTableProps) {
   const { data: groupedLabs, isLoading } = usePriorLabs(patientId);
-
-  const latestCurrentNoteAttachmentId = React.useMemo(() => {
-    if (!noteId) return null;
-    const allAttachments = groupedLabs ? groupedLabs.flatMap((g: any) => g.attachments) : [];
-    const currentNoteAttachments = allAttachments.filter((att: any) => att.noteId === noteId);
-    if (currentNoteAttachments.length === 0) return null;
-    let latest = currentNoteAttachments[0];
-    for (let i = 1; i < currentNoteAttachments.length; i++) {
-      if (new Date(currentNoteAttachments[i].uploadedAt).getTime() > new Date(latest.uploadedAt).getTime()) {
-        latest = currentNoteAttachments[i];
-      }
-    }
-    return latest.id;
-  }, [groupedLabs, noteId]);
-
-
 
   if (isLoading) {
     return <div className="p-4 text-[12px] text-text-muted">Loading prior labs...</div>;
@@ -88,8 +70,12 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
         </div>
       )}
 
-      {/* Saved history — grouped by tag, view-only */}
-      {groupedLabs?.map((group: any) => (
+      {/* Saved history — grouped by tag, only the most recent per tag */}
+      {groupedLabs?.map((group: any) => {
+        // Only show the single most-recent attachment per tag (API returns desc order)
+        const latestAttachment = group.attachments[0];
+        if (!latestAttachment) return null;
+        return (
         <div key={group.tag} className="border border-border rounded-[6px] overflow-hidden bg-surface">
           <div className="flex items-center gap-2 px-2.5 py-1.5 bg-surface-2 border-b border-border">
             <FlaskConical className="w-3 h-3 text-text-muted shrink-0" />
@@ -97,23 +83,17 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
               {group.tag}
             </span>
             <span className="text-[9px] font-bold text-text-muted bg-surface-3 border border-border px-1.5 py-[1px] rounded-full shrink-0">
-              {group.attachments.length}
+              Latest
             </span>
           </div>
           <ul className="divide-y divide-border">
-            {group.attachments.map((att: any) => (
-              <li key={att.id} className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-surface-2/70 transition-colors">
+              <li key={latestAttachment.id} className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-surface-2/70 transition-colors">
                 <span className="text-[11px] font-mono text-text-secondary whitespace-nowrap shrink-0 w-[72px]">
-                  {new Date(att.uploadedAt).toLocaleDateString()}
+                  {new Date(latestAttachment.uploadedAt).toLocaleDateString()}
                 </span>
-                {att.id === latestCurrentNoteAttachmentId && (
-                  <span className="text-[8px] font-bold text-accent bg-accent/10 border border-accent/30 px-1 py-[1px] rounded uppercase tracking-[0.5px] shrink-0">
-                    Latest
-                  </span>
-                )}
-                <span className="flex-1 min-w-0 text-[12px] text-text-secondary truncate" title={att.textResult || undefined}>
-                  {att.textResult ? (
-                    <span className="italic">&quot;{att.textResult}&quot;</span>
+                <span className="flex-1 min-w-0 text-[12px] text-text-secondary truncate" title={latestAttachment.textResult || undefined}>
+                  {latestAttachment.textResult ? (
+                    <span className="italic">&quot;{latestAttachment.textResult}&quot;</span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-text-muted">
                       <FileText className="w-3 h-3 shrink-0" />
@@ -122,13 +102,13 @@ export function PriorLabsTable({ patientId, noteId, localAttachments = [], onRem
                   )}
                 </span>
                 <div className="shrink-0">
-                  <DownloadButton attachmentId={att.id} storageKey={att.storageKey} />
+                  <DownloadButton attachmentId={latestAttachment.id} storageKey={latestAttachment.storageKey} />
                 </div>
               </li>
-            ))}
           </ul>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
