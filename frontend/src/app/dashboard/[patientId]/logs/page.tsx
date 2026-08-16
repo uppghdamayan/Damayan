@@ -190,14 +190,21 @@ function getReadableDescriptionText(entry: AuditLogEntry): string {
     }
   } else if (table === 'vitals') {
     if (action === 'CREATE') {
-      const bp = reqBody.bloodPressure || changes.bloodPressure;
-      const hr = reqBody.heartRate || changes.heartRate;
-      const temp = reqBody.temperature || changes.temperature;
+      const sbp = reqBody.sbp ?? changes.sbp;
+      const dbp = reqBody.dbp ?? changes.dbp;
+      const hr = reqBody.heartRate ?? changes.heartRate;
+      const rr = reqBody.respiratoryRate ?? changes.respiratoryRate;
+      const temp = reqBody.temperature ?? changes.temperature;
+      const spo2 = reqBody.oxygenSaturation ?? changes.oxygenSaturation;
       const parts = [];
-      if (bp) parts.push(`${bp} mmHg`);
-      if (hr) parts.push(`${hr} bpm`);
-      if (temp) parts.push(`${temp} °C`);
+      if (sbp != null && dbp != null) parts.push(`${sbp}/${dbp} mmHg`);
+      if (hr != null) parts.push(`${hr} bpm`);
+      if (rr != null) parts.push(`${rr} breaths/min`);
+      if (temp != null) parts.push(`${temp} °C`);
+      if (spo2 != null) parts.push(`${spo2}% SpO2`);
       return parts.length > 0 ? `Recorded new Vital Signs: ${parts.join(', ')}` : 'Recorded new Vital Signs';
+    } else if (action === 'DELETE') {
+      return 'Deleted a vital signs record';
     }
   } else if (table === 'progress_notes') {
     if (action === 'CREATE') {
@@ -272,7 +279,8 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
       birthDate: 'birthdate',
       sex: 'sex',
       civilStatus: 'civil status',
-      bloodPressure: 'blood pressure',
+      sbp: 'systolic BP',
+      dbp: 'diastolic BP',
       heartRate: 'heart rate',
       temperature: 'temperature',
       respiratoryRate: 'respiratory rate',
@@ -520,14 +528,19 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
   // ── Vitals ────────────────────────────────────────────────────────────────
   } else if (table === 'vitals') {
     if (action === 'CREATE') {
-      const bp = reqBody.bloodPressure || changes.bloodPressure;
-      const hr = reqBody.heartRate || changes.heartRate;
-      const temp = reqBody.temperature || changes.temperature;
+      const sbp = reqBody.sbp ?? changes.sbp;
+      const dbp = reqBody.dbp ?? changes.dbp;
+      const hr = reqBody.heartRate ?? changes.heartRate;
+      const rr = reqBody.respiratoryRate ?? changes.respiratoryRate;
+      const temp = reqBody.temperature ?? changes.temperature;
+      const spo2 = reqBody.oxygenSaturation ?? changes.oxygenSaturation;
       const parts: React.ReactNode[] = [];
-      if (bp) parts.push(<strong key="bp" className="font-semibold text-text-primary">{bp} mmHg</strong>);
-      if (hr) parts.push(<strong key="hr" className="font-semibold text-text-primary">{hr} bpm</strong>);
-      if (temp) parts.push(<strong key="temp" className="font-semibold text-text-primary">{temp} °C</strong>);
-      
+      if (sbp != null && dbp != null) parts.push(<strong key="bp" className="font-semibold text-text-primary">{sbp}/{dbp} mmHg</strong>);
+      if (hr != null) parts.push(<strong key="hr" className="font-semibold text-text-primary">{hr} bpm</strong>);
+      if (rr != null) parts.push(<strong key="rr" className="font-semibold text-text-primary">{rr} breaths/min</strong>);
+      if (temp != null) parts.push(<strong key="temp" className="font-semibold text-text-primary">{temp} °C</strong>);
+      if (spo2 != null) parts.push(<strong key="spo2" className="font-semibold text-text-primary">{spo2}% SpO2</strong>);
+
       if (parts.length > 0) {
         return (
           <span className="text-text-secondary">
@@ -555,6 +568,8 @@ function getReadableDescription(entry: AuditLogEntry): React.ReactNode {
           )}
         </span>
       );
+    } else if (action === 'DELETE') {
+      return <span className="text-text-secondary">Deleted a vital signs record</span>;
     }
 
   // ── Visits ────────────────────────────────────────────────────────────────

@@ -3,8 +3,9 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma, Medication, MedicationLog } from '@prisma/client';
+import { Prisma, Medication, MedicationLog, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
 
@@ -12,7 +13,10 @@ type PrismaTx = Prisma.TransactionClient;
 
 @Injectable()
 export class MedicationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   // ─────────────────────────────────────────────
   // LIST — active by default; ?includeInactive=true returns the full history
@@ -251,6 +255,45 @@ export class MedicationsService {
   // items" loop below), mirroring ProblemsService#upsertFromAssessment's
   // auto-resolve behavior for problems dropped from a note's assessment.
   // ─────────────────────────────────────────────
+  // Note: unlike upsertFromNoteMedications' medicationLog writes, entries here
+  // also feed the centralized Logs page's AuditLog table. This method is
+  // called internally by InitialNotesService/ProgressNotesService on note
+  // publish — never through MedicationsController — so the global
+  // AuditLogInterceptor (which only taps HTTP responses) never sees these
+  // mutations. Without this, every medication added/updated/discontinued as
+  // a side effect of publishing a note was invisible on the Logs page.
+  private async getUserRole(
+    userId: string,
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<Role | undefined> {
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role;
+  }
+
+  private async logAudit(
+    patientId: string,
+    userId: string,
+    userRole: Role | undefined,
+    action: 'CREATE' | 'UPDATE',
+    medicationId: string,
+    name: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
+  ) {
+    if (!userRole) return;
+    await this.auditLogsService.create({
+      userId,
+      userRole,
+      action,
+      tableName: 'medications',
+      recordId: medicationId,
+      patientId,
+      changes: { name, _sourceNote: sourceNote },
+    });
+  }
+
   async upsertFromNoteMedications(
     patientId: string,
     items: {
@@ -266,6 +309,7 @@ export class MedicationsService {
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
     const keptIds = new Set<string>();
+    const userRole = await this.getUserRole(userId, client);
 
     const existing = await client.medication.findMany({
       where: { patientId },
@@ -325,8 +369,8 @@ export class MedicationsService {
           promises.push(
             client.medication
               .update({ where: { id: match.id }, data })
-              .then(() =>
-                client.medicationLog.create({
+              .then(async () => {
+                await client.medicationLog.create({
                   data: {
                     patientId,
                     medicationId: match.id,
@@ -334,16 +378,25 @@ export class MedicationsService {
                     description: `Reactivated medication '${match.name}' from ${sourceNote}`,
                     editorId: userId,
                   },
-                }),
-              ),
+                });
+                await this.logAudit(
+                  patientId,
+                  userId,
+                  userRole,
+                  'UPDATE',
+                  match.id,
+                  match.name,
+                  sourceNote,
+                );
+              }),
           );
         } else if (changes.length > 0) {
           data.updatedBy = userId;
           promises.push(
             client.medication
               .update({ where: { id: match.id }, data })
-              .then(() =>
-                client.medicationLog.create({
+              .then(async () => {
+                await client.medicationLog.create({
                   data: {
                     patientId,
                     medicationId: match.id,
@@ -351,8 +404,17 @@ export class MedicationsService {
                     description: `Updated '${match.name}' from ${sourceNote}: ${changes.join(', ')}`,
                     editorId: userId,
                   },
-                }),
-              ),
+                });
+                await this.logAudit(
+                  patientId,
+                  userId,
+                  userRole,
+                  'UPDATE',
+                  match.id,
+                  match.name,
+                  sourceNote,
+                );
+              }),
           );
         }
         continue;
@@ -373,8 +435,8 @@ export class MedicationsService {
               addedBy: userId,
             },
           })
-          .then((newMed) =>
-            client.medicationLog.create({
+          .then(async (newMed) => {
+            await client.medicationLog.create({
               data: {
                 patientId,
                 medicationId: newMed.id,
@@ -382,8 +444,17 @@ export class MedicationsService {
                 description: `Added medication '${newMed.name}' from ${sourceNote}`,
                 editorId: userId,
               },
-            }),
-          ),
+            });
+            await this.logAudit(
+              patientId,
+              userId,
+              userRole,
+              'CREATE',
+              newMed.id,
+              newMed.name,
+              sourceNote,
+            );
+          }),
       );
     }
 
@@ -396,8 +467,8 @@ export class MedicationsService {
               where: { id: ext.id },
               data: { isActive: false },
             })
-            .then(() =>
-              client.medicationLog.create({
+            .then(async () => {
+              await client.medicationLog.create({
                 data: {
                   patientId,
                   medicationId: ext.id,
@@ -405,8 +476,17 @@ export class MedicationsService {
                   description: `Discontinued medication '${ext.name}' — no longer listed in the ${sourceNote}`,
                   editorId: userId,
                 },
-              }),
-            ),
+              });
+              await this.logAudit(
+                patientId,
+                userId,
+                userRole,
+                'UPDATE',
+                ext.id,
+                ext.name,
+                sourceNote,
+              );
+            }),
         );
       }
     }

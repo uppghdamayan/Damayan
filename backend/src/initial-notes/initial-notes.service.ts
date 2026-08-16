@@ -373,9 +373,7 @@ export class InitialNotesService {
           version.id,
         );
 
-        const assessmentItems = mapAssessmentSnapshot(
-          note.assessment as any[],
-        );
+        const assessmentItems = mapAssessmentSnapshot(note.assessment as any[]);
         const medicationItems = ((note.medicationSnapshot as any[]) || [])
           .filter(
             (m) =>
@@ -399,7 +397,7 @@ export class InitialNotesService {
             fromPast: m.fromPast || false,
           }));
 
-        await Promise.all([
+        const [resolvedIdByKey] = await Promise.all([
           this.problemsService.upsertFromAssessment(
             patientId,
             assessmentItems,
@@ -424,6 +422,23 @@ export class InitialNotesService {
 
         const problemChanges = diffByTitle(beforeProblems, afterProblems);
         const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
+
+        // Heal tempId's into real id's in the note's stored assessment snapshot
+        const updatedSnapshot = (note.assessment as any[]).map((item) => {
+          if (!item || typeof item !== 'object') return item;
+          const key = item.id || item.tempId;
+          if (key && resolvedIdByKey.has(key)) {
+            const newId = resolvedIdByKey.get(key);
+            const { tempId, isNew, ...rest } = item;
+            return { ...rest, id: newId };
+          }
+          return item;
+        });
+
+        await tx.initialNote.update({
+          where: { id },
+          data: { assessment: updatedSnapshot as any },
+        });
 
         await this.visitsService.updateChangeSummary(
           note.visitId,

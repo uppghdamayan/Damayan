@@ -455,7 +455,7 @@ export class ProgressNotesService {
               fromPast: m.fromPast || false,
             }));
 
-          await Promise.all([
+          const [resolvedIdByKey] = await Promise.all([
             this.problemsService.upsertFromAssessment(
               patientId,
               snapshotItems,
@@ -482,6 +482,27 @@ export class ProgressNotesService {
             beforeMeds,
             afterMeds,
           ) as object;
+
+          // Heal tempId's into real id's in the note's stored snapshot
+          // so that future diffs (e.g., when the note is edited and then diffed against the previous note)
+          // can correctly match items by identity instead of falling back to title matching.
+          const updatedSnapshot = (note.problemListSnapshot as any[]).map(
+            (item) => {
+              if (!item || typeof item !== 'object') return item;
+              const key = item.id || item.tempId;
+              if (key && resolvedIdByKey.has(key)) {
+                const newId = resolvedIdByKey.get(key);
+                const { tempId, isNew, ...rest } = item;
+                return { ...rest, id: newId };
+              }
+              return item;
+            },
+          );
+
+          await tx.progressNote.update({
+            where: { id },
+            data: { problemListSnapshot: updatedSnapshot as any },
+          });
         }
 
         await this.visitsService.updateChangeSummary(

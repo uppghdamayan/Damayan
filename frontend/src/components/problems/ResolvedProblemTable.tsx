@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { getCreatorName } from '@/lib/problem-utils';
 import type { Problem } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 150px';
+const COLUMN_LAYOUT = '22px 14px minmax(180px, 3fr) 1.1fr 1.8fr 1fr 140px';
 
 interface ResolvedProblemTableProps {
   problems: Problem[];
@@ -79,8 +79,8 @@ export function ResolvedRow({
       </div>
 
       {/* Column 3: Problem name */}
-      <div className="flex items-center gap-2 truncate text-text-muted line-through decoration-text-muted/65 decoration-1">
-        <span className="text-[13px] font-semibold truncate">{problem.title}</span>
+      <div className="flex items-center gap-2 text-text-muted line-through decoration-text-muted/65 decoration-1 min-w-0">
+        <span className="text-[13px] font-semibold break-words whitespace-normal leading-snug">{problem.title}</span>
       </div>
       
       {/* Column 4: Date of Diagnosis */}

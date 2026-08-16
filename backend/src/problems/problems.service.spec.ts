@@ -59,6 +59,9 @@ function makeClient(seed: any[]) {
     problemLog: {
       create: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ role: 'DOCTOR' }),
+    },
   };
 
   return { client, problems };
@@ -68,7 +71,7 @@ describe('ProblemsService#upsertFromAssessment', () => {
   let service: ProblemsService;
 
   beforeEach(() => {
-    service = new ProblemsService({} as any);
+    service = new ProblemsService({} as any, { create: jest.fn() } as any);
   });
 
   it('resolveMissing: false leaves an absent ACTIVE problem untouched and logs nothing', async () => {

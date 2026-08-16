@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { getCreatorName, getSelectableParents } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px 2.5fr 1.2fr 2.2fr 1.1fr 1.8fr 150px';
+const COLUMN_LAYOUT = '22px 14px minmax(180px, 3fr) 1.1fr 1.8fr 1fr minmax(140px, 1.8fr) 140px';
 
 export type DragOverAction = 'nest' | 'unnest' | 'reorder';
 
@@ -148,19 +148,19 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 3: Problem name and code with visual tree branch connectors */}
-      <div className="flex items-center gap-2 truncate text-text-primary min-w-0">
+      <div className="flex items-center flex-wrap gap-1.5 text-text-primary min-w-0 py-0.5">
         {depth > 0 && (
-          <div className="flex items-center flex-shrink-0" style={{ width: `${depth * 20}px` }}>
+          <div className="flex items-center flex-shrink-0 self-stretch" style={{ width: `${depth * 20}px` }}>
             {Array.from({ length: depth - 1 }).map((_, i) => (
-              <span key={i} className="w-[20px] h-6 inline-block border-r border-border/40" />
+              <span key={i} className="w-[20px] h-full inline-block border-r border-border/40" />
             ))}
-            <div className="w-[20px] h-6 flex items-center justify-center relative">
+            <div className="w-[20px] h-full min-h-[24px] flex items-center justify-center relative">
               <span className="absolute left-0 top-0 bottom-1/2 w-2.5 border-l-2 border-b-2 border-accent/40 rounded-bl-[4px]" />
             </div>
           </div>
         )}
 
-        <span className={cn('text-[13px] truncate', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
+        <span className={cn('text-[13px] break-words whitespace-normal leading-snug', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
           {problem.title}
         </span>
 
@@ -169,7 +169,7 @@ export function ActiveProblemRow({
         )}
 
         {depth > 0 && (
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-accent/80 bg-accent/5 px-1.5 py-0.2 rounded border border-accent/15 flex-shrink-0 hidden @lg:inline">
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-accent/80 bg-accent/5 px-1.5 py-0.5 rounded border border-accent/15 flex-shrink-0">
             Sub-problem
           </span>
         )}
@@ -216,7 +216,7 @@ export function ActiveProblemRow({
           value={problem.parentId || ''}
           onChange={(e) => onParentChange(e.target.value || null)}
           className={cn(
-            'h-6 w-full max-w-[140px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate transition-colors',
+            'h-6 w-full max-w-[200px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate transition-colors',
             problem.parentId && 'border-accent/40 bg-accent/5 font-medium'
           )}
         >

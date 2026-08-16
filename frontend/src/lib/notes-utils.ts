@@ -26,6 +26,7 @@ export interface TimelineNoteView {
     subjective?: { label: string; body: string }[];   // e.g. [{label: 'Chief Complaint', body: ...}, {label: 'HPI', body: ...}] for initial; [{label: 'Subjective', body}] for progress
     objective?: string;
     assessment?: string[];          // problem titles
+    assessmentItems?: { id?: string; title: string }[];  // same items, paired with problem id (when known) for identity-based diffing
     nonPharm?: string;
     pharm?: string;
     diagnostics?: string[];
@@ -79,6 +80,64 @@ export function diffListItems(
     if (!matchedPrevIndices.has(i)) {
       diffItems.push({ text: previous[i], status: 'removed' });
     }
+  }
+
+  return diffItems;
+}
+
+/**
+ * Identity-aware diffing for assessment/problem items between consecutive notes.
+ * Problems carry a stable id across notes (they are the same Problem record being
+ * carried forward), so a problem whose id matches but whose title changed (e.g. a
+ * diagnosis edited from "CKD stage 3b" to "CKD stage 4") must be tagged 'updated' —
+ * NOT 'removed'+'added', which would incorrectly read as the old problem being
+ * resolved and a brand-new problem being added. Falls back to name-based matching
+ * (via diffListItems) for items without an id (e.g. legacy snapshots, plain strings).
+ */
+export function diffAssessmentItems(
+  current: { id?: string; title: string }[],
+  previous: { id?: string; title: string }[] | null
+): { text: string; status: 'existing' | 'added' | 'removed' | 'updated'; fromText?: string }[] {
+  if (!previous) {
+    return current.map(item => ({ text: item.title, status: 'existing' as const }));
+  }
+
+  const prevById = new Map(previous.filter(p => p.id).map(p => [p.id!, p]));
+  const matchedPrevIds = new Set<string>();
+
+  const currentWithId = current.filter(c => c.id);
+  const currentWithoutId = current.filter(c => !c.id);
+  const previousWithoutId = previous.filter(p => !p.id);
+
+  const diffItems: { text: string; status: 'existing' | 'added' | 'removed' | 'updated'; fromText?: string }[] = [];
+
+  for (const curr of currentWithId) {
+    const prev = prevById.get(curr.id!);
+    if (prev) {
+      matchedPrevIds.add(curr.id!);
+      if (prev.title.trim().toLowerCase() !== curr.title.trim().toLowerCase()) {
+        diffItems.push({ text: curr.title, status: 'updated', fromText: prev.title });
+      } else {
+        diffItems.push({ text: curr.title, status: 'existing' });
+      }
+    } else {
+      diffItems.push({ text: curr.title, status: 'added' });
+    }
+  }
+
+  for (const prev of previous) {
+    if (prev.id && !matchedPrevIds.has(prev.id)) {
+      diffItems.push({ text: prev.title, status: 'removed' });
+    }
+  }
+
+  // Items without a stable id (rare/legacy) fall back to name-based matching amongst themselves.
+  if (currentWithoutId.length > 0 || previousWithoutId.length > 0) {
+    const nameDiff = diffListItems(
+      currentWithoutId.map(c => c.title),
+      previousWithoutId.length > 0 ? previousWithoutId.map(p => p.title) : null
+    );
+    diffItems.push(...nameDiff);
   }
 
   return diffItems;
@@ -207,11 +266,20 @@ export function diffMedicationItems(
  * have no prefix.
  */
 export function formatAssessmentTitles(rawItems: any[] | null | undefined): string[] {
+  return formatAssessmentItems(rawItems).map((i) => i.title);
+}
+
+/**
+ * Same traversal as formatAssessmentTitles, but keeps each item's problem id
+ * alongside its formatted display title so callers can diff by identity
+ * (see diffAssessmentItems) instead of by text.
+ */
+export function formatAssessmentItems(rawItems: any[] | null | undefined): { id?: string; title: string }[] {
   if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
 
   // Check if items are all plain strings
   if (rawItems.every((item) => typeof item === 'string')) {
-    return rawItems.filter(Boolean);
+    return rawItems.filter(Boolean).map((title) => ({ title }));
   }
 
   // Normalize objects
@@ -256,11 +324,11 @@ export function formatAssessmentTitles(rawItems: any[] | null | undefined): stri
   });
 
   if (hasAnyParentId) {
-    const result: string[] = [];
+    const result: { id?: string; title: string }[] = [];
     const traverse = (nodes: typeof items, depth: number) => {
       nodes.forEach((n) => {
         const prefix = depth > 0 ? '↳ ' : '';
-        result.push(prefix + n.title);
+        result.push({ id: n.id, title: prefix + n.title });
         const kids = childrenByParent.get(n.key);
         if (kids) traverse(kids, depth + 1);
       });
@@ -272,7 +340,7 @@ export function formatAssessmentTitles(rawItems: any[] | null | undefined): stri
   // Fallback for snapshots where parentId was not tracked but explicitDepth was
   return items.map((item) => {
     const prefix = (item.explicitDepth && item.explicitDepth > 0) ? '↳ ' : '';
-    return prefix + item.title;
+    return { id: item.id, title: prefix + item.title };
   });
 }
 
@@ -313,7 +381,8 @@ export function mapNoteToTimelineView(
       subjectiveSections.push({ label: 'Psychosocial History', body: initialNote.psychosocialHistory });
     }
 
-    const assessmentTitles = formatAssessmentTitles(initialNote.assessment);
+    const assessmentItems = formatAssessmentItems(initialNote.assessment);
+    const assessmentTitles = assessmentItems.map((i) => i.title);
 
     const medicationList = Array.isArray(initialNote.medicationSnapshot)
       ? initialNote.medicationSnapshot
@@ -380,6 +449,7 @@ export function mapNoteToTimelineView(
         subjective: subjectiveSections,
         objective: initialNote.physicalExam || undefined,
         assessment: assessmentTitles,
+        assessmentItems,
         nonPharm: initialNote.mgmtNonpharm || undefined,
         pharm: initialNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(initialNote.diagnostics) ? initialNote.diagnostics : undefined,
@@ -393,7 +463,8 @@ export function mapNoteToTimelineView(
       { label: 'Subjective', body: progressNote.subjective }
     ];
 
-    const assessmentTitles = formatAssessmentTitles(progressNote.problemListSnapshot);
+    const assessmentItems = formatAssessmentItems(progressNote.problemListSnapshot);
+    const assessmentTitles = assessmentItems.map((i) => i.title);
 
     // Mirror the INITIAL branch's `source !== 'past'` filter: publish()
     // drops 'past' entries for both note types before they reach the master
@@ -467,6 +538,7 @@ export function mapNoteToTimelineView(
         subjective: subjectiveSections,
         objective: progressNote.objective || undefined,
         assessment: assessmentTitles,
+        assessmentItems,
         nonPharm: progressNote.mgmtNonpharm || undefined,
         pharm: progressNote.mgmtPharm || undefined,
         diagnostics: Array.isArray(progressNote.diagnostics) ? progressNote.diagnostics : undefined,

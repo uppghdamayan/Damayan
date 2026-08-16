@@ -4,8 +4,9 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, Problem, ProblemStatus } from '@prisma/client';
+import { Prisma, Problem, ProblemStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { ReorderProblemsDto } from './dto/reorder-problems.dto';
@@ -14,7 +15,10 @@ type PrismaTx = Prisma.TransactionClient;
 
 @Injectable()
 export class ProblemsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   // ─────────────────────────────────────────────
   // LIST — flat, sort-ordered. Tree is built client-side (Appendix B).
@@ -372,9 +376,10 @@ export class ProblemsService {
     // the clinician has reviewed, so absence must not be read as "resolved".
     // Defaults true — the Progress Note keeps today's behaviour.
     options: { resolveMissing?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<Map<string, string>> {
     const validItems = assessmentItems.filter((i) => i.title?.trim());
     const keptIds = new Set<string>();
+    const userRole = await this.getUserRole(userId, client);
 
     const existing = await client.problem.findMany({
       where: {
@@ -491,6 +496,15 @@ export class ProblemsService {
                       client,
                       match.id,
                     );
+                    await this.logAudit(
+                      patientId,
+                      userId,
+                      userRole,
+                      'UPDATE',
+                      match.id,
+                      item.title,
+                      sourceNote,
+                    );
                   }
                   if (dateHasChanged) {
                     await this.logAction(
@@ -500,6 +514,15 @@ export class ProblemsService {
                       `Changed Date of Diagnosis for '${item.title}' from ${sourceNote}`,
                       client,
                       match.id,
+                    );
+                    await this.logAudit(
+                      patientId,
+                      userId,
+                      userRole,
+                      'UPDATE',
+                      match.id,
+                      item.title,
+                      sourceNote,
                     );
                   }
                 }),
@@ -523,16 +546,25 @@ export class ProblemsService {
                   updatedByUser: { connect: { id: userId } },
                 },
               })
-              .then(() =>
-                this.logAction(
+              .then(async () => {
+                await this.logAction(
                   patientId,
                   userId,
                   'Reactivated',
                   `Reactivated problem '${match.title}' from ${sourceNote}`,
                   client,
                   match.id,
-                ),
-              ),
+                );
+                await this.logAudit(
+                  patientId,
+                  userId,
+                  userRole,
+                  'UPDATE',
+                  match.id,
+                  item.title,
+                  sourceNote,
+                );
+              }),
           );
           continue;
         }
@@ -552,16 +584,25 @@ export class ProblemsService {
                   updatedByUser: { connect: { id: userId } },
                 },
               })
-              .then(() =>
-                this.logAction(
+              .then(async () => {
+                await this.logAction(
                   patientId,
                   userId,
                   'Restored',
                   `Restored removed problem '${match.title}' from ${sourceNote}`,
                   client,
                   match.id,
-                ),
-              ),
+                );
+                await this.logAudit(
+                  patientId,
+                  userId,
+                  userRole,
+                  'UPDATE',
+                  match.id,
+                  item.title,
+                  sourceNote,
+                );
+              }),
           );
           continue;
         }
@@ -582,15 +623,24 @@ export class ProblemsService {
               }),
             },
           })
-          .then((newProb) => {
+          .then(async (newProb) => {
             registerResolved(newProb.id);
-            return this.logAction(
+            await this.logAction(
               patientId,
               userId,
               'Created',
               `Added problem '${newProb.title}' from ${sourceNote}`,
               client,
               newProb.id,
+            );
+            await this.logAudit(
+              patientId,
+              userId,
+              userRole,
+              'CREATE',
+              newProb.id,
+              newProb.title,
+              sourceNote,
             );
           }),
       );
@@ -611,16 +661,25 @@ export class ProblemsService {
                   updatedByUser: { connect: { id: userId } },
                 },
               })
-              .then(() =>
-                this.logAction(
+              .then(async () => {
+                await this.logAction(
                   patientId,
                   userId,
                   'Resolved',
                   `Resolved problem '${ext.title}' — no longer listed in the ${sourceNote}`,
                   client,
                   ext.id,
-                ),
-              ),
+                );
+                await this.logAudit(
+                  patientId,
+                  userId,
+                  userRole,
+                  'UPDATE',
+                  ext.id,
+                  ext.title,
+                  sourceNote,
+                );
+              }),
           );
         }
       }
@@ -682,6 +741,15 @@ export class ProblemsService {
             client,
             selfId,
           );
+          await this.logAudit(
+            patientId,
+            userId,
+            userRole,
+            'UPDATE',
+            selfId,
+            current.title,
+            sourceNote,
+          );
           continue;
         }
       }
@@ -705,7 +773,18 @@ export class ProblemsService {
         client,
         selfId,
       );
+      await this.logAudit(
+        patientId,
+        userId,
+        userRole,
+        'UPDATE',
+        selfId,
+        current.title,
+        sourceNote,
+      );
     }
+
+    return resolvedIdByKey;
   }
 
   // ─────────────────────────────────────────────
@@ -795,6 +874,51 @@ export class ProblemsService {
         description,
         problemId: problemId ?? null,
       },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // AUDIT TRAIL — feeds the patient-facing centralized Logs page.
+  //
+  // Problem CRUD reaching this service via ProblemsController is already
+  // audit-logged by the global AuditLogInterceptor (it taps the HTTP
+  // response). But upsertFromAssessment is called *internally* by
+  // InitialNotesService/ProgressNotesService on note publish — never through
+  // the controller — so the interceptor never sees those mutations. Without
+  // this, every problem created/renamed/resolved/reactivated as a side
+  // effect of publishing a note was invisible on the Logs page even though
+  // it's a real, frequent source of problem-list activity.
+  // ─────────────────────────────────────────────
+
+  private async getUserRole(
+    userId: string,
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<Role | undefined> {
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role;
+  }
+
+  private async logAudit(
+    patientId: string,
+    userId: string,
+    userRole: Role | undefined,
+    action: 'CREATE' | 'UPDATE',
+    problemId: string,
+    title: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
+  ) {
+    if (!userRole) return;
+    await this.auditLogsService.create({
+      userId,
+      userRole,
+      action,
+      tableName: 'problems',
+      recordId: problemId,
+      patientId,
+      changes: { title, _sourceNote: sourceNote },
     });
   }
 }

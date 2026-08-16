@@ -23,9 +23,12 @@ function buildService(existing: any[]) {
     medicationLog: {
       create: medicationLogCreate,
     },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ role: 'DOCTOR' }),
+    },
   };
 
-  const service = new MedicationsService({} as any);
+  const service = new MedicationsService({} as any, { create: jest.fn() } as any);
 
   return { service, client, medicationUpdate, medicationCreate, medicationLogCreate };
 }

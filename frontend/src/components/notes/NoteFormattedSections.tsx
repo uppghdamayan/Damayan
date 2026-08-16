@@ -10,7 +10,7 @@ import {
   Download,
   Eye
 } from 'lucide-react';
-import { TimelineNoteView, diffListItems, diffMedicationItems } from '@/lib/notes-utils';
+import { TimelineNoteView, diffAssessmentItems, diffMedicationItems } from '@/lib/notes-utils';
 import { Badge } from '@/components/ui/badge';
 import { useAttachmentsByNote, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
 import { AttachmentPeekModal } from './AttachmentPeekModal';
@@ -133,10 +133,15 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const prevMedsDetailed = effectivePreviousNote?.sections.medicationsDetailed || null;
   const medDiff = diffMedicationItems(currentMedsDetailed, prevMedsDetailed);
 
-  // Diff assessment
-  const currentAssessment = note.sections.assessment || [];
-  const prevAssessment = effectivePreviousNote?.sections.assessment || null;
-  const assessmentDiff = diffListItems(currentAssessment, prevAssessment);
+  // Diff assessment — identity-aware (by problem id) so an edited problem (e.g.
+  // "CKD stage 3b" -> "CKD stage 4") shows as 'updated', not resolved+new.
+  const currentAssessmentItems = note.sections.assessmentItems
+    || (note.sections.assessment || []).map((title) => ({ title }));
+  const prevAssessmentItems = effectivePreviousNote
+    ? (effectivePreviousNote.sections.assessmentItems
+        || (effectivePreviousNote.sections.assessment || []).map((title) => ({ title })))
+    : null;
+  const assessmentDiff = diffAssessmentItems(currentAssessmentItems, prevAssessmentItems);
 
   const isNonDoctor = note.authorRole === 'NURSE' || note.authorRole === 'PHARMACIST';
 
@@ -203,9 +208,12 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                   item.status === 'removed' ? 'bg-[var(--text-muted)]' : 'bg-[var(--red)]'
                 }`} />
                 <div className="flex items-center flex-wrap gap-1.5">
-                  <span className={`text-[12px] font-medium ${
-                    item.status === 'removed' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'
-                  }`}>
+                  <span
+                    className={`text-[12px] font-medium ${
+                      item.status === 'removed' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'
+                    }`}
+                    title={item.status === 'updated' && item.fromText ? `Updated from "${item.fromText}"` : undefined}
+                  >
                     {item.text}
                   </span>
                   {item.status === 'removed' && (
@@ -213,6 +221,9 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
                   )}
                   {item.status === 'added' && (
                     <Badge variant="active" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">NEW</Badge>
+                  )}
+                  {item.status === 'updated' && (
+                    <Badge variant="info" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">UPDATED</Badge>
                   )}
                 </div>
               </div>

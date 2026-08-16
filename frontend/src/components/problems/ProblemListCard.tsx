@@ -133,7 +133,7 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
                   className="flex-1 min-w-0"
                   style={item.depth > 0 ? { paddingLeft: `${item.depth * 20}px` } : undefined}
                 >
-                  <div className="text-[12px] text-text-primary font-medium truncate">
+                  <div className="text-[12px] text-text-primary font-medium break-words whitespace-normal leading-snug">
                     {item.depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
                     {p.title}
                   </div>
@@ -165,7 +165,7 @@ export function ProblemListCard({ patientId }: { patientId: string }) {
                         className="flex-1 min-w-0"
                         style={item.depth > 0 ? { paddingLeft: `${item.depth * 20}px` } : undefined}
                       >
-                        <div className="text-[12px] text-text-primary font-medium truncate">
+                        <div className="text-[12px] text-text-primary font-medium break-words whitespace-normal leading-snug">
                           {item.depth > 0 && <span className="font-mono text-text-muted mr-1 select-none">↳</span>}
                           {p.title}
                         </div>

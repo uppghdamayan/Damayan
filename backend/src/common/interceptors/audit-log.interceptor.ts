@@ -54,6 +54,11 @@ export class AuditLogInterceptor implements NestInterceptor {
       return { action: 'CREATE', tableName: 'vitals' };
     if (path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) && method === 'PATCH')
       return { action: 'UPDATE', tableName: 'vitals' };
+    if (
+      path.match(/^\/patients\/[^/]+\/vitals\/[^/]+$/) &&
+      method === 'DELETE'
+    )
+      return { action: 'DELETE', tableName: 'vitals' };
 
     // Visits
     if (path.match(/^\/patients\/[^/]+\/visits$/) && method === 'POST')
@@ -183,6 +188,16 @@ export class AuditLogInterceptor implements NestInterceptor {
       ctx.firstName = responseBody.user.firstName;
     if (responseBody.user?.lastName != null)
       ctx.lastName = responseBody.user.lastName;
+    // Vital signs — the record uses sbp/dbp, not a combined "bloodPressure"
+    if (responseBody.sbp != null) ctx.sbp = responseBody.sbp;
+    if (responseBody.dbp != null) ctx.dbp = responseBody.dbp;
+    if (responseBody.heartRate != null) ctx.heartRate = responseBody.heartRate;
+    if (responseBody.respiratoryRate != null)
+      ctx.respiratoryRate = responseBody.respiratoryRate;
+    if (responseBody.temperature != null)
+      ctx.temperature = responseBody.temperature;
+    if (responseBody.oxygenSaturation != null)
+      ctx.oxygenSaturation = responseBody.oxygenSaturation;
     return ctx;
   }
 

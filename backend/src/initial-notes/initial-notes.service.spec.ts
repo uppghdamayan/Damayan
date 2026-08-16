@@ -92,7 +92,7 @@ describe('InitialNotesService — logs and version history', () => {
           provide: ProblemsService,
           useValue: {
             findActiveForPatient: jest.fn().mockResolvedValue([]),
-            upsertFromAssessment: jest.fn(),
+            upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
           },
         },
         {
