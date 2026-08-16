@@ -261,7 +261,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     let existing = existingProblems.filter((p: any) => {
       if (!p || typeof p !== 'object') return true;
       if (p.id) return activeIds.has(p.id);
-      if (p.isNew) return true;
+      if (p.isNew || !p.id) return true;
       const title = p.title?.trim().toLowerCase();
       return !!title && activeTitles.has(title);
     });
@@ -322,7 +322,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
     const existing = [...existingMeds];
-    const existingNames = new Set(existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()));
+    const existingNames = new Set(
+      existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean)
+    );
 
     for (const m of activeMedications) {
       if (m.name && !existingNames.has(m.name.trim().toLowerCase())) {
@@ -332,6 +334,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           formulation: m.formulation || undefined,
           quantity: m.quantity || undefined,
           instructions: m.instructions || undefined,
+          fromPast: m.fromPast || false,
         });
         existingNames.add(m.name.trim().toLowerCase());
       }
@@ -363,18 +366,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           ? currentProblemsWhileEditing
           : mergeActiveProblems(validProblems, activeProblems);
 
-      // For unpublished (draft) notes, always use the authoritative active medications list
-      // instead of merging with the stale snapshot to avoid duplicates.
+      const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
       const finalMeds = isPublished
         ? validMeds
-        : activeMeds.map((m: any) => ({
-            name: m.name,
-            dose: m.dose || undefined,
-            formulation: m.formulation || undefined,
-            quantity: m.quantity || undefined,
-            instructions: m.instructions || undefined,
-            fromPast: m.fromPast || false,
-          }));
+        : currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
+          ? currentMedicationsWhileEditing
+          : validMeds.length > 0
+            ? mergeActiveMedications(validMeds, activeMeds)
+            : activeMeds.map((m: any) => ({
+                name: m.name,
+                dose: m.dose || undefined,
+                formulation: m.formulation || undefined,
+                quantity: m.quantity || undefined,
+                instructions: m.instructions || undefined,
+                fromPast: m.fromPast || false,
+              }));
 
       const finalDiagnostics = (!note.diagnostics || note.diagnostics.length === 0) && !isPublished
         ? copyForward?.inheritedDiagnostics || []
@@ -409,15 +415,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           parsed.problemListSnapshot = currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
             ? currentProblemsWhileEditing
             : mergeActiveProblems(validProblems, activeProblems);
-          // Always replace with authoritative active medications — never merge stale draft meds
-          parsed.medicationSnapshot = activeMeds.map((m: any) => ({
-            name: m.name,
-            dose: m.dose || undefined,
-            formulation: m.formulation || undefined,
-            quantity: m.quantity || undefined,
-            instructions: m.instructions || undefined,
-            fromPast: m.fromPast || false,
-          }));
+
+          const draftMeds = (parsed.medicationSnapshot as any[]) || [];
+          const validMeds = draftMeds.filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name)).map((m: any) => typeof m === 'string' ? { name: m, dose: '' } : m);
+          const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
+          parsed.medicationSnapshot = currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
+            ? currentMedicationsWhileEditing
+            : validMeds.length > 0
+              ? mergeActiveMedications(validMeds, activeMeds)
+              : activeMeds.map((m: any) => ({
+                  name: m.name,
+                  dose: m.dose || undefined,
+                  formulation: m.formulation || undefined,
+                  quantity: m.quantity || undefined,
+                  instructions: m.instructions || undefined,
+                  fromPast: m.fromPast || false,
+                }));
           
           if (!parsed.diagnostics || parsed.diagnostics.length === 0) {
             parsed.diagnostics = copyForward?.inheritedDiagnostics || [];
@@ -484,24 +497,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         const mergedProbs = isProblemEditMode
           ? currentValues.problemListSnapshot || []
           : mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
-        // Replace the baseline from active list, but preserve any medications the user added this session (isNew)
-        const userAddedMeds = (currentValues.medicationSnapshot || []).filter((m: any) => m && m.isNew);
-        const replacedMeds = [
-          ...copyForward.activeMedications.map((m: any) => ({
-            name: m.name,
-            dose: m.dose || undefined,
-            formulation: m.formulation || undefined,
-            quantity: m.quantity || undefined,
-            instructions: m.instructions || undefined,
-            fromPast: m.fromPast || false,
-          })),
-          ...userAddedMeds,
-        ];
+
+        const currentMeds = currentValues.medicationSnapshot || [];
+        const mergedMeds = isMedicationEditMode
+          ? currentMeds
+          : mergeActiveMedications(currentMeds, copyForward.activeMedications);
 
         form.reset({
           ...currentValues,
           problemListSnapshot: mergedProbs,
-          medicationSnapshot: replacedMeds,
+          medicationSnapshot: mergedMeds,
         });
       }
     }
@@ -766,9 +771,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       nodes.forEach((n) => {
         const p = n.item;
         if (typeof p === 'object' && p !== null) {
-          const { isNew, ...rest } = p;
           cleanProblems.push({
-            ...rest,
+            ...p,
             parentId: p.parentId || null,
             depth,
           });
@@ -793,8 +797,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       problemListSnapshot: cleanProblems,
       medicationSnapshot: values.medicationSnapshot?.map((m: any) => {
         if (typeof m === 'object' && m !== null) {
-          const { isNew, ...rest } = m;
-          return rest;
+          return { ...m };
         }
         return m;
       }),

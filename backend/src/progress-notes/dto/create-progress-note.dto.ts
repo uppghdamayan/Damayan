@@ -8,10 +8,11 @@ import {
   IsInt,
   IsIn,
   ValidateIf,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class AssessmentItemDto {
+export class AssessmentItemDto {
   // Stable Problem.id this snapshot entry represents, when it already exists
   // as a master Problem record. Required for upsertFromAssessment to match by
   // identity instead of by title text — without it, a title edited elsewhere
@@ -42,13 +43,25 @@ class AssessmentItemDto {
   @IsOptional()
   depth?: number;
 
+  @IsBoolean()
+  @IsOptional()
+  isNew?: boolean;
+
   @ValidateIf((o) => o.diagnosisDate !== null)
   @IsDateString()
   @IsOptional()
   diagnosisDate?: string | null;
 }
 
-class MedicationItemDto {
+export class MedicationItemDto {
+  @IsString()
+  @IsOptional()
+  id?: string;
+
+  @IsString()
+  @IsOptional()
+  tempId?: string;
+
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -77,6 +90,10 @@ class MedicationItemDto {
   @IsOptional()
   @IsIn(['past', 'prescribed'])
   source?: 'past' | 'prescribed';
+
+  @IsBoolean()
+  @IsOptional()
+  isNew?: boolean;
 
   @IsOptional()
   fromPast?: boolean;

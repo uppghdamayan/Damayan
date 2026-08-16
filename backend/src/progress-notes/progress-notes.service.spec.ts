@@ -216,3 +216,42 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
     );
   });
 });
+
+describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
+  it('preserves newly added medications with isNew: true even if not active yet', async () => {
+    const mockMedicationsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([
+        { name: 'Insulin Glargine', dose: '14 units' },
+        { name: 'Amlodipine', dose: '10 mg' },
+      ]),
+    };
+
+    const service = new ProgressNotesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    const snapshot = [
+      { name: 'Insulin Glargine', dose: '14 units' },
+      { name: 'Sodium Bicarbonate', dose: '650 mg', isNew: true },
+      { name: 'Removed Drug', dose: '5 mg' },
+    ];
+
+    const result = await (service as any).reconcileMedicationSnapshot(
+      'patient-1',
+      snapshot,
+      {} as any,
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe('Insulin Glargine');
+    expect(result[1].name).toBe('Sodium Bicarbonate');
+    expect(result[1].isNew).toBe(true);
+  });
+});
+
