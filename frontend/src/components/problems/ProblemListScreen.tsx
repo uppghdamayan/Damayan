@@ -908,7 +908,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           {activeDragItem ? (
             <div 
               style={{ width: activeDragRect ? activeDragRect.width / scale : undefined }} 
-              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm"
+              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm min-w-[880px]"
             >
               <ActiveProblemRow
                 problem={activeDragItem.problem}
@@ -932,7 +932,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           ) : activeResolvedDragItem ? (
             <div 
               style={{ width: activeDragRect ? activeDragRect.width / scale : undefined }} 
-              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm"
+              className="bg-surface shadow-2xl border-2 border-accent rounded-lg ring-4 ring-accent/20 opacity-95 overflow-hidden backdrop-blur-sm min-w-[760px]"
             >
               <ResolvedRow
                 problem={activeResolvedDragItem}

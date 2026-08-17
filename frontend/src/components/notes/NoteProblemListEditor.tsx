@@ -218,8 +218,8 @@ export function NoteProblemListEditor({
                       className="w-full h-[32px] px-2.5 text-[13px] font-semibold rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-white text-text-primary disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
                     />
                   ) : (
-                    <span className={cn('text-[13px] truncate flex items-center gap-2', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
-                      {item.title}
+                    <span className={cn('text-[13px] flex items-center flex-wrap gap-1.5 min-w-0', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
+                      <span className="break-words [overflow-wrap:anywhere] min-w-0">{item.title}</span>
                       {depth > 0 && (
                         <span className="text-[9px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-[2px] rounded border border-accent/25 flex-shrink-0">
                           Sub-problem

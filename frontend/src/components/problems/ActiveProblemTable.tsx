@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { getCreatorName, getSelectableParents } from '@/lib/problem-utils';
 import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
-const COLUMN_LAYOUT = '22px 14px minmax(180px, 3fr) 1.1fr 1.8fr 1fr minmax(140px, 1.8fr) 140px';
+const COLUMN_LAYOUT = '22px 14px minmax(190px, 3fr) minmax(110px, 1.1fr) minmax(130px, 1.6fr) minmax(85px, 0.9fr) minmax(150px, 1.8fr) 130px';
 
 export type DragOverAction = 'nest' | 'unnest' | 'reorder';
 
@@ -114,7 +114,7 @@ export function ActiveProblemRow({
       {...(canManage ? dragHandleProps?.attributes : {})}
       {...(canManage ? dragHandleProps?.listeners : {})}
       className={cn(
-        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry group relative',
+        'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry group relative min-w-0',
         canManage && !isOptimistic && 'cursor-grab active:cursor-grabbing hover:bg-surface-2/60',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light/50 border-t-2 border-t-accent',
@@ -160,7 +160,7 @@ export function ActiveProblemRow({
           </div>
         )}
 
-        <span className={cn('text-[13px] break-words whitespace-normal leading-snug', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
+        <span className={cn('text-[13px] break-words [overflow-wrap:anywhere] whitespace-normal leading-snug min-w-0', depth > 0 ? 'font-medium text-text-primary' : 'font-semibold text-text-primary')}>
           {problem.title}
         </span>
 
@@ -176,7 +176,7 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 4: Date of Diagnosis */}
-      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-left">
+      <div className="text-[12px] font-mono text-text-secondary whitespace-nowrap text-left min-w-0">
         {problem.diagnosisDate
           ? new Date(problem.diagnosisDate).toLocaleDateString('en-PH', {
               month: 'short',
@@ -197,7 +197,7 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 6: Status */}
-      <div className="flex justify-start">
+      <div className="flex justify-start min-w-0">
         <select
           disabled={!canManage}
           value={problem.status}
@@ -210,13 +210,13 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 7: Nest Under with Visual Option Hierarchy & Quick Un-nest */}
-      <div className="flex items-center gap-1 justify-start">
+      <div className="flex items-center gap-1 justify-start min-w-0">
         <select
           disabled={!canManage}
           value={problem.parentId || ''}
           onChange={(e) => onParentChange(e.target.value || null)}
           className={cn(
-            'h-6 w-full max-w-[200px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate transition-colors',
+            'h-6 w-full min-w-0 max-w-[180px] px-1 bg-surface-2 border border-border rounded text-[11px] text-text-primary outline-none cursor-pointer focus:border-accent disabled:bg-surface-2 disabled:cursor-not-allowed truncate transition-colors',
             problem.parentId && 'border-accent/40 bg-accent/5 font-medium'
           )}
         >
@@ -249,18 +249,18 @@ export function ActiveProblemRow({
       </div>
 
       {/* Column 8: Actions */}
-      <div className="flex items-center justify-end pr-4 gap-1.5">
+      <div className="flex items-center justify-end pr-4 gap-1.5 min-w-0">
         {canManage && (
           <>
             <button
               onClick={onEdit}
-              className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer"
+              className="h-[22px] px-2 rounded text-[10px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary transition-all duration-150 cursor-pointer flex-shrink-0"
             >
               Edit
             </button>
             <button
               onClick={onDelete}
-              className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer"
+              className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer flex-shrink-0"
             >
               Remove
             </button>
@@ -441,19 +441,19 @@ export function ActiveProblemTable({
             : 'No active problems recorded.'}
         </div>
       ) : (
-        <>
+        <div className="min-w-[880px] w-full flex flex-col">
           <div 
             className="relative grid items-center gap-4 px-[14px] py-2 bg-surface-2 after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[''] text-[9px] font-bold uppercase tracking-[0.6px] text-text-secondary rounded-t-lg text-left"
             style={{ gridTemplateColumns: COLUMN_LAYOUT }}
           >
             <div className="w-[22px]" />
             <div className="w-[14px]" />
-            <div className="text-left">Problem</div>
-            <div className="whitespace-nowrap text-left">Date of Diagnosis</div>
-            <div className="text-left">Added By</div>
-            <div className="text-left">Status</div>
-            <div className="text-left">Nest Under</div>
-            <div className="text-right pr-4">Actions</div>
+            <div className="text-left min-w-0">Problem</div>
+            <div className="whitespace-nowrap text-left min-w-0">Date of Diagnosis</div>
+            <div className="text-left min-w-0">Added By</div>
+            <div className="text-left min-w-0">Status</div>
+            <div className="text-left min-w-0">Nest Under</div>
+            <div className="text-right pr-4 min-w-0">Actions</div>
           </div>
           <div className="flex flex-col relative min-h-[100px]">
             {/* Publishing is surfaced inline on the Publish button ("…" spinner) per
@@ -478,7 +478,7 @@ export function ActiveProblemTable({
               </SortableContext>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
