@@ -117,6 +117,42 @@ function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
   );
 }
 
+function MedicationDiffItem({ item }: { item: { text: string; status: 'existing' | 'added' | 'removed' | 'dose-up' | 'dose-down' | 'dose-changed'; fromDose?: string; toDose?: string } }) {
+  return (
+    <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+      {item.status === 'removed' ? (
+        <Badge variant="removed" className="border-dashed line-through opacity-70">{item.text}</Badge>
+      ) : item.status === 'added' ? (
+        <Badge variant="active" className="shadow-sm">{item.text}</Badge>
+      ) : item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed' ? (
+        <Badge
+          variant="resolved"
+          className="shadow-sm"
+          title={item.fromDose && item.toDose ? `Dose changed from ${item.fromDose} to ${item.toDose}` : undefined}
+        >
+          {item.text}
+        </Badge>
+      ) : (
+        <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
+      )}
+      {item.status === 'removed' && (
+        <Badge variant="critical" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">REMOVED</Badge>
+      )}
+      {item.status === 'added' && (
+        <Badge variant="saved" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">NEW</Badge>
+      )}
+      {(item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed') && (
+        <Badge
+          variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
+          className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]"
+        >
+          {item.status === 'dose-up' ? '↑ DOSE' : item.status === 'dose-down' ? '↓ DOSE' : 'DOSE CHANGED'}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 interface NoteFormattedSectionsProps {
   note: TimelineNoteView;
   previousNote: TimelineNoteView | null;
@@ -132,6 +168,14 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const currentMedsDetailed = note.sections.medicationsDetailed || [];
   const prevMedsDetailed = effectivePreviousNote?.sections.medicationsDetailed || null;
   const medDiff = diffMedicationItems(currentMedsDetailed, prevMedsDetailed);
+
+  // Fill column 1 first (up to 5 items), only spilling into column 2 if more than 5
+  const medCol1 = medDiff.length <= 5 ? medDiff : medDiff.slice(0, Math.ceil(medDiff.length / 2));
+  const medCol2 = medDiff.length <= 5 ? [] : medDiff.slice(Math.ceil(medDiff.length / 2));
+
+  const diagnostics = note.sections.diagnostics || [];
+  const diagCol1 = diagnostics.length <= 5 ? diagnostics : diagnostics.slice(0, Math.ceil(diagnostics.length / 2));
+  const diagCol2 = diagnostics.length <= 5 ? [] : diagnostics.slice(Math.ceil(diagnostics.length / 2));
 
   // Diff assessment — identity-aware (by problem id) so an edited problem (e.g.
   // "CKD stage 3b" -> "CKD stage 4") shows as 'updated', not resolved+new.
@@ -244,18 +288,29 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       )}
 
       {/* Diagnostics */}
-      {note.sections.diagnostics && note.sections.diagnostics.length > 0 && (
+      {diagnostics.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 border-b-[1.5px] border-b-[var(--green)] pb-1 w-full text-[var(--green)] font-bold">
             <Search className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Diagnostics</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-1 pl-2">
-            {note.sections.diagnostics.map((diag, idx) => (
-              <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
-                <Badge variant="active" className="shadow-sm">{diag}</Badge>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1 pl-2 items-start">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              {diagCol1.map((diag, idx) => (
+                <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
+                  <Badge variant="active" className="shadow-sm">{diag}</Badge>
+                </div>
+              ))}
+            </div>
+            {diagCol2.length > 0 && (
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {diagCol2.map((diag, idx) => (
+                  <div key={idx + diagCol1.length} className="flex items-center flex-wrap gap-1.5 min-w-0">
+                    <Badge variant="active" className="shadow-sm">{diag}</Badge>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -278,40 +333,19 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <Pill className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Medications</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-1 pl-2">
-            {medDiff.map((item, idx) => (
-              <div key={idx} className="flex items-center flex-wrap gap-1.5 min-w-0">
-                {item.status === 'removed' ? (
-                  <Badge variant="removed" className="border-dashed line-through opacity-70">{item.text}</Badge>
-                ) : item.status === 'added' ? (
-                  <Badge variant="active" className="shadow-sm">{item.text}</Badge>
-                ) : item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed' ? (
-                  <Badge
-                    variant="resolved"
-                    className="shadow-sm"
-                    title={item.fromDose && item.toDose ? `Dose changed from ${item.fromDose} to ${item.toDose}` : undefined}
-                  >
-                    {item.text}
-                  </Badge>
-                ) : (
-                  <Badge variant="resolved" className="shadow-sm">{item.text}</Badge>
-                )}
-                {item.status === 'removed' && (
-                  <Badge variant="critical" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">REMOVED</Badge>
-                )}
-                {item.status === 'added' && (
-                  <Badge variant="saved" className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]">NEW</Badge>
-                )}
-                {(item.status === 'dose-up' || item.status === 'dose-down' || item.status === 'dose-changed') && (
-                  <Badge
-                    variant={item.status === 'dose-up' ? 'info' : item.status === 'dose-down' ? 'published' : 'draft'}
-                    className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]"
-                  >
-                    {item.status === 'dose-up' ? '↑ DOSE' : item.status === 'dose-down' ? '↓ DOSE' : 'DOSE CHANGED'}
-                  </Badge>
-                )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1 pl-2 items-start">
+            <div className="flex flex-col gap-1.5 min-w-0">
+              {medCol1.map((item, idx) => (
+                <MedicationDiffItem key={idx} item={item} />
+              ))}
+            </div>
+            {medCol2.length > 0 && (
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {medCol2.map((item, idx) => (
+                  <MedicationDiffItem key={idx + medCol1.length} item={item} />
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
