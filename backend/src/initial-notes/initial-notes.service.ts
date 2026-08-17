@@ -18,6 +18,7 @@ import {
 } from '../progress-notes/progress-notes.utils';
 import { buildSnapshot, diffNoteFields } from './initial-notes.utils';
 import { mapAssessmentSnapshot } from '../problems/problems.utils';
+import { mapMedicationSnapshot } from '../medications/medications.utils';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -240,37 +241,28 @@ export class InitialNotesService {
           // above) — never re-syncs Problem records from here. Problem
           // changes on a published patient go through the Problems module.
 
-          if (updateData.medicationSnapshot) {
-            const medicationItems = (
-              (updateData.medicationSnapshot as any[]) || []
-            )
-              .filter(
-                (m) =>
-                  m &&
-                  m.name &&
-                  String(m.name).trim() !== '' &&
-                  m.source !== 'past',
-              )
-              .map((m) => ({
-                name: String(m.name).trim(),
-                dose:
-                  m.dose !== undefined && m.dose !== null
-                    ? String(m.dose).trim()
-                    : '',
-                formulation: m.formulation,
-                quantity:
-                  m.quantity !== undefined && m.quantity !== null
-                    ? Number(m.quantity)
-                    : undefined,
-                instructions: m.instructions,
-              }));
-            await this.medicationsService.upsertFromNoteMedications(
-              patientId,
-              medicationItems,
-              userId,
-              'Initial Note',
-              tx,
+          // Array.isArray + length guard, not just truthy: `[]` is truthy in
+          // JS, and upsertFromNoteMedications reads an empty list as "the
+          // patient now has zero active medications" and deactivates every
+          // one of them. A snapshot that's empty (or entirely 'past', which
+          // mapMedicationSnapshot filters down to empty) must be a no-op
+          // here, not a mass-discontinue.
+          if (
+            Array.isArray(updateData.medicationSnapshot) &&
+            updateData.medicationSnapshot.length > 0
+          ) {
+            const medicationItems = mapMedicationSnapshot(
+              updateData.medicationSnapshot as any[],
             );
+            if (medicationItems.length > 0) {
+              await this.medicationsService.upsertFromNoteMedications(
+                patientId,
+                medicationItems,
+                userId,
+                'Initial Note',
+                tx,
+              );
+            }
           }
 
           const afterProblems = await this.problemsService.findActiveForPatient(
@@ -374,28 +366,9 @@ export class InitialNotesService {
         );
 
         const assessmentItems = mapAssessmentSnapshot(note.assessment as any[]);
-        const medicationItems = ((note.medicationSnapshot as any[]) || [])
-          .filter(
-            (m) =>
-              m &&
-              m.name &&
-              String(m.name).trim() !== '' &&
-              m.source !== 'past',
-          )
-          .map((m) => ({
-            name: String(m.name).trim(),
-            dose:
-              m.dose !== undefined && m.dose !== null
-                ? String(m.dose).trim()
-                : '',
-            formulation: m.formulation,
-            quantity:
-              m.quantity !== undefined && m.quantity !== null
-                ? Number(m.quantity)
-                : undefined,
-            instructions: m.instructions,
-            fromPast: m.fromPast || false,
-          }));
+        const medicationItems = mapMedicationSnapshot(
+          note.medicationSnapshot as any[],
+        );
 
         const [resolvedIdByKey] = await Promise.all([
           this.problemsService.upsertFromAssessment(

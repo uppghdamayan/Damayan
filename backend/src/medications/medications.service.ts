@@ -318,13 +318,11 @@ export class MedicationsService {
     const promises: Promise<any>[] = [];
 
     for (const item of items) {
+      const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
       const match = existing.find(
         (m) =>
-          m.name.toLowerCase() === item.name.trim().toLowerCase() &&
-          String(m.dose ?? '').toLowerCase() ===
-            String(item.dose ?? '')
-              .trim()
-              .toLowerCase(),
+          normalize(m.name) === normalize(item.name) &&
+          normalize(String(m.dose ?? '')) === normalize(String(item.dose ?? '')),
       );
       if (match) {
         keptIds.add(match.id);
@@ -458,8 +456,11 @@ export class MedicationsService {
       );
     }
 
-    // Deactivate missing items
-    for (const ext of existing) {
+    // Deactivate missing items. Guarded on a non-empty `items` — an empty (or
+    // all-'past', which the caller's filter collapses to empty) snapshot must
+    // never be read as "the patient has zero active medications now"; that
+    // would mass-discontinue every medication on the chart from one save.
+    for (const ext of items.length > 0 ? existing : []) {
       if (!keptIds.has(ext.id) && ext.isActive) {
         promises.push(
           client.medication

@@ -47,7 +47,8 @@ export function AddressCombobox({
   const listId = useId();
 
   // Filter options based on user input
-  const filteredOptions = options.filter((opt) =>
+  const uniqueOptions = Array.from(new Set(options));
+  const filteredOptions = uniqueOptions.filter((opt) =>
     opt.toLowerCase().includes((value || '').toLowerCase())
   );
 
@@ -218,7 +219,7 @@ export function AddressCombobox({
 
                 return (
                   <li
-                    key={opt}
+                    key={`${opt}-${idx}`}
                     role="option"
                     aria-selected={isSelected}
                     onMouseDown={(e) => {

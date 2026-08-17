@@ -421,8 +421,25 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     return map;
   }, [activeProblemTree]);
 
+  // `copyForward` is a useMemo over three React Query results (see
+  // useCopyForwardData) and gets a new object identity on every refetch —
+  // window focus, the 20s medications staleTime lapsing, any
+  // invalidateQueries. Without this guard that identity change re-fires
+  // form.reset below and silently reverts medicationSnapshot/assessment to
+  // the last server-persisted value, discarding anything the user typed but
+  // hasn't saved yet. Once a given note id has been hydrated, only re-hydrate
+  // if the form has no unsaved edits.
+  const hydratedNoteIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    if (note && hydratedNoteIdRef.current === note.id && form.formState.isDirty) {
+      return;
+    }
+    if (!note && hydratedNoteIdRef.current === 'new' && form.formState.isDirty) {
+      return;
+    }
     if (note) {
+        hydratedNoteIdRef.current = note.id;
         const draftProblems = note.assessment as any[] || [];
         const validProblems = draftProblems.filter((p: any) => p && p.title);
         
@@ -459,6 +476,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         visitDatetime: note.createdAt,
       });
     } else if (!copyLoading) {
+      hydratedNoteIdRef.current = 'new';
       // Check local storage
       const draft = localStorage.getItem(`damayan:draft:${patientId}:initial`);
       if (draft) {

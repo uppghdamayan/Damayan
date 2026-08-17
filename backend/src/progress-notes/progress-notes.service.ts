@@ -17,6 +17,7 @@ import { InitialNotesService } from '../initial-notes/initial-notes.service';
 import { StorageService } from '../storage/storage.service';
 import { diffByTitle, diffByNameDoseUnit } from './progress-notes.utils';
 import { mapAssessmentSnapshot } from '../problems/problems.utils';
+import { mapMedicationSnapshot } from '../medications/medications.utils';
 
 @Injectable()
 export class ProgressNotesService {
@@ -428,28 +429,9 @@ export class ProgressNotesService {
             note.problemListSnapshot as any[],
           );
 
-          const snapshotMeds = ((note.medicationSnapshot as any[]) || [])
-            .filter(
-              (m) =>
-                m &&
-                m.name &&
-                String(m.name).trim() !== '' &&
-                m.source !== 'past',
-            )
-            .map((m) => ({
-              name: String(m.name).trim(),
-              dose:
-                m.dose !== undefined && m.dose !== null
-                  ? String(m.dose).trim()
-                  : '',
-              formulation: m.formulation,
-              quantity:
-                m.quantity !== undefined && m.quantity !== null
-                  ? Number(m.quantity)
-                  : undefined,
-              instructions: m.instructions,
-              fromPast: m.fromPast || false,
-            }));
+          const snapshotMeds = mapMedicationSnapshot(
+            note.medicationSnapshot as any[],
+          );
 
           const [resolvedIdByKey] = await Promise.all([
             this.problemsService.upsertFromAssessment(
@@ -609,28 +591,7 @@ export class ProgressNotesService {
 
           const validProblems = mapAssessmentSnapshot(prevSnapshotProblems);
 
-          const validMeds = prevSnapshotMeds
-            .filter(
-              (m) =>
-                m &&
-                m.name &&
-                String(m.name).trim() !== '' &&
-                m.source !== 'past',
-            )
-            .map((m) => ({
-              name: String(m.name).trim(),
-              dose:
-                m.dose !== undefined && m.dose !== null
-                  ? String(m.dose).trim()
-                  : '',
-              formulation: m.formulation,
-              quantity:
-                m.quantity !== undefined && m.quantity !== null
-                  ? Number(m.quantity)
-                  : undefined,
-              instructions: m.instructions,
-              fromPast: m.fromPast || false,
-            }));
+          const validMeds = mapMedicationSnapshot(prevSnapshotMeds);
 
           await this.problemsService.upsertFromAssessment(
             patientId,
