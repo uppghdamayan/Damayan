@@ -321,16 +321,38 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
-    const activeNames = new Set(
-      (activeMedications || []).map((m: any) => m.name?.trim().toLowerCase()).filter(Boolean)
+    const activeByName = new Map(
+      (activeMedications || [])
+        .filter((m: any) => m.name?.trim())
+        .map((m: any) => [m.name.trim().toLowerCase(), m]),
     );
+    const activeNames = new Set(activeByName.keys());
 
-    const existing = existingMeds.filter((m: any) => {
-      if (!m || typeof m !== 'object') return true;
-      if (m.isNew) return true;
-      const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
-      return !!name && activeNames.has(name);
-    });
+    const existing = existingMeds
+      .filter((m: any) => {
+        if (!m || typeof m !== 'object') return true;
+        if (m.isNew) return true;
+        const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
+        return !!name && activeNames.has(name);
+      })
+      // A name match kept the *stale* snapshot entry — dose/formulation/
+      // instructions/quantity edited on the medication itself (e.g. via the
+      // Medications module) never made it in, since only brand-new names
+      // were ever added below. Resync those fields from the live active
+      // medication so a published dose change actually shows up here.
+      .map((m: any) => {
+        if (!m || typeof m !== 'object' || m.isNew) return m;
+        const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
+        const live = name ? activeByName.get(name) : undefined;
+        if (!live) return m;
+        return {
+          ...m,
+          dose: live.dose || undefined,
+          formulation: live.formulation || undefined,
+          quantity: live.quantity || undefined,
+          instructions: live.instructions || undefined,
+        };
+      });
 
     const existingNames = new Set(
       existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean)

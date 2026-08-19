@@ -418,6 +418,20 @@ export class MedicationsService {
         continue;
       }
 
+      // A same-name, active row with a different dose is a dose change,
+      // not a brand-new medication — the row itself still gets
+      // discontinued+recreated below (dose is never silently overwritten,
+      // per the note above), but the log must carry an 'Updated' entry too
+      // so the dose change is visible under the Updated filter instead of
+      // only showing as a Discontinued/Created pair.
+      const doseChangedFrom = existing.find(
+        (m) =>
+          m.isActive &&
+          !keptIds.has(m.id) &&
+          normalize(m.name) === normalize(item.name) &&
+          normalize(String(m.dose ?? '')) !== normalize(String(item.dose ?? '')),
+      );
+
       promises.push(
         client.medication
           .create({
@@ -443,6 +457,17 @@ export class MedicationsService {
                 editorId: userId,
               },
             });
+            if (doseChangedFrom) {
+              await client.medicationLog.create({
+                data: {
+                  patientId,
+                  medicationId: newMed.id,
+                  action: 'Updated',
+                  description: `Updated '${newMed.name}' from ${sourceNote}: dose changed to '${newMed.dose}' (from '${doseChangedFrom.dose}')`,
+                  editorId: userId,
+                },
+              });
+            }
             await this.logAudit(
               patientId,
               userId,

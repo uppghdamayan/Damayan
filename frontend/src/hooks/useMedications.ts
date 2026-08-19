@@ -36,6 +36,11 @@ function invalidateMedications(qc: ReturnType<typeof useQueryClient>, patientId:
   qc.invalidateQueries({ queryKey: ['medication-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes any banner-level counts
   qc.invalidateQueries({ queryKey: ['audit-logs'] });
+  // Progress Note's "Current Medication List" sidebar hydrates from
+  // copyForward.activeMedications, not from this hook's own query — without
+  // this, publishing a medication change in the Medications module never
+  // refreshes the open note's sidebar snapshot.
+  qc.invalidateQueries({ queryKey: ['carry-forward', patientId] });
 }
 
 export function useCreateMedication(patientId: string) {

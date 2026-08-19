@@ -47,6 +47,11 @@ function invalidateProblems(qc: ReturnType<typeof useQueryClient>, patientId: st
   qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] }); // refreshes Patient._count.problems
   qc.invalidateQueries({ queryKey: ['audit-logs'] });
+  // Progress Note's Problem List sidebar hydrates from
+  // copyForward.activeProblems, not from this hook's own query — without
+  // this, a Problem List module change never refreshes the open note's
+  // sidebar snapshot. Mirrors the medications fix in useMedications.ts.
+  qc.invalidateQueries({ queryKey: ['carry-forward', patientId] });
 }
 
 export function useCreateProblem(patientId: string) {
@@ -148,9 +153,6 @@ export function useReorderProblems(patientId: string) {
     onError: (_err, _input, context) => {
       if (context?.previous) qc.setQueryData(['problems', patientId], context.previous);
     },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['problems', patientId] });
-      qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
-    },
+    onSettled: () => invalidateProblems(qc, patientId),
   });
 }
