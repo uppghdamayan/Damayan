@@ -57,6 +57,7 @@ export function VitalsCard({ patientId }: { patientId: string }) {
   );
 
   const timeStr = latest ? new Date(latest.measuredAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
+  const dateStr = latest ? new Date(latest.measuredAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 
   return (
     <div className={`bg-surface border border-border ${isRecent ? 'border-l-[3px] border-l-accent' : ''} rounded-card shadow-card overflow-hidden`}>
@@ -77,7 +78,12 @@ export function VitalsCard({ patientId }: { patientId: string }) {
           </span>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {dateStr && (
+            <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-[3px] rounded-full border border-accent text-accent-hover bg-accent-light whitespace-nowrap">
+              Latest Vital: {dateStr}
+            </span>
+          )}
           <Link
             href={`/dashboard/${patientId}/vitals`}
             className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-surface-2 text-text-secondary border border-border hover:bg-surface-3 hover:text-text-primary hover:border-border-strong transition-all duration-150 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"

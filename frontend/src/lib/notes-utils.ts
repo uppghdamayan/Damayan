@@ -351,7 +351,10 @@ export function formatAssessmentItems(rawItems: any[] | null | undefined): { id?
     const result: { id?: string; title: string }[] = [];
     const traverse = (nodes: typeof items, depth: number) => {
       nodes.forEach((n) => {
-        const prefix = depth > 0 ? '↳ ' : '';
+        // Regular spaces collapse in HTML — the diff/assessment list renders
+        // this title in a plain <span>, so indent with non-breaking spaces
+        // or every depth beyond 1 silently loses its extra indent.
+        const prefix = depth > 0 ? '  '.repeat(depth - 1) + '↳ ' : '';
         result.push({ id: n.id, title: prefix + n.title });
         const kids = childrenByParent.get(n.key);
         if (kids) traverse(kids, depth + 1);
@@ -363,7 +366,8 @@ export function formatAssessmentItems(rawItems: any[] | null | undefined): { id?
 
   // Fallback for snapshots where parentId was not tracked but explicitDepth was
   return items.map((item) => {
-    const prefix = (item.explicitDepth && item.explicitDepth > 0) ? '↳ ' : '';
+    const depth = item.explicitDepth || 0;
+    const prefix = depth > 0 ? '  '.repeat(depth - 1) + '↳ ' : '';
     return { id: item.id, title: prefix + item.title };
   });
 }
