@@ -634,9 +634,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // Then exits edit mode, releasing the lock so the Master Problem List
   // unlocks.
   const handleSaveDraftProblemList = () => {
-    setIsProblemEditMode(false);
-    releaseProblemLock();
-    persistDraftSnapshot();
+    persistDraftSnapshot(() => {
+      setIsProblemEditMode(false);
+      releaseProblemLock();
+    });
   };
 
   // Mirrors enterProblemEditMode/handleRevertProblemList/
@@ -665,9 +666,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const handleSaveDraftMedications = () => {
-    setIsMedicationEditMode(false);
-    releaseMedicationLock();
-    persistDraftSnapshot();
+    persistDraftSnapshot(() => {
+      setIsMedicationEditMode(false);
+      releaseMedicationLock();
+    });
   };
 
   const scrollToError = (fieldName?: string) => {
@@ -992,12 +994,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // as a side effect of a sub-section button would flip `noteId` mid-render
   // and change what the header Draft/Undraft toggle and the medication/
   // problem edit locks (keyed off `hasOpenDbDraft: !!noteId`) mean.
-  const persistDraftSnapshot = () => {
+  // `onSettled` fires once the edits are actually durable — either the PATCH
+  // has landed (noteId case) or synchronously for the localStorage-only
+  // case. Callers use it to drop their edit-mode guard: dropping the guard
+  // eagerly, before the PATCH resolves, opens a window where a `note`/
+  // `copyForward` refetch mid-flight re-hydrates the form from the
+  // pre-save snapshot and silently reverts what was just saved (missing
+  // "New" tag, reverted title edits, etc.).
+  const persistDraftSnapshot = (onSettled?: () => void) => {
     if (noteId) {
       if (updateMutation.isPending) return;
       updateMutation.mutate(
         { id: noteId, data: cleanFormValues(form.getValues()) },
-        { onSuccess: () => setLastSaved(new Date()) },
+        {
+          onSuccess: () => setLastSaved(new Date()),
+          onSettled: () => onSettled?.(),
+        },
       );
     } else {
       localStorage.setItem(
@@ -1005,6 +1017,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         JSON.stringify(form.getValues()),
       );
       setLastSaved(new Date());
+      onSettled?.();
     }
   };
 
