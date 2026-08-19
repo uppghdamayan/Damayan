@@ -1,3 +1,4 @@
+import { arrayMove } from '@dnd-kit/sortable';
 import type { Problem, ProblemNode } from '@/types/problem';
 
 type Creator = { firstName: string; lastName: string; role: string } | null | undefined;
@@ -100,21 +101,22 @@ export interface FlatAssessmentItem {
   originalIndex: number;
 }
 
-// Flattens an assessment list into tree (parent-then-children) order —
-// identical in spirit to the Master Problem List's buildProblemTree + DFS
-// flatten — so a row visually sits right under its parent based on parentId,
-// instead of staying wherever it was first added. Sibling order otherwise
-// follows array order; items whose parentId points nowhere resolvable fall
-// back to root.
-export function buildAssessmentFlatOrder(items: NoteAssessmentItem[]): FlatAssessmentItem[] {
-  const withKeys = items.map((item, originalIndex) => ({
+type KeyedAssessmentItem = { item: NoteAssessmentItem; originalIndex: number; key: string };
+
+// Shared indexing pass behind buildAssessmentFlatOrder/effectiveParentKey/
+// reorderAssessmentSibling — assigns each item its display key (real id/
+// tempId, or a positional fallback for identity-less legacy rows) and groups
+// items into parent -> ordered-children buckets (sibling order = array
+// order), plus the root bucket for items with no resolvable parent.
+function buildAssessmentIndex(items: NoteAssessmentItem[]) {
+  const withKeys: KeyedAssessmentItem[] = items.map((item, originalIndex) => ({
     item,
     originalIndex,
     key: assessmentItemKey(item) || `__idx_${originalIndex}`,
   }));
   const byKey = new Map(withKeys.map((w) => [w.key, w]));
-  const childrenByParent = new Map<string, typeof withKeys>();
-  const roots: typeof withKeys = [];
+  const childrenByParent = new Map<string, KeyedAssessmentItem[]>();
+  const roots: KeyedAssessmentItem[] = [];
 
   withKeys.forEach((w) => {
     const parentKey = w.item.parentId || undefined;
@@ -127,8 +129,20 @@ export function buildAssessmentFlatOrder(items: NoteAssessmentItem[]): FlatAsses
     }
   });
 
+  return { withKeys, byKey, childrenByParent, roots };
+}
+
+// Flattens an assessment list into tree (parent-then-children) order —
+// identical in spirit to the Master Problem List's buildProblemTree + DFS
+// flatten — so a row visually sits right under its parent based on parentId,
+// instead of staying wherever it was first added. Sibling order otherwise
+// follows array order; items whose parentId points nowhere resolvable fall
+// back to root.
+export function buildAssessmentFlatOrder(items: NoteAssessmentItem[]): FlatAssessmentItem[] {
+  const { roots, childrenByParent } = buildAssessmentIndex(items);
+
   const result: FlatAssessmentItem[] = [];
-  const traverse = (nodes: typeof withKeys, depth: number) => {
+  const traverse = (nodes: KeyedAssessmentItem[], depth: number) => {
     nodes.forEach((n) => {
       result.push({ item: n.item, key: n.key, depth, originalIndex: n.originalIndex });
       const kids = childrenByParent.get(n.key);
@@ -136,5 +150,66 @@ export function buildAssessmentFlatOrder(items: NoteAssessmentItem[]): FlatAsses
     });
   };
   traverse(roots, 0);
+  return result;
+}
+
+// A given item's resolved parent key — `null` for a root item, whether that's
+// because it truly has no parentId or because its parentId points nowhere
+// resolvable (the same fallback-to-root rule buildAssessmentFlatOrder
+// applies). Two items with different-but-both-dead parentIds must still
+// count as siblings, so this is what sibling-only reordering compares —
+// never raw item.parentId.
+export function effectiveParentKey(items: NoteAssessmentItem[], key: string): string | null {
+  const { byKey, roots } = buildAssessmentIndex(items);
+  if (roots.some((w) => w.key === key)) return null;
+  const parentKey = byKey.get(key)?.item.parentId;
+  return parentKey && byKey.has(parentKey) ? parentKey : null;
+}
+
+// Moves `activeKey` to the position currently held by `overKey`, but only
+// when they're siblings (same effectiveParentKey) — dragging across levels
+// is refused (returns null; caller should no-op) so a note-local reorder can
+// never be misread as a re-nest, which is the only one of the two that
+// writes back to the shared master Problem.parentId on publish. The
+// returned array is normalised to DFS display order (array index == display
+// index), which is what lets the reordered position survive a save/reload
+// even for a host (the Initial Note) that submits the raw array with no
+// re-flatten of its own. Does not touch `depth` — a same-level reorder never
+// changes it, and re-stamping would falsely mark untouched rows as modified
+// in the Initial Note's version diff.
+export function reorderAssessmentSibling(
+  items: NoteAssessmentItem[],
+  activeKey: string,
+  overKey: string,
+): NoteAssessmentItem[] | null {
+  if (activeKey === overKey) return null;
+  const activeParent = effectiveParentKey(items, activeKey);
+  const overParent = effectiveParentKey(items, overKey);
+  if (activeParent !== overParent) return null;
+
+  const { roots, childrenByParent } = buildAssessmentIndex(items);
+  const group = activeParent === null ? roots : childrenByParent.get(activeParent);
+  if (!group) return null;
+
+  const oldIndex = group.findIndex((w) => w.key === activeKey);
+  const newIndex = group.findIndex((w) => w.key === overKey);
+  if (oldIndex === -1 || newIndex === -1) return null;
+
+  const moved = arrayMove(group, oldIndex, newIndex);
+  if (activeParent === null) {
+    roots.splice(0, roots.length, ...moved);
+  } else {
+    childrenByParent.set(activeParent, moved);
+  }
+
+  const result: NoteAssessmentItem[] = [];
+  const traverse = (nodes: KeyedAssessmentItem[]) => {
+    nodes.forEach((n) => {
+      result.push(n.item);
+      const kids = childrenByParent.get(n.key);
+      if (kids) traverse(kids);
+    });
+  };
+  traverse(roots);
   return result;
 }

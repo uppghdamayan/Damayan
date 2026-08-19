@@ -15,7 +15,6 @@ import {
   useSensors,
   type DragEndEvent,
   type DragMoveEvent,
-  type Modifier,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 
@@ -30,6 +29,7 @@ import {
 import { useInitialNote } from '@/hooks/useInitialNote';
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant, getCreatorName } from '@/lib/problem-utils';
+import { zoomModifier } from '@/lib/dnd-utils';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -58,20 +58,6 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // disabled) rather than risk a data mismatch between the two drafts.
   const { isLockedByOther, lockNoteId, tryAcquire, release } = useProblemEditLock(patientId, 'master');
   const effectiveCanManage = canManage && !isLockedByOther && hasPublishedInitialNote;
-
-  const zoomModifier: Modifier = useMemo(() => {
-    return ({ transform, activeNodeRect }) => {
-      const currentScale = (useUiStore.getState().uiScale || 100) / 100;
-      if (currentScale === 1 || !activeNodeRect) {
-        return transform;
-      }
-      return {
-        ...transform,
-        x: transform.x + activeNodeRect.left * (1 / currentScale - 1),
-        y: transform.y + activeNodeRect.top * (1 / currentScale - 1),
-      };
-    };
-  }, []);
 
   const { data, isLoading } = useProblems(patientId);
   const { data: logsData, isLoading: logsLoading } = useProblemLogs(patientId);

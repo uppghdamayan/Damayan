@@ -108,14 +108,17 @@ export function ActiveProblemRow({
     });
 
   const isOptimistic = problem.id.startsWith('optimistic-');
+  // Nested (sub-)problems aren't movable — only the top-of-nest (depth 0)
+  // row can be dragged/reordered.
+  const canDrag = canManage && depth === 0;
 
   return (
     <div
-      {...(canManage ? dragHandleProps?.attributes : {})}
-      {...(canManage ? dragHandleProps?.listeners : {})}
+      {...(canDrag ? dragHandleProps?.attributes : {})}
+      {...(canDrag ? dragHandleProps?.listeners : {})}
       className={cn(
         'grid items-center gap-4 px-[14px] py-3 bg-surface transition-all duration-150 animate-row-entry group relative min-w-0',
-        canManage && !isOptimistic && 'cursor-grab active:cursor-grabbing hover:bg-surface-2/60',
+        canDrag && !isOptimistic && 'cursor-grab active:cursor-grabbing hover:bg-surface-2/60',
         isDragging && 'relative z-10 opacity-40 shadow-sm dragging',
         isReorderHover && 'bg-accent-light/50 border-t-2 border-t-accent',
         isNestHover && 'bg-green-bg/80 border-2 border-dashed border-green-border relative shadow-sm',
@@ -126,7 +129,7 @@ export function ActiveProblemRow({
     >
       {/* Column 1: Drag handle indicator */}
       <div className="flex items-center justify-center">
-        {canManage ? (
+        {canDrag ? (
           <span
             className="text-border-strong group-hover:text-accent flex-shrink-0 select-none text-[15px] font-bold transition-colors cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-surface-3"
             title="Drag to reorder, nest (drag right), or un-nest (drag left)"
@@ -304,7 +307,9 @@ function SortableRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.problem.id,
-    disabled: !canManage,
+    // Nested (sub-)problems aren't movable — only the top-of-nest (depth 0)
+    // row can be dragged/reordered.
+    disabled: !canManage || item.depth > 0,
   });
 
   const isTargetNestOrUnnest = dragOverState?.id === item.problem.id && (dragOverState.action === 'nest' || dragOverState.action === 'unnest');

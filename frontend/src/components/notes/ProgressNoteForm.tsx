@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { buildProblemTree, getCreatorName } from '@/lib/problem-utils';
+import { buildProblemTree, getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
+import type { NoteAssessmentItem } from '@/lib/problem-utils';
 import { 
   progressNoteDraftSchema, 
   progressNotePublishSchema, 
@@ -811,33 +812,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const cleanFormValues = (values: any) => {
-    const rawProblems = (values.problemListSnapshot || []) as any[];
-    const withKeys = rawProblems.map((item: any, originalIndex: number) => ({
-      item,
-      originalIndex,
-      key: item?.id || item?.tempId || `__idx_${originalIndex}`,
-    }));
-    const byKey = new Map(withKeys.map((w) => [w.key, w]));
-    const childrenByParent = new Map<string, typeof withKeys>();
-    const roots: typeof withKeys = [];
-
-    withKeys.forEach((w) => {
-      const parentKey = w.item?.parentId ? String(w.item.parentId) : undefined;
-      if (parentKey && byKey.has(parentKey) && parentKey !== w.key) {
-        const arr = childrenByParent.get(parentKey) || [];
-        arr.push(w);
-        childrenByParent.set(parentKey, arr);
-      } else {
-        roots.push(w);
-      }
-    });
-
-    const cleanProblems: any[] = [];
-    const traverse = (nodes: typeof withKeys, depth: number) => {
-      nodes.forEach((n) => {
-        const p = n.item;
-        if (typeof p === 'object' && p !== null) {
-          cleanProblems.push({
+    const rawProblems = (values.problemListSnapshot || []) as NoteAssessmentItem[];
+    // DFS parent-then-children flatten via the same helper the editor uses
+    // for display order, so submit order can never drift from what the
+    // clinician saw (including any drag-to-reorder). Legacy bare-string
+    // items pass through untouched — they carry no title/parentId to project.
+    const cleanProblems = buildAssessmentFlatOrder(rawProblems).map(({ item: p, depth }) =>
+      p && typeof p === 'object'
+        ? {
             id: p.id,
             tempId: p.tempId,
             title: p.title,
@@ -845,15 +827,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             depth,
             isNew: p.isNew,
             diagnosisDate: p.diagnosisDate,
-          });
-        } else {
-          cleanProblems.push(p);
-        }
-        const kids = childrenByParent.get(n.key);
-        if (kids) traverse(kids, depth + 1);
-      });
-    };
-    traverse(roots, 0);
+          }
+        : p,
+    );
 
     return {
       ...values,

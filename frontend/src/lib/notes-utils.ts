@@ -105,40 +105,64 @@ export function diffAssessmentItems(
   const prevById = new Map(previous.filter(p => p.id).map(p => [p.id!, p]));
   const matchedPrevIds = new Set<string>();
 
-  const currentWithId = current.filter(c => c.id);
-  const currentWithoutId = current.filter(c => !c.id);
+  // Id-less items (legacy snapshots, or a problem typed fresh in-note that
+  // has no Problem id yet) fall back to name matching amongst themselves —
+  // but that match is resolved up front, keyed by array position, so the
+  // walk below can place every item — id'd or not — in one pass that
+  // preserves `current`'s array order. Previously id'd items were all
+  // diffed first and id-less items appended afterward regardless of where
+  // they actually sat in `current`, so a freshly-added problem always
+  // floated to the bottom of the note's Assessment display no matter where
+  // it was nested/positioned in the live Problem List — out of step with
+  // every other view of the same array (the note editor, Master Problem
+  // List) which renders it in its real position.
   const previousWithoutId = previous.filter(p => !p.id);
+  const matchedPrevWithoutIdIdx = new Set<number>();
+  const nameMatchByPosition = new Map<number, { title: string } | undefined>();
+  current.forEach((c, idx) => {
+    if (c.id) return;
+    const prevIdx = previousWithoutId.findIndex(
+      (p, i) => !matchedPrevWithoutIdIdx.has(i) && p.title.trim().toLowerCase() === c.title.trim().toLowerCase(),
+    );
+    if (prevIdx !== -1) {
+      matchedPrevWithoutIdIdx.add(prevIdx);
+      nameMatchByPosition.set(idx, previousWithoutId[prevIdx]);
+    }
+  });
 
   const diffItems: { text: string; status: 'existing' | 'added' | 'removed' | 'updated'; fromText?: string }[] = [];
 
-  for (const curr of currentWithId) {
-    const prev = prevById.get(curr.id!);
-    if (prev) {
-      matchedPrevIds.add(curr.id!);
-      if (prev.title.trim().toLowerCase() !== curr.title.trim().toLowerCase()) {
-        diffItems.push({ text: curr.title, status: 'updated', fromText: prev.title });
+  current.forEach((curr, idx) => {
+    if (curr.id) {
+      const prev = prevById.get(curr.id);
+      if (prev) {
+        matchedPrevIds.add(curr.id);
+        if (prev.title.trim().toLowerCase() !== curr.title.trim().toLowerCase()) {
+          diffItems.push({ text: curr.title, status: 'updated', fromText: prev.title });
+        } else {
+          diffItems.push({ text: curr.title, status: 'existing' });
+        }
       } else {
-        diffItems.push({ text: curr.title, status: 'existing' });
+        diffItems.push({ text: curr.title, status: 'added' });
       }
-    } else {
-      diffItems.push({ text: curr.title, status: 'added' });
+      return;
     }
-  }
+    const prev = nameMatchByPosition.get(idx);
+    diffItems.push(prev ? { text: curr.title, status: 'existing' } : { text: curr.title, status: 'added' });
+  });
 
+  // Removed items — present in `previous` but with no match in `current` —
+  // have no position of their own to preserve, so they stay appended last.
   for (const prev of previous) {
     if (prev.id && !matchedPrevIds.has(prev.id)) {
       diffItems.push({ text: prev.title, status: 'removed' });
     }
   }
-
-  // Items without a stable id (rare/legacy) fall back to name-based matching amongst themselves.
-  if (currentWithoutId.length > 0 || previousWithoutId.length > 0) {
-    const nameDiff = diffListItems(
-      currentWithoutId.map(c => c.title),
-      previousWithoutId.length > 0 ? previousWithoutId.map(p => p.title) : null
-    );
-    diffItems.push(...nameDiff);
-  }
+  previousWithoutId.forEach((prev, i) => {
+    if (!matchedPrevWithoutIdIdx.has(i)) {
+      diffItems.push({ text: prev.title, status: 'removed' });
+    }
+  });
 
   return diffItems;
 }

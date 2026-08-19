@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { buildAssessmentFlatOrder, type NoteAssessmentItem } from '@/lib/problem-utils';
 import type { InitialNoteSnapshot } from '@/types/initial-note';
 
 interface SectionProps {
@@ -82,6 +83,15 @@ export function InitialNoteVersionView({
   const historyChanged = historyFields.some((f) => changed(f.key as string));
 
   const assessment = snapshot.assessment ?? [];
+  // DFS parent-then-children depth via the same helper the editor uses for
+  // display order, keyed back to assessment's own array positions — a
+  // snapshot's stored `depth` can be stale (e.g. legacy notes saved before
+  // nesting was normalised on submit), so deriving it from parentId here is
+  // what keeps a historical version's indentation faithful to how it
+  // actually rendered.
+  const assessmentDepthByIndex = new Map(
+    buildAssessmentFlatOrder(assessment as NoteAssessmentItem[]).map((f) => [f.originalIndex, f.depth]),
+  );
   const medications = snapshot.medicationSnapshot ?? [];
   const diagnostics = snapshot.diagnostics ?? [];
 
@@ -168,8 +178,7 @@ export function InitialNoteVersionView({
         {assessment.length > 0 ? (
           <div className="flex flex-col gap-1.5 pt-0.5">
             {assessment.map((item, i) => {
-              const itemAny = item as any;
-              const depth = itemAny.parentId ? (itemAny.depth || 1) : (itemAny.parentId === null ? 0 : (item.depth ?? 0));
+              const depth = assessmentDepthByIndex.get(i) ?? item.depth ?? 0;
               return (
                 <div
                   key={`${item.title}-${i}`}
