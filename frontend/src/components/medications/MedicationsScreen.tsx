@@ -13,6 +13,7 @@ import {
   useMedicationLogs,
 } from '@/hooks/useMedications';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -44,12 +45,28 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const hasPublishedInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
   const canManage = (user?.role === 'DOCTOR' || user?.role === 'ADMIN') && hasPublishedInitialNote;
 
+  // Same query args as NoteTimeline's useProgressNotes(patientId, 1, 100) —
+  // keep them in sync so the two hooks share one cached fetch.
+  const { data: progressNotesResponse } = useProgressNotes(patientId, 1, 100);
+  // The Master Medication List is read-only unless a note draft is currently
+  // in progress — an unpublished Initial Note, or an unpublished (DRAFT)
+  // Progress Note — mirrors the same rule on the Master Problem List (see
+  // ProblemListScreen's hasDraftNoteInProgress for the full rationale).
+  const hasDraftNoteInProgress = Boolean(
+    (initialNote && initialNote.status === 'DRAFT') ||
+      (progressNotesResponse?.data ?? []).some((n) => n.status === 'DRAFT'),
+  );
+
   const openExistingProgressNote = useUiStore((state) => state.openExistingProgressNote);
   // Mutual-exclusion lock vs. the Progress Note's in-note medication editor —
   // see useMedicationEditLock. While a note holds it, this list stays
   // read-only rather than risk a data mismatch between the two drafts.
   const { isLockedByOther, lockNoteId, tryAcquire, release } = useMedicationEditLock(patientId, 'master');
-  const effectiveCanManage = canManage && !isLockedByOther;
+  const effectiveCanManage = canManage && !isLockedByOther && hasDraftNoteInProgress;
+  // Visual/read-only gate for the two tables — distinct from effectiveCanManage
+  // in that it ignores isLockedByOther (that gets its own banner instead of
+  // the generic grayed-out treatment).
+  const isMasterListLocked = !hasPublishedInitialNote || !hasDraftNoteInProgress;
 
   const { data, isLoading } = useMedications(patientId, true);
   const createMedication = useCreateMedication(patientId);
@@ -202,6 +219,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   // Returns false — and leaves pendingChanges untouched — if the note holds
   // it, so every call site can bail out of its edit before mutating state.
   const ensureEditMode = () => {
+    if (!hasDraftNoteInProgress) return false;
     if (isEditMode) return true;
     return tryAcquire();
   };
@@ -209,6 +227,10 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const handleAdd = () => {
     if (!hasPublishedInitialNote) {
       toast.error('An Initial Note must be created and published first.');
+      return;
+    }
+    if (!hasDraftNoteInProgress) {
+      toast.error('Editing requires a note draft in progress — start or open an unpublished Initial or Progress Note first.');
       return;
     }
     if (isLockedByOther) {
@@ -219,7 +241,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     setModalOpen(true);
   };
   const handleEdit = (m: Medication) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     if (isLockedByOther) {
       tryAcquire();
       return;
@@ -270,7 +292,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (m: Medication) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     if (isLockedByOther) {
       tryAcquire();
       return;
@@ -317,14 +339,14 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleSaveDraft = () => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     localStorage.setItem(draftStorageKey, JSON.stringify(pendingChanges));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
 
   const handlePublish = async () => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     setIsPublishing(true);
     try {
       const publishedChanges: Record<string, string[]> = {};
@@ -460,15 +482,35 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         </div>
       )}
 
+      {hasPublishedInitialNote && !hasDraftNoteInProgress && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface border border-slate-400/30 bg-slate-500/5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-600 flex-shrink-0 text-[16px]">
+              🔒
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-text-primary">Editing Locked — No Note Draft in Progress</h4>
+              <p className="text-[12px] text-text-secondary mt-0.5">
+                {user?.role === 'DOCTOR' || user?.role === 'ADMIN'
+                  ? 'The Master Medication List can only be edited while an Initial or Progress Note draft is in progress. Start or open an unpublished note to make changes.'
+                  : 'The Master Medication List can only be edited while an Initial or Progress Note draft is in progress.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(user?.role === 'DOCTOR' || user?.role === 'ADMIN') && (
         <div className="flex justify-end -mb-2">
           <button
             onClick={handleAdd}
-            disabled={!hasPublishedInitialNote || isLockedByOther}
+            disabled={!hasPublishedInitialNote || !hasDraftNoteInProgress || isLockedByOther}
             title={
               !hasPublishedInitialNote
                 ? 'An Initial Note must be published before adding medications'
-                : isLockedByOther
+                : !hasDraftNoteInProgress
+                  ? 'Editing requires a note draft in progress — start or open an unpublished Initial or Progress Note first'
+                  : isLockedByOther
                   ? 'Locked — a Progress Note draft is currently editing medications'
                   : undefined
             }
@@ -482,7 +524,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       <div className={cn(
         "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all duration-200",
         isEditMode ? "border-l-amber-500" : "border-l-accent",
-        !hasPublishedInitialNote && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
+        isMasterListLocked && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
       )}>
         <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 border-b border-border">
           {/* Left side */}
@@ -511,9 +553,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {!hasPublishedInitialNote && (
+            {isMasterListLocked && (
               <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
-                🔒 Read Only
+                🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
               </span>
             )}
           </div>
@@ -631,15 +673,15 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
 
       <div className={cn(
         "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden",
-        !hasPublishedInitialNote && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
+        isMasterListLocked && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
       )}>
         <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
           <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
           <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
           <div className="ml-auto flex items-center gap-2">
-            {!hasPublishedInitialNote && (
+            {isMasterListLocked && (
               <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
-                🔒 Read Only
+                🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
               </span>
             )}
             <span className="text-[9px] font-bold uppercase tracking-[0.5px] px-2.5 py-[3px] rounded border border-border text-text-secondary bg-surface-2">

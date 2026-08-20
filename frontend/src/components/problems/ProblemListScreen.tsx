@@ -27,6 +27,7 @@ import {
   useProblemLogs,
 } from '@/hooks/useProblems';
 import { useInitialNote } from '@/hooks/useInitialNote';
+import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant, getCreatorName } from '@/lib/problem-utils';
 import { zoomModifier } from '@/lib/dnd-utils';
@@ -52,12 +53,30 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const { data: initialNote, isLoading: initialNoteLoading } = useInitialNote(patientId);
   const hasPublishedInitialNote = Boolean(initialNote && initialNote.status === 'PUBLISHED');
 
+  // Same query args as NoteTimeline's useProgressNotes(patientId, 1, 100) —
+  // keep them in sync so the two hooks share one cached fetch instead of
+  // holding divergent caches for the same patient.
+  const { data: progressNotesResponse } = useProgressNotes(patientId, 1, 100);
+  // The Master Problem List is read-only unless a note draft is currently in
+  // progress — an unpublished Initial Note, or an unpublished (DRAFT)
+  // Progress Note — so doctors never edit the master list "cold", outside
+  // the context of a note. Once every note for this patient is published,
+  // editing locks again.
+  const hasDraftNoteInProgress = Boolean(
+    (initialNote && initialNote.status === 'DRAFT') ||
+      (progressNotesResponse?.data ?? []).some((n) => n.status === 'DRAFT'),
+  );
+
   // Mutual-exclusion lock vs. the Progress Note's in-note Assessment editor —
   // see useProblemEditLock for the full rationale. While a note holds it,
   // this list stays read-only (all edit/add/drag/status/delete affordances
   // disabled) rather than risk a data mismatch between the two drafts.
   const { isLockedByOther, lockNoteId, tryAcquire, release } = useProblemEditLock(patientId, 'master');
-  const effectiveCanManage = canManage && !isLockedByOther && hasPublishedInitialNote;
+  const effectiveCanManage = canManage && !isLockedByOther && hasPublishedInitialNote && hasDraftNoteInProgress;
+  // Visual/read-only gate for the two tables — distinct from effectiveCanManage
+  // in that it ignores isLockedByOther (that state gets its own banner and
+  // "Locked" badge rather than the generic grayed-out treatment).
+  const isMasterListLocked = !hasPublishedInitialNote || !hasDraftNoteInProgress;
 
   const { data, isLoading } = useProblems(patientId);
   const { data: logsData, isLoading: logsLoading } = useProblemLogs(patientId);
@@ -84,7 +103,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // Returns false — and leaves state untouched — if the note holds it, so
   // every call site can bail out of its edit before mutating draft state.
   const ensureEditMode = () => {
-    if (!hasPublishedInitialNote) return false;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return false;
     if (isEditMode) return true;
     if (!tryAcquire()) return false;
     setIsEditMode(true);
@@ -280,6 +299,10 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       toast.error('An Initial Note must be created and published first.');
       return;
     }
+    if (!hasDraftNoteInProgress) {
+      toast.error('Editing requires a note draft in progress — start or open an unpublished Initial or Progress Note first.');
+      return;
+    }
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       return;
@@ -288,13 +311,13 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setModalOpen(true);
   };
   const handleEdit = (p: Problem) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     setEditing(p);
     setModalOpen(true);
   };
 
   const handleSave = async (values: { title: string; parentId?: string | null; diagnosisDate?: string | null }) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     try {
       if (editing) {
         if (!ensureEditMode()) return;
@@ -349,7 +372,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleStatusChange = async (p: Problem, status: ProblemStatusValue) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       return;
@@ -436,13 +459,13 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleDelete = (p: Problem) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     setProblemToDelete(p);
     setDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = () => {
-    if (!problemToDelete || !hasPublishedInitialNote) return;
+    if (!problemToDelete || !hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     if (isLockedByOther) {
       tryAcquire(); // surfaces the "locked by a note" toast
       setDeleteModalOpen(false);
@@ -489,7 +512,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   const handleReorder = (items: { id: string; sortOrder: number }[]) => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     reorderProblems.mutate({ items });
   };
 
@@ -508,14 +531,14 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // Save Draft: persists to localStorage only — does NOT call the API
   // so other co-doctors never see unpublished edits
   const handleSaveDraft = () => {
-    if (!hasPublishedInitialNote || !draftOrder) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress || !draftOrder) return;
     localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() }));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
 
   const handlePublish = () => {
-    if (!hasPublishedInitialNote) return;
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     const items = displayFlatProblems.map((item, index) => ({ 
       id: item.problem.id, 
       sortOrder: index,
@@ -745,6 +768,24 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         </div>
       )}
 
+      {hasPublishedInitialNote && !hasDraftNoteInProgress && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-surface border border-slate-400/30 bg-slate-500/5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-600 flex-shrink-0 text-[16px]">
+              🔒
+            </div>
+            <div>
+              <h4 className="text-[13px] font-bold text-text-primary">Editing Locked — No Note Draft in Progress</h4>
+              <p className="text-[12px] text-text-secondary mt-0.5">
+                {canManage
+                  ? 'The Master Problem List can only be edited while an Initial or Progress Note draft is in progress. Start or open an unpublished note to make changes.'
+                  : 'The Master Problem List can only be edited while an Initial or Progress Note draft is in progress.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {canManage && (
         <div className="flex justify-end -mb-2">
           <button
@@ -753,6 +794,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             title={
               !hasPublishedInitialNote
                 ? 'An Initial Note must be published before adding problems'
+                : !hasDraftNoteInProgress
+                ? 'Editing requires a note draft in progress — start or open an unpublished Initial or Progress Note first'
                 : isLockedByOther
                 ? 'Locked — a Progress Note draft is currently editing problems'
                 : undefined
@@ -785,7 +828,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           className={cn(
             "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
             isEditMode ? 'border-l-amber-500' : 'border-l-accent',
-            !hasPublishedInitialNote && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
+            isMasterListLocked && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
             showActiveDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
@@ -835,9 +878,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                   </span>
                   Draft Mode (Unpublished)
                 </span>
-              ) : !hasPublishedInitialNote ? (
+              ) : isMasterListLocked ? (
                 <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
-                  🔒 Read Only
+                  🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
                 </span>
               ) : (
                 <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1.5 select-none">
@@ -881,7 +924,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         <div 
           className={cn(
             "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
-            !hasPublishedInitialNote && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
+            isMasterListLocked && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
             showResolvedDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
@@ -911,9 +954,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
             {/* Right side */}
             <div className="flex items-center gap-2">
-              {!hasPublishedInitialNote && (
+              {isMasterListLocked && (
                 <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
-                  🔒 Read Only
+                  🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
                 </span>
               )}
             </div>
