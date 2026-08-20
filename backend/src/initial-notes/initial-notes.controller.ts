@@ -108,9 +108,12 @@ export class InitialNotesController {
     );
   }
 
+  // Any DOCTOR (not just the original author) or ADMIN may edit — clinical
+  // notes are collaborative, not personally owned. Who actually made the
+  // edit is still recorded via lastEditor/lastEditedAt (published notes) and
+  // the InitialNoteLog audit trail (both draft and published) in the service.
   @Patch(':id')
-  @UseGuards(AuthorGuard)
-  @NoteModel('initialNote')
+  @Roles(Role.DOCTOR, Role.ADMIN)
   update(
     @Param('patientId') patientId: string,
     @Param('id') id: string,
