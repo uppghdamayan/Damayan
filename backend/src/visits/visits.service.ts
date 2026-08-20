@@ -11,10 +11,7 @@ export class VisitsService {
     const skip = (page - 1) * limit;
     const whereClause: Prisma.VisitWhereInput = {
       patientId,
-      OR: [
-        { initialNote: { isNot: null } },
-        { progressNote: { isNot: null } },
-      ],
+      OR: [{ initialNote: { isNot: null } }, { progressNote: { isNot: null } }],
     };
 
     const [data, total] = await Promise.all([

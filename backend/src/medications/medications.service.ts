@@ -318,11 +318,13 @@ export class MedicationsService {
     const promises: Promise<any>[] = [];
 
     for (const item of items) {
-      const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      const normalize = (s: string) =>
+        s.trim().toLowerCase().replace(/\s+/g, ' ');
       const match = existing.find(
         (m) =>
           normalize(m.name) === normalize(item.name) &&
-          normalize(String(m.dose ?? '')) === normalize(String(item.dose ?? '')),
+          normalize(String(m.dose ?? '')) ===
+            normalize(String(item.dose ?? '')),
       );
       if (match) {
         keptIds.add(match.id);
@@ -429,7 +431,8 @@ export class MedicationsService {
           m.isActive &&
           !keptIds.has(m.id) &&
           normalize(m.name) === normalize(item.name) &&
-          normalize(String(m.dose ?? '')) !== normalize(String(item.dose ?? '')),
+          normalize(String(m.dose ?? '')) !==
+            normalize(String(item.dose ?? '')),
       );
 
       promises.push(

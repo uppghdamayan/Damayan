@@ -5,6 +5,7 @@ import {
   buildProblemTree,
   getCreatorName,
   buildAssessmentFlatOrder,
+  removeAssessmentItemWithPromotion,
   formatDiagnosisDate,
   type NoteAssessmentItem,
 } from '@/lib/problem-utils';
@@ -2268,8 +2269,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         onConfirm={() => {
           if (deleteProblemIndex !== null) {
             const current = form.getValues('assessment') || [];
-            const updated = [...current];
-            updated.splice(deleteProblemIndex, 1);
+            const updated = removeAssessmentItemWithPromotion(current, deleteProblemIndex);
             form.setValue('assessment', updated, { shouldDirty: true, shouldTouch: true });
             setDeleteProblemIndex(null);
           }

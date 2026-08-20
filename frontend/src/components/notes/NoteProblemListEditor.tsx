@@ -31,6 +31,7 @@ import {
   assessmentItemKey as itemKey,
   buildAssessmentFlatOrder as buildFlatOrder,
   reorderAssessmentSibling,
+  removeAssessmentItemWithPromotion,
   formatDiagnosisDate as formatDate,
   type NoteAssessmentItem,
 } from '@/lib/problem-utils';
@@ -417,9 +418,7 @@ export function NoteProblemListEditor({
   };
 
   const removeItem = (idx: number) => {
-    const next = [...items];
-    next.splice(idx, 1);
-    onChange(next);
+    onChange(removeAssessmentItemWithPromotion(items, idx));
   };
 
   const addProblem = () => {

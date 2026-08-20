@@ -10,8 +10,12 @@ export class DeletedNotesService {
       where: { patientId },
       orderBy: { deletedAt: 'desc' },
       include: {
-        author: { select: { id: true, firstName: true, lastName: true, role: true } },
-        deletedByUser: { select: { id: true, firstName: true, lastName: true, role: true } },
+        author: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+        deletedByUser: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
         visit: true,
       },
     });

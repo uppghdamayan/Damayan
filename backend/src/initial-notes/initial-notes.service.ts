@@ -206,10 +206,7 @@ export class InitialNotesService {
 
           // Version + log the edit. A save that changed nothing records
           // neither, so the history stays free of no-op entries.
-          const { changedFields, summary } = diffNoteFields(
-            note as unknown as Record<string, unknown>,
-            updatedNote as unknown as Record<string, unknown>,
-          );
+          const { changedFields, summary } = diffNoteFields(note, updatedNote);
           if (changedFields.length > 0) {
             const version = await this.snapshotVersion(
               patientId,
@@ -297,10 +294,7 @@ export class InitialNotesService {
     return this.prisma.$transaction(async (tx) => {
       const updatedNote = await tx.initialNote.update({ where: { id }, data });
 
-      const { changedFields, summary } = diffNoteFields(
-        note as unknown as Record<string, unknown>,
-        updatedNote as unknown as Record<string, unknown>,
-      );
+      const { changedFields, summary } = diffNoteFields(note, updatedNote);
       if (changedFields.length > 0) {
         await this.logAction(
           patientId,
@@ -467,7 +461,7 @@ export class InitialNotesService {
             deletedBy: userId,
             originalCreatedAt: note.createdAt,
             visitId: note.visitId,
-          }
+          },
         });
 
         // Bug Fix: clear problems and medications on initial note deletion.
@@ -532,10 +526,15 @@ export class InitialNotesService {
       // Check if visit is now empty and can be deleted
       const visitDetails = await tx.visit.findUnique({
         where: { id: note.visitId },
-        include: { vitalSigns: true, documents: true, progressNote: true }
+        include: { vitalSigns: true, documents: true, progressNote: true },
       });
 
-      if (visitDetails && visitDetails.vitalSigns.length === 0 && visitDetails.documents.length === 0 && !visitDetails.progressNote) {
+      if (
+        visitDetails &&
+        visitDetails.vitalSigns.length === 0 &&
+        visitDetails.documents.length === 0 &&
+        !visitDetails.progressNote
+      ) {
         await tx.visit.delete({ where: { id: note.visitId } });
       }
 

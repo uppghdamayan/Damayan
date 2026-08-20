@@ -103,7 +103,7 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
     await service.upsertFromNoteMedications(
       'patient-1',
       // A legacy snapshot without formulation/instructions/quantity at all.
-      [{ name: 'Amlodipine', dose: '10 mg' } as any],
+      [{ name: 'Amlodipine', dose: '10 mg' }],
       'user-1',
       'Progress Note',
       client as any,

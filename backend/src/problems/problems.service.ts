@@ -183,16 +183,59 @@ export class ProblemsService {
           data.sortOrder = await this.getNextSortOrder(patientId, tx);
         }
 
-        // Business rule 5: removing a parent cascades to its direct children.
-        if (dto.status === ProblemStatus.REMOVED) {
-          await tx.problem.updateMany({
+        // Business rule 5: taking a parent out of the active tree — whether
+        // Resolved or Removed — promotes its first surviving (non-Removed)
+        // child into the parent's slot (same parentId + sortOrder as the
+        // old parent) and re-parents the remaining former siblings under
+        // that heir. The heir's own children are untouched — the whole
+        // branch shifts up one level as one block instead of being wiped
+        // out (Removed) or silently orphaned (Resolved).
+        if (
+          dto.status === ProblemStatus.REMOVED ||
+          dto.status === ProblemStatus.RESOLVED
+        ) {
+          const children = await tx.problem.findMany({
             where: {
               patientId,
               parentId: id,
               status: { not: ProblemStatus.REMOVED },
             },
-            data: { status: ProblemStatus.REMOVED },
+            orderBy: { sortOrder: 'asc' },
           });
+
+          if (children.length > 0) {
+            const [heir, ...rest] = children;
+            const verb =
+              dto.status === ProblemStatus.REMOVED ? 'removed' : 'resolved';
+
+            await tx.problem.update({
+              where: { id: heir.id },
+              data: {
+                parentId: existing.parentId,
+                sortOrder: existing.sortOrder,
+                updatedBy: userId,
+              },
+            });
+
+            if (rest.length > 0) {
+              await tx.problem.updateMany({
+                where: { id: { in: rest.map((p) => p.id) } },
+                data: { parentId: heir.id, updatedBy: userId },
+              });
+            }
+
+            await this.logAction(
+              patientId,
+              userId,
+              'Updated',
+              `Promoted '${heir.title}' to replace ${verb} parent '${existing.title}'` +
+                (rest.length > 0
+                  ? ` (${rest.length} sibling${rest.length === 1 ? '' : 's'} re-parented under it)`
+                  : ''),
+              tx,
+              heir.id,
+            );
+          }
         }
 
         let action = 'Updated';

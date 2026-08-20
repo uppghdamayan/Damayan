@@ -64,21 +64,15 @@ describe('initial-notes.utils', () => {
   describe('diffNoteFields', () => {
     it('reports no changes for an identical note', () => {
       const note = makeNote();
-      const { changedFields, summary } = diffNoteFields(
-        note as unknown as Record<string, unknown>,
-        makeNote() as unknown as Record<string, unknown>,
-      );
+      const { changedFields, summary } = diffNoteFields(note, makeNote());
       expect(changedFields).toEqual([]);
       expect(summary).toBe('');
     });
 
     it('describes a single edited section in full words', () => {
       const { changedFields, summary } = diffNoteFields(
-        makeNote() as unknown as Record<string, unknown>,
-        makeNote({ hpi: 'Vertigo on standing.' }) as unknown as Record<
-          string,
-          unknown
-        >,
+        makeNote(),
+        makeNote({ hpi: 'Vertigo on standing.' }),
       );
 
       expect(changedFields).toEqual(['hpi']);
@@ -87,11 +81,11 @@ describe('initial-notes.utils', () => {
 
     it('joins several edited sections into one clause', () => {
       const { changedFields, summary } = diffNoteFields(
-        makeNote() as unknown as Record<string, unknown>,
+        makeNote(),
         makeNote({
           chiefComplaint: 'Dizziness',
           physicalExam: 'Nystagmus noted.',
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(changedFields).toEqual(['chiefComplaint', 'physicalExam']);
@@ -100,11 +94,11 @@ describe('initial-notes.utils', () => {
 
     it('distinguishes filling in a blank section from editing one', () => {
       const { summary } = diffNoteFields(
-        makeNote({ allergies: null }) as unknown as Record<string, unknown>,
+        makeNote({ allergies: null }),
         makeNote({
           allergies: 'Penicillin',
           hpi: 'Vertigo on standing.',
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(summary).toBe(
@@ -114,11 +108,8 @@ describe('initial-notes.utils', () => {
 
     it('describes emptying a section as cleared', () => {
       const { summary } = diffNoteFields(
-        makeNote({ mgmtNonpharm: 'Hydration' }) as unknown as Record<
-          string,
-          unknown
-        >,
-        makeNote({ mgmtNonpharm: '' }) as unknown as Record<string, unknown>,
+        makeNote({ mgmtNonpharm: 'Hydration' }),
+        makeNote({ mgmtNonpharm: '' }),
       );
 
       expect(summary).toBe('Cleared the Non-pharmacologic Management');
@@ -128,10 +119,10 @@ describe('initial-notes.utils', () => {
       const { changedFields, summary } = diffNoteFields(
         makeNote({
           assessment: [{ title: 'Migraine' }, { title: 'Anemia' }],
-        }) as unknown as Record<string, unknown>,
+        }),
         makeNote({
           assessment: [{ title: 'Migraine' }, { title: 'Hypertension' }],
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(changedFields).toEqual(['assessment']);
@@ -145,11 +136,11 @@ describe('initial-notes.utils', () => {
         makeNote({
           allergies: null,
           mgmtNonpharm: 'Hydration',
-        }) as unknown as Record<string, unknown>,
+        }),
         makeNote({
           allergies: '',
           mgmtNonpharm: '  Hydration  ',
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(changedFields).toEqual([]);
@@ -159,10 +150,10 @@ describe('initial-notes.utils', () => {
       const { changedFields } = diffNoteFields(
         makeNote({
           assessment: [{ title: 'Migraine', icdCode: 'G43' }],
-        }) as unknown as Record<string, unknown>,
+        }),
         makeNote({
           assessment: [{ icdCode: 'G43', title: 'Migraine' }],
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(changedFields).toEqual([]);
@@ -172,10 +163,10 @@ describe('initial-notes.utils', () => {
       const { changedFields } = diffNoteFields(
         makeNote({
           assessment: [{ title: 'A' }, { title: 'B' }],
-        }) as unknown as Record<string, unknown>,
+        }),
         makeNote({
           assessment: [{ title: 'B' }, { title: 'A' }],
-        }) as unknown as Record<string, unknown>,
+        }),
       );
 
       expect(changedFields).toEqual(['assessment']);

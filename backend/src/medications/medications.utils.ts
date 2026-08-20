@@ -18,9 +18,7 @@
  *   "Reflect to Prescribed" on top of an existing entry) doesn't create two
  *   Medication rows.
  */
-export function mapMedicationSnapshot(
-  snapshot: any[] | null | undefined,
-): {
+export function mapMedicationSnapshot(snapshot: any[] | null | undefined): {
   name: string;
   dose: string;
   formulation?: string;
@@ -33,8 +31,10 @@ export function mapMedicationSnapshot(
       (m) => m && m.name && String(m.name).trim() !== '' && m.source !== 'past',
     )
     .map((m) => {
-      const doseStr = m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '';
-      const unitStr = m.unit !== undefined && m.unit !== null ? String(m.unit).trim() : '';
+      const doseStr =
+        m.dose !== undefined && m.dose !== null ? String(m.dose).trim() : '';
+      const unitStr =
+        m.unit !== undefined && m.unit !== null ? String(m.unit).trim() : '';
       return {
         name: String(m.name).trim(),
         dose: [doseStr, unitStr].filter(Boolean).join(' '),

@@ -356,6 +356,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
     try {
       await updateProblem.mutateAsync({ id: p.id, status });
+      if (status === 'RESOLVED' || status === 'REMOVED') {
+        mirrorPromotionInDraft(p);
+      }
       const messages: Record<ProblemStatusValue, string> = {
         ACTIVE: `'${p.title}' has been reactivated.`,
         RESOLVED: `'${p.title}' has been resolved.`,
@@ -400,6 +403,38 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
   };
 
+  // Shared by delete (status -> REMOVED, item leaves the tree entirely) and
+  // resolve (status -> RESOLVED, item stays in the Resolved section but
+  // drops out of the *active* tree). Either way the server has already
+  // promoted the problem's first surviving child into its slot (see
+  // problems.service.ts "Business rule 5") and the refetch will carry that
+  // through — this just keeps the *unpublished* local draft (draftOrder/
+  // draftParents/draftTitles/draftDiagnosisDates) from disagreeing with it.
+  // Left unpruned, a stale draftParents entry could re-nest a promoted child
+  // back under the now-inactive problem on the next Publish.
+  const mirrorPromotionInDraft = (changedProblem: Problem) => {
+    if (!isEditMode) return;
+    const changedId = changedProblem.id;
+    const children = draftActiveProblems.filter(
+      (p) =>
+        p.id !== changedId &&
+        (draftParents && p.id in draftParents ? draftParents[p.id] : p.parentId) === changedId,
+    );
+    if (children.length === 0) return;
+    const changedParentId =
+      draftParents && changedId in draftParents ? draftParents[changedId] : changedProblem.parentId;
+
+    setDraftParents((prev) => {
+      const base = { ...(prev || {}) };
+      const [heir, ...rest] = children;
+      base[heir.id] = changedParentId;
+      rest.forEach((sibling) => {
+        base[sibling.id] = heir.id;
+      });
+      return base;
+    });
+  };
+
   const handleDelete = (p: Problem) => {
     if (!hasPublishedInitialNote) return;
     setProblemToDelete(p);
@@ -414,9 +449,36 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       setProblemToDelete(null);
       return;
     }
-    deleteProblem.mutate(problemToDelete.id, {
+    const deletedId = problemToDelete.id;
+    deleteProblem.mutate(deletedId, {
       onSuccess: () => {
-        toast.success(`'${problemToDelete.title}' has been permanently deleted.`);
+        mirrorPromotionInDraft(problemToDelete);
+
+        if (isEditMode) {
+          // The deleted problem itself leaves the draft entirely (unlike
+          // resolve, which keeps it in the tree at its old slot/status).
+          setDraftOrder((prev) => (prev ? prev.filter((id) => id !== deletedId) : prev));
+          setDraftParents((prev) => {
+            if (!prev || !(deletedId in prev)) return prev;
+            const next = { ...prev };
+            delete next[deletedId];
+            return next;
+          });
+          setDraftTitles((prev) => {
+            if (!prev || !(deletedId in prev)) return prev;
+            const next = { ...prev };
+            delete next[deletedId];
+            return next;
+          });
+          setDraftDiagnosisDates((prev) => {
+            if (!prev || !(deletedId in prev)) return prev;
+            const next = { ...prev };
+            delete next[deletedId];
+            return next;
+          });
+        }
+
+        toast.success(`'${problemToDelete.title}' has been removed from the problem list.`);
         setDeleteModalOpen(false);
         setProblemToDelete(null);
       },

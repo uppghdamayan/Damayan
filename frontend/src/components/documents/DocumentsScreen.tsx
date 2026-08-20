@@ -649,7 +649,9 @@ function AttachmentRow({ file, selectedFileId, onSelectFile, onStartLoadingPrevi
   const { refetch, isFetching } = useAttachmentDownloadUrl(file.id);
   const deleteMutation = useDeleteAttachment();
   const { user } = useAuthStore();
-  const canDelete = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+  const canDelete =
+    (user?.role === 'DOCTOR' || user?.role === 'ADMIN') &&
+    file.raw.noteStatus !== 'PUBLISHED';
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const isSelected = selectedFileId === file.id;

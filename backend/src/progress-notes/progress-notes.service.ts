@@ -618,27 +618,12 @@ export class ProgressNotesService {
               deletedBy: userId,
               originalCreatedAt: note.createdAt,
               visitId: note.visitId,
-            }
+            },
           });
 
-          // Also delete attachments since we are hard-deleting the note
-          const attachments = await tx.attachment.findMany({
-            where: { noteId: id },
-          });
-
-          for (const att of attachments) {
-            if (att.storageKey) {
-              await this.storageService
-                .delete(att.storageKey)
-                .catch((e) =>
-                  console.error('Failed to delete attachment from storage', e),
-                );
-            }
-          }
-
-          await tx.attachment.deleteMany({
-            where: { noteId: id },
-          });
+          // Attachments are intentionally kept — they stay listed under
+          // Documents (orphaned, no longer tied to a live note) and remain
+          // individually deletable there.
 
           await tx.progressNote.delete({
             where: { id },
@@ -647,35 +632,22 @@ export class ProgressNotesService {
           // Check if visit is now empty and can be deleted
           const visitDetails = await tx.visit.findUnique({
             where: { id: note.visitId },
-            include: { vitalSigns: true, documents: true, initialNote: true }
+            include: { vitalSigns: true, documents: true, initialNote: true },
           });
 
-          if (visitDetails && visitDetails.vitalSigns.length === 0 && visitDetails.documents.length === 0 && !visitDetails.initialNote) {
+          if (
+            visitDetails &&
+            visitDetails.vitalSigns.length === 0 &&
+            visitDetails.documents.length === 0 &&
+            !visitDetails.initialNote
+          ) {
             await tx.visit.delete({ where: { id: note.visitId } });
           }
 
           return { success: true, ...note, isDeleted: true };
         }
 
-        // Hard delete for DRAFT
-        const attachments = await tx.attachment.findMany({
-          where: { noteId: id },
-        });
-
-        for (const att of attachments) {
-          if (att.storageKey) {
-            await this.storageService
-              .delete(att.storageKey)
-              .catch((e) =>
-                console.error('Failed to delete attachment from storage', e),
-              );
-          }
-        }
-
-        await tx.attachment.deleteMany({
-          where: { noteId: id },
-        });
-
+        // Hard delete for DRAFT — attachments are kept (see note above).
         await tx.progressNote.delete({ where: { id } });
         await tx.visit.delete({ where: { id: note.visitId } });
 
@@ -707,23 +679,7 @@ export class ProgressNotesService {
         const noteIds = drafts.map((d) => d.id);
         const visitIds = drafts.map((d) => d.visitId);
 
-        const attachments = await tx.attachment.findMany({
-          where: { noteId: { in: noteIds } },
-        });
-
-        for (const att of attachments) {
-          if (att.storageKey) {
-            await this.storageService
-              .delete(att.storageKey)
-              .catch((e) =>
-                console.error('Failed to delete attachment from storage', e),
-              );
-          }
-        }
-
-        await tx.attachment.deleteMany({
-          where: { noteId: { in: noteIds } },
-        });
+        // Attachments are intentionally kept (see deleteDraft above).
 
         const count = await tx.progressNote.deleteMany({
           where: { id: { in: noteIds } },

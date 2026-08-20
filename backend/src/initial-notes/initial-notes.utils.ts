@@ -73,7 +73,7 @@ function stableStringify(value: unknown): string {
     }
     if (typeof v === 'object') {
       const out: Record<string, unknown> = {};
-      for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+      for (const key of Object.keys(v).sort()) {
         const normalized = normalize((v as Record<string, unknown>)[key]);
         if (normalized !== undefined) out[key] = normalized;
       }

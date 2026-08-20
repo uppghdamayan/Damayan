@@ -166,6 +166,51 @@ export function effectiveParentKey(items: NoteAssessmentItem[], key: string): st
   return parentKey && byKey.has(parentKey) ? parentKey : null;
 }
 
+// Removes the item at `index`, but instead of leaving its children dangling
+// (which buildAssessmentFlatOrder would silently flatten to root), promotes
+// its first child into the removed item's slot — same effective parent — and
+// re-parents the remaining former siblings under that heir. Mirrors the
+// master Problem List's "Business rule 5" promotion in problems.service.ts
+// so a note's assessment tree and the master list never disagree about what
+// happens to a deleted parent's children.
+export function removeAssessmentItemWithPromotion(
+  items: NoteAssessmentItem[],
+  index: number,
+): NoteAssessmentItem[] {
+  const removed = items[index];
+  if (!removed) return items;
+
+  const { withKeys, childrenByParent } = buildAssessmentIndex(items);
+  const removedEntry = withKeys[index];
+  const removedKey = removedEntry.key;
+  const removedParentKey = effectiveParentKey(items, removedKey);
+  const kids = childrenByParent.get(removedKey);
+
+  const next = items.slice();
+  next.splice(index, 1);
+
+  if (kids && kids.length > 0) {
+    const [heir, ...rest] = kids;
+    const byOriginalIndex = new Map(next.map((it, i) => [it, i]));
+    const heirIdx = byOriginalIndex.get(heir.item);
+    if (heirIdx !== undefined) {
+      next[heirIdx] = { ...heir.item, parentId: removedParentKey ?? null };
+    }
+    rest.forEach((sibling) => {
+      const idx = byOriginalIndex.get(sibling.item);
+      if (idx !== undefined) {
+        next[idx] = { ...sibling.item, parentId: heir.key };
+      }
+    });
+  }
+
+  // Re-flatten to DFS display order (array index == display index) and
+  // re-stamp depth — the promoted subtree genuinely changed level, so it
+  // should be flagged as modified in the Initial Note's version diff.
+  const flat = buildAssessmentFlatOrder(next);
+  return flat.map(({ item, depth }) => ({ ...item, depth }));
+}
+
 // Moves `activeKey` to the position currently held by `overKey`, but only
 // when they're siblings (same effectiveParentKey) — dragging across levels
 // is refused (returns null; caller should no-op) so a note-local reorder can

@@ -231,7 +231,7 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { chiefComplaint: 'Dizziness', hpi: 'Vertigo on standing.' } as any,
+        { chiefComplaint: 'Dizziness', hpi: 'Vertigo on standing.' },
         USER_ID,
       );
 
@@ -261,7 +261,7 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { chiefComplaint: 'X' } as any,
+        { chiefComplaint: 'X' },
         USER_ID,
       );
 
@@ -278,7 +278,7 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { chiefComplaint: 'Headache' } as any,
+        { chiefComplaint: 'Headache' },
         USER_ID,
       );
 
@@ -308,7 +308,7 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { hpi: 'Edited HPI.' } as any,
+        { hpi: 'Edited HPI.' },
         USER_ID,
       );
 
@@ -346,7 +346,7 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { hpi: 'Revised draft HPI.' } as any,
+        { hpi: 'Revised draft HPI.' },
         USER_ID,
       );
 
@@ -368,7 +368,7 @@ describe('InitialNotesService — logs and version history', () => {
 
       await service.create(
         PATIENT_ID,
-        { visitDatetime: '2026-07-20T02:00:00Z' } as any,
+        { visitDatetime: '2026-07-20T02:00:00Z' },
         USER_ID,
       );
 

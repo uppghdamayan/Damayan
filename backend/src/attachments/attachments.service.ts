@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
-import { NoteType } from '@prisma/client';
+import { NoteStatus, NoteType } from '@prisma/client';
 
 @Injectable()
 export class AttachmentsService {
@@ -82,8 +83,78 @@ export class AttachmentsService {
     });
   }
 
+  /**
+   * Resolves the lifecycle status of the note an attachment belongs to.
+   * Returns null when the note no longer exists (orphaned attachment).
+   */
+  private async getNoteStatus(
+    noteType: NoteType,
+    noteId: string,
+  ): Promise<NoteStatus | null> {
+    if (noteType === NoteType.INITIAL_NOTE) {
+      const note = await this.prisma.initialNote.findUnique({
+        where: { id: noteId },
+        select: { status: true },
+      });
+      return note?.status ?? null;
+    }
+
+    const note = await this.prisma.progressNote.findUnique({
+      where: { id: noteId },
+      select: { status: true },
+    });
+    return note?.status ?? null;
+  }
+
+  /**
+   * Batch-resolves note statuses for a list of attachments, keyed by
+   * `${noteType}:${noteId}`, to avoid one query per row.
+   */
+  private async getNoteStatusMap(
+    attachments: { noteType: NoteType; noteId: string }[],
+  ): Promise<Map<string, NoteStatus>> {
+    const initialNoteIds = [
+      ...new Set(
+        attachments
+          .filter((a) => a.noteType === NoteType.INITIAL_NOTE)
+          .map((a) => a.noteId),
+      ),
+    ];
+    const progressNoteIds = [
+      ...new Set(
+        attachments
+          .filter((a) => a.noteType === NoteType.PROGRESS_NOTE)
+          .map((a) => a.noteId),
+      ),
+    ];
+
+    const [initialNotes, progressNotes] = await Promise.all([
+      initialNoteIds.length
+        ? this.prisma.initialNote.findMany({
+            where: { id: { in: initialNoteIds } },
+            select: { id: true, status: true },
+          })
+        : Promise.resolve([]),
+      progressNoteIds.length
+        ? this.prisma.progressNote.findMany({
+            where: { id: { in: progressNoteIds } },
+            select: { id: true, status: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const map = new Map<string, NoteStatus>();
+    for (const note of initialNotes) {
+      map.set(`${NoteType.INITIAL_NOTE}:${note.id}`, note.status);
+    }
+    for (const note of progressNotes) {
+      map.set(`${NoteType.PROGRESS_NOTE}:${note.id}`, note.status);
+    }
+    return map;
+  }
+
   async findByNote(noteType: NoteType, noteId: string) {
-    return this.prisma.attachment.findMany({
+    const attachments = await this.prisma.attachment.findMany({
       where: { noteType, noteId },
       orderBy: { uploadedAt: 'asc' },
       include: {
@@ -92,6 +163,13 @@ export class AttachmentsService {
         },
       },
     });
+
+    const statusMap = await this.getNoteStatusMap(attachments);
+    return attachments.map((attachment) => ({
+      ...attachment,
+      noteStatus:
+        statusMap.get(`${attachment.noteType}:${attachment.noteId}`) ?? null,
+    }));
   }
 
   async findByPatient(patientId: string) {
@@ -105,8 +183,15 @@ export class AttachmentsService {
       },
     });
 
+    const statusMap = await this.getNoteStatusMap(attachments);
+    const withStatus = attachments.map((attachment) => ({
+      ...attachment,
+      noteStatus:
+        statusMap.get(`${attachment.noteType}:${attachment.noteId}`) ?? null,
+    }));
+
     // Group by tag
-    const grouped = attachments.reduce(
+    const grouped = withStatus.reduce(
       (acc, attachment) => {
         const tag = attachment.tag;
         if (!acc[tag]) {
@@ -115,7 +200,7 @@ export class AttachmentsService {
         acc[tag].push(attachment);
         return acc;
       },
-      {} as Record<string, typeof attachments>,
+      {} as Record<string, typeof withStatus>,
     );
 
     return Object.keys(grouped).map((tag) => ({
@@ -142,6 +227,16 @@ export class AttachmentsService {
     });
     if (!attachment) {
       throw new NotFoundException('Attachment not found');
+    }
+
+    const noteStatus = await this.getNoteStatus(
+      attachment.noteType,
+      attachment.noteId,
+    );
+    if (noteStatus === NoteStatus.PUBLISHED) {
+      throw new ForbiddenException(
+        'Cannot delete attachments from a published note',
+      );
     }
 
     if (attachment.storageKey) {
