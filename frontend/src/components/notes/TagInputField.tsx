@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent } from 'react';
-import { XIcon } from 'lucide-react';
+import { XIcon, PencilIcon, CheckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface TagItem {
@@ -24,6 +24,8 @@ export function TagInputField({
   onInputChange
 }: TagInputFieldProps) {
   const [inputValue, setInputValue] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const handleAdd = () => {
     if (disabled) return;
@@ -52,26 +54,90 @@ export function TagInputField({
     const newVal = [...value];
     newVal.splice(index, 1);
     onChange(newVal);
+    if (editingIndex === index) setEditingIndex(null);
+  };
+
+  const handleStartEdit = (index: number) => {
+    if (disabled) return;
+    const item = value[index];
+    setEditingIndex(index);
+    setEditValue(isObjectFormat ? item.title : item);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex === null) return;
+    const val = editValue.trim();
+    if (!val) {
+      setEditingIndex(null);
+      return;
+    }
+    const newVal = [...value];
+    newVal[editingIndex] = isObjectFormat ? { title: val } : val;
+    onChange(newVal);
+    setEditingIndex(null);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditingIndex(null);
+    }
   };
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
-        {value.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] font-medium text-text-primary hover:border-border-strong transition-colors">
-            <span>{isObjectFormat ? item.title : item}</span>
-            {!disabled && (
+        {value.map((item, idx) =>
+          editingIndex === idx ? (
+            <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-accent rounded-[6px] text-[12px]">
+              <input
+                type="text"
+                autoFocus
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                onBlur={handleSaveEdit}
+                className="w-[120px] bg-transparent outline-none text-text-primary"
+              />
               <button
                 type="button"
-                onClick={() => handleRemove(idx)}
-                className="text-text-muted hover:text-red transition-colors p-0.5 rounded-full hover:bg-surface-3 cursor-pointer"
-                title="Remove"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleSaveEdit}
+                className="text-text-muted hover:text-accent transition-colors p-0.5 rounded-full hover:bg-surface-3 cursor-pointer"
+                title="Save"
               >
-                <XIcon className="w-3 h-3" />
+                <CheckIcon className="w-3 h-3" />
               </button>
-            )}
-          </div>
-        ))}
+            </div>
+          ) : (
+            <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-2 border border-border rounded-[6px] text-[12px] font-medium text-text-primary hover:border-border-strong transition-colors">
+              <span>{isObjectFormat ? item.title : item}</span>
+              {!disabled && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(idx)}
+                    className="text-text-muted hover:text-accent transition-colors p-0.5 rounded-full hover:bg-surface-3 cursor-pointer"
+                    title="Edit"
+                  >
+                    <PencilIcon className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(idx)}
+                    className="text-text-muted hover:text-red transition-colors p-0.5 rounded-full hover:bg-surface-3 cursor-pointer"
+                    title="Remove"
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        )}
         {value.length === 0 && (
           <span className="text-[12px] text-text-muted italic">No diagnostics added.</span>
         )}

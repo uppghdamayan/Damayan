@@ -1,13 +1,34 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 
+// Assessment row: the live ACTIVE Problem list, DFS-flattened server-side
+// (backend/src/problems/problem-tree.util.ts) — same shape and nesting the
+// Problem List and Progress Note assessment use, so `depth` always reflects
+// real parent/child structure rather than a guessed indent.
+export interface DocumentDraftAssessmentItem {
+  id: string;
+  title: string;
+  parentId: string | null;
+  diagnosisDate?: string | null;
+  depth: number;
+}
+
+export interface DocumentDraftMedicationItem {
+  id: string;
+  name: string;
+  dose: string;
+  formulation: string | null;
+  instructions: string | null;
+  quantity: number | null;
+}
+
 export interface DocumentDraftData {
   patient: any;
   physician: { id: string; firstName: string; lastName: string; role?: string } | null;
   candidateDoctors: { id: string; firstName: string; lastName: string; role?: string }[];
-  assessment: { title: string }[] | null;
+  assessment: DocumentDraftAssessmentItem[] | null;
   diagnostics: string[] | null;
-  medications: any[];
+  medications: DocumentDraftMedicationItem[];
   chiefComplaintDefault?: string;
   latestVisitDate?: string | null;
 }

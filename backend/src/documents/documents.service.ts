@@ -12,12 +12,15 @@ import { renderPrescription } from './templates/prescription.template';
 import { renderReferralLetter } from './templates/referral-letter.template';
 import { randomUUID } from 'crypto';
 import { GenerateDocumentDto } from './dto/generate-document.dto';
+import { ProblemsService } from '../problems/problems.service';
+import { flattenProblemTree } from '../problems/problem-tree.util';
 
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly problemsService: ProblemsService,
   ) {}
 
   private async resolvePhysician(
@@ -72,10 +75,13 @@ export class DocumentsService {
 
     // None of these lookups depend on each other's results, so run them
     // concurrently instead of serially to cut request latency.
-    const [patient, physician, latestNote, medications, latestVisit] =
+    const [patient, physician, activeProblems, latestNote, medications, latestVisit] =
       await Promise.all([
         this.prisma.patient.findUnique({ where: { id: patientId } }),
         this.resolvePhysician(userId, undefined, visitId),
+        needsAssessment
+          ? this.problemsService.findActiveForPatient(patientId)
+          : Promise.resolve(null),
         needsAssessment
           ? this.prisma.initialNote.findFirst({
               where: { visit: { patientId }, status: 'PUBLISHED' },
@@ -85,7 +91,7 @@ export class DocumentsService {
         needsMedications
           ? this.prisma.medication.findMany({
               where: { patientId, isActive: true },
-              orderBy: { createdAt: 'desc' },
+              orderBy: { createdAt: 'asc' },
             })
           : Promise.resolve(null),
         needsLatestVisit
@@ -101,31 +107,19 @@ export class DocumentsService {
     const data: Record<string, any> = { patient, physician };
 
     if (needsAssessment) {
-      let assessment = latestNote?.assessment as any[] | null;
-      if (assessment && assessment.length > 0) {
-        const dbProblems = await this.prisma.problem.findMany({
-          where: { patientId },
-        });
-        const getDepth = (id: string, currentDepth: number = 0): number => {
-          const p = dbProblems.find((x) => x.id === id);
-          if (!p || !p.parentId) return currentDepth;
-          return getDepth(p.parentId, currentDepth + 1);
-        };
-        const titleToDepth = new Map<string, number>();
-        dbProblems.forEach((p) => {
-          titleToDepth.set(p.title.trim().toLowerCase(), getDepth(p.id));
-        });
-
-        assessment = assessment.map((a: any) => ({
-          ...a,
-          depth:
-            a.depth !== undefined
-              ? a.depth
-              : titleToDepth.get(a.title?.trim().toLowerCase()) || 0,
-        }));
-      }
-
-      data.assessment = assessment ?? null;
+      // Assessment always reflects the live, ACTIVE Problem list — same
+      // status filter, sortOrder, and parent/child nesting the Problem List
+      // and Progress Note assessment use — never a frozen note snapshot.
+      data.assessment =
+        activeProblems && activeProblems.length > 0
+          ? flattenProblemTree(activeProblems).map(({ problem, depth }) => ({
+              id: problem.id,
+              title: problem.title,
+              parentId: problem.parentId,
+              diagnosisDate: problem.diagnosisDate,
+              depth,
+            }))
+          : null;
       data.diagnostics = latestNote?.diagnostics ?? null;
       data.chiefComplaintDefault = latestNote?.chiefComplaint ?? '';
     }

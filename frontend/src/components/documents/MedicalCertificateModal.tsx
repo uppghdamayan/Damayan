@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDocumentDraft, useGenerateDocument } from '@/hooks/useDocuments';
 import { Button } from '../ui/button';
+import { DocumentDraftPreview } from './DocumentDraftPreview';
 
 interface MedicalCertificateModalProps {
   patientId: string;
@@ -51,22 +52,7 @@ export function MedicalCertificateModal({ patientId, visitId, onClose }: Medical
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-150">
       <div className="px-[18px] py-5 flex flex-col gap-4 overflow-y-auto">
-        <div className="bg-surface-2 border border-border rounded-card p-4 text-[13px] text-text-primary">
-          <h3 className="font-bold text-[14px] mb-2 border-b border-border pb-1">MEDICAL CERTIFICATE (Draft)</h3>
-          <p><strong>Patient:</strong> {draft.patient.firstName} {draft.patient.lastName}</p>
-          <div className="mt-2 font-bold">Assessment:</div>
-          <ul className="list-disc list-inside">
-            {draft.assessment && draft.assessment.length > 0 ? draft.assessment.map((a, i) => (
-              <li key={i}>{a.title}</li>
-            )) : <li>No assessment</li>}
-          </ul>
-          <div className="mt-2 font-bold">Medications:</div>
-          <ul className="list-disc list-inside">
-            {draft.medications && draft.medications.length > 0 ? draft.medications.map((m, i) => (
-              <li key={i}>{m.name} {m.dose}</li>
-            )) : <li>No active medications</li>}
-          </ul>
-        </div>
+        <DocumentDraftPreview draft={draft} title="MEDICAL CERTIFICATE (Draft)" />
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">

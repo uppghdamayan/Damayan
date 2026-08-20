@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDocumentDraft, useGenerateDocument } from '@/hooks/useDocuments';
 import { Button } from '../ui/button';
+import { DocumentDraftPreview } from './DocumentDraftPreview';
 
 interface ReferralLetterModalProps {
   patientId: string;
@@ -46,16 +47,7 @@ export function ReferralLetterModal({ patientId, visitId, onClose }: ReferralLet
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-150">
       <div className="px-[18px] py-5 flex flex-col gap-4 overflow-y-auto">
-        <div className="bg-surface-2 border border-border rounded-card p-4 text-[13px] text-text-primary">
-          <h3 className="font-bold text-[14px] mb-2 border-b border-border pb-1">REFERRAL LETTER (Draft)</h3>
-          <p><strong>Patient:</strong> {draft.patient.firstName} {draft.patient.lastName}</p>
-          <div className="mt-2 font-bold">Assessment:</div>
-          <ul className="list-disc list-inside">
-            {draft.assessment && draft.assessment.length > 0 ? draft.assessment.map((a, i) => (
-              <li key={i}>{a.title}</li>
-            )) : <li>No assessment</li>}
-          </ul>
-        </div>
+        <DocumentDraftPreview draft={draft} title="REFERRAL LETTER (Draft)" />
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">

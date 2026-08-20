@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 import { usePatient } from '@/hooks/usePatients';
+import { useInitialNote } from '@/hooks/useInitialNote';
 import { useAuthStore } from '@/stores/authStore';
 import { PatientBanner } from '@/components/patients/PatientBanner';
 import { PatientBannerSkeleton } from '@/components/patients/PatientBannerSkeleton';
@@ -54,6 +55,10 @@ export default function PatientDashboardPage() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const canCreateNote = user?.role === 'DOCTOR' || user?.role === 'ADMIN';
+  // No PUBLISHED initial note yet (404 = none at all, or an unpublished draft)
+  // means there's nothing to progress from — label the action honestly.
+  const { data: activeInitialNote } = useInitialNote(patientId);
+  const hasPublishedInitialNote = activeInitialNote?.status === 'PUBLISHED';
 
   useEffect(() => {
     // Eagerly prefetch other tabs' data in the background so they are ready if the user navigates.
@@ -92,7 +97,7 @@ export default function PatientDashboardPage() {
               onClick={() => router.push(`/dashboard/${patientId}/notes`)}
               className="h-[28px] px-3 rounded-btn text-[11px] font-semibold bg-accent text-white border border-accent-hover shadow-btn-primary hover:bg-accent-hover hover:shadow-btn-primary-hover transition-all duration-150 inline-flex items-center gap-[5px] whitespace-nowrap cursor-pointer"
             >
-              New Progress Note
+              {hasPublishedInitialNote ? 'New Progress Note' : 'Create Initial Note'}
             </button>
           )}
         </div>
