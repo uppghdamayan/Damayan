@@ -108,9 +108,11 @@ export function ActiveProblemRow({
     });
 
   const isOptimistic = problem.id.startsWith('optimistic-');
-  // Nested (sub-)problems aren't movable — only the top-of-nest (depth 0)
-  // row can be dragged/reordered.
-  const canDrag = canManage && depth === 0;
+  // Master Problem List: nested (sub-)problems are draggable too — reorder
+  // among siblings, nest deeper, or un-nest — same as top-level rows. (The
+  // Progress/Initial Note's in-note Assessment editor is the one place that
+  // still restricts dragging to depth 0 — see NoteProblemListEditor.)
+  const canDrag = canManage;
 
   return (
     <div
@@ -307,9 +309,8 @@ function SortableRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.problem.id,
-    // Nested (sub-)problems aren't movable — only the top-of-nest (depth 0)
-    // row can be dragged/reordered.
-    disabled: !canManage || item.depth > 0,
+    // Master Problem List: nested rows are draggable too (see ActiveProblemRow).
+    disabled: !canManage,
   });
 
   const isTargetNestOrUnnest = dragOverState?.id === item.problem.id && (dragOverState.action === 'nest' || dragOverState.action === 'unnest');
