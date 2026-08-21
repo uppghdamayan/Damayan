@@ -119,6 +119,7 @@ export function diffAssessmentItems(
   const previousWithoutId = previous.filter(p => !p.id);
   const matchedPrevWithoutIdIdx = new Set<number>();
   const nameMatchByPosition = new Map<number, { title: string } | undefined>();
+  const currentIdxByPrevNoIdIdx = new Map<number, number>();
   current.forEach((c, idx) => {
     if (c.id) return;
     const prevIdx = previousWithoutId.findIndex(
@@ -127,41 +128,67 @@ export function diffAssessmentItems(
     if (prevIdx !== -1) {
       matchedPrevWithoutIdIdx.add(prevIdx);
       nameMatchByPosition.set(idx, previousWithoutId[prevIdx]);
+      currentIdxByPrevNoIdIdx.set(prevIdx, idx);
     }
   });
 
-  const diffItems: { text: string; status: 'existing' | 'added' | 'removed' | 'updated'; fromText?: string }[] = [];
+  type DiffItem = { text: string; status: 'existing' | 'added' | 'removed' | 'updated'; fromText?: string };
 
-  current.forEach((curr, idx) => {
+  const currentDiff: DiffItem[] = current.map((curr, idx) => {
     if (curr.id) {
       const prev = prevById.get(curr.id);
       if (prev) {
         matchedPrevIds.add(curr.id);
         if (prev.title.trim().toLowerCase() !== curr.title.trim().toLowerCase()) {
-          diffItems.push({ text: curr.title, status: 'updated', fromText: prev.title });
-        } else {
-          diffItems.push({ text: curr.title, status: 'existing' });
+          return { text: curr.title, status: 'updated', fromText: prev.title };
         }
-      } else {
-        diffItems.push({ text: curr.title, status: 'added' });
+        return { text: curr.title, status: 'existing' };
       }
-      return;
+      return { text: curr.title, status: 'added' };
     }
     const prev = nameMatchByPosition.get(idx);
-    diffItems.push(prev ? { text: curr.title, status: 'existing' } : { text: curr.title, status: 'added' });
+    return prev ? { text: curr.title, status: 'existing' } : { text: curr.title, status: 'added' };
   });
 
   // Removed items — present in `previous` but with no match in `current` —
-  // have no position of their own to preserve, so they stay appended last.
+  // used to just get appended after every surviving item, which drops a
+  // resolved problem to the very bottom of the list regardless of where it
+  // sat relative to its siblings. When it was nested under a parent that's
+  // still active, that severs the visual adjacency the "└" indent depends
+  // on. Instead, walk `previous` in its original order and slot each
+  // removed item in right after the nearest earlier item that still
+  // survives in `current` — i.e. right after its old neighbor/parent —
+  // so a resolved child still renders directly under its parent.
+  const insertAfter = new Map<number, DiffItem[]>(); // key: currentDiff index (-1 = before everything)
+  let anchorIdx = -1;
+  let noIdCursor = -1;
   for (const prev of previous) {
-    if (prev.id && !matchedPrevIds.has(prev.id)) {
-      diffItems.push({ text: prev.title, status: 'removed' });
+    if (prev.id) {
+      if (matchedPrevIds.has(prev.id)) {
+        const idx = current.findIndex(c => c.id === prev.id);
+        if (idx !== -1) anchorIdx = idx;
+      } else {
+        const arr = insertAfter.get(anchorIdx) || [];
+        arr.push({ text: prev.title, status: 'removed' });
+        insertAfter.set(anchorIdx, arr);
+      }
+      continue;
+    }
+    noIdCursor++;
+    if (matchedPrevWithoutIdIdx.has(noIdCursor)) {
+      const idx = currentIdxByPrevNoIdIdx.get(noIdCursor);
+      if (idx !== undefined) anchorIdx = idx;
+    } else {
+      const arr = insertAfter.get(anchorIdx) || [];
+      arr.push({ text: prev.title, status: 'removed' });
+      insertAfter.set(anchorIdx, arr);
     }
   }
-  previousWithoutId.forEach((prev, i) => {
-    if (!matchedPrevWithoutIdIdx.has(i)) {
-      diffItems.push({ text: prev.title, status: 'removed' });
-    }
+
+  const diffItems: DiffItem[] = [...(insertAfter.get(-1) || [])];
+  currentDiff.forEach((item, idx) => {
+    diffItems.push(item);
+    diffItems.push(...(insertAfter.get(idx) || []));
   });
 
   return diffItems;

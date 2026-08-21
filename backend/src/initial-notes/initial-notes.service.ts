@@ -390,14 +390,25 @@ export class InitialNotesService {
         const problemChanges = diffByTitle(beforeProblems, afterProblems);
         const medicationChanges = diffByNameDoseUnit(beforeMeds, afterMeds);
 
-        // Heal tempId's into real id's in the note's stored assessment snapshot
+        // Heal tempId's into real id's in the note's stored assessment snapshot.
+        // parentId references also point at tempId's — a child's parentId must
+        // be healed too, else it dangles once its parent's tempId disappears
+        // and the child silently falls back to root (loses its nesting) in
+        // every subsequent read of this snapshot.
         const updatedSnapshot = (note.assessment as any[]).map((item) => {
           if (!item || typeof item !== 'object') return item;
           const key = item.id || item.tempId;
+          const healedParentId =
+            item.parentId && resolvedIdByKey.has(item.parentId)
+              ? resolvedIdByKey.get(item.parentId)
+              : item.parentId;
           if (key && resolvedIdByKey.has(key)) {
             const newId = resolvedIdByKey.get(key);
             const { tempId, isNew, ...rest } = item;
-            return { ...rest, id: newId };
+            return { ...rest, id: newId, parentId: healedParentId };
+          }
+          if (healedParentId !== item.parentId) {
+            return { ...item, parentId: healedParentId };
           }
           return item;
         });

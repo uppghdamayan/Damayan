@@ -464,14 +464,24 @@ export class ProgressNotesService {
           // Heal tempId's into real id's in the note's stored snapshot
           // so that future diffs (e.g., when the note is edited and then diffed against the previous note)
           // can correctly match items by identity instead of falling back to title matching.
+          // parentId references also point at tempId's — a child's parentId
+          // must be healed too, else it dangles once its parent's tempId is
+          // gone and the child silently loses its nesting on every later read.
           const updatedSnapshot = (note.problemListSnapshot as any[]).map(
             (item) => {
               if (!item || typeof item !== 'object') return item;
               const key = item.id || item.tempId;
+              const healedParentId =
+                item.parentId && resolvedIdByKey.has(item.parentId)
+                  ? resolvedIdByKey.get(item.parentId)
+                  : item.parentId;
               if (key && resolvedIdByKey.has(key)) {
                 const newId = resolvedIdByKey.get(key);
                 const { tempId, isNew, ...rest } = item;
-                return { ...rest, id: newId };
+                return { ...rest, id: newId, parentId: healedParentId };
+              }
+              if (healedParentId !== item.parentId) {
+                return { ...item, parentId: healedParentId };
               }
               return item;
             },
