@@ -3,6 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { buildProblemTree, getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
 import type { NoteAssessmentItem } from '@/lib/problem-utils';
+import { progressDraftKey } from '@/lib/note-drafts';
 import { 
   progressNoteDraftSchema, 
   progressNotePublishSchema, 
@@ -99,8 +100,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const hasLocalDraft = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    return !!localStorage.getItem(`damayan:draft:${patientId}:progress`);
-  }, [patientId]);
+    return !!localStorage.getItem(progressDraftKey(patientId, noteId));
+  }, [patientId, noteId]);
 
   const isInitialLoading = noteId
     ? (noteLoading && !note)
@@ -295,6 +296,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         // Same problem, possibly renamed since this snapshot was taken (id
         // match), or a legacy id-less entry now healed with its id (title
         // match) — sync in place instead of adding a second entry.
+        //
+        // diagnosisDate is deliberately NOT carried from the master problem
+        // here — a progress note starts with a blank diagnosis date every
+        // time; see the `null` seeding note on the brand-new-note branch
+        // below for why.
         const prev = existing[matchIdx];
         existing[matchIdx] = {
           ...(typeof prev === 'object' ? prev : {}),
@@ -302,7 +308,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           parentId: p.parentId || undefined,
           depth: item.depth,
-          diagnosisDate: p.diagnosisDate ?? null,
+          diagnosisDate: null,
         };
         continue;
       }
@@ -314,10 +320,29 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         title: p.title,
         parentId: p.parentId || undefined,
         depth: item.depth,
-        diagnosisDate: p.diagnosisDate ?? null,
+        diagnosisDate: null,
       });
     }
-    return existing;
+
+    // Re-sort into the master list's own order (Problem.sortOrder via
+    // buildProblemTree's DFS) so a reorder published in the Problem List
+    // module — even while this note was already open as a draft — is
+    // reflected here instead of staying frozen in whatever order the
+    // snapshot array happened to have. Id-less rows (isNew, or legacy
+    // entries that never got healed with an id) have no master rank to
+    // compare against — they sort after every ranked row, keeping their
+    // existing relative order among themselves.
+    const orderRank = new Map<string, number>();
+    flatActive.forEach(({ problem }, idx) => {
+      if (problem.id) orderRank.set(problem.id, idx);
+    });
+    const withRank = existing.map((item: any, originalIndex: number) => ({
+      item,
+      originalIndex,
+      rank: item?.id && orderRank.has(item.id) ? orderRank.get(item.id)! : Number.MAX_SAFE_INTEGER,
+    }));
+    withRank.sort((a, b) => a.rank - b.rank || a.originalIndex - b.originalIndex);
+    return withRank.map((w) => w.item);
   };
 
   const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
@@ -429,7 +454,10 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 title: p.title,
                 parentId: p.parentId || undefined,
                 depth,
-                diagnosisDate: p.diagnosisDate ?? null,
+                // Always blank — a progress note's diagnosis date is never
+                // inherited from the master problem or a prior note; see the
+                // mergeActiveProblems note above.
+                diagnosisDate: null,
               }));
 
       const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
@@ -476,7 +504,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         visitDatetime: note.visit?.visitDatetime || note.createdAt,
       });
     } else if (!noteId && !copyLoading) {
-      const draft = localStorage.getItem(`damayan:draft:${patientId}:progress`);
+      const draft = localStorage.getItem(progressDraftKey(patientId, noteId));
       if (draft) {
         try {
           const parsed = JSON.parse(draft);
@@ -494,7 +522,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   title: p.title,
                   parentId: p.parentId || undefined,
                   depth,
-                  diagnosisDate: p.diagnosisDate ?? null,
+                  diagnosisDate: null,
                 }));
 
           const draftMeds = parsed.medicationSnapshot as any[] | null | undefined;
@@ -546,6 +574,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           parentId: p.parentId || undefined,
           depth,
+          diagnosisDate: null,
         })),
         medicationSnapshot: activeMeds.map((m: any) => ({
           name: m.name,
@@ -618,7 +647,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         title: p.title,
         parentId: p.parentId || undefined,
         depth,
-        diagnosisDate: p.diagnosisDate ?? null,
+        diagnosisDate: null,
       })),
       { shouldDirty: true },
     );
@@ -763,7 +792,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           onSuccess: () => {
             publishMutation.mutate(noteId, {
               onSuccess: () => {
-                localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+                localStorage.removeItem(progressDraftKey(patientId, noteId));
                 releaseProblemLock();
                 releaseMedicationLock();
                 resolve(true);
@@ -782,7 +811,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   } else {
     createAndPublishMutation.mutate(cleanFormValues(formValues), {
       onSuccess: () => {
-        localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+        localStorage.removeItem(progressDraftKey(patientId, noteId));
         releaseProblemLock();
         releaseMedicationLock();
         resolve(true);
@@ -933,7 +962,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     if (noteId) {
       deleteMutation.mutate(noteId, {
         onSuccess: () => {
-          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          localStorage.removeItem(progressDraftKey(patientId, noteId));
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -966,7 +995,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           // Every other terminal path (publish, delete, revert) already
           // clears this — without it, a stale draft's body and visitDatetime
           // leak into the very next new note opened for this patient.
-          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          localStorage.removeItem(progressDraftKey(patientId, noteId));
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');
@@ -1013,7 +1042,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       );
     } else {
       localStorage.setItem(
-        `damayan:draft:${patientId}:progress`,
+        progressDraftKey(patientId, noteId),
         JSON.stringify(form.getValues()),
       );
       setLastSaved(new Date());
@@ -1081,7 +1110,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 }
                 setLocalAttachments([]);
               }
-              localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+              localStorage.removeItem(progressDraftKey(patientId, noteId));
               // Defensive — validateForPublish already blocks publishing
               // while the section is mid-edit, so this is normally already
               // released, but a published note has no further use for the
@@ -1122,7 +1151,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             }
             setLocalAttachments([]);
           }
-          localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+          localStorage.removeItem(progressDraftKey(patientId, noteId));
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -1159,9 +1188,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   useAutoSave(formValues, (data) => {
-    localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(data));
+    localStorage.setItem(progressDraftKey(patientId, noteId), JSON.stringify(data));
     setLastSaved(new Date());
-  }, `damayan:draft:${patientId}:progress`, 5000);
+  }, progressDraftKey(patientId, noteId), 5000);
 
   if ((noteId && noteLoading) || (!noteId && copyLoading)) {
     return (
@@ -1306,7 +1335,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       title: p.title,
                       parentId: p.parentId || undefined,
                       depth,
-                      diagnosisDate: p.diagnosisDate ?? null,
+                      diagnosisDate: null,
                     }));
                     const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
                       name: m.name,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useUiStore } from '@/stores/uiStore';
+import { hasProgressDraft } from '@/lib/note-drafts';
 
 export type ProblemEditOwner = 'master' | 'note';
 
@@ -11,7 +12,7 @@ function hasMasterDraft(patientId: string): boolean {
 
 function hasNoteDraft(patientId: string): boolean {
   if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem(`damayan:draft:${patientId}:progress`);
+  return hasProgressDraft(patientId);
 }
 
 /**

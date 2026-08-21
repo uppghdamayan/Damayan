@@ -75,32 +75,38 @@ export class DocumentsService {
 
     // None of these lookups depend on each other's results, so run them
     // concurrently instead of serially to cut request latency.
-    const [patient, physician, activeProblems, latestNote, medications, latestVisit] =
-      await Promise.all([
-        this.prisma.patient.findUnique({ where: { id: patientId } }),
-        this.resolvePhysician(userId, undefined, visitId),
-        needsAssessment
-          ? this.problemsService.findActiveForPatient(patientId)
-          : Promise.resolve(null),
-        needsAssessment
-          ? this.prisma.initialNote.findFirst({
-              where: { visit: { patientId }, status: 'PUBLISHED' },
-              orderBy: { createdAt: 'desc' },
-            })
-          : Promise.resolve(null),
-        needsMedications
-          ? this.prisma.medication.findMany({
-              where: { patientId, isActive: true },
-              orderBy: { createdAt: 'asc' },
-            })
-          : Promise.resolve(null),
-        needsLatestVisit
-          ? this.prisma.visit.findFirst({
-              where: { patientId },
-              orderBy: { visitDatetime: 'desc' },
-            })
-          : Promise.resolve(null),
-      ]);
+    const [
+      patient,
+      physician,
+      activeProblems,
+      latestNote,
+      medications,
+      latestVisit,
+    ] = await Promise.all([
+      this.prisma.patient.findUnique({ where: { id: patientId } }),
+      this.resolvePhysician(userId, undefined, visitId),
+      needsAssessment
+        ? this.problemsService.findActiveForPatient(patientId)
+        : Promise.resolve(null),
+      needsAssessment
+        ? this.prisma.initialNote.findFirst({
+            where: { visit: { patientId }, status: 'PUBLISHED' },
+            orderBy: { createdAt: 'desc' },
+          })
+        : Promise.resolve(null),
+      needsMedications
+        ? this.prisma.medication.findMany({
+            where: { patientId, isActive: true },
+            orderBy: { createdAt: 'asc' },
+          })
+        : Promise.resolve(null),
+      needsLatestVisit
+        ? this.prisma.visit.findFirst({
+            where: { patientId },
+            orderBy: { visitDatetime: 'desc' },
+          })
+        : Promise.resolve(null),
+    ]);
 
     if (!patient) throw new NotFoundException('Patient not found');
 

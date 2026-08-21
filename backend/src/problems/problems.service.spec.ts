@@ -239,6 +239,46 @@ describe('ProblemsService#upsertFromAssessment', () => {
       originalDate,
     );
   });
+
+  it('writes the snapshot order back to Problem.sortOrder for existing ACTIVE problems', async () => {
+    // Simulates a note reorder: two already-ACTIVE problems swap position in
+    // the published snapshot. Without writing sortOrder back here, the
+    // master Problem List / dashboard keep showing the pre-note order.
+    const { client, problems } = makeClient([
+      {
+        id: 'p1',
+        patientId: PATIENT_ID,
+        title: 'Hypertension',
+        status: 'ACTIVE',
+        sortOrder: 0,
+        parentId: null,
+        diagnosisDate: null,
+      },
+      {
+        id: 'p2',
+        patientId: PATIENT_ID,
+        title: 'Diabetes',
+        status: 'ACTIVE',
+        sortOrder: 1,
+        parentId: null,
+        diagnosisDate: null,
+      },
+    ]);
+
+    await service.upsertFromAssessment(
+      PATIENT_ID,
+      [
+        { id: 'p2', title: 'Diabetes', sortOrder: 0 },
+        { id: 'p1', title: 'Hypertension', sortOrder: 1 },
+      ],
+      USER_ID,
+      'Progress Note',
+      client as any,
+    );
+
+    expect(problems.find((p) => p.id === 'p2')!.sortOrder).toBe(0);
+    expect(problems.find((p) => p.id === 'p1')!.sortOrder).toBe(1);
+  });
 });
 
 /**

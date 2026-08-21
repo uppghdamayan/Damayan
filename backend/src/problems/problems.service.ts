@@ -408,6 +408,13 @@ export class ProblemsService {
       // `null` means "root level"; a string nests under that id or tempId.
       parentId?: string | null;
       diagnosisDate?: string | null;
+      // Positional index in the published snapshot (see
+      // mapAssessmentSnapshot) — the note's own array order, the single
+      // source of truth this method writes back to Problem.sortOrder so the
+      // master list, dashboard, and next note all agree on order. Optional
+      // for backward compatibility with any caller that doesn't supply it
+      // (falls back to append/getNextSortOrder behaviour).
+      sortOrder?: number;
     }[],
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
@@ -454,6 +461,7 @@ export class ProblemsService {
         parentId?: string | null;
         hasParentId: boolean;
         diagnosisDate?: string | null;
+        sortOrder?: number;
       }
     >();
     for (const item of validItems) {
@@ -469,11 +477,26 @@ export class ProblemsService {
           parentId: item.parentId,
           hasParentId: Object.prototype.hasOwnProperty.call(item, 'parentId'),
           diagnosisDate: item.diagnosisDate,
+          sortOrder: item.sortOrder,
         });
       }
     }
 
-    let currentSortOrder = await this.getNextSortOrder(patientId, client);
+    // Every item that survives this publish (matched-ACTIVE, reactivated,
+    // restored, or newly created) gets a contiguous sortOrder assigned in
+    // snapshot order — falling back to array-iteration order when the
+    // caller didn't supply one (legacy callers / tests). Items dropped to
+    // RESOLVED below are numbered past this range so they never collide
+    // with the renumbered actives.
+    const hasExplicitOrder = Array.from(uniqueItems.values()).every(
+      (i) => typeof i.sortOrder === 'number',
+    );
+    const orderedUniqueItems = hasExplicitOrder
+      ? Array.from(uniqueItems.values()).sort(
+          (a, b) => (a.sortOrder as number) - (b.sortOrder as number),
+        )
+      : Array.from(uniqueItems.values());
+    let activeIndex = 0;
     const promises: Promise<any>[] = [];
 
     // Every incoming identity key (a real Problem.id or a client tempId)
@@ -492,7 +515,7 @@ export class ProblemsService {
         : date.toISOString().split('T')[0];
     };
 
-    for (const item of uniqueItems.values()) {
+    for (const item of orderedUniqueItems) {
       const match = item.id
         ? existingById.get(item.id)
         : existing.find(
@@ -516,7 +539,9 @@ export class ProblemsService {
 
         if (match.status === ProblemStatus.ACTIVE) {
           keptIds.add(match.id);
-          if (renamed || dateHasChanged) {
+          const sortOrder = activeIndex++;
+          const orderChanged = match.sortOrder !== sortOrder;
+          if (renamed || dateHasChanged || orderChanged) {
             promises.push(
               client.problem
                 .update({
@@ -526,6 +551,7 @@ export class ProblemsService {
                     ...(dateHasChanged && {
                       diagnosisDate: newDiagnosisDate,
                     }),
+                    ...(orderChanged && { sortOrder }),
                     updatedByUser: { connect: { id: userId } },
                   },
                 })
@@ -576,7 +602,7 @@ export class ProblemsService {
 
         if (match.status === ProblemStatus.RESOLVED) {
           keptIds.add(match.id);
-          const sortOrder = currentSortOrder++;
+          const sortOrder = activeIndex++;
           promises.push(
             client.problem
               .update({
@@ -614,7 +640,7 @@ export class ProblemsService {
 
         if (match.status === ProblemStatus.REMOVED) {
           keptIds.add(match.id);
-          const sortOrder = currentSortOrder++;
+          const sortOrder = activeIndex++;
           promises.push(
             client.problem
               .update({
@@ -651,7 +677,7 @@ export class ProblemsService {
         }
       }
 
-      const sortOrder = currentSortOrder++;
+      const sortOrder = activeIndex++;
       promises.push(
         client.problem
           .create({
@@ -689,11 +715,13 @@ export class ProblemsService {
       );
     }
 
-    // Mark missing items as RESOLVED
+    // Mark missing items as RESOLVED — numbered past every active item so a
+    // renumbered 0..n-1 active range never collides with a resolved one.
+    let inactiveIndex = activeIndex;
     if (options.resolveMissing !== false) {
       for (const ext of existing) {
         if (!keptIds.has(ext.id) && ext.status === ProblemStatus.ACTIVE) {
-          const sortOrder = currentSortOrder++;
+          const sortOrder = inactiveIndex++;
           promises.push(
             client.problem
               .update({

@@ -110,20 +110,24 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
     );
   });
 
-  it('breaks a visitDatetime tie using createdAt', async () => {
-    const tiedTime = new Date('2026-03-01T00:00:00Z');
+  it('prefers the latest published progress note even when the initial note has a later visit date', async () => {
+    // The reported bug: an initial note's visitDatetime is arbitrary,
+    // unvalidated client input and can be dated after every progress note.
+    // Once any published progress note exists, it must always win — the
+    // resolver no longer compares visit dates between the two note kinds.
     const progressNoteFindFirst = jest.fn().mockResolvedValue(
       progressNote({
-        id: 'progress-tied',
-        createdAt: new Date('2026-03-01T00:00:01Z'),
-        visit: { visitDatetime: tiedTime },
+        id: 'progress-earlier',
+        mgmtPharm: 'progress-pharm',
+        createdAt: new Date('2026-01-15T00:00:00Z'),
+        visit: { visitDatetime: new Date('2026-01-15T00:00:00Z') },
       }),
     );
     const initialNoteFindFirst = jest.fn().mockResolvedValue(
       initialNote({
-        id: 'initial-tied',
-        createdAt: new Date('2026-03-01T00:00:00Z'),
-        visit: { visitDatetime: tiedTime },
+        id: 'initial-future-dated',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        visit: { visitDatetime: new Date('2026-06-01T00:00:00Z') },
       }),
     );
 
@@ -134,7 +138,9 @@ describe('ProgressNotesService.resolveCarryForwardSource', () => {
 
     const result = await service.resolveCarryForwardSource('patient-1');
 
-    expect(result.sourceNoteId).toBe('progress-tied');
+    expect(result.sourceNoteId).toBe('progress-earlier');
+    expect(result.sourceKind).toBe('progress');
+    expect(result.mgmtPharm).toBe('progress-pharm');
   });
 
   it('returns a blank field as-is instead of walking back to an older note', async () => {

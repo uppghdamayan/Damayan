@@ -142,19 +142,29 @@ export class ProgressNotesService {
   // one missing the DOCTOR-author filter its sibling had), which is how a
   // note could end up silently inheriting from the wrong ancestor.
   //
-  // Candidates are PUBLISHED, not soft-deleted, and authored by a DOCTOR or
-  // by nobody (null authorId) — mirrors the `authorRole === 'DOCTOR' ||
-  // !authorRole` branch in publish() that actually updates the problem/med
-  // snapshots, and excludes NURSE/PHARMACIST notes which don't carry a
-  // clinical management plan. `excludeNoteId` lets the caller exclude the
-  // note currently being edited (e.g. the author's own open draft) so a note
-  // can never inherit from itself.
+  // Candidates are PUBLISHED and authored by a DOCTOR or by nobody (null
+  // authorId) — mirrors the `authorRole === 'DOCTOR' || !authorRole` branch
+  // in publish() that actually updates the problem/med snapshots, and
+  // excludes NURSE/PHARMACIST notes which don't carry a clinical management
+  // plan. `excludeNoteId` lets the caller exclude the note currently being
+  // edited (e.g. the author's own open draft) so a note can never inherit
+  // from itself. (Deletion is a hard delete plus a copy into the DeletedNote
+  // archive table, not a soft-delete flag — there is no such column on
+  // either note model, so no filter is needed here.)
   //
-  // "Latest" is strictly the newest single note by visit.visitDatetime, tied
-  // on createdAt — not a field-by-field walk back through older notes. If
-  // that note left a field blank, the blank is returned as-is: clearing a
-  // field is a deliberate clinical decision, not a gap to paper over with an
-  // older value.
+  // The chain of progress notes is the clinical record's spine: once at
+  // least one published progress note exists, it — the newest one — is
+  // always the source, never the initial note, regardless of either note's
+  // visit date. Falling back to a visit-date comparison let a future-dated
+  // or timezone-shifted initial note permanently outrank every later
+  // progress note. The initial note is only ever the source before any
+  // progress note has been published.
+  //
+  // Among progress notes, "latest" is strictly the newest single note by
+  // visit.visitDatetime, tied on createdAt — not a field-by-field walk back
+  // through older notes. If that note left a field blank, the blank is
+  // returned as-is: clearing a field is a deliberate clinical decision, not
+  // a gap to paper over with an older value.
   // ─────────────────────────────────────────────
   async resolveCarryForwardSource(
     patientId: string,
@@ -193,6 +203,7 @@ export class ProgressNotesService {
           visit: { patientId },
           status: NoteStatus.PUBLISHED,
         },
+        orderBy: [{ visit: { visitDatetime: 'desc' } }, { createdAt: 'desc' }],
         select: {
           id: true,
           mgmtNonpharm: true,
@@ -204,15 +215,7 @@ export class ProgressNotesService {
       }),
     ]);
 
-    const pickProgress =
-      !!latestProgress &&
-      (!latestInitial ||
-        latestProgress.visit.visitDatetime >
-          latestInitial.visit.visitDatetime ||
-        (latestProgress.visit.visitDatetime.getTime() ===
-          latestInitial.visit.visitDatetime.getTime() &&
-          latestProgress.createdAt >= latestInitial.createdAt));
-
+    const pickProgress = !!latestProgress;
     const source = pickProgress ? latestProgress : latestInitial;
 
     if (!source) {

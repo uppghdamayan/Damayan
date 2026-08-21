@@ -17,16 +17,22 @@ export function mapAssessmentSnapshot(raw: any[] | null | undefined): {
   title: string;
   parentId?: string | null;
   diagnosisDate?: string | null;
+  sortOrder: number;
 }[] {
   return (raw || [])
     .filter((p) => p && p.title && String(p.title).trim() !== '')
-    .map((p) => {
+    .map((p, index) => {
       const hasParentId = Object.prototype.hasOwnProperty.call(p, 'parentId');
       return {
         id: p.id ? String(p.id) : undefined,
         tempId: p.tempId ? String(p.tempId) : undefined,
         title: String(p.title).trim(),
         diagnosisDate: p.diagnosisDate ?? undefined,
+        // Positional index in the published snapshot — the note's array
+        // order is the clinician's reviewed order, and this is what lets
+        // upsertFromAssessment write it back to the master Problem.sortOrder
+        // so the master list, dashboard, and next note all agree on order.
+        sortOrder: index,
         ...(hasParentId
           ? { parentId: p.parentId === null ? null : String(p.parentId) }
           : {}),

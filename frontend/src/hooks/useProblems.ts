@@ -143,9 +143,24 @@ export function useReorderProblems(patientId: string) {
       await qc.cancelQueries({ queryKey: ['problems', patientId] });
       const previous = qc.getQueryData<ProblemsResponse>(['problems', patientId]);
       if (previous) {
-        const sortMap = new Map(input.items.map((i) => [i.id, i.sortOrder]));
+        // Patch every field the payload carries, not just sortOrder — a
+        // reorder can bundle parentId/title/diagnosisDate changes (see
+        // ProblemListScreen.handlePublish), and patching sortOrder alone
+        // left those stale in the cache until the refetch landed, showing
+        // the old nesting/title/date for a moment right after Publish.
+        const itemMap = new Map(input.items.map((i) => [i.id, i]));
         qc.setQueryData<ProblemsResponse>(['problems', patientId], {
-          data: previous.data.map((p) => (sortMap.has(p.id) ? { ...p, sortOrder: sortMap.get(p.id)! } : p)),
+          data: previous.data.map((p) => {
+            const item = itemMap.get(p.id);
+            if (!item) return p;
+            return {
+              ...p,
+              sortOrder: item.sortOrder,
+              ...(item.parentId !== undefined && { parentId: item.parentId }),
+              ...(item.title !== undefined && { title: item.title }),
+              ...(item.diagnosisDate !== undefined && { diagnosisDate: item.diagnosisDate }),
+            };
+          }),
         });
       }
       return { previous };

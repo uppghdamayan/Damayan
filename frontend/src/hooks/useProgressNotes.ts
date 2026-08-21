@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
 import { useMedications } from './useMedications';
+import { progressDraftKey, clearProgressDrafts } from '@/lib/note-drafts';
 
 export interface NoteVisit {
   id: string;
@@ -140,7 +141,8 @@ export function useCreateProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
-      localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables));
+      // Not-yet-created note — no id to scope by.
+      localStorage.setItem(progressDraftKey(patientId), JSON.stringify(variables));
     }
   });
 }
@@ -165,7 +167,8 @@ export function useCreateAndPublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
-      localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables));
+      // Not-yet-created note — no id to scope by.
+      localStorage.setItem(progressDraftKey(patientId), JSON.stringify(variables));
     }
   });
 }
@@ -187,7 +190,7 @@ export function useUpdateProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
-      localStorage.setItem(`damayan:draft:${patientId}:progress`, JSON.stringify(variables.data));
+      localStorage.setItem(progressDraftKey(patientId, variables.id), JSON.stringify(variables.data));
     }
   });
 }
@@ -229,6 +232,7 @@ export function usePublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      clearProgressDrafts(patientId);
     },
   });
 }
@@ -246,7 +250,7 @@ export function useDeleteAllDraftProgressNotes(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
-      localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+      clearProgressDrafts(patientId);
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
   });
@@ -260,7 +264,7 @@ export function useDeleteProgressNote(patientId: string) {
         method: 'DELETE',
       }),
     onSuccess: (_, deletedId) => {
-      localStorage.removeItem(`damayan:draft:${patientId}:progress`);
+      clearProgressDrafts(patientId);
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
