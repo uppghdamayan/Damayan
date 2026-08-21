@@ -95,7 +95,12 @@ export function useCopyForwardData(patientId: string | null, excludeNoteId?: str
 
   const data = useMemo(() => {
     const activeProblems = problemsData?.data.filter(p => p.status === 'ACTIVE') || [];
-    const activeMedications = medicationsData?.data.filter(m => m.isActive) || [];
+    // findAll (used by this hook) sorts isActive desc, createdAt desc for the
+    // Medications module's own display — re-sort to insertion order (oldest
+    // first) here to match the backend's findActiveForPatient, which is what
+    // actually gets written into medicationSnapshot on note create/publish.
+    const activeMedications = (medicationsData?.data.filter(m => m.isActive) || [])
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     return {
       activeProblems,
