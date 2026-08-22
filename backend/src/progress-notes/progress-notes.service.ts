@@ -258,6 +258,13 @@ export class ProgressNotesService {
       );
     }
 
+    const author = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    const canSyncProblems =
+      author?.role === 'DOCTOR' || author?.role === 'ADMIN' || !author?.role;
+
     return this.prisma.$transaction(
       async (tx) => {
         const [activeProblems, activeMedications, latestVitals] =
@@ -279,6 +286,18 @@ export class ProgressNotesService {
             dto.medicationSnapshot as any[] | undefined,
             tx,
           );
+
+        const healedProblemListSnapshot =
+          dto.problemListSnapshot !== undefined && canSyncProblems
+            ? await this.syncProblemsFromSnapshot(
+                patientId,
+                dto.problemListSnapshot as any[],
+                userId,
+                tx,
+              )
+            : dto.problemListSnapshot !== undefined
+              ? (dto.problemListSnapshot as any)
+              : (activeProblems as any);
 
         // Progress notes have no user-facing visit-date input — the client
         // sends a submit-time stamp, but we don't trust it as the source of
@@ -314,10 +333,7 @@ export class ProgressNotesService {
             mgmtNonpharm: dto.mgmtNonpharm ?? carryForward.mgmtNonpharm,
             mgmtPharm: dto.mgmtPharm ?? carryForward.mgmtPharm,
             diagnostics: dto.diagnostics ? (dto.diagnostics as any) : [],
-            problemListSnapshot:
-              dto.problemListSnapshot !== undefined
-                ? (dto.problemListSnapshot as any)
-                : (activeProblems as any),
+            problemListSnapshot: healedProblemListSnapshot,
             medicationSnapshot:
               dto.medicationSnapshot !== undefined
                 ? (reconciledMedicationSnapshot as any)
@@ -392,7 +408,8 @@ export class ProgressNotesService {
     const authorRole = note.author?.role;
     // Nurse-authored notes never touch the master Problem List (same gate
     // publish() uses) — leave the raw snapshot as submitted for them.
-    const canSyncProblems = authorRole === 'DOCTOR' || !authorRole;
+    const canSyncProblems =
+      authorRole === 'DOCTOR' || authorRole === 'ADMIN' || !authorRole;
 
     // Only reconcile for drafts — a published note's snapshot is a locked
     // historical record and should not be silently rewritten by this guard.
@@ -576,6 +593,52 @@ export class ProgressNotesService {
     );
   }
 
+  private async revertProblemsToPreviousNote(
+    patientId: string,
+    excludeNoteId: string | null,
+    userId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    let prevSnapshotProblems: any[] = [];
+    const carryForward = await this.resolveCarryForwardSource(
+      patientId,
+      excludeNoteId,
+      tx,
+    );
+
+    if (
+      carryForward.sourceKind === 'progress' &&
+      carryForward.sourceNoteId
+    ) {
+      const prevProgress = await tx.progressNote.findUnique({
+        where: { id: carryForward.sourceNoteId },
+        select: { problemListSnapshot: true },
+      });
+      prevSnapshotProblems =
+        (prevProgress?.problemListSnapshot as any[]) || [];
+    } else if (
+      carryForward.sourceKind === 'initial' &&
+      carryForward.sourceNoteId
+    ) {
+      const initialNote = await tx.initialNote.findUnique({
+        where: { id: carryForward.sourceNoteId },
+        select: { assessment: true },
+      });
+      if (initialNote) {
+        prevSnapshotProblems = (initialNote.assessment as any[]) || [];
+      }
+    }
+
+    const validProblems = mapAssessmentSnapshot(prevSnapshotProblems);
+    await this.problemsService.upsertFromAssessment(
+      patientId,
+      validProblems,
+      userId,
+      'Progress Note',
+      tx,
+    );
+  }
+
   async deleteDraft(patientId: string, id: string, userId: string) {
     return this.prisma.$transaction(
       async (tx) => {
@@ -620,9 +683,9 @@ export class ProgressNotesService {
           // "what's the previous note" resolution as note creation, so
           // deleting the latest note always reverts to exactly what the next
           // note would otherwise have inherited from.
-          let prevSnapshotProblems: any[] = [];
-          let prevSnapshotMeds: any[] = [];
+          await this.revertProblemsToPreviousNote(patientId, id, userId, tx);
 
+          let prevSnapshotMeds: any[] = [];
           const carryForward = await this.resolveCarryForwardSource(
             patientId,
             id,
@@ -635,10 +698,8 @@ export class ProgressNotesService {
           ) {
             const prevProgress = await tx.progressNote.findUnique({
               where: { id: carryForward.sourceNoteId },
-              select: { problemListSnapshot: true, medicationSnapshot: true },
+              select: { medicationSnapshot: true },
             });
-            prevSnapshotProblems =
-              (prevProgress?.problemListSnapshot as any[]) || [];
             prevSnapshotMeds =
               (prevProgress?.medicationSnapshot as any[]) || [];
           } else if (
@@ -647,26 +708,16 @@ export class ProgressNotesService {
           ) {
             const initialNote = await tx.initialNote.findUnique({
               where: { id: carryForward.sourceNoteId },
-              select: { assessment: true, medicationSnapshot: true },
+              select: { medicationSnapshot: true },
             });
             if (initialNote) {
-              prevSnapshotProblems = (initialNote.assessment as any[]) || [];
               prevSnapshotMeds =
                 (initialNote.medicationSnapshot as any[]) || [];
             }
           }
 
-          const validProblems = mapAssessmentSnapshot(prevSnapshotProblems);
-
           const validMeds = mapMedicationSnapshot(prevSnapshotMeds);
 
-          await this.problemsService.upsertFromAssessment(
-            patientId,
-            validProblems,
-            userId,
-            'Progress Note',
-            tx,
-          );
           await this.medicationsService.upsertFromNoteMedications(
             patientId,
             validMeds,
@@ -699,14 +750,20 @@ export class ProgressNotesService {
           // Check if visit is now empty and can be deleted
           const visitDetails = await tx.visit.findUnique({
             where: { id: note.visitId },
-            include: { vitalSigns: true, documents: true, initialNote: true },
+            include: {
+              vitalSigns: true,
+              documents: true,
+              initialNote: true,
+              deletedNotes: true,
+            },
           });
 
           if (
             visitDetails &&
             visitDetails.vitalSigns.length === 0 &&
             visitDetails.documents.length === 0 &&
-            !visitDetails.initialNote
+            !visitDetails.initialNote &&
+            (!visitDetails.deletedNotes || visitDetails.deletedNotes.length === 0)
           ) {
             await tx.visit.delete({ where: { id: note.visitId } });
           }
@@ -715,8 +772,30 @@ export class ProgressNotesService {
         }
 
         // Hard delete for DRAFT — attachments are kept (see note above).
+        // Revert Master Problem List to previous published note baseline.
+        await this.revertProblemsToPreviousNote(patientId, id, userId, tx);
+
         await tx.progressNote.delete({ where: { id } });
-        await tx.visit.delete({ where: { id: note.visitId } });
+
+        const draftVisitDetails = await tx.visit.findUnique({
+          where: { id: note.visitId },
+          include: {
+            vitalSigns: true,
+            documents: true,
+            initialNote: true,
+            deletedNotes: true,
+          },
+        });
+
+        if (
+          draftVisitDetails &&
+          draftVisitDetails.vitalSigns.length === 0 &&
+          draftVisitDetails.documents.length === 0 &&
+          !draftVisitDetails.initialNote &&
+          (!draftVisitDetails.deletedNotes || draftVisitDetails.deletedNotes.length === 0)
+        ) {
+          await tx.visit.delete({ where: { id: note.visitId } });
+        }
 
         return { success: true, ...note };
       },
@@ -752,9 +831,31 @@ export class ProgressNotesService {
           where: { id: { in: noteIds } },
         });
 
-        await tx.visit.deleteMany({
-          where: { id: { in: visitIds } },
-        });
+        for (const vId of visitIds) {
+          const vDetails = await tx.visit.findUnique({
+            where: { id: vId },
+            include: {
+              vitalSigns: true,
+              documents: true,
+              initialNote: true,
+              progressNote: true,
+              deletedNotes: true,
+            },
+          });
+          if (
+            vDetails &&
+            vDetails.vitalSigns.length === 0 &&
+            vDetails.documents.length === 0 &&
+            !vDetails.initialNote &&
+            !vDetails.progressNote &&
+            (!vDetails.deletedNotes || vDetails.deletedNotes.length === 0)
+          ) {
+            await tx.visit.delete({ where: { id: vId } });
+          }
+        }
+
+        // Revert Master Problem List to baseline
+        await this.revertProblemsToPreviousNote(patientId, null, userId, tx);
 
         return { count: count.count };
       },

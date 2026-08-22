@@ -152,6 +152,7 @@ interface RowProps {
   canReorder: boolean;
   isSibling: boolean;
   creatorName: string;
+  masterDiagnosisDate?: string | null;
   eligibleParents: NoteAssessmentItem[];
   items: NoteAssessmentItem[];
   updateItem: (idx: number, patch: Partial<NoteAssessmentItem>) => void;
@@ -170,6 +171,7 @@ function SortableAssessmentRow({
   canReorder,
   isSibling,
   creatorName,
+  masterDiagnosisDate,
   eligibleParents,
   items,
   updateItem,
@@ -187,6 +189,7 @@ function SortableAssessmentRow({
     opacity: isDragging ? 0.4 : undefined,
   };
   const parentItem = item.parentId ? items.find((i) => itemKey(i) === item.parentId) : undefined;
+  const effectiveDiagnosisDate = item.diagnosisDate || masterDiagnosisDate || null;
 
   return (
     <div
@@ -291,13 +294,13 @@ function SortableAssessmentRow({
           {isEditMode ? (
             <input
               type="date"
-              value={item.diagnosisDate ? new Date(item.diagnosisDate).toISOString().split('T')[0] : ''}
+              value={effectiveDiagnosisDate ? new Date(effectiveDiagnosisDate).toISOString().split('T')[0] : ''}
               onChange={(e) => updateItem(originalIndex, { diagnosisDate: e.target.value || null })}
               disabled={isDisabled}
               className="h-[30px] px-2 text-xs font-medium text-text-primary rounded-[5px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent focus:ring-1 focus:ring-accent bg-white disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
             />
           ) : (
-            <span className="font-mono text-xs font-semibold text-text-primary">{formatDate(item.diagnosisDate)}</span>
+            <span className="font-mono text-xs font-semibold text-text-primary">{formatDate(effectiveDiagnosisDate)}</span>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -582,6 +585,7 @@ export function NoteProblemListEditor({
                   canReorder={canReorder && depth === 0}
                   isSibling={isSibling}
                   creatorName={creatorName}
+                  masterDiagnosisDate={master?.diagnosisDate || null}
                   eligibleParents={eligibleParents}
                   items={items}
                   updateItem={updateItem}

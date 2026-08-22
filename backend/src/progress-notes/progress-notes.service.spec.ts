@@ -324,3 +324,134 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     expect(result[0].dose).toBe('5 mg');
   });
 });
+
+describe('ProgressNotesService draft problem syncing & reverting', () => {
+  it('syncs problems to master when a draft is created by a doctor', async () => {
+    const mockProblemsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([]),
+      upsertFromAssessment: jest.fn().mockResolvedValue(new Map([['temp-1', 'prob-real-1']])),
+    };
+    const mockMedicationsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([]),
+    };
+    const mockVitalsService = {
+      findLatestForPatient: jest.fn().mockResolvedValue(null),
+    };
+    const mockVisitsService = {
+      createForNote: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+    };
+    const mockPrisma = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ role: 'DOCTOR' }),
+      },
+      initialNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'init-1',
+          status: 'PUBLISHED',
+          visit: { visitDatetime: new Date() },
+        }),
+      },
+      progressNote: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'progress-1', ...data })),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
+    };
+
+    const mockInitialNotesService = {
+      findOne: jest.fn().mockResolvedValue({ status: 'PUBLISHED' }),
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      mockVisitsService as any,
+      mockProblemsService as any,
+      mockMedicationsService as any,
+      mockVitalsService as any,
+      mockInitialNotesService as any,
+      {} as any,
+    );
+
+    const dto = {
+      subjective: 'Test subjective',
+      objective: 'Test objective',
+      problemListSnapshot: [{ tempId: 'temp-1', title: 'Hypertension stage 1' }],
+    };
+
+    const result = await service.create('patient-1', dto as any, 'user-1');
+
+    expect(mockProblemsService.upsertFromAssessment).toHaveBeenCalledWith(
+      'patient-1',
+      expect.any(Array),
+      'user-1',
+      'Progress Note',
+      mockPrisma,
+    );
+    expect((result.problemListSnapshot as any)[0].id).toBe('prob-real-1');
+  });
+
+  it('reverts problems to previous note snapshot when a draft is deleted', async () => {
+    const mockProblemsService = {
+      upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+    };
+    const mockProgressNoteFindFirst = jest.fn().mockResolvedValue(null);
+    const mockInitialNoteFindFirst = jest.fn().mockResolvedValue({
+      id: 'initial-1',
+      status: 'PUBLISHED',
+      mgmtNonpharm: '',
+      mgmtPharm: '',
+      diagnostics: [],
+      createdAt: new Date(),
+      visit: { visitDatetime: new Date() },
+    });
+
+    const mockPrisma = {
+      progressNote: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'draft-1',
+          authorId: 'user-1',
+          status: 'DRAFT',
+          visitId: 'visit-1',
+          visit: { patientId: 'patient-1' },
+        }),
+        findFirst: mockProgressNoteFindFirst,
+        delete: jest.fn().mockResolvedValue({ id: 'draft-1' }),
+      },
+      initialNote: {
+        findFirst: mockInitialNoteFindFirst,
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'initial-1',
+          assessment: [{ title: 'Hypertension' }],
+          medicationSnapshot: [],
+        }),
+      },
+      visit: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        delete: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      {} as any,
+      mockProblemsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.deleteDraft('patient-1', 'draft-1', 'user-1');
+
+    expect(mockProblemsService.upsertFromAssessment).toHaveBeenCalledWith(
+      'patient-1',
+      expect.arrayContaining([expect.objectContaining({ title: 'Hypertension' })]),
+      'user-1',
+      'Progress Note',
+      mockPrisma,
+    );
+    expect(mockPrisma.progressNote.delete).toHaveBeenCalledWith({ where: { id: 'draft-1' } });
+  });
+});
+

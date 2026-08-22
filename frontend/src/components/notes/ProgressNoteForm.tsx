@@ -297,26 +297,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         // match), or a legacy id-less entry now healed with its id (title
         // match) — sync in place instead of adding a second entry.
         //
-        // Master always wins here: an in-note edit (rename/reorder/nest)
-        // is now synced straight into the master Problem row as soon as
-        // it's saved (see syncProblemsFromSnapshot on the backend), so by
-        // the time this merge runs again master already reflects the last
-        // save — pulling it back in is a no-op, not a clobber. The only
-        // way to diverge from master is Revert, which explicitly discards
-        // the draft and re-seeds from master (handleRevertProblemList).
-        //
-        // diagnosisDate is deliberately NOT carried from the master problem
-        // here — a progress note starts with a blank diagnosis date every
-        // time; see the `null` seeding note on the brand-new-note branch
-        // below for why.
+        // Preserve in-note edits (title/nesting/date) already captured in the
+        // snapshot so a background activeProblems refetch never reverts what
+        // the user is drafting or has saved in this draft.
         const prev = existing[matchIdx];
         existing[matchIdx] = {
           ...(typeof prev === 'object' ? prev : {}),
           id: p.id,
-          title: p.title,
-          parentId: p.parentId || undefined,
+          title: (typeof prev === 'object' && prev.title) ? prev.title : p.title,
+          parentId: (typeof prev === 'object' && prev.parentId !== undefined) ? prev.parentId : (p.parentId || undefined),
           depth: item.depth,
-          diagnosisDate: null,
+          diagnosisDate: (typeof prev === 'object' && prev.diagnosisDate) ? prev.diagnosisDate : (p.diagnosisDate || null),
         };
         continue;
       }
@@ -328,7 +319,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         title: p.title,
         parentId: p.parentId || undefined,
         depth: item.depth,
-        diagnosisDate: null,
+        diagnosisDate: p.diagnosisDate || null,
       });
     }
 
@@ -462,10 +453,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 title: p.title,
                 parentId: p.parentId || undefined,
                 depth,
-                // Always blank — a progress note's diagnosis date is never
-                // inherited from the master problem or a prior note; see the
-                // mergeActiveProblems note above.
-                diagnosisDate: null,
+                diagnosisDate: p.diagnosisDate || null,
               }));
 
       const currentMedicationsWhileEditing = isMedicationEditMode ? form.getValues('medicationSnapshot') : undefined;
@@ -530,7 +518,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   title: p.title,
                   parentId: p.parentId || undefined,
                   depth,
-                  diagnosisDate: null,
+                  diagnosisDate: p.diagnosisDate || null,
                 }));
 
           const draftMeds = parsed.medicationSnapshot as any[] | null | undefined;
@@ -582,7 +570,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           title: p.title,
           parentId: p.parentId || undefined,
           depth,
-          diagnosisDate: null,
+          diagnosisDate: p.diagnosisDate || null,
         })),
         medicationSnapshot: activeMeds.map((m: any) => ({
           name: m.name,
@@ -655,7 +643,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         title: p.title,
         parentId: p.parentId || undefined,
         depth,
-        diagnosisDate: null,
+        diagnosisDate: p.diagnosisDate || null,
       })),
       { shouldDirty: true },
     );

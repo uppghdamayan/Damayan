@@ -537,14 +537,20 @@ export class InitialNotesService {
       // Check if visit is now empty and can be deleted
       const visitDetails = await tx.visit.findUnique({
         where: { id: note.visitId },
-        include: { vitalSigns: true, documents: true, progressNote: true },
+        include: {
+          vitalSigns: true,
+          documents: true,
+          progressNote: true,
+          deletedNotes: true,
+        },
       });
 
       if (
         visitDetails &&
         visitDetails.vitalSigns.length === 0 &&
         visitDetails.documents.length === 0 &&
-        !visitDetails.progressNote
+        !visitDetails.progressNote &&
+        (!visitDetails.deletedNotes || visitDetails.deletedNotes.length === 0)
       ) {
         await tx.visit.delete({ where: { id: note.visitId } });
       }

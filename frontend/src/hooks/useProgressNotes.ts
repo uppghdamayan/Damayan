@@ -138,6 +138,9 @@ export function useCreateProgressNote(patientId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
@@ -163,7 +166,9 @@ export function useCreateAndPublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['visits', patientId] });
       queryClient.invalidateQueries({ queryKey: ['latest-vitals', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
@@ -187,6 +192,9 @@ export function useUpdateProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (err, variables) => {
@@ -228,6 +236,7 @@ export function usePublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
@@ -249,6 +258,8 @@ export function useDeleteAllDraftProgressNotes(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       clearProgressDrafts(patientId);
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
@@ -269,6 +280,8 @@ export function useDeleteProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
