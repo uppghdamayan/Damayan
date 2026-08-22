@@ -31,7 +31,7 @@ export interface TimelineNoteView {
     pharm?: string;
     diagnostics?: string[];
     medications?: string[];
-    medicationsDetailed?: { name: string; dose?: string }[];
+    medicationsDetailed?: { name: string; dose?: string; formulation?: string; instructions?: string; quantity?: number }[];
   };
   isDeleted: boolean;
 }
@@ -255,13 +255,16 @@ export function normalizeMedicationName(s: string): string {
  * are never falsely matched against each other.
  */
 export function diffMedicationItems(
-  current: { name: string; dose?: string }[],
-  previous: { name: string; dose?: string }[] | null
+  current: { name: string; dose?: string; formulation?: string; instructions?: string; quantity?: number }[],
+  previous: { name: string; dose?: string; formulation?: string; instructions?: string; quantity?: number }[] | null
 ): {
   text: string;
   status: 'existing' | 'added' | 'removed' | 'dose-up' | 'dose-down' | 'dose-changed';
   fromDose?: string;
   toDose?: string;
+  sigUpdated?: boolean;
+  fromSig?: string;
+  toSig?: string;
 }[] {
   const formatItem = (item: { name: string; dose?: string }) =>
     item.dose ? `${item.name} ${item.dose}` : item.name;
@@ -288,10 +291,28 @@ export function diffMedicationItems(
       const prevDose = prevVal.dose ? String(prevVal.dose).trim() : '';
       const { isDifferent, status } = compareDoses(currDose, prevDose);
 
+      const currSig = curr.instructions ? String(curr.instructions).trim() : '';
+      const prevSig = prevVal.instructions ? String(prevVal.instructions).trim() : '';
+      const sigUpdated = currSig !== prevSig;
+
       if (isDifferent) {
-        diffItems.push({ text: formatItem(curr), status, fromDose: prevDose || undefined, toDose: currDose || undefined });
+        diffItems.push({
+          text: formatItem(curr),
+          status,
+          fromDose: prevDose || undefined,
+          toDose: currDose || undefined,
+          sigUpdated: sigUpdated || undefined,
+          fromSig: prevSig || undefined,
+          toSig: currSig || undefined,
+        });
       } else {
-        diffItems.push({ text: formatItem(curr), status: 'existing' });
+        diffItems.push({
+          text: formatItem(curr),
+          status: 'existing',
+          sigUpdated: sigUpdated || undefined,
+          fromSig: prevSig || undefined,
+          toSig: currSig || undefined,
+        });
       }
     } else {
       diffItems.push({ text: formatItem(curr), status: 'added' });
@@ -543,7 +564,13 @@ export function mapNoteToTimelineView(
             if (med && typeof med === 'object') {
               const doseStr = med.dose != null ? String(med.dose).trim() : '';
               const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
-              return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
+              return {
+                name: med.name,
+                dose: `${doseStr}${unitStr}`.trim() || undefined,
+                formulation: med.formulation || undefined,
+                instructions: med.instructions || undefined,
+                quantity: med.quantity || undefined,
+              };
             }
             return { name: '' };
           }).filter((m: any) => m.name)
@@ -629,7 +656,13 @@ export function mapNoteToTimelineView(
             if (med && typeof med === 'object') {
               const doseStr = med.dose != null ? String(med.dose).trim() : '';
               const unitStr = med.unit ? ` ${String(med.unit).trim()}` : '';
-              return { name: med.name, dose: `${doseStr}${unitStr}`.trim() || undefined };
+              return {
+                name: med.name,
+                dose: `${doseStr}${unitStr}`.trim() || undefined,
+                formulation: med.formulation || undefined,
+                instructions: med.instructions || undefined,
+                quantity: med.quantity || undefined,
+              };
             }
             return { name: '' };
           }).filter((m: any) => m.name)

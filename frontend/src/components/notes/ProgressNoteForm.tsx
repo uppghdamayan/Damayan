@@ -228,6 +228,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return map;
   }, [copyForward?.activeMedications]);
 
+  const originalSigByMedName = useMemo(() => {
+    const map = new Map<string, string>();
+    (copyForward?.activeMedications || []).forEach((m: any) => {
+      if (m?.name) map.set(String(m.name).trim().toLowerCase(), String(m.instructions ?? '').trim());
+    });
+    return map;
+  }, [copyForward?.activeMedications]);
+
   const mergeActiveProblems = (existingProblems: any[], activeProblems: any[]) => {
     const tree = buildProblemTree(activeProblems || []);
     const flatActive: { problem: any; depth: number }[] = [];
@@ -371,10 +379,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         if (!live) return m;
         return {
           ...m,
-          dose: live.dose || undefined,
-          formulation: live.formulation || undefined,
-          quantity: live.quantity || undefined,
-          instructions: live.instructions || undefined,
+          dose: m.dose !== undefined ? m.dose : (live.dose || undefined),
+          formulation: m.formulation !== undefined ? m.formulation : (live.formulation || undefined),
+          quantity: m.quantity !== undefined ? m.quantity : (live.quantity || undefined),
+          instructions: m.instructions !== undefined ? m.instructions : (live.instructions || undefined),
+          fromPast: m.fromPast ?? live.fromPast ?? false,
         };
       });
 
@@ -1640,6 +1649,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       onSaveDraft={handleSaveDraftMedications}
                       onEditMedication={(idx) => setEditMedIndex(idx)}
                       originalDoseByMedName={originalDoseByMedName}
+                      originalSigByMedName={originalSigByMedName}
                       nameOptions={nameOptions}
                       newMedName={newMedName}
                       setNewMedName={setNewMedName}

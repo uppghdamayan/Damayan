@@ -84,10 +84,11 @@ export function mergeActiveMedications(
       if (!live) return m;
       return {
         ...m,
-        dose: live.dose || undefined,
-        formulation: live.formulation || undefined,
-        quantity: live.quantity || undefined,
-        instructions: live.instructions || undefined,
+        dose: m.dose !== undefined ? m.dose : (live.dose || undefined),
+        formulation: m.formulation !== undefined ? m.formulation : (live.formulation || undefined),
+        quantity: m.quantity !== undefined ? m.quantity : (live.quantity || undefined),
+        instructions: m.instructions !== undefined ? m.instructions : (live.instructions || undefined),
+        fromPast: m.fromPast ?? live.fromPast ?? false,
       };
     });
 

@@ -163,7 +163,19 @@ function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
   );
 }
 
-function MedicationDiffItem({ item }: { item: { text: string; status: 'existing' | 'added' | 'removed' | 'dose-up' | 'dose-down' | 'dose-changed'; fromDose?: string; toDose?: string } }) {
+function MedicationDiffItem({
+  item,
+}: {
+  item: {
+    text: string;
+    status: 'existing' | 'added' | 'removed' | 'dose-up' | 'dose-down' | 'dose-changed';
+    fromDose?: string;
+    toDose?: string;
+    sigUpdated?: boolean;
+    fromSig?: string;
+    toSig?: string;
+  };
+}) {
   return (
     <div className="flex items-center flex-wrap gap-1.5 min-w-0">
       {item.status === 'removed' ? (
@@ -193,6 +205,15 @@ function MedicationDiffItem({ item }: { item: { text: string; status: 'existing'
           className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]"
         >
           {item.status === 'dose-up' ? '↑ DOSE' : item.status === 'dose-down' ? '↓ DOSE' : 'DOSE CHANGED'}
+        </Badge>
+      )}
+      {item.sigUpdated && item.status !== 'added' && item.status !== 'removed' && (
+        <Badge
+          variant="draft"
+          className="px-1.5 py-0 h-3.5 text-[8.5px] uppercase font-bold tracking-[0.5px]"
+          title={item.fromSig && item.toSig ? `Sig changed from "${item.fromSig}" to "${item.toSig}"` : item.toSig ? `Sig set to "${item.toSig}"` : 'Sig removed'}
+        >
+          SIG UPDATED
         </Badge>
       )}
     </div>

@@ -114,8 +114,18 @@ export function MedicationEntry({
         <span className={getHighlightClass('dose')}>{medication.dose}</span>
       </div>
 
-      <div className={cn("text-[12px] truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
+      <div className={cn("text-[12px] truncate pr-2 flex items-center flex-wrap min-w-0 gap-1.5", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
         <span className={cn("truncate", getHighlightClass('instructions'))}>{medication.instructions || '-'}</span>
+        {medication.isActive && (draftChangedFields?.includes('instructions') || recentlyPublishedFields?.includes('instructions')) && (
+          <span className={cn(
+            "px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px] shrink-0",
+            draftChangedFields?.includes('instructions')
+              ? "text-amber bg-amber-bg border-amber-border" 
+              : "text-green bg-green-bg border-green-border animate-highlight-pill"
+          )}>
+            updated
+          </span>
+        )}
       </div>
 
       <div className={cn("text-[12px] font-mono text-left flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>

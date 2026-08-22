@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Pill } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ComboboxInput } from '@/components/ui/ComboboxInput';
 

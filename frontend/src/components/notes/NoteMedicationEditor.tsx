@@ -28,6 +28,7 @@ interface NoteMedicationEditorProps {
   onSaveDraft?: () => void;
   onEditMedication: (index: number) => void;
   originalDoseByMedName: Map<string, string>;
+  originalSigByMedName?: Map<string, string>;
   nameOptions: string[];
   newMedName: string;
   setNewMedName: (v: string) => void;
@@ -55,6 +56,7 @@ export function NoteMedicationEditor({
   onSaveDraft,
   onEditMedication,
   originalDoseByMedName,
+  originalSigByMedName,
   nameOptions,
   newMedName,
   setNewMedName,
@@ -161,6 +163,12 @@ export function NoteMedicationEditor({
           const doseDirection =
             doseStatus === 'dose-up' ? 'up' : doseStatus === 'dose-down' ? 'down' : doseStatus === 'dose-changed' ? 'changed' : null;
 
+          const originalSig = !isNewMed && medName
+            ? originalSigByMedName?.get(String(medName).trim().toLowerCase())
+            : undefined;
+          const isSigChanged =
+            !isNewMed && originalSig !== undefined && String(medSig || '').trim() !== String(originalSig || '').trim();
+
           return (
             <div
               key={idx}
@@ -195,6 +203,14 @@ export function NoteMedicationEditor({
                       title={`Dose changed from ${originalDose}`}
                     >
                       {doseDirection === 'up' ? '↑ Dose' : doseDirection === 'down' ? '↓ Dose' : 'Dose Changed'}
+                    </span>
+                  )}
+                  {isSigChanged && (
+                    <span
+                      className="text-[9.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 border text-amber-800 bg-amber-50 border-amber-600/40"
+                      title={originalSig ? `Sig changed from "${originalSig}"` : 'Sig added'}
+                    >
+                      Sig Updated
                     </span>
                   )}
                   {medForm && (
