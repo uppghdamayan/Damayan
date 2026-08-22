@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { progressDraftKey } from '@/lib/note-drafts';
 
 const UI_SCALE_MIN = 80;
 const UI_SCALE_MAX = 150;
@@ -144,6 +145,9 @@ export const useUiStore = create<UiState>()(
       }),
       setActiveScreen: (s) => set({ activeScreen: s }),
       openNewProgressNote: (patientId) => set((state) => {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.removeItem(progressDraftKey(patientId, null));
+        }
         const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
           activeNoteEditor: { patientId, noteId: null, mode: 'new' },

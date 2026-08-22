@@ -22,10 +22,11 @@ export function progressDraftKey(patientId: string, noteId?: string | null): str
 // progress-note edit in flight" (e.g. the master/note problem-edit mutual
 // lock), not which specific note.
 export function hasProgressDraft(patientId: string): boolean {
-  const prefix = `${PREFIX}${patientId}${SUFFIX}:`;
+  if (typeof window === 'undefined' || !window.localStorage) return false;
+  const prefix = `${PREFIX}${patientId}${SUFFIX}`;
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.startsWith(prefix)) return true;
+    if (key && (key === prefix || key.startsWith(`${prefix}:`))) return true;
   }
   return false;
 }
@@ -33,11 +34,12 @@ export function hasProgressDraft(patientId: string): boolean {
 // Removes every progress-draft key for this patient — called on publish/
 // delete so no orphaned per-note key can bleed into a future note.
 export function clearProgressDrafts(patientId: string): void {
-  const prefix = `${PREFIX}${patientId}${SUFFIX}:`;
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  const prefix = `${PREFIX}${patientId}${SUFFIX}`;
   const toRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.startsWith(prefix)) toRemove.push(key);
+    if (key && (key === prefix || key.startsWith(`${prefix}:`))) toRemove.push(key);
   }
   toRemove.forEach((key) => localStorage.removeItem(key));
 }

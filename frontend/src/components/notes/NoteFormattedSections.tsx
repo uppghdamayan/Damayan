@@ -215,10 +215,6 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
   const prevMedsDetailed = effectivePreviousNote?.sections.medicationsDetailed || null;
   const medDiff = diffMedicationItems(currentMedsDetailed, prevMedsDetailed);
 
-  // Fill column 1 first (up to 5 items), only spilling into column 2 if more than 5
-  const medCol1 = medDiff.length <= 5 ? medDiff : medDiff.slice(0, Math.ceil(medDiff.length / 2));
-  const medCol2 = medDiff.length <= 5 ? [] : medDiff.slice(Math.ceil(medDiff.length / 2));
-
   const diagnostics = note.sections.diagnostics || [];
   const diagCol1 = diagnostics.length <= 5 ? diagnostics : diagnostics.slice(0, Math.ceil(diagnostics.length / 2));
   const diagCol2 = diagnostics.length <= 5 ? [] : diagnostics.slice(Math.ceil(diagnostics.length / 2));
@@ -374,19 +370,10 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <Pill className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Medications</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1 pl-2 items-start">
-            <div className="flex flex-col gap-1.5 min-w-0">
-              {medCol1.map((item, idx) => (
-                <MedicationDiffItem key={idx} item={item} />
-              ))}
-            </div>
-            {medCol2.length > 0 && (
-              <div className="flex flex-col gap-1.5 min-w-0">
-                {medCol2.map((item, idx) => (
-                  <MedicationDiffItem key={idx + medCol1.length} item={item} />
-                ))}
-              </div>
-            )}
+          <div className="flex flex-col gap-1.5 mt-1 pl-2">
+            {medDiff.map((item, idx) => (
+              <MedicationDiffItem key={idx} item={item} />
+            ))}
           </div>
         </div>
       )}

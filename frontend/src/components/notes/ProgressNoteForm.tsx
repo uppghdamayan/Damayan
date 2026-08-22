@@ -463,14 +463,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           ? currentMedicationsWhileEditing
           : hasMedSnapshot
             ? mergeActiveMedications(validMeds, activeMeds)
-            : activeMeds.map((m: any) => ({
-                name: m.name,
-                dose: m.dose || undefined,
-                formulation: m.formulation || undefined,
-                quantity: m.quantity || undefined,
-                instructions: m.instructions || undefined,
-                fromPast: m.fromPast || false,
-              }));
+            : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
+              ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+              : activeMeds.map((m: any) => ({
+                  name: m.name,
+                  dose: m.dose || undefined,
+                  formulation: m.formulation || undefined,
+                  quantity: m.quantity || undefined,
+                  instructions: m.instructions || undefined,
+                  fromPast: m.fromPast || false,
+                }));
       // A med added in-note but not yet persisted to the server lives only
       // in current form state (neither the server snapshot nor the master
       // list carries it yet). A refetch of `note`/`copyForward` between
@@ -529,14 +531,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             ? currentMedicationsWhileEditing
             : hasMedSnapshot
               ? mergeActiveMedications(validMeds, activeMeds)
-              : activeMeds.map((m: any) => ({
-                  name: m.name,
-                  dose: m.dose || undefined,
-                  formulation: m.formulation || undefined,
-                  quantity: m.quantity || undefined,
-                  instructions: m.instructions || undefined,
-                  fromPast: m.fromPast || false,
-                }));
+              : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
+                ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+                : activeMeds.map((m: any) => ({
+                    name: m.name,
+                    dose: m.dose || undefined,
+                    formulation: m.formulation || undefined,
+                    quantity: m.quantity || undefined,
+                    instructions: m.instructions || undefined,
+                    fromPast: m.fromPast || false,
+                  }));
           parsed.medicationSnapshot = isMedicationEditMode ? baseDraftMeds : reuniteLocallyAddedMeds(baseDraftMeds);
           
           if (!parsed.diagnostics) {
@@ -558,6 +562,18 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           return;
         } catch (e) {}
       }
+
+      const initialMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
+        ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+        : activeMeds.map((m: any) => ({
+            name: m.name,
+            dose: m.dose || undefined,
+            formulation: m.formulation || undefined,
+            quantity: m.quantity || undefined,
+            instructions: m.instructions || undefined,
+            fromPast: m.fromPast || false,
+          }));
+
       form.reset({
         subjective: '',
         objective: '',
@@ -572,13 +588,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           depth,
           diagnosisDate: p.diagnosisDate || null,
         })),
-        medicationSnapshot: activeMeds.map((m: any) => ({
-          name: m.name,
-          dose: m.dose || undefined,
-          formulation: m.formulation || undefined,
-          quantity: m.quantity || undefined,
-          instructions: m.instructions || undefined,
-        })),
+        medicationSnapshot: initialMeds,
         visitDatetime: new Date().toISOString(),
       });
     }
@@ -675,15 +685,19 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
 
   const handleRevertMedications = () => {
     const activeMeds = copyForward?.activeMedications || [];
+    const initialMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
+      ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+      : activeMeds.map((m: any) => ({
+          name: m.name,
+          dose: m.dose || undefined,
+          formulation: m.formulation || undefined,
+          quantity: m.quantity || undefined,
+          instructions: m.instructions || undefined,
+          fromPast: m.fromPast || false,
+        }));
     form.setValue(
       'medicationSnapshot',
-      activeMeds.map((m: any) => ({
-        name: m.name,
-        dose: m.dose || undefined,
-        formulation: m.formulation || undefined,
-        quantity: m.quantity || undefined,
-        instructions: m.instructions || undefined,
-      })),
+      initialMeds,
       { shouldDirty: true },
     );
     setIsMedicationEditMode(false);
@@ -1333,25 +1347,30 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       depth,
                       diagnosisDate: null,
                     }));
-                    const defaultMeds = (copyForward?.activeMedications || []).map((m: any) => ({
-                      name: m.name,
-                      dose: m.dose || undefined,
-                      formulation: m.formulation || undefined,
-                      quantity: m.quantity || undefined,
-                      instructions: m.instructions || undefined,
-                    }));
+                    const defaultMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
+                      ? mergeActiveMedications(copyForward.inheritedMedications, copyForward?.activeMedications || [])
+                      : (copyForward?.activeMedications || []).map((m: any) => ({
+                          name: m.name,
+                          dose: m.dose || undefined,
+                          formulation: m.formulation || undefined,
+                          quantity: m.quantity || undefined,
+                          instructions: m.instructions || undefined,
+                          fromPast: m.fromPast || false,
+                        }));
                     
                     form.reset({
                       subjective: '',
                       objective: '',
                       labs: '',
-                      mgmtNonpharm: '',
-                      mgmtPharm: '',
+                      mgmtNonpharm: copyForward?.inheritedMgmtNonpharm || '',
+                      mgmtPharm: copyForward?.inheritedMgmtPharm || '',
                       diagnostics: [],
                       problemListSnapshot: defaultProblems,
                       medicationSnapshot: defaultMeds,
                       visitDatetime: formValues.visitDatetime || new Date().toISOString(),
                     });
+
+                    localStorage.removeItem(progressDraftKey(patientId, noteId));
 
                     // Clear controlled inputs
                     setNewProbTitle('');

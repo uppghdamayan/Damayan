@@ -68,7 +68,9 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
 
     if (!nameStr) e.name = 'Medication name is required.';
     if (!doseStr) e.dose = 'Dose is required.';
-    if (qtyStr) {
+    if (!qtyStr) {
+      e.quantity = 'Quantity is required.';
+    } else {
       const qtyNum = parseInt(qtyStr, 10);
       if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
     }
@@ -88,7 +90,7 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
       name: nameStr,
       dose: doseStr,
       formulation: formStr || undefined,
-      quantity: qtyStr ? parseInt(qtyStr, 10) : undefined,
+      quantity: parseInt(qtyStr, 10),
       instructions: instStr || undefined,
     });
   };
@@ -108,33 +110,31 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
     >
       <div className="bg-surface border border-border rounded-[10px] w-[460px] max-h-[80vh] overflow-y-auto shadow-modal">
         <div className="flex items-center gap-2.5 px-[18px] py-4 border-b border-border">
-          <h2 className="text-[15px] font-bold flex-1 text-text-primary">Edit Medication</h2>
-          <button onClick={onClose} aria-label="Close modal"
-            className="w-6 h-6 rounded-btn bg-transparent border-transparent hover:bg-surface-2 hover:border-border transition-all duration-150 inline-flex items-center justify-center text-text-muted cursor-pointer">
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Pill className="w-4 h-4 text-accent" />
+          <h2 className="text-[13px] font-bold text-text-primary">
+            {editing ? 'Edit Medication' : 'Add Medication'}
+          </h2>
         </div>
 
-        <div className="px-[18px] py-[18px]">
-          <div className="flex flex-col gap-1.5 mb-3.5">
+        <div className="p-[18px] flex flex-col gap-3.5">
+          <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
               Medication Name <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
             </label>
             <ComboboxInput
               value={values.name}
               onChange={(val) => {
-                setValues(v => ({ ...v, name: val }));
-                setErrors(er => ({ ...er, name: !val.trim() ? 'Medication name is required.' : '' }));
+                setValues((v) => ({ ...v, name: val }));
+                if (errors.name) setErrors((e) => ({ ...e, name: '' }));
               }}
               options={nameOptions}
-              placeholder="e.g. Losartan"
-              hasError={!!errors.name}
-              maxLength={255}
+              placeholder="e.g. Losartan, Metformin"
+              className={inputCn(!!errors.name)}
             />
             {errors.name && <p className="text-[12px] text-red mt-1">{errors.name}</p>}
           </div>
 
-          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3 mb-3.5">
+          <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
                 Dose <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
@@ -143,16 +143,15 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
                 type="text"
                 value={values.dose}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setValues((v) => ({ ...v, dose: val }));
-                  setErrors((er) => ({ ...er, dose: !val.trim() ? 'Dose is required.' : '' }));
+                  setValues((v) => ({ ...v, dose: e.target.value }));
+                  if (errors.dose) setErrors((er) => ({ ...er, dose: '' }));
                 }}
-                placeholder="e.g. 10mg"
-                maxLength={255}
+                placeholder="e.g. 50 mg"
                 className={inputCn(!!errors.dose)}
               />
               {errors.dose && <p className="text-[12px] text-red mt-1">{errors.dose}</p>}
             </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
                 Formulation
@@ -161,29 +160,28 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
                 type="text"
                 value={values.formulation}
                 onChange={(e) => setValues((v) => ({ ...v, formulation: e.target.value }))}
-                placeholder="e.g. Tablet, Syrup"
-                maxLength={50}
+                placeholder="e.g. tablet"
                 className={inputCn()}
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5 mb-3.5">
+          <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              Sig / Instructions
+              Instructions / Sig
             </label>
             <input
+              type="text"
               value={values.instructions}
               onChange={(e) => setValues((v) => ({ ...v, instructions: e.target.value }))}
-              placeholder="e.g. Take 1 tab daily"
-              maxLength={50}
+              placeholder="e.g. 1 tab PO OD with meals"
               className={inputCn()}
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              Quantity
+              Quantity <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
             </label>
             <input
               type="number" step="1" min="1"
@@ -192,7 +190,9 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
                 const val = e.target.value;
                 setValues((v) => ({ ...v, quantity: val }));
                 let err = '';
-                if (val) {
+                if (!val.trim()) {
+                  err = 'Quantity is required.';
+                } else {
                   const qtyNum = parseInt(val, 10);
                   if (isNaN(qtyNum) || qtyNum <= 0) err = 'Quantity must be a whole number greater than 0.';
                 }

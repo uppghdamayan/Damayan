@@ -69,7 +69,7 @@ export interface CarryForwardSource {
   sourceVisitDatetime: string | null;
   mgmtNonpharm: string;
   mgmtPharm: string;
-  diagnostics: string[];
+  medicationSnapshot?: any[];
 }
 
 // The single source of truth for "what would the next progress note inherit
@@ -107,9 +107,9 @@ export function useCopyForwardData(patientId: string | null, excludeNoteId?: str
       activeProblems,
       activeMedications,
       sourceNoteId: carryForwardData?.sourceNoteId ?? null,
-      inheritedDiagnostics: [],
       inheritedMgmtPharm: carryForwardData?.mgmtPharm || '',
       inheritedMgmtNonpharm: carryForwardData?.mgmtNonpharm || '',
+      inheritedMedications: carryForwardData?.medicationSnapshot || [],
     };
   }, [problemsData, medicationsData, carryForwardData]);
 
@@ -142,6 +142,7 @@ export function useCreateProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      clearProgressDrafts(patientId);
     },
     onError: (err, variables) => {
       // Not-yet-created note — no id to scope by.
@@ -170,6 +171,7 @@ export function useCreateAndPublishProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+      clearProgressDrafts(patientId);
     },
     onError: (err, variables) => {
       // Not-yet-created note — no id to scope by.

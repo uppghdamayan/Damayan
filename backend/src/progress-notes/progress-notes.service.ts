@@ -17,7 +17,10 @@ import { InitialNotesService } from '../initial-notes/initial-notes.service';
 import { StorageService } from '../storage/storage.service';
 import { diffByTitle, diffByNameDoseUnit } from './progress-notes.utils';
 import { mapAssessmentSnapshot } from '../problems/problems.utils';
-import { mapMedicationSnapshot } from '../medications/medications.utils';
+import {
+  mapMedicationSnapshot,
+  mergeActiveMedications,
+} from '../medications/medications.utils';
 
 @Injectable()
 export class ProgressNotesService {
@@ -133,39 +136,6 @@ export class ProgressNotesService {
     });
   }
 
-  // ─────────────────────────────────────────────
-  // The single source of truth for "what does the next progress note carry
-  // forward from". Used by create() (server-side default), the
-  // /carry-forward endpoint (frontend prefill + timeline "Inherited by
-  // today's note" pin), and deleteDraft()'s revert path — all four used to
-  // compute "latest" differently (different filters, different orderBy keys,
-  // one missing the DOCTOR-author filter its sibling had), which is how a
-  // note could end up silently inheriting from the wrong ancestor.
-  //
-  // Candidates are PUBLISHED and authored by a DOCTOR or by nobody (null
-  // authorId) — mirrors the `authorRole === 'DOCTOR' || !authorRole` branch
-  // in publish() that actually updates the problem/med snapshots, and
-  // excludes NURSE/PHARMACIST notes which don't carry a clinical management
-  // plan. `excludeNoteId` lets the caller exclude the note currently being
-  // edited (e.g. the author's own open draft) so a note can never inherit
-  // from itself. (Deletion is a hard delete plus a copy into the DeletedNote
-  // archive table, not a soft-delete flag — there is no such column on
-  // either note model, so no filter is needed here.)
-  //
-  // The chain of progress notes is the clinical record's spine: once at
-  // least one published progress note exists, it — the newest one — is
-  // always the source, never the initial note, regardless of either note's
-  // visit date. Falling back to a visit-date comparison let a future-dated
-  // or timezone-shifted initial note permanently outrank every later
-  // progress note. The initial note is only ever the source before any
-  // progress note has been published.
-  //
-  // Among progress notes, "latest" is strictly the newest single note by
-  // visit.visitDatetime, tied on createdAt — not a field-by-field walk back
-  // through older notes. If that note left a field blank, the blank is
-  // returned as-is: clearing a field is a deliberate clinical decision, not
-  // a gap to paper over with an older value.
-  // ─────────────────────────────────────────────
   async resolveCarryForwardSource(
     patientId: string,
     excludeNoteId?: string | null,
@@ -176,7 +146,7 @@ export class ProgressNotesService {
     sourceVisitDatetime: Date | null;
     mgmtNonpharm: string;
     mgmtPharm: string;
-    diagnostics: string[];
+    medicationSnapshot: any[];
   }> {
     const client = tx ?? this.prisma;
 
@@ -193,7 +163,7 @@ export class ProgressNotesService {
           id: true,
           mgmtNonpharm: true,
           mgmtPharm: true,
-          diagnostics: true,
+          medicationSnapshot: true,
           createdAt: true,
           visit: { select: { visitDatetime: true } },
         },
@@ -208,7 +178,7 @@ export class ProgressNotesService {
           id: true,
           mgmtNonpharm: true,
           mgmtPharm: true,
-          diagnostics: true,
+          medicationSnapshot: true,
           createdAt: true,
           visit: { select: { visitDatetime: true } },
         },
@@ -225,9 +195,12 @@ export class ProgressNotesService {
         sourceVisitDatetime: null,
         mgmtNonpharm: '',
         mgmtPharm: '',
-        diagnostics: [],
+        medicationSnapshot: [],
       };
     }
+
+    const rawMeds = (source.medicationSnapshot as any[]) || [];
+    const sourceMeds = mapMedicationSnapshot(rawMeds);
 
     return {
       sourceNoteId: source.id,
@@ -235,7 +208,7 @@ export class ProgressNotesService {
       sourceVisitDatetime: source.visit.visitDatetime,
       mgmtNonpharm: source.mgmtNonpharm ?? '',
       mgmtPharm: source.mgmtPharm ?? '',
-      diagnostics: [],
+      medicationSnapshot: sourceMeds,
     };
   }
 
@@ -337,7 +310,13 @@ export class ProgressNotesService {
             medicationSnapshot:
               dto.medicationSnapshot !== undefined
                 ? (reconciledMedicationSnapshot as any)
-                : (activeMedications as any),
+                : carryForward.medicationSnapshot &&
+                    carryForward.medicationSnapshot.length > 0
+                  ? (mergeActiveMedications(
+                      carryForward.medicationSnapshot,
+                      activeMedications,
+                    ) as any)
+                  : (activeMedications as any),
             status: NoteStatus.DRAFT,
           },
         });

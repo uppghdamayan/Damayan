@@ -58,3 +58,59 @@ export function mapMedicationSnapshot(snapshot: any[] | null | undefined): {
   }
   return deduped;
 }
+
+export function mergeActiveMedications(
+  existingMeds: any[],
+  activeMedications: any[],
+) {
+  const activeByName = new Map(
+    (activeMedications || [])
+      .filter((m: any) => m && m.name && String(m.name).trim() !== '')
+      .map((m: any) => [String(m.name).trim().toLowerCase(), m]),
+  );
+  const activeNames = new Set(activeByName.keys());
+
+  const existing = (existingMeds || [])
+    .filter((m: any) => {
+      if (!m || typeof m !== 'object') return false;
+      if (m.isNew) return true;
+      const name = String(m.name || '').trim().toLowerCase();
+      return !!name && activeNames.has(name);
+    })
+    .map((m: any) => {
+      if (!m || typeof m !== 'object' || m.isNew) return m;
+      const name = String(m.name || '').trim().toLowerCase();
+      const live = name ? activeByName.get(name) : undefined;
+      if (!live) return m;
+      return {
+        ...m,
+        dose: live.dose || undefined,
+        formulation: live.formulation || undefined,
+        quantity: live.quantity || undefined,
+        instructions: live.instructions || undefined,
+      };
+    });
+
+  const existingNames = new Set(
+    existing
+      .map((m: any) => String(m.name || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  for (const m of activeMedications || []) {
+    const name = String(m.name || '').trim().toLowerCase();
+    if (!name) continue;
+    if (!existingNames.has(name)) {
+      existing.push({
+        name: m.name,
+        dose: m.dose || undefined,
+        formulation: m.formulation || undefined,
+        quantity: m.quantity || undefined,
+        instructions: m.instructions || undefined,
+        fromPast: m.fromPast || false,
+      });
+    }
+  }
+
+  return existing;
+}

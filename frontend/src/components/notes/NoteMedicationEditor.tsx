@@ -74,19 +74,24 @@ export function NoteMedicationEditor({
   const handleAddMedication = () => {
     const trimmedName = newMedName.trim();
     const trimmedDose = newMedDose.trim();
-    if (!trimmedName || !trimmedDose) {
-      setMedError('Medication name and dose are required.');
+    const trimmedQty = newMedQuantity.trim();
+    if (!trimmedName || !trimmedDose || !trimmedQty) {
+      setMedError('Medication name, dose, and quantity are required.');
+      return;
+    }
+    const qtyNum = parseInt(trimmedQty, 10);
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      setMedError('Quantity must be a whole number greater than 0.');
       return;
     }
     setMedError('');
-    const qtyNum = newMedQuantity.trim() ? parseInt(newMedQuantity.trim(), 10) : undefined;
     onChange([
       ...meds,
       {
         name: trimmedName,
         dose: trimmedDose,
         formulation: newMedFormulation.trim() || undefined,
-        quantity: !isNaN(qtyNum as number) && (qtyNum as number) > 0 ? qtyNum : undefined,
+        quantity: qtyNum,
         instructions: newMedInstructions.trim() || undefined,
         isNew: true,
       },
@@ -330,14 +335,17 @@ export function NoteMedicationEditor({
                 min="1"
                 step="1"
                 value={newMedQuantity}
-                onChange={(e) => setNewMedQuantity(e.target.value)}
+                onChange={(e) => {
+                  setNewMedQuantity(e.target.value);
+                  if (medError) setMedError('');
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     handleAddMedication();
                   }
                 }}
-                placeholder="Qty"
+                placeholder="Qty *"
                 disabled={isDisabled}
                 className="w-full min-w-0 h-[34px] px-2.5 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
