@@ -342,14 +342,57 @@ export class ProgressNotesService {
     return this.publish(patientId, note.id, userId);
   }
 
+  // Shared by update() (draft save) and publish() — upserts the note's
+  // problemListSnapshot into the live Problem rows, then heals tempId's
+  // (and any parentId pointing at one) into the real ids upsert just
+  // assigned. Draft saves call this too now so the Master Problem List
+  // reflects an in-note edit as soon as it's saved, not only at publish —
+  // "the draft is already the master, unless reverted".
+  private async syncProblemsFromSnapshot(
+    patientId: string,
+    problemListSnapshotRaw: any[],
+    userId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<any[]> {
+    const snapshotItems = mapAssessmentSnapshot(problemListSnapshotRaw);
+    const resolvedIdByKey = await this.problemsService.upsertFromAssessment(
+      patientId,
+      snapshotItems,
+      userId,
+      'Progress Note',
+      tx,
+    );
+    return (problemListSnapshotRaw || []).map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const key = item.id || item.tempId;
+      const healedParentId =
+        item.parentId && resolvedIdByKey.has(item.parentId)
+          ? resolvedIdByKey.get(item.parentId)
+          : item.parentId;
+      if (key && resolvedIdByKey.has(key)) {
+        const newId = resolvedIdByKey.get(key);
+        const { tempId, isNew, ...rest } = item;
+        return { ...rest, id: newId, parentId: healedParentId };
+      }
+      if (healedParentId !== item.parentId) {
+        return { ...item, parentId: healedParentId };
+      }
+      return item;
+    });
+  }
+
   async update(id: string, dto: UpdateProgressNoteDto, userId: string) {
     const note = await this.prisma.progressNote.findUnique({
       where: { id },
-      include: { visit: true },
+      include: { visit: true, author: { select: { role: true } } },
     });
     if (!note) throw new NotFoundException('Note not found');
 
     const { visitDatetime, ...updateData } = dto;
+    const authorRole = note.author?.role;
+    // Nurse-authored notes never touch the master Problem List (same gate
+    // publish() uses) — leave the raw snapshot as submitted for them.
+    const canSyncProblems = authorRole === 'DOCTOR' || !authorRole;
 
     // Only reconcile for drafts — a published note's snapshot is a locked
     // historical record and should not be silently rewritten by this guard.
@@ -364,7 +407,9 @@ export class ProgressNotesService {
       );
     }
 
-    const data: Prisma.ProgressNoteUpdateInput = {
+    const buildData = (
+      problemListSnapshot?: any[],
+    ): Prisma.ProgressNoteUpdateInput => ({
       ...(updateData.subjective !== undefined && {
         subjective: updateData.subjective,
       }),
@@ -381,19 +426,55 @@ export class ProgressNotesService {
         diagnostics: updateData.diagnostics,
       }),
       ...(updateData.problemListSnapshot !== undefined && {
-        problemListSnapshot: updateData.problemListSnapshot as any,
+        problemListSnapshot: (problemListSnapshot ??
+          updateData.problemListSnapshot) as any,
       }),
       ...(updateData.medicationSnapshot !== undefined && {
         medicationSnapshot: updateData.medicationSnapshot as any,
       }),
-    };
+      ...(note.status === NoteStatus.PUBLISHED && {
+        lastEditor: { connect: { id: userId } },
+        lastEditedAt: new Date(),
+      }),
+    });
 
-    if (note.status === NoteStatus.PUBLISHED) {
-      data.lastEditor = { connect: { id: userId } };
-      data.lastEditedAt = new Date();
+    // Draft, has a problem-list edit to save, and this author is allowed to
+    // touch the master list — sync now instead of waiting for publish.
+    // TEMP DEBUG — remove once the draft->master sync gap is diagnosed.
+    console.log('[progress-notes.update] TRACE', {
+      noteId: id,
+      status: note.status,
+      hasSnapshot: updateData.problemListSnapshot !== undefined,
+      authorRole,
+      canSyncProblems,
+    });
+    if (
+      updateData.problemListSnapshot !== undefined &&
+      note.status === NoteStatus.DRAFT &&
+      canSyncProblems
+    ) {
+      console.log('[progress-notes.update] TRACE syncing problems now', {
+        snapshot: updateData.problemListSnapshot,
+      });
+      return this.prisma.$transaction(async (tx) => {
+        const healedSnapshot = await this.syncProblemsFromSnapshot(
+          note.visit.patientId,
+          updateData.problemListSnapshot as any[],
+          userId,
+          tx,
+        );
+        console.log('[progress-notes.update] TRACE healed snapshot', healedSnapshot);
+        return tx.progressNote.update({
+          where: { id },
+          data: buildData(healedSnapshot),
+        });
+      });
     }
 
-    return this.prisma.progressNote.update({ where: { id }, data });
+    return this.prisma.progressNote.update({
+      where: { id },
+      data: buildData(),
+    });
   }
 
   async publish(patientId: string, id: string, userId: string) {
@@ -428,20 +509,19 @@ export class ProgressNotesService {
             this.medicationsService.findActiveForPatient(patientId, tx),
           ]);
 
-          const snapshotItems = mapAssessmentSnapshot(
-            note.problemListSnapshot as any[],
-          );
-
           const snapshotMeds = mapMedicationSnapshot(
             note.medicationSnapshot as any[],
           );
 
-          const [resolvedIdByKey] = await Promise.all([
-            this.problemsService.upsertFromAssessment(
+          const [updatedSnapshot] = await Promise.all([
+            // Draft saves already sync problems into master via update() —
+            // this call is a no-op re-sync when nothing changed since the
+            // last save, and the only path left for a note published in
+            // one shot without an intermediate draft save.
+            this.syncProblemsFromSnapshot(
               patientId,
-              snapshotItems,
+              note.problemListSnapshot as any[],
               userId,
-              'Progress Note',
               tx,
             ),
             this.medicationsService.upsertFromNoteMedications(
@@ -463,32 +543,6 @@ export class ProgressNotesService {
             beforeMeds,
             afterMeds,
           ) as object;
-
-          // Heal tempId's into real id's in the note's stored snapshot
-          // so that future diffs (e.g., when the note is edited and then diffed against the previous note)
-          // can correctly match items by identity instead of falling back to title matching.
-          // parentId references also point at tempId's — a child's parentId
-          // must be healed too, else it dangles once its parent's tempId is
-          // gone and the child silently loses its nesting on every later read.
-          const updatedSnapshot = (note.problemListSnapshot as any[]).map(
-            (item) => {
-              if (!item || typeof item !== 'object') return item;
-              const key = item.id || item.tempId;
-              const healedParentId =
-                item.parentId && resolvedIdByKey.has(item.parentId)
-                  ? resolvedIdByKey.get(item.parentId)
-                  : item.parentId;
-              if (key && resolvedIdByKey.has(key)) {
-                const newId = resolvedIdByKey.get(key);
-                const { tempId, isNew, ...rest } = item;
-                return { ...rest, id: newId, parentId: healedParentId };
-              }
-              if (healedParentId !== item.parentId) {
-                return { ...item, parentId: healedParentId };
-              }
-              return item;
-            },
-          );
 
           await tx.progressNote.update({
             where: { id },

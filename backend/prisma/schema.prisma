@@ -169,7 +169,7 @@ model Visit {
   updatedAt          DateTime  @updatedAt      @map("updated_at")
 
   // Relations
-  patient      Patient       @relation(fields: [patientId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   physician    User          @relation("VisitPhysician", fields: [physicianId], references: [id])
   initialNote  InitialNote?
   progressNote ProgressNote?
@@ -212,7 +212,7 @@ model InitialNote {
   updatedAt            DateTime   @updatedAt      @map("updated_at")
 
   // Relations
-  visit       Visit        @relation(fields: [visitId], references: [id])
+  visit       Visit        @relation(fields: [visitId], references: [id], onDelete: Cascade)
   author      User?        @relation("InitialNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("InitialNoteEditor", fields: [lastEditedBy], references: [id])
   versions    InitialNoteVersion[]
@@ -243,7 +243,7 @@ model ProgressNote {
   updatedAt            DateTime   @updatedAt      @map("updated_at")
 
   // Relations
-  visit       Visit        @relation(fields: [visitId], references: [id])
+  visit       Visit        @relation(fields: [visitId], references: [id], onDelete: Cascade)
   author      User?        @relation("ProgressNoteAuthor", fields: [authorId], references: [id])
   lastEditor  User?        @relation("ProgressNoteEditor", fields: [lastEditedBy], references: [id])
 
@@ -269,7 +269,7 @@ model Problem {
   updatedAt DateTime      @updatedAt      @map("updated_at")
 
   // Relations
-  patient  Patient   @relation(fields: [patientId], references: [id])
+  patient  Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
   parent   Problem?  @relation("ProblemNesting", fields: [parentId], references: [id])
   children Problem[] @relation("ProblemNesting")
   addedByUser User?  @relation("ProblemAddedBy", fields: [addedBy], references: [id])
@@ -300,7 +300,7 @@ model Medication {
   updatedAt    DateTime @updatedAt      @map("updated_at")
 
   // Relations
-  patient     Patient @relation(fields: [patientId], references: [id])
+  patient     Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   addedByUser User?   @relation("MedicationAddedBy", fields: [addedBy], references: [id])
   updatedByUser User? @relation("MedicationUpdatedBy", fields: [updatedBy], references: [id])
 
@@ -328,8 +328,8 @@ model VitalSign {
   createdAt         DateTime @default(now()) @map("created_at")
 
   // Relations
-  patient    Patient   @relation(fields: [patientId], references: [id])
-  visit      Visit?    @relation(fields: [visitId], references: [id])
+  patient    Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visit      Visit?    @relation(fields: [visitId], references: [id], onDelete: Cascade)
   measuredByUser User? @relation("VitalMeasuredBy", fields: [measuredBy], references: [id])
 
   @@index([patientId, measuredAt(sort: Desc)])
@@ -350,8 +350,8 @@ model Document {
   generatedAt  DateTime     @default(now()) @map("generated_at")
 
   // Relations
-  patient         Patient @relation(fields: [patientId], references: [id])
-  visit           Visit?  @relation(fields: [visitId], references: [id])
+  patient         Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visit           Visit?  @relation(fields: [visitId], references: [id], onDelete: Cascade)
   generatedByUser User?   @relation("DocumentGeneratedBy", fields: [generatedBy], references: [id])
 
   @@index([patientId, generatedAt(sort: Desc)])  // DocumentsService.findByPatient()
@@ -375,7 +375,7 @@ model Attachment {
   uploadedAt     DateTime @default(now()) @map("uploaded_at")
 
   // Relations (polymorphic via noteType + noteId — no direct FK)
-  patient        Patient      @relation(fields: [patientId], references: [id])
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   uploadedByUser User?        @relation("AttachmentUploadedBy", fields: [uploadedBy], references: [id])
 
   @@index([noteType, noteId])              // AttachmentsService.findByNote()
@@ -402,7 +402,7 @@ model AuditLog {
 
   // Relations
   user    User    @relation("AuditLogUser", fields: [userId], references: [id])
-  patient Patient? @relation("AuditLogPatient", fields: [patientId], references: [id])
+  patient Patient? @relation("AuditLogPatient", fields: [patientId], references: [id], onDelete: SetNull)
 
   @@index([patientId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -426,7 +426,7 @@ model ProblemLog {
   createdAt   DateTime @default(now()) @map("created_at")
 
   editor  User    @relation("ProblemLogEditor", fields: [editorId], references: [id])
-  patient Patient @relation("ProblemLogPatient", fields: [patientId], references: [id])
+  patient Patient @relation("ProblemLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
   @@map("problem_logs")
@@ -446,7 +446,7 @@ model MedicationLog {
   createdAt   DateTime @default(now()) @map("created_at")
 
   editor  User    @relation("MedicationLogEditor", fields: [editorId], references: [id])
-  patient Patient @relation("MedicationLogPatient", fields: [patientId], references: [id])
+  patient Patient @relation("MedicationLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
   @@map("medication_logs")
@@ -467,7 +467,7 @@ model InitialNoteLog {
   createdAt     DateTime @default(now()) @map("created_at")
 
   editor  User    @relation("InitialNoteLogEditor", fields: [editorId], references: [id])
-  patient Patient @relation("InitialNoteLogPatient", fields: [patientId], references: [id])
+  patient Patient @relation("InitialNoteLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
   @@map("initial_note_logs")
@@ -494,7 +494,7 @@ model InitialNoteVersion {
   // Note: initialNoteId is nullable so versions survive hard-deletion.
   initialNote InitialNote? @relation(fields: [initialNoteId], references: [id], onDelete: SetNull)
   editor      User        @relation("InitialNoteVersionEditor", fields: [editorId], references: [id])
-  patient     Patient     @relation("InitialNoteVersionPatient", fields: [patientId], references: [id])
+  patient     Patient     @relation("InitialNoteVersionPatient", fields: [patientId], references: [id], onDelete: Cascade)
 
   @@unique([initialNoteId, versionNumber])
   @@index([initialNoteId, versionNumber(sort: Desc)])
@@ -517,8 +517,8 @@ model DeletedNote {
   deletedAt            DateTime   @default(now()) @map("deleted_at")
   originalCreatedAt    DateTime   @map("original_created_at")
 
-  patient       Patient @relation(fields: [patientId], references: [id])
-  visit         Visit?  @relation(fields: [visitId], references: [id])
+  patient       Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visit         Visit?  @relation(fields: [visitId], references: [id], onDelete: Cascade)
   author        User?   @relation("DeletedNoteAuthor", fields: [authorId], references: [id])
   deletedByUser User?   @relation("DeletedNoteDeleter", fields: [deletedBy], references: [id])
 

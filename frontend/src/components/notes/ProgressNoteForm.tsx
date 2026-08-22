@@ -297,6 +297,14 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         // match), or a legacy id-less entry now healed with its id (title
         // match) — sync in place instead of adding a second entry.
         //
+        // Master always wins here: an in-note edit (rename/reorder/nest)
+        // is now synced straight into the master Problem row as soon as
+        // it's saved (see syncProblemsFromSnapshot on the backend), so by
+        // the time this merge runs again master already reflects the last
+        // save — pulling it back in is a no-op, not a clobber. The only
+        // way to diverge from master is Revert, which explicitly discards
+        // the draft and re-seeds from master (handleRevertProblemList).
+        //
         // diagnosisDate is deliberately NOT carried from the master problem
         // here — a progress note starts with a blank diagnosis date every
         // time; see the `null` seeding note on the brand-new-note branch
