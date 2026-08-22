@@ -14,6 +14,52 @@ import { TimelineNoteView, diffAssessmentItems, diffMedicationItems } from '@/li
 import { Badge } from '@/components/ui/badge';
 import { useAttachmentsByNote, useAttachmentDownloadUrl } from '@/hooks/useAttachments';
 import { AttachmentPeekModal } from './AttachmentPeekModal';
+import { cn } from '@/lib/utils';
+
+function SubjectiveItemView({ sub, isInitial }: { sub: { label: string; body: string }; isInitial: boolean }) {
+  const isPmh = sub.label === 'Past Medical History (PMH)';
+
+  if (isPmh && sub.body) {
+    const lines = sub.body.split('\n');
+    return (
+      <div className="flex flex-col gap-0.5">
+        {isInitial && (
+          <span className="text-[11px] font-semibold text-[var(--text-primary)]">{sub.label}</span>
+        )}
+        <div className="flex flex-col gap-1 pl-1">
+          {lines.map((line, lIdx) => {
+            const match = line.match(/^(Comorbidities|Surgeries|Hospitalizations|Allergies):\s*(.*)$/);
+            if (match) {
+              const [, label, content] = match;
+              return (
+                <div key={lIdx} className="leading-relaxed text-[12.5px]">
+                  <span className="font-medium text-[var(--text-primary)] mr-1.5">
+                    {label}:
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    {content || 'None'}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <p key={lIdx} className="whitespace-pre-wrap text-[12.5px]">{line}</p>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {isInitial && (
+        <span className="text-[11px] font-semibold text-[var(--text-primary)]">{sub.label}</span>
+      )}
+      <p className="whitespace-pre-wrap pl-1 text-[12.5px]">{sub.body || '—'}</p>
+    </div>
+  );
+}
 
 function NoteAttachmentItem({ att }: { att: any }) {
   const { refetch: getDownloadUrl, isFetching } = useAttachmentDownloadUrl(att.id);
@@ -194,7 +240,7 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
       <div className="flex flex-col gap-4 text-[13px] text-[var(--text-secondary)] leading-relaxed">
         <div className="flex flex-col gap-2 pl-1">
           {note.sections.subjective.map((sub, idx) => (
-            <p key={idx} className="whitespace-pre-wrap pl-1 text-[var(--text-primary)]">{sub.body || '—'}</p>
+            <SubjectiveItemView key={idx} sub={sub} isInitial={note.kind === 'initial'} />
           ))}
         </div>
         <NoteAttachmentsSection note={note} />
@@ -211,14 +257,9 @@ export function NoteFormattedSections({ note, previousNote }: NoteFormattedSecti
             <MessageSquare className="w-3.5 h-3.5" />
             <span className="text-[11.5px] uppercase tracking-[0.6px]">Subjective</span>
           </div>
-          <div className="flex flex-col gap-2 mt-1 pl-1">
+          <div className="flex flex-col gap-2.5 mt-1 pl-1">
             {note.sections.subjective.map((sub, idx) => (
-              <div key={idx} className="flex flex-col gap-0.5">
-                {note.kind === 'initial' && (
-                  <span className="text-[11px] font-semibold text-[var(--text-primary)]">{sub.label}</span>
-                )}
-                <p className="whitespace-pre-wrap pl-1">{sub.body || '—'}</p>
-              </div>
+              <SubjectiveItemView key={idx} sub={sub} isInitial={note.kind === 'initial'} />
             ))}
           </div>
         </div>

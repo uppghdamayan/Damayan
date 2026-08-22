@@ -399,19 +399,45 @@ export function formatAssessmentItems(rawItems: any[] | null | undefined): { id?
   });
 }
 
+/**
+ * Strips numbering tags (e.g., "1. ", "2. ", "1) ", bullets) and normalizes
+ * PMH text into a clean comma-separated list of items. Returns 'None' if empty.
+ */
+export function cleanPmhString(raw: string | null | undefined): string {
+  if (!raw || typeof raw !== 'string') return 'None';
+  const trimmed = raw.trim();
+  if (!trimmed || /^(?:none|n\/?a|nil|no(?:ne)? known|denies)$/i.test(trimmed)) {
+    return 'None';
+  }
+
+  // Split by newlines, or inline number markers (e.g. ", 2. " or "; 2. " or " 2. ")
+  const lines = trimmed.split(/(?:[\r\n]+|(?<=[^\d\s]|\))\s*[,;]?\s*(?=\b\d+[\.\)]\s+))/);
+
+  const cleanedItems = lines
+    .map((line) => {
+      let item = line.trim();
+      // Strip leading list numbering or bullets: e.g. "1. ", "1) ", "[1] ", "- ", "• ", "* "
+      item = item.replace(/^(?:\[?\d+[\.\)\]]\s*|[-•*]\s*)+/, '').trim();
+      // Strip trailing semicolons, commas, or periods used as list item endings
+      item = item.replace(/[.,;]+$/, '').trim();
+      return item;
+    })
+    .filter(Boolean);
+
+  if (cleanedItems.length === 0) return 'None';
+  return cleanedItems.join(', ');
+}
+
 export function mapNoteToTimelineView(
-  note: InitialNote | ProgressNote,
-  isLatest: boolean,
+  note: InitialNote | ProgressNote | Record<string, any>,
+  isLatest: boolean = false,
   initialNoteAuthorId?: string | null
 ): TimelineNoteView {
-  const isDeletedNote = 'originalNoteId' in note;
-  
-  if (isDeletedNote) {
-    const deletedNote = note as any; // Type as DeletedNote locally
-    const originalContent = deletedNote.content;
-    const isInitial = deletedNote.noteType === 'INITIAL_NOTE';
+  // Handle deleted note structure if it's passed as DeletedNoteRecord
+  if ('originalContent' in note && 'originalNoteType' in note) {
+    const deletedNote = note as any;
+    const originalContent = deletedNote.originalContent || {};
     
-    // The migration stored the row using row_to_json, so the keys are in snake_case.
     // Convert the necessary keys to camelCase for the mapping function to work.
     const camelCasedContent = { ...originalContent };
     
@@ -463,16 +489,20 @@ export function mapNoteToTimelineView(
       { label: 'Chief Complaint', body: initialNote.chiefComplaint },
       { label: 'History of Present Illness (HPI)', body: initialNote.hpi },
     ];
-    if (initialNote.pmhComorbidities || initialNote.pmhSurgeries || initialNote.pmhHospitalizations || initialNote.allergies) {
+    const hasPmh = Boolean(
+      (initialNote.pmhComorbidities && initialNote.pmhComorbidities.trim()) ||
+      (initialNote.pmhSurgeries && initialNote.pmhSurgeries.trim()) ||
+      (initialNote.pmhHospitalizations && initialNote.pmhHospitalizations.trim()) ||
+      (initialNote.allergies && initialNote.allergies.trim())
+    );
+    if (hasPmh) {
       const pmhParts = [
-        initialNote.pmhComorbidities ? `Comorbidities: ${initialNote.pmhComorbidities}` : null,
-        initialNote.pmhSurgeries ? `Surgeries: ${initialNote.pmhSurgeries}` : null,
-        initialNote.pmhHospitalizations ? `Hospitalizations: ${initialNote.pmhHospitalizations}` : null,
-        initialNote.allergies ? `Allergies: ${initialNote.allergies}` : null,
-      ].filter(Boolean).join('\n');
-      if (pmhParts) {
-        subjectiveSections.push({ label: 'Past Medical History (PMH)', body: pmhParts });
-      }
+        `Comorbidities: ${cleanPmhString(initialNote.pmhComorbidities)}`,
+        `Surgeries: ${cleanPmhString(initialNote.pmhSurgeries)}`,
+        `Hospitalizations: ${cleanPmhString(initialNote.pmhHospitalizations)}`,
+        `Allergies: ${cleanPmhString(initialNote.allergies)}`,
+      ].join('\n');
+      subjectiveSections.push({ label: 'Past Medical History (PMH)', body: pmhParts });
     }
     if (initialNote.familyHistory) {
       subjectiveSections.push({ label: 'Family Medical History', body: initialNote.familyHistory });

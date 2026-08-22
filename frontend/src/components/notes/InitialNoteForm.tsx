@@ -14,6 +14,7 @@ import {
   initialNotePublishSchema, 
   InitialNoteDraftValues 
 } from '@/lib/validation/initial-note-schema';
+import { cleanPmhString } from '@/lib/notes-utils';
 import {
   useInitialNote,
   useCreateInitialNote,
@@ -1185,22 +1186,22 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   <div className="flex flex-col text-[12.5px] bg-surface-2/60 border border-border rounded-lg overflow-hidden divide-y divide-border/60">
                     <div className="p-3 flex flex-col gap-0.5">
                       <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Comorbidities</span>
-                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhComorbidities || 'None'}</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{cleanPmhString(note.pmhComorbidities)}</span>
                     </div>
                     <div className="p-3 flex flex-col gap-0.5">
                       <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Surgeries</span>
-                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhSurgeries || 'None'}</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{cleanPmhString(note.pmhSurgeries)}</span>
                     </div>
                     <div className="p-3 flex flex-col gap-0.5">
                       <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Hospitalizations</span>
-                      <span className="text-text-primary font-medium leading-relaxed">{note.pmhHospitalizations || 'None'}</span>
+                      <span className="text-text-primary font-medium leading-relaxed">{cleanPmhString(note.pmhHospitalizations)}</span>
                     </div>
                     <div className="p-3 flex flex-col gap-1 bg-surface">
                       <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Allergies</span>
-                      {note.allergies ? (
+                      {cleanPmhString(note.allergies) !== 'None' ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-bg border border-red-border text-red font-semibold text-[12px] w-fit">
                           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{note.allergies}</span>
+                          <span>{cleanPmhString(note.allergies)}</span>
                         </div>
                       ) : (
                         <span className="text-text-secondary font-medium">No known allergies</span>

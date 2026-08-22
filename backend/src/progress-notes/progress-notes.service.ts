@@ -457,22 +457,11 @@ export class ProgressNotesService {
 
     // Draft, has a problem-list edit to save, and this author is allowed to
     // touch the master list — sync now instead of waiting for publish.
-    // TEMP DEBUG — remove once the draft->master sync gap is diagnosed.
-    console.log('[progress-notes.update] TRACE', {
-      noteId: id,
-      status: note.status,
-      hasSnapshot: updateData.problemListSnapshot !== undefined,
-      authorRole,
-      canSyncProblems,
-    });
     if (
       updateData.problemListSnapshot !== undefined &&
       note.status === NoteStatus.DRAFT &&
       canSyncProblems
     ) {
-      console.log('[progress-notes.update] TRACE syncing problems now', {
-        snapshot: updateData.problemListSnapshot,
-      });
       return this.prisma.$transaction(async (tx) => {
         const healedSnapshot = await this.syncProblemsFromSnapshot(
           note.visit.patientId,
@@ -480,7 +469,6 @@ export class ProgressNotesService {
           userId,
           tx,
         );
-        console.log('[progress-notes.update] TRACE healed snapshot', healedSnapshot);
         return tx.progressNote.update({
           where: { id },
           data: buildData(healedSnapshot),
