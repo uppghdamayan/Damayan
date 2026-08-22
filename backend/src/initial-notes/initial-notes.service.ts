@@ -132,6 +132,27 @@ export class InitialNotesService {
     }
 
     const { visitDatetime, ...updateData } = dto;
+
+    // For published notes: Prescribed Medications under Plan are locked.
+    // Only Past Medications (source: 'past') under History module are editable.
+    let effectiveMedicationSnapshot = updateData.medicationSnapshot;
+    if (
+      note.status === NoteStatus.PUBLISHED &&
+      updateData.medicationSnapshot !== undefined
+    ) {
+      const existingPrescribed = Array.isArray(note.medicationSnapshot)
+        ? (note.medicationSnapshot as any[]).filter(
+            (m) => !m || typeof m !== 'object' || m.source !== 'past',
+          )
+        : [];
+      const newPast = Array.isArray(updateData.medicationSnapshot)
+        ? (updateData.medicationSnapshot as any[]).filter(
+            (m) => m && typeof m === 'object' && m.source === 'past',
+          )
+        : [];
+      effectiveMedicationSnapshot = [...existingPrescribed, ...newPast];
+    }
+
     const data: Prisma.InitialNoteUpdateInput = {
       ...(updateData.chiefComplaint !== undefined && {
         chiefComplaint: updateData.chiefComplaint,
@@ -183,8 +204,8 @@ export class InitialNotesService {
       ...(updateData.diagnostics !== undefined && {
         diagnostics: updateData.diagnostics,
       }),
-      ...(updateData.medicationSnapshot !== undefined && {
-        medicationSnapshot: updateData.medicationSnapshot as any,
+      ...(effectiveMedicationSnapshot !== undefined && {
+        medicationSnapshot: effectiveMedicationSnapshot as any,
       }),
     };
 
@@ -245,6 +266,7 @@ export class InitialNotesService {
           // mapMedicationSnapshot filters down to empty) must be a no-op
           // here, not a mass-discontinue.
           if (
+            note.status !== NoteStatus.PUBLISHED &&
             Array.isArray(updateData.medicationSnapshot) &&
             updateData.medicationSnapshot.length > 0
           ) {

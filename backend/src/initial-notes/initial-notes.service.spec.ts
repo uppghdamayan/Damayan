@@ -332,6 +332,59 @@ describe('InitialNotesService — logs and version history', () => {
         'Revised published Initial Note (v2): Edited the History of Present Illness',
       );
     });
+
+    it('locks prescribed medications and only updates past medications on published notes', async () => {
+      const original = makeNote({
+        status: 'PUBLISHED',
+        medicationSnapshot: [
+          { name: 'Abacavir/Lamivudine', dose: '600/300mg' },
+          { name: 'Ibuprofen', dose: '400mg' },
+        ] as any,
+      });
+      prisma.initialNote.findUnique.mockResolvedValue(original);
+      tx.initialNoteVersion.count.mockResolvedValue(1);
+      tx.initialNoteVersion.aggregate.mockResolvedValue({
+        _max: { versionNumber: 1 },
+      });
+
+      tx.initialNote.update.mockImplementation(({ data }: any) => {
+        const updatedState = makeNote({
+          ...original,
+          ...data,
+        });
+        return Promise.resolve(updatedState);
+      });
+
+      await service.update(
+        PATIENT_ID,
+        NOTE_ID,
+        {
+          medicationSnapshot: [
+            { name: 'test', dose: '10mg', source: 'past' },
+          ],
+        },
+        USER_ID,
+      );
+
+      expect(
+        tx.initialNote.update.mock.calls[0][0].data.medicationSnapshot,
+      ).toEqual([
+        { name: 'Abacavir/Lamivudine', dose: '600/300mg' },
+        { name: 'Ibuprofen', dose: '400mg' },
+        { name: 'test', dose: '10mg', source: 'past' },
+      ]);
+
+      const versionData = tx.initialNoteVersion.create.mock.calls[0][0].data;
+      expect(versionData.changedFields).toEqual(['pmhMedications']);
+      expect(versionData.changeSummary).toBe(
+        'Added the Past Medical History (Past Medications) (added test)',
+      );
+
+      const logData = tx.initialNoteLog.create.mock.calls[0][0].data;
+      expect(logData.description).toBe(
+        'Revised published Initial Note (v2): Added the Past Medical History (Past Medications) (added test)',
+      );
+    });
   });
 
   describe('update — draft note', () => {

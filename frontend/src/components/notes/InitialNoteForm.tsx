@@ -460,18 +460,22 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
           obHistory: note.obHistory || '',
           psychosocialHistory: note.psychosocialHistory || '',
           physicalExam: note.physicalExam || '',
-          assessment: validProblems.length > 0
+          assessment: isPublished
             ? validProblems
-            : (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null })),
-          medicationSnapshot: validMeds.length > 0
+            : validProblems.length > 0
+              ? validProblems
+              : (copyForward?.activeProblems || []).map((p: any) => ({ id: p.id || undefined, title: p.title, parentId: p.parentId ?? null, diagnosisDate: p.diagnosisDate ?? null })),
+          medicationSnapshot: isPublished
             ? validMeds
-            : (copyForward?.activeMedications || []).map((m: any) => ({
-                name: m.name,
-                dose: m.dose || undefined,
-                formulation: m.formulation || undefined,
-                quantity: m.quantity || undefined,
-                instructions: m.instructions || undefined,
-              })),
+            : validMeds.length > 0
+              ? validMeds
+              : (copyForward?.activeMedications || []).map((m: any) => ({
+                  name: m.name,
+                  dose: m.dose || undefined,
+                  formulation: m.formulation || undefined,
+                  quantity: m.quantity || undefined,
+                  instructions: m.instructions || undefined,
+                })),
           mgmtNonpharm: note.mgmtNonpharm || '',
           mgmtPharm: note.mgmtPharm || '',
         diagnostics: note.diagnostics || [],
@@ -1213,18 +1217,34 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         : [];
                       if (pastMeds.length === 0) return null;
                       return (
-                        <div className="p-3 flex flex-col gap-1 bg-surface">
+                        <div className="p-3 flex flex-col gap-2 bg-surface">
                           <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-text-muted">Past Medications</span>
-                          <div className="flex flex-col gap-1 mt-0.5">
+                          <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-surface divide-y divide-border/60">
                             {pastMeds.map((med: any, idx: number) => {
                               const medName = typeof med === 'string' ? med : med.name;
                               const medDetails = typeof med !== 'string'
                                 ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
                                 : '';
+                              const instructions = typeof med !== 'string' ? med.instructions : '';
+
                               return (
-                                <div key={idx} className="text-[12px] text-text-primary flex items-center justify-between">
-                                  <span className="font-semibold">{medName}</span>
-                                  {medDetails && <span className="text-[11px] font-mono text-amber">{medDetails}</span>}
+                                <div key={idx} className="flex flex-col gap-1 p-2.5 hover:bg-surface-2/50 transition-colors">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="w-2 h-2 rounded-full bg-amber shrink-0" />
+                                      <span className="text-[13px] font-bold text-text-primary truncate">{medName}</span>
+                                    </div>
+                                    {medDetails && (
+                                      <span className="text-[11px] font-medium font-mono text-text-secondary shrink-0 bg-surface-2 px-2 py-0.5 rounded border border-border">
+                                        {medDetails}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {instructions && (
+                                    <div className="text-[11.5px] text-text-secondary pl-4 leading-relaxed font-sans">
+                                      {instructions}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}

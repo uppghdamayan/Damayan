@@ -13,6 +13,7 @@ export const INITIAL_NOTE_FIELD_LABELS: Record<string, string> = {
   pmhComorbidities: 'Past Medical History (Comorbidities)',
   pmhSurgeries: 'Past Medical History (Surgeries)',
   pmhHospitalizations: 'Past Medical History (Hospitalizations)',
+  pmhMedications: 'Past Medical History (Past Medications)',
   allergies: 'Allergies',
   familyHistory: 'Family History',
   socialHistory: 'Social History',
@@ -20,7 +21,7 @@ export const INITIAL_NOTE_FIELD_LABELS: Record<string, string> = {
   psychosocialHistory: 'Psychosocial History',
   physicalExam: 'Physical Exam',
   assessment: 'Assessment',
-  medicationSnapshot: 'Medications',
+  medicationSnapshot: 'Past Medical History (Past Medications)',
   mgmtNonpharm: 'Non-pharmacologic Management',
   diagnostics: 'Diagnostics',
 };
@@ -32,6 +33,7 @@ export const INITIAL_NOTE_FIELD_SHORT_LABELS: Record<string, string> = {
   pmhComorbidities: 'Comorbidities',
   pmhSurgeries: 'Surgeries',
   pmhHospitalizations: 'Hospitalizations',
+  pmhMedications: 'Past Meds',
   allergies: 'Allergies',
   familyHistory: 'Family History',
   socialHistory: 'Social History',
@@ -39,7 +41,7 @@ export const INITIAL_NOTE_FIELD_SHORT_LABELS: Record<string, string> = {
   psychosocialHistory: 'Psychosocial History',
   physicalExam: 'Physical Exam',
   assessment: 'Assessment',
-  medicationSnapshot: 'Medications',
+  medicationSnapshot: 'Past Meds',
   mgmtNonpharm: 'Non-pharm Mgmt',
   diagnostics: 'Diagnostics',
 };

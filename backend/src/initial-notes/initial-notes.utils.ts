@@ -25,7 +25,8 @@ export const INITIAL_NOTE_CONTENT_FIELDS = [
 ] as const;
 
 export type InitialNoteContentField =
-  (typeof INITIAL_NOTE_CONTENT_FIELDS)[number];
+  | (typeof INITIAL_NOTE_CONTENT_FIELDS)[number]
+  | 'pmhMedications';
 
 /**
  * Full section names as a clinician would read them — these go straight into
@@ -41,6 +42,7 @@ export const INITIAL_NOTE_FIELD_LABELS: Record<
   pmhComorbidities: 'Past Medical History (Comorbidities)',
   pmhSurgeries: 'Past Medical History (Surgeries)',
   pmhHospitalizations: 'Past Medical History (Hospitalizations)',
+  pmhMedications: 'Past Medical History (Past Medications)',
   allergies: 'Allergies',
   familyHistory: 'Family History',
   socialHistory: 'Social History',
@@ -221,6 +223,59 @@ export function diffNoteFields(
   const changes: FieldChange[] = [];
 
   for (const field of INITIAL_NOTE_CONTENT_FIELDS) {
+    if (field === 'medicationSnapshot') {
+      const beforeList = Array.isArray(before[field])
+        ? (before[field] as any[])
+        : [];
+      const afterList = Array.isArray(after[field])
+        ? (after[field] as any[])
+        : [];
+
+      const beforePast = beforeList.filter(
+        (m) => m && typeof m === 'object' && m.source === 'past',
+      );
+      const afterPast = afterList.filter(
+        (m) => m && typeof m === 'object' && m.source === 'past',
+      );
+
+      const beforePrescribed = beforeList.filter(
+        (m) => !m || typeof m !== 'object' || m.source !== 'past',
+      );
+      const afterPrescribed = afterList.filter(
+        (m) => !m || typeof m !== 'object' || m.source !== 'past',
+      );
+
+      const pastChanged =
+        stableStringify(beforePast) !== stableStringify(afterPast);
+      const prescribedChanged =
+        stableStringify(beforePrescribed) !== stableStringify(afterPrescribed);
+
+      if (pastChanged) {
+        const wasEmpty = isEmptyValue(beforePast);
+        const isNowEmpty = isEmptyValue(afterPast);
+        changes.push({
+          field: 'pmhMedications',
+          kind: wasEmpty ? 'added' : isNowEmpty ? 'cleared' : 'edited',
+          detail: describeListDelta('medicationSnapshot', beforePast, afterPast),
+        });
+      }
+
+      if (prescribedChanged) {
+        const wasEmpty = isEmptyValue(beforePrescribed);
+        const isNowEmpty = isEmptyValue(afterPrescribed);
+        changes.push({
+          field: 'medicationSnapshot',
+          kind: wasEmpty ? 'added' : isNowEmpty ? 'cleared' : 'edited',
+          detail: describeListDelta(
+            'medicationSnapshot',
+            beforePrescribed,
+            afterPrescribed,
+          ),
+        });
+      }
+      continue;
+    }
+
     if (stableStringify(before[field]) === stableStringify(after[field])) {
       continue;
     }

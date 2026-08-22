@@ -79,8 +79,14 @@ export function InitialNoteVersionView({
     { key: 'psychosocialHistory', label: 'Psychosocial History' },
   ];
 
-  const hasAnyHistory = historyFields.some((f) => !!snapshot[f.key]);
-  const historyChanged = historyFields.some((f) => changed(f.key as string));
+  const allMeds = Array.isArray(snapshot.medicationSnapshot) ? snapshot.medicationSnapshot : [];
+  const pastMeds = allMeds.filter((m: any) => m && typeof m === 'object' && m.source === 'past');
+  const prescribedMeds = allMeds.filter((m: any) => !m || typeof m !== 'object' || m.source !== 'past');
+
+  const isPastMedsChanged = changed('pmhMedications') || changed('medicationSnapshot');
+
+  const hasAnyHistory = historyFields.some((f) => !!snapshot[f.key]) || pastMeds.length > 0;
+  const historyChanged = historyFields.some((f) => changed(f.key as string)) || isPastMedsChanged;
 
   const assessment = snapshot.assessment ?? [];
   // DFS parent-then-children depth via the same helper the editor uses for
@@ -92,7 +98,6 @@ export function InitialNoteVersionView({
   const assessmentDepthByIndex = new Map(
     buildAssessmentFlatOrder(assessment as NoteAssessmentItem[]).map((f) => [f.originalIndex, f.depth]),
   );
-  const medications = snapshot.medicationSnapshot ?? [];
   const diagnostics = snapshot.diagnostics ?? [];
 
   return (
@@ -114,7 +119,7 @@ export function InitialNoteVersionView({
       </Section>
 
       <Section
-        title="History Module (PMH, Family, Social)"
+        title="Past Medical History"
         icon={<History className="w-3.5 h-3.5" />}
         changed={historyChanged}
       >
@@ -156,6 +161,59 @@ export function InitialNoteVersionView({
                   </div>
                 );
               })}
+
+            {pastMeds.length > 0 && (
+              <div
+                className={cn(
+                  "flex flex-col gap-1.5 rounded p-2.5 transition-all border @min-[1024px]:col-span-2",
+                  isPastMedsChanged
+                    ? "bg-amber-bg/20 border-amber-border/50"
+                    : "bg-surface-2/40 border-border/50"
+                )}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-[0.5px]",
+                    isPastMedsChanged ? "text-amber" : "text-text-muted"
+                  )}>
+                    Past Medications
+                  </span>
+                  {isPastMedsChanged && (
+                    <span className="text-[8.5px] font-bold uppercase tracking-wider text-amber bg-amber-bg border border-amber-border px-1 py-0 rounded">
+                      Modified
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5 mt-0.5">
+                  {pastMeds.map((med: any, idx: number) => {
+                    const medName = typeof med === 'string' ? med : med.name;
+                    const dose = typeof med !== 'string' ? med.dose : '';
+                    const formulation = typeof med !== 'string' ? med.formulation : '';
+                    const quantity = typeof med !== 'string' ? med.quantity : '';
+                    const instructions = typeof med !== 'string' ? med.instructions : '';
+
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-1.5 px-2.5 rounded bg-surface border border-border/60 text-[12px]">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-text-primary">{medName}</span>
+                            {dose && <span className="font-mono font-semibold text-accent">{dose}</span>}
+                            {formulation && <span className="text-text-secondary">({formulation})</span>}
+                            {quantity && <span className="text-text-muted">Qty: {quantity}</span>}
+                          </div>
+                          {instructions && (
+                            <div className="text-[11px] text-text-muted mt-0.5">
+                              {instructions}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <EmptyValue />
@@ -205,13 +263,13 @@ export function InitialNoteVersionView({
       </Section>
 
       <Section
-        title="Medications"
+        title="Medications (Prescribed)"
         icon={<Pill className="w-3.5 h-3.5" />}
-        changed={changed('medicationSnapshot')}
+        changed={false}
       >
-        {medications.length > 0 ? (
+        {prescribedMeds.length > 0 ? (
           <div className="flex flex-col gap-2 pt-0.5">
-            {medications.map((med, i) => (
+            {prescribedMeds.map((med: any, i: number) => (
               <div key={`${med.name}-${i}`} className="flex items-start gap-2 py-1.5 px-2.5 rounded bg-surface-2/50 border border-border/60 text-[12px]">
                 <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 mt-1.5" />
                 <div className="flex-1 min-w-0">
