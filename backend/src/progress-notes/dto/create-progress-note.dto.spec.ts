@@ -4,14 +4,13 @@ import { validate } from 'class-validator';
 import { CreateProgressNoteDto } from './create-progress-note.dto';
 
 describe('CreateProgressNoteDto medicationSnapshot validation', () => {
-  it('rejects an instructions value over 50 characters', async () => {
+  it('rejects an instructions value over 255 characters', async () => {
     const dto = plainToInstance(CreateProgressNoteDto, {
       medicationSnapshot: [
         {
           name: 'Amlodipine',
           dose: '10 mg',
-          instructions:
-            'Take 1 tablet by mouth twice daily after meals for 7 days straight',
+          instructions: 'Take 1 tablet by mouth twice daily after meals. '.repeat(11),
         },
       ],
     });

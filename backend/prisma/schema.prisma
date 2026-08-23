@@ -290,7 +290,7 @@ model Medication {
   name         String   @db.VarChar(255)
   dose         String   @db.VarChar(255)
   formulation  String?  @db.VarChar(50)
-  instructions String?  @db.VarChar(50)
+  instructions String?  @db.VarChar(255)
   quantity     Int?
   isActive     Boolean  @default(true) @map("is_active")
   fromPast     Boolean  @default(false) @map("from_past")

@@ -85,7 +85,7 @@ export class MedicationItemDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(50)
+  @MaxLength(255)
   instructions?: string;
 
   @IsString()
