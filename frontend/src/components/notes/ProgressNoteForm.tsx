@@ -163,6 +163,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   } = useMedicationEditLock(patientId, 'note', { noteId, hasOpenDbDraft: !!noteId });
   const [isMedicationEditMode, setIsMedicationEditMode] = useState(false);
 
+  // Names (lowercased) the clinician explicitly discontinued from this note's
+  // medication list via the trash icon. A discontinued medication stays
+  // ACTIVE on the master Medication row until this note is actually
+  // published (see MedicationsService#upsertFromNoteMedications) — so a
+  // Save Draft in between triggers a `note`/`copyForward` refetch, and
+  // mergeActiveMedications' "add missing active meds back" step would
+  // otherwise silently resurrect the removal, since the med still reads as
+  // active in the master list. Consulted there to keep a deliberate removal
+  // removed until Revert or a fresh note load clears it.
+  const removedMedNamesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    removedMedNamesRef.current.clear();
+  }, [noteId]);
+
   useEffect(() => {
     if (medicationListLockOwner === 'note' && !isMedicationEditMode) {
       setIsMedicationEditMode(true);
@@ -202,6 +217,30 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       visitDatetime: new Date().toISOString(),
     },
   });
+
+  const handleMedicationSnapshotChange = (next: any[]) => {
+    const prev = form.getValues('medicationSnapshot') || [];
+    const nextNames = new Set(
+      (next || [])
+        .map((m: any) => (typeof m === 'string' ? m : m?.name)?.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    for (const m of prev) {
+      if (!m) continue;
+      const isNewItem = typeof m === 'object' && m.isNew;
+      if (isNewItem) continue; // never persisted to the master list — nothing to "resurrect"
+      const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
+      if (name && !nextNames.has(name)) {
+        removedMedNamesRef.current.add(name);
+      }
+    }
+    // A name back in `next` (e.g. re-added via the sub-form) is no longer a
+    // pending discontinuation.
+    for (const name of nextNames) {
+      removedMedNamesRef.current.delete(name);
+    }
+    form.setValue('medicationSnapshot', next, { shouldDirty: true, shouldTouch: true });
+  };
 
   const activeProblemTree = useMemo(() => {
     const activeProbs = copyForward?.activeProblems || [];
@@ -394,6 +433,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     for (const m of activeMedications || []) {
       const name = m.name?.trim().toLowerCase();
       if (!name) continue;
+      if (removedMedNamesRef.current.has(name)) continue; // explicitly discontinued in this note — do not resurrect
       if (!existingNames.has(name)) {
         existing.push({
           name: m.name,
@@ -709,6 +749,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       initialMeds,
       { shouldDirty: true },
     );
+    removedMedNamesRef.current.clear();
     setIsMedicationEditMode(false);
     releaseMedicationLock();
   };
@@ -1639,7 +1680,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   render={({ field }) => (
                     <NoteMedicationEditor
                       value={field.value || []}
-                      onChange={(next) => field.onChange(next)}
+                      onChange={handleMedicationSnapshotChange}
                       isPublished={isPublished}
                       isDisabled={isDisabled}
                       isEditMode={isMedicationEditMode}
