@@ -1,13 +1,15 @@
-import { useProgressNotes, useCarryForwardSource, ProgressNote } from '@/hooks/useProgressNotes';
+import { useProgressNotes, useCarryForwardSource, useCopyForwardData, ProgressNote } from '@/hooks/useProgressNotes';
 import { useInitialNote, useInitialNotes, useDeleteInitialNote, InitialNote } from '@/hooks/useInitialNote';
 import { useNewProgressNoteAction } from '@/hooks/useNewProgressNoteAction';
 import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
+import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
 import { useDeletedNotes } from '@/hooks/useDeletedNotes';
 import { DeletedNote } from '@/types/deleted-note';
 import { useState, useMemo } from 'react';
 import { mapNoteToTimelineView } from '@/lib/notes-utils';
+import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications } from '@/lib/note-snapshot-merge';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
 import { ClipboardList, ArrowRight } from 'lucide-react';
@@ -15,6 +17,53 @@ import { useDeleteProgressNote } from '@/hooks/useProgressNotes';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { Skeleton } from '@/components/ui/skeleton';
+
+/**
+ * Mirrors ProgressNoteForm's branch selection for a snapshot-less draft
+ * (see ProgressNoteForm.tsx's hydration effect, `hasProblemSnapshot`/
+ * `hasMedSnapshot` branches) so a draft's timeline entry never diverges
+ * from what the editor would show for the same note, whether or not the
+ * editor is actually mounted right now.
+ */
+function mergeProblemsForDraft(problemListSnapshot: unknown, activeProblems: any[]): any[] {
+  const hasSnapshot = Array.isArray(problemListSnapshot);
+  const validProblems = (hasSnapshot ? (problemListSnapshot as any[]) : [])
+    .filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title))
+    .map((p: any) => (typeof p === 'string' ? { title: p } : p));
+
+  if (hasSnapshot) return mergeActiveProblems(validProblems, activeProblems);
+
+  return flattenActiveProblemTree(activeProblems).map(({ problem: p, depth }) => ({
+    id: p.id || undefined,
+    title: p.title,
+    parentId: p.parentId || undefined,
+    depth,
+    diagnosisDate: p.diagnosisDate || null,
+  }));
+}
+
+function mergeMedsForDraft(
+  medicationSnapshot: unknown,
+  activeMedications: any[],
+  inheritedMedications: any[],
+): any[] {
+  const hasSnapshot = Array.isArray(medicationSnapshot);
+  const validMeds = (hasSnapshot ? (medicationSnapshot as any[]) : [])
+    .filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name))
+    .map((m: any) => (typeof m === 'string' ? { name: m, dose: '' } : m));
+
+  if (hasSnapshot) return mergeActiveMedications(validMeds, activeMedications);
+  if (inheritedMedications.length > 0) return mergeActiveMedications(inheritedMedications, activeMedications);
+
+  return activeMedications.map((m: any) => ({
+    name: m.name,
+    dose: m.dose || undefined,
+    formulation: m.formulation || undefined,
+    quantity: m.quantity || undefined,
+    instructions: m.instructions || undefined,
+    fromPast: m.fromPast || false,
+  }));
+}
 
 
 interface NoteTimelineProps {
@@ -65,6 +114,20 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
 
   const progressNotes = progressNotesResponse?.data || [];
 
+  // The one DRAFT progress note (if any) this patient has open — its
+  // timeline entry is kept 1:1 with the editor sidebar (see mappedNotes
+  // below). Only one draft is ever active at a time per NoteTimeline.tsx's
+  // own "+ New Note" gating (hasDrafts below), so `.find` is unambiguous.
+  const draftProgressNote = progressNotes.find((n: any) => n.status === 'DRAFT' && !n.isDeleted);
+  // excludeNoteId matches ProgressNoteForm's own useCopyForwardData call for
+  // this same note (ProgressNoteForm.tsx:99) — same cache entry, no extra
+  // request, and `inheritedMedications` resolves to exactly what the editor
+  // sees (never the draft's own still-blank snapshot).
+  const { data: copyForward } = useCopyForwardData(patientId, draftProgressNote?.id ?? null);
+  const liveDraftSnapshot = useDraftSnapshotStore((s) =>
+    draftProgressNote ? s.byKey[`${patientId}:${draftProgressNote.id}`] : undefined
+  );
+
   // Combine and sort
   const allNotesRaw = useMemo(() => {
     const combined: any[] = [...progressNotes];
@@ -114,9 +177,27 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
     return sortedRaw.map((note, index) => {
       // The latest note is the first one in the sorted list (since newest first)
       const isLatest = index === 0;
-      return mapNoteToTimelineView(note, isLatest, initialNoteAuthorId);
+      // Keep the one open DRAFT's timeline entry 1:1 with ProgressNoteForm:
+      // prefer the editor's own live form state when it's mounted
+      // (liveDraftSnapshot — covers in-note discontinuations and unsaved
+      // isNew rows the merge below can't see), else run the identical merge
+      // against the live master lists so the entry still isn't stuck on a
+      // stale/null persisted snapshot with the panel closed.
+      let noteForView = note;
+      if (draftProgressNote && note.id === draftProgressNote.id && copyForward) {
+        noteForView = {
+          ...note,
+          problemListSnapshot:
+            liveDraftSnapshot?.problemListSnapshot ??
+            mergeProblemsForDraft(note.problemListSnapshot, copyForward.activeProblems),
+          medicationSnapshot:
+            liveDraftSnapshot?.medicationSnapshot ??
+            mergeMedsForDraft(note.medicationSnapshot, copyForward.activeMedications, copyForward.inheritedMedications),
+        };
+      }
+      return mapNoteToTimelineView(noteForView, isLatest, initialNoteAuthorId);
     });
-  }, [sortedRaw, activeInitialNote]);
+  }, [sortedRaw, activeInitialNote, draftProgressNote, copyForward, liveDraftSnapshot]);
 
   const inheritedSourceId = carryForwardSource?.sourceNoteId ?? undefined;
 
@@ -266,7 +347,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             // it fragments the "Inherited by today's note" chain instead of the linear live history.
             const previousNote = note.kind === 'initial'
               ? null
-              : (mappedNotes.slice(index + 1).find(n => !n.isDeleted && n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id && !n.isDeleted) : null) || null);
+              : (mappedNotes.slice(index + 1).find(n => !n.isDeleted && n.status !== 'DRAFT' && n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id && !n.isDeleted && n.status !== 'DRAFT') : null) || null);
             const isOpenNote = expandedNotes.has(note.id);
 
             return (

@@ -878,7 +878,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     switch (status) {
       case 'critical': return 'text-red font-semibold';
       case 'warn': return 'text-amber font-medium';
-      case 'normal': return 'text-green';
       default: return 'text-[var(--text-secondary)]';
     }
   };

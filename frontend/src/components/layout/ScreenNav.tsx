@@ -26,7 +26,7 @@ const ALL_TABS = [
   { id: 'dashboard', label: 'Dashboard', path: '', icon: LayoutDashboard },
   { id: 'vitals', label: 'Vital Signs', path: '/vitals', icon: Activity },
   { id: 'note-timeline', label: 'Note Timeline', path: '/notes', icon: Clock },
-  { id: 'initial-note', label: 'Initial Note', path: '/initial-note', icon: FileText },
+  { id: 'initial-note', label: 'History', path: '/initial-note', icon: FileText },
   { id: 'problems', label: 'Problem List', path: '/problems', icon: ListTodo },
   { id: 'medications', label: 'Medications', path: '/medications', icon: Pill },
   { id: 'documents', label: 'Documents', path: '/documents', icon: Printer },

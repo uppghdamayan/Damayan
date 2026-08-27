@@ -1,10 +1,5 @@
 import { useLatestVitals } from '@/hooks/useVitals';
-import { 
-  classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
-  classifyTemperature, classifyRespiratoryRate,
-  formatBloodPressure, formatTemperature
-} from '@/lib/vitals-utils';
-import { cn } from '@/lib/utils';
+import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 
@@ -17,20 +12,6 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
 
   if (isLoading) return <div className="h-[60px] bg-surface-2 animate-pulse rounded-lg mb-4" />;
   if (!vitals) return null;
-
-  const getStatusColor = (status: 'normal' | 'warn' | 'critical' | 'unknown') => {
-    switch (status) {
-      case 'critical': return 'text-red font-semibold';
-      case 'warn': return 'text-amber font-medium';
-      case 'normal': return 'text-green';
-      default: return '';
-    }
-  };
-
-  const hrStatus = classifyHeartRate(vitals.heartRate);
-  const tempStatus = classifyTemperature(Number(vitals.temperature));
-  const o2Status = classifyOxygenSaturation(vitals.oxygenSaturation);
-  const bpStatus = classifyBloodPressure(vitals.sbp, vitals.dbp);
 
   return (
     <div className="bg-surface border border-accent-mid rounded-[8px] shadow-[0_4px_12px_rgba(10,110,95,0.08)] mb-4 overflow-hidden">
@@ -65,19 +46,19 @@ export function VitalsSummaryRow({ patientId }: VitalsSummaryRowProps) {
                 <td className="px-[10px] py-2 border-b border-border font-mono text-[11px] text-text-secondary align-middle">
                   {new Date(vitals.measuredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {new Date(vitals.measuredAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                 </td>
-                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(bpStatus))}>
+                <td className="px-[10px] py-2 border-b border-border font-mono text-[13px] text-text-primary align-middle">
                   {formatBloodPressure(vitals.sbp, vitals.dbp)}
                 </td>
-                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(hrStatus))}>
+                <td className="px-[10px] py-2 border-b border-border font-mono text-[13px] text-text-primary align-middle">
                   {vitals.heartRate ?? '—'}
                 </td>
-                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(classifyRespiratoryRate(vitals.respiratoryRate)))}>
+                <td className="px-[10px] py-2 border-b border-border font-mono text-[13px] text-text-primary align-middle">
                   {vitals.respiratoryRate ?? '—'}
                 </td>
-                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(tempStatus))}>
+                <td className="px-[10px] py-2 border-b border-border font-mono text-[13px] text-text-primary align-middle">
                   {formatTemperature(Number(vitals.temperature))}
                 </td>
-                <td className={cn("px-[10px] py-2 border-b border-border font-mono text-[13px] align-middle", getStatusColor(o2Status))}>
+                <td className="px-[10px] py-2 border-b border-border font-mono text-[13px] text-text-primary align-middle">
                   {vitals.oxygenSaturation ? `${vitals.oxygenSaturation}%` : '—'}
                 </td>
               </tr>

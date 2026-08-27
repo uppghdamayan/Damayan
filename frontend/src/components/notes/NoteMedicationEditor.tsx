@@ -286,7 +286,7 @@ export function NoteMedicationEditor({
               Add Medication
             </span>
             <span className="text-xs text-text-muted">
-              * Name &amp; dose required
+              <span className="text-red font-bold">*</span> Name, dose &amp; quantity required
             </span>
           </div>
 
@@ -308,7 +308,7 @@ export function NoteMedicationEditor({
 
           {/* Row 2: Responsive Grid for Dose, Formulation, Quantity */}
           <div className="grid grid-cols-12 gap-2 w-full">
-            <div className="col-span-5 flex flex-col min-w-0">
+            <div className="col-span-5 flex flex-col min-w-0 relative">
               <input
                 type="text"
                 value={newMedDose}
@@ -325,8 +325,9 @@ export function NoteMedicationEditor({
                 placeholder="Dose (e.g. 10 mg)"
                 maxLength={255}
                 disabled={isDisabled}
-                className="w-full min-w-0 h-[34px] px-3 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
+                className="w-full min-w-0 h-[34px] pl-3 pr-6 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
+              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-red font-bold text-[13px]">*</span>
             </div>
             <div className="col-span-4 flex flex-col min-w-0">
               <input
@@ -345,7 +346,7 @@ export function NoteMedicationEditor({
                 className="w-full min-w-0 h-[34px] px-3 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
             </div>
-            <div className="col-span-3 flex flex-col min-w-0">
+            <div className="col-span-3 flex flex-col min-w-0 relative">
               <input
                 type="number"
                 min="1"
@@ -361,10 +362,11 @@ export function NoteMedicationEditor({
                     handleAddMedication();
                   }
                 }}
-                placeholder="Qty *"
+                placeholder="Qty"
                 disabled={isDisabled}
-                className="w-full min-w-0 h-[34px] px-2.5 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
+                className="w-full min-w-0 h-[34px] pl-2.5 pr-6 text-[13px] text-text-primary rounded-[6px] border border-border-strong/80 dark:border-slate-600 outline-none focus:border-accent bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)] placeholder:text-text-muted/80 disabled:bg-surface-2 disabled:cursor-not-allowed shadow-xs"
               />
+              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-red font-bold text-[13px]">*</span>
             </div>
           </div>
 

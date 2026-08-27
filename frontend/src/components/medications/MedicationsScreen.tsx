@@ -173,8 +173,18 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     return [...list, ...newItems];
   }, [rawData, pendingChanges, patientId, user]);
 
-  const active = all.filter((m) => m.isActive);
-  const inactive = all.filter((m) => !m.isActive);
+  // The backend orders findAll isActive desc, createdAt desc (newest
+  // active med first) — that ordering is for other callers (e.g. dropdowns
+  // that want the latest first), not this list. Re-sort to insertion order
+  // (oldest first) so a newly added medication lands at the bottom, linear
+  // with how it's added, and matches the Progress Note sidebar's own
+  // insertion-order display (see useCopyForwardData's activeMedications
+  // re-sort in hooks/useProgressNotes.ts) instead of jumping to the top the
+  // moment it's published.
+  const byCreatedAtAsc = (a: Medication, b: Medication) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  const active = all.filter((m) => m.isActive).sort(byCreatedAtAsc);
+  const inactive = all.filter((m) => !m.isActive).sort(byCreatedAtAsc);
 
   // Last Edited By Logic
   const lastPublishedEdit = useMemo(() => {

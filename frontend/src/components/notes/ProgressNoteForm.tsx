@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { buildProblemTree, getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
+import { getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
 import type { NoteAssessmentItem } from '@/lib/problem-utils';
+import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications } from '@/lib/note-snapshot-merge';
 import { progressDraftKey } from '@/lib/note-drafts';
 import { 
   progressNoteDraftSchema, 
@@ -37,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 
@@ -243,17 +245,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   };
 
   const activeProblemTree = useMemo(() => {
-    const activeProbs = copyForward?.activeProblems || [];
-    const tree = buildProblemTree(activeProbs);
-    const list: { problem: any; depth: number }[] = [];
-    const traverse = (nodes: any[], depth: number) => {
-      nodes.forEach(node => {
-        list.push({ problem: node, depth });
-        traverse(node.children || [], depth + 1);
-      });
-    };
-    traverse(tree, 0);
-    return list;
+    return flattenActiveProblemTree(copyForward?.activeProblems || []);
   }, [copyForward?.activeProblems]);
 
   // Baseline dose per medication name, taken from the patient's current active
@@ -274,180 +266,6 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     });
     return map;
   }, [copyForward?.activeMedications]);
-
-  const mergeActiveProblems = (existingProblems: any[], activeProblems: any[]) => {
-    const tree = buildProblemTree(activeProblems || []);
-    const flatActive: { problem: any; depth: number }[] = [];
-    const traverse = (nodes: any[], depth: number) => {
-      nodes.forEach(node => {
-        flatActive.push({ problem: node, depth });
-        traverse(node.children || [], depth + 1);
-      });
-    };
-    traverse(tree, 0);
-
-    const activeIds = new Set(
-      flatActive.map(({ problem }) => problem.id).filter(Boolean),
-    );
-    const activeTitles = new Set(
-      flatActive.map(({ problem }) => problem.title?.trim().toLowerCase()).filter(Boolean),
-    );
-    // Drop any snapshot entry that is tied to a master Problem (has an id)
-    // which is no longer in the active list — resolved or removed via the
-    // Problem List module (or a prior note). Without this, a draft note's
-    // snapshot only ever grows: a problem deleted from the Master Problem
-    // List stayed "stuck" in every open progress note forever.
-    //
-    // Id-less entries need their own rule: entries the clinician typed fresh
-    // in this note (`isNew`) are always kept — the Problem List has no say
-    // over them yet. But id-less entries that AREN'T `isNew` are leftover
-    // snapshots saved before ids were tracked on assessment items at all
-    // (localStorage drafts, older DB drafts). Those are only trustworthy if
-    // their title still matches something currently active; otherwise
-    // they're exactly the kind of stale, disconnected entry this is meant to
-    // clear (a resolved/removed/renamed problem whose old snapshot lacks the
-    // id needed to detect that directly).
-    let existing = existingProblems.filter((p: any) => {
-      if (!p || typeof p !== 'object') return true;
-      if (p.id) return activeIds.has(p.id);
-      if (p.isNew || !p.id) return true;
-      const title = p.title?.trim().toLowerCase();
-      return !!title && activeTitles.has(title);
-    });
-
-    // Match by stable Problem.id first — falling back to title text only for
-    // legacy/id-less entries. Matching by title alone means a title edited
-    // elsewhere (Problem List module) or in-note no longer matches its own
-    // prior snapshot entry, so both the stale and the fresh title get kept,
-    // producing a visible duplicate before the note is even published.
-    const existingById = new Map<string, number>();
-    const existingTitles = new Map<string, number>();
-    existing.forEach((p: any, idx: number) => {
-      if (p && typeof p === 'object' && p.id) existingById.set(p.id, idx);
-      const title = (typeof p === 'string' ? p : p?.title)?.trim().toLowerCase();
-      if (title) existingTitles.set(title, idx);
-    });
-
-    for (const item of flatActive) {
-      const p = item.problem;
-      if (!p.title) continue;
-      const titleKey = p.title.trim().toLowerCase();
-
-      const matchIdx = (p.id && existingById.has(p.id))
-        ? existingById.get(p.id)!
-        : existingTitles.has(titleKey)
-          ? existingTitles.get(titleKey)!
-          : undefined;
-
-      if (matchIdx !== undefined) {
-        // Same problem, possibly renamed since this snapshot was taken (id
-        // match), or a legacy id-less entry now healed with its id (title
-        // match) — sync in place instead of adding a second entry.
-        //
-        // Preserve in-note edits (title/nesting/date) already captured in the
-        // snapshot so a background activeProblems refetch never reverts what
-        // the user is drafting or has saved in this draft.
-        const prev = existing[matchIdx];
-        existing[matchIdx] = {
-          ...(typeof prev === 'object' ? prev : {}),
-          id: p.id,
-          title: (typeof prev === 'object' && prev.title) ? prev.title : p.title,
-          parentId: (typeof prev === 'object' && prev.parentId !== undefined) ? prev.parentId : (p.parentId || undefined),
-          depth: item.depth,
-          diagnosisDate: (typeof prev === 'object' && prev.diagnosisDate) ? prev.diagnosisDate : (p.diagnosisDate || null),
-        };
-        continue;
-      }
-
-      // Not found in existing — this problem was added to the Master List
-      // since the snapshot was last updated. Add it now.
-      existing.push({
-        id: p.id || undefined,
-        title: p.title,
-        parentId: p.parentId || undefined,
-        depth: item.depth,
-        diagnosisDate: p.diagnosisDate || null,
-      });
-    }
-
-    // Re-sort into the master list's own order (Problem.sortOrder via
-    // buildProblemTree's DFS) so a reorder published in the Problem List
-    // module — even while this note was already open as a draft — is
-    // reflected here instead of staying frozen in whatever order the
-    // snapshot array happened to have. Id-less rows (isNew, or legacy
-    // entries that never got healed with an id) have no master rank to
-    // compare against — they sort after every ranked row, keeping their
-    // existing relative order among themselves.
-    const orderRank = new Map<string, number>();
-    flatActive.forEach(({ problem }, idx) => {
-      if (problem.id) orderRank.set(problem.id, idx);
-    });
-    const withRank = existing.map((item: any, originalIndex: number) => ({
-      item,
-      originalIndex,
-      rank: item?.id && orderRank.has(item.id) ? orderRank.get(item.id)! : Number.MAX_SAFE_INTEGER,
-    }));
-    withRank.sort((a, b) => a.rank - b.rank || a.originalIndex - b.originalIndex);
-    return withRank.map((w) => w.item);
-  };
-
-  const mergeActiveMedications = (existingMeds: any[], activeMedications: any[]) => {
-    const activeByName = new Map(
-      (activeMedications || [])
-        .filter((m: any) => m.name?.trim())
-        .map((m: any) => [m.name.trim().toLowerCase(), m]),
-    );
-    const activeNames = new Set(activeByName.keys());
-
-    const existing = existingMeds
-      .filter((m: any) => {
-        if (!m || typeof m !== 'object') return true;
-        if (m.isNew) return true;
-        const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
-        return !!name && activeNames.has(name);
-      })
-      // A name match kept the *stale* snapshot entry — dose/formulation/
-      // instructions/quantity edited on the medication itself (e.g. via the
-      // Medications module) never made it in, since only brand-new names
-      // were ever added below. Resync those fields from the live active
-      // medication so a published dose change actually shows up here.
-      .map((m: any) => {
-        if (!m || typeof m !== 'object' || m.isNew) return m;
-        const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
-        const live = name ? activeByName.get(name) : undefined;
-        if (!live) return m;
-        return {
-          ...m,
-          dose: m.dose !== undefined ? m.dose : (live.dose || undefined),
-          formulation: m.formulation !== undefined ? m.formulation : (live.formulation || undefined),
-          quantity: m.quantity !== undefined ? m.quantity : (live.quantity || undefined),
-          instructions: m.instructions !== undefined ? m.instructions : (live.instructions || undefined),
-          fromPast: m.fromPast ?? live.fromPast ?? false,
-        };
-      });
-
-    const existingNames = new Set(
-      existing.map((m: any) => (typeof m === 'string' ? m : m.name)?.trim().toLowerCase()).filter(Boolean)
-    );
-
-    for (const m of activeMedications || []) {
-      const name = m.name?.trim().toLowerCase();
-      if (!name) continue;
-      if (removedMedNamesRef.current.has(name)) continue; // explicitly discontinued in this note — do not resurrect
-      if (!existingNames.has(name)) {
-        existing.push({
-          name: m.name,
-          dose: m.dose || undefined,
-          formulation: m.formulation || undefined,
-          quantity: m.quantity || undefined,
-          instructions: m.instructions || undefined,
-          fromPast: m.fromPast || false,
-        });
-      }
-    }
-
-    return existing;
-  };
 
   // A medication added within this note via the "Add Medication" sub-form
   // carries `isNew: true` and exists only in local form state until it's
@@ -511,9 +329,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         : currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
           ? currentMedicationsWhileEditing
           : hasMedSnapshot
-            ? mergeActiveMedications(validMeds, activeMeds)
+            ? mergeActiveMedications(validMeds, activeMeds, removedMedNamesRef.current)
             : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
-              ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+              ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
               : activeMeds.map((m: any) => ({
                   name: m.name,
                   dose: m.dose || undefined,
@@ -579,9 +397,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           const baseDraftMeds = currentMedicationsWhileEditing && currentMedicationsWhileEditing.length > 0
             ? currentMedicationsWhileEditing
             : hasMedSnapshot
-              ? mergeActiveMedications(validMeds, activeMeds)
+              ? mergeActiveMedications(validMeds, activeMeds, removedMedNamesRef.current)
               : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
-                ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+                ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
                 : activeMeds.map((m: any) => ({
                     name: m.name,
                     dose: m.dose || undefined,
@@ -613,7 +431,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       }
 
       const initialMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
-        ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+        ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
         : activeMeds.map((m: any) => ({
             name: m.name,
             dose: m.dose || undefined,
@@ -668,7 +486,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         const currentMeds = currentValues.medicationSnapshot || [];
         const mergedMeds = isMedicationEditMode
           ? currentMeds
-          : mergeActiveMedications(currentMeds, copyForward.activeMedications);
+          : mergeActiveMedications(currentMeds, copyForward.activeMedications, removedMedNamesRef.current);
 
         form.reset({
           ...currentValues,
@@ -681,6 +499,30 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   }, [copyForward, copyLoading, note, form]);
 
   const formValues = form.watch();
+
+  // Publishes this draft's live Assessment/Medications form state to
+  // NoteTimeline (via draftSnapshotStore) so the timeline entry for this
+  // note stays 1:1 with what's shown here, including editor-local state
+  // (in-note discontinuations, unsaved isNew rows) the timeline's own merge
+  // can't otherwise see. Only meaningful for a saved DRAFT — a brand-new
+  // note has no timeline entry yet, and a PUBLISHED note's timeline entry
+  // is the persisted content, matching the hydration bail at :649 above.
+  const { setDraftSnapshot, clearDraftSnapshot } = useDraftSnapshotStore.getState();
+  const draftSnapshotKey = noteId ? `${patientId}:${noteId}` : null;
+  useEffect(() => {
+    if (!draftSnapshotKey || note?.status === 'PUBLISHED') return;
+    setDraftSnapshot(draftSnapshotKey, {
+      problemListSnapshot: formValues.problemListSnapshot || [],
+      medicationSnapshot: formValues.medicationSnapshot || [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSnapshotKey, formValues.problemListSnapshot, formValues.medicationSnapshot, note?.status]);
+
+  useEffect(() => {
+    if (!draftSnapshotKey) return;
+    return () => clearDraftSnapshot(draftSnapshotKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSnapshotKey]);
 
   // Acquires the mutual edit lock (if not already held) before entering the
   // Problem List's own draft-edit mode. No-ops (staying read-only) if the
@@ -964,11 +806,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           return {
             name: m.name,
             dose: m.dose,
-            unit: m.unit,
             formulation: m.formulation,
             quantity: m.quantity,
             instructions: m.instructions,
-            source: m.source,
             isNew: m.isNew,
             fromPast: m.fromPast,
           };
@@ -1398,7 +1238,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       diagnosisDate: null,
                     }));
                     const defaultMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
-                      ? mergeActiveMedications(copyForward.inheritedMedications, copyForward?.activeMedications || [])
+                      ? mergeActiveMedications(copyForward.inheritedMedications, copyForward?.activeMedications || [], removedMedNamesRef.current)
                       : (copyForward?.activeMedications || []).map((m: any) => ({
                           name: m.name,
                           dose: m.dose || undefined,
