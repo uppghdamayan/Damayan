@@ -455,9 +455,9 @@ export function mapNoteToTimelineView(
   initialNoteAuthorId?: string | null
 ): TimelineNoteView {
   // Handle deleted note structure if it's passed as DeletedNoteRecord
-  if ('originalContent' in note && 'originalNoteType' in note) {
+  if ('content' in note && 'noteType' in note) {
     const deletedNote = note as any;
-    const originalContent = deletedNote.originalContent || {};
+    const originalContent = deletedNote.content || {};
     
     // Convert the necessary keys to camelCase for the mapping function to work.
     const camelCasedContent = { ...originalContent };
