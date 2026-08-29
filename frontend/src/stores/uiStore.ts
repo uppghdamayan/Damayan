@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { progressDraftKey } from '@/lib/note-drafts';
+import { BP } from '@/lib/breakpoints';
 
 const UI_SCALE_MIN = 80;
 const UI_SCALE_MAX = 150;
@@ -54,12 +55,28 @@ interface MedicationEditLock {
 
 interface UiState {
   sidebarCollapsed: boolean;
+  // True once the user has collapsed/expanded the sidebar themselves. Until
+  // then AppWidthEffect may pick a width-appropriate default for them.
+  sidebarUserSet: boolean;
   documentationPanelOpen: boolean;
   activeScreen: ActiveScreen;
-  setSidebarCollapsed: (v: boolean) => void;
+  // Measured width of #app-root, fed by AppWidthEffect. 0 = not measured yet.
+  // This is the only width the store branches on, and deliberately not
+  // window.innerWidth: it is the same box the `@container app` rules in
+  // globals.css measure, so the JS branches and the CSS branches stay in
+  // agreement even under the zoom-based UI scale.
+  appWidth: number;
+  setAppWidth: (width: number) => void;
+  setSidebarCollapsed: (v: boolean, opts?: { userInitiated?: boolean }) => void;
   toggleSidebar: () => void;
   setDocumentationPanelOpen: (v: boolean) => void;
   setActiveScreen: (s: ActiveScreen) => void;
+  // Last user-dragged panel widths, in px. null = never resized, so the
+  // breakpoint tier's default applies. Persisted so a resize survives reload.
+  sidebarWidthPx: number | null;
+  docPanelWidthPx: number | null;
+  setSidebarWidthPx: (px: number | null) => void;
+  setDocPanelWidthPx: (px: number | null) => void;
   activeNoteEditor: ActiveNoteEditorState;
   openNewProgressNote: (patientId: string) => void;
   openExistingProgressNote: (patientId: string, noteId: string) => void;
@@ -84,85 +101,83 @@ interface UiState {
   releaseMedicationEditLock: (owner: MedicationEditOwner) => void;
 }
 
-// Viewport-aware default: collapse on screens < 1440px
-const getDefaultSidebarCollapsed = () => {
-  if (typeof window === 'undefined') return false;
-  return window.innerWidth < 1440;
-};
+// Below this width there is not room for the patient sidebar and the
+// documentation panel side by side, so opening one closes the other. appWidth
+// is 0 until the first measurement lands — treat that as "unknown" and never
+// force a panel closed on a guess.
+const isCompact = (appWidth: number) => appWidth > 0 && appWidth <= BP.compact;
 
 export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
-      sidebarCollapsed: getDefaultSidebarCollapsed(),
+      // Deterministic on the server and on the first client render. The
+      // width-appropriate default is applied by AppWidthEffect once #app-root
+      // has actually been measured, so there is no hydration mismatch left to
+      // suppress.
+      sidebarCollapsed: false,
+      sidebarUserSet: false,
       documentationPanelOpen: false,
       activeScreen: 'dashboard',
       activeNoteEditor: { patientId: null, noteId: null, mode: null },
+      appWidth: 0,
+      sidebarWidthPx: null,
+      docPanelWidthPx: null,
       uiScale: UI_SCALE_DEFAULT,
-      increaseUiScale: () => set((state) => {
-        const nextScale = Math.min(UI_SCALE_MAX, state.uiScale + UI_SCALE_STEP);
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (nextScale / 100)) <= 1100;
-        return {
-          uiScale: nextScale,
-          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
-        };
+      setAppWidth: (width) => set((state) => {
+        if (width <= 0 || width === state.appWidth) return { appWidth: state.appWidth };
+        // Shrinking past the compact threshold with both panels open has to
+        // resolve to one of them. Keep the note panel — it can be holding
+        // unsaved clinical text — and collapse the patient list, which can't.
+        if (isCompact(width) && state.documentationPanelOpen && !state.sidebarCollapsed) {
+          return { appWidth: width, sidebarCollapsed: true };
+        }
+        return { appWidth: width };
       }),
-      decreaseUiScale: () => set((state) => {
-        const nextScale = Math.max(UI_SCALE_MIN, state.uiScale - UI_SCALE_STEP);
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (nextScale / 100)) <= 1100;
-        return {
-          uiScale: nextScale,
-          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
-        };
-      }),
-      resetUiScale: () => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (UI_SCALE_DEFAULT / 100)) <= 1100;
-        return {
-          uiScale: UI_SCALE_DEFAULT,
-          sidebarCollapsed: isSmallScreen && state.documentationPanelOpen ? true : state.sidebarCollapsed
-        };
-      }),
-      setSidebarCollapsed: (v) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
-        return {
-          sidebarCollapsed: v,
-          documentationPanelOpen: isSmallScreen && !v ? false : state.documentationPanelOpen,
-        };
-      }),
+      setSidebarWidthPx: (px) => set({ sidebarWidthPx: px }),
+      setDocPanelWidthPx: (px) => set({ docPanelWidthPx: px }),
+      // The scale actions no longer repeat the exclusion check. Changing the
+      // scale changes the measured width of #app-root, which routes back
+      // through setAppWidth above — one code path instead of four.
+      increaseUiScale: () => set((state) => ({
+        uiScale: Math.min(UI_SCALE_MAX, state.uiScale + UI_SCALE_STEP),
+      })),
+      decreaseUiScale: () => set((state) => ({
+        uiScale: Math.max(UI_SCALE_MIN, state.uiScale - UI_SCALE_STEP),
+      })),
+      resetUiScale: () => set({ uiScale: UI_SCALE_DEFAULT }),
+      setSidebarCollapsed: (v, opts) => set((state) => ({
+        sidebarCollapsed: v,
+        sidebarUserSet: state.sidebarUserSet || opts?.userInitiated !== false,
+        documentationPanelOpen: isCompact(state.appWidth) && !v ? false : state.documentationPanelOpen,
+      })),
       toggleSidebar: () => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         const newCollapsed = !state.sidebarCollapsed;
         return {
           sidebarCollapsed: newCollapsed,
-          documentationPanelOpen: isSmallScreen && !newCollapsed ? false : state.documentationPanelOpen,
+          sidebarUserSet: true,
+          documentationPanelOpen: isCompact(state.appWidth) && !newCollapsed ? false : state.documentationPanelOpen,
         };
       }),
-      setDocumentationPanelOpen: (v) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
-        return {
-          documentationPanelOpen: v,
-          sidebarCollapsed: isSmallScreen && v ? true : state.sidebarCollapsed,
-        };
-      }),
+      setDocumentationPanelOpen: (v) => set((state) => ({
+        documentationPanelOpen: v,
+        sidebarCollapsed: isCompact(state.appWidth) && v ? true : state.sidebarCollapsed,
+      })),
       setActiveScreen: (s) => set({ activeScreen: s }),
       openNewProgressNote: (patientId) => set((state) => {
         if (typeof window !== 'undefined' && window.localStorage) {
           localStorage.removeItem(progressDraftKey(patientId, null));
         }
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
         return {
-          activeNoteEditor: { patientId, noteId: null, mode: 'new' },
+          activeNoteEditor: { patientId, noteId: null, mode: 'new' as const },
           documentationPanelOpen: true,
-          sidebarCollapsed: isSmallScreen ? true : state.sidebarCollapsed,
+          sidebarCollapsed: isCompact(state.appWidth) ? true : state.sidebarCollapsed,
         };
       }),
-      openExistingProgressNote: (patientId, noteId) => set((state) => {
-        const isSmallScreen = typeof window !== 'undefined' && (window.innerWidth / (state.uiScale / 100)) <= 1100;
-        return {
-          activeNoteEditor: { patientId, noteId, mode: 'edit' },
-          documentationPanelOpen: true,
-          sidebarCollapsed: isSmallScreen ? true : state.sidebarCollapsed,
-        };
-      }),
+      openExistingProgressNote: (patientId, noteId) => set((state) => ({
+        activeNoteEditor: { patientId, noteId, mode: 'edit' as const },
+        documentationPanelOpen: true,
+        sidebarCollapsed: isCompact(state.appWidth) ? true : state.sidebarCollapsed,
+      })),
       closeNoteEditor: () => set({
         activeNoteEditor: { patientId: null, noteId: null, mode: null },
       }),
@@ -203,8 +218,14 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'damayan-ui-sidebar',
+      // appWidth is deliberately absent — it is a live measurement, and a
+      // persisted stale value would make the first render branch on the
+      // previous session's window size.
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
+        sidebarUserSet: state.sidebarUserSet,
+        sidebarWidthPx: state.sidebarWidthPx,
+        docPanelWidthPx: state.docPanelWidthPx,
         uiScale: state.uiScale,
         problemEditLock: state.problemEditLock,
         medicationEditLock: state.medicationEditLock,

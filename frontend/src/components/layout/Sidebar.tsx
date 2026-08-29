@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,17 +15,28 @@ import { SidebarSkeleton } from '@/components/layout/SidebarSkeleton';
 import { apiRequest } from '@/lib/api';
 import type { Patient } from '@/types/patient';
 import { cn } from '@/lib/utils';
+import { usePanelResize } from '@/hooks/usePanelResize';
+import { BP, SIDEBAR_MIN_PX, MIN_CENTER_W } from '@/lib/breakpoints';
 import { Search, Plus } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 
 export function Sidebar() {
-  const { 
-    sidebarCollapsed, 
-    setSidebarCollapsed, 
-    onPublishAndSwitch, 
-    closeNoteEditor, 
-    setDocumentationPanelOpen 
+  const {
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    onPublishAndSwitch,
+    closeNoteEditor,
+    setDocumentationPanelOpen,
+    appWidth,
+    documentationPanelOpen,
+    sidebarWidthPx,
+    setSidebarWidthPx,
   } = useUiStore();
+
+  // Same switch point as the documentation panel. The old one was `@md`, which
+  // on Tailwind v4's container scale is 448px rather than the 768px it reads
+  // as, so the overlay branch effectively never ran.
+  const isOverlay = appWidth > 0 && appWidth < BP.laptop;
   const { activePatient, setActivePatient } = usePatientStore();
   const { user } = useAuthStore();
   const qc = useQueryClient();
@@ -37,41 +48,41 @@ export function Sidebar() {
   const [pendingPatient, setPendingPatient] = useState<Patient | null>(null);
   const [isPublishingPending, setIsPublishingPending] = useState(false);
 
-  const [isResizing, setIsResizing] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
+  // Budgets around MIN_CENTER_W and the documentation panel's current width.
+  // The two clamps were previously independent — 45% of the viewport here, 60%
+  // there — so both at maximum asked for 105% and left the chart with nothing.
+  const getMax = useCallback(() => {
+    const docW = documentationPanelOpen
+      ? (document.querySelector<HTMLElement>('[data-panel="documentation"]')?.offsetWidth ?? 0)
+      : 0;
+    return Math.max(SIDEBAR_MIN_PX, appWidth - docW - MIN_CENTER_W);
+  }, [appWidth, documentationPanelOpen]);
 
+  const { isResizing, handleProps } = usePanelResize({
+    side: 'left',
+    cssVar: '--sidebar-w-user',
+    elementRef: asideRef,
+    min: SIDEBAR_MIN_PX,
+    getMax,
+    persistedPx: sidebarWidthPx,
+    onCommit: setSidebarWidthPx,
+    enabled: !isOverlay && !sidebarCollapsed,
+  });
+
+  // Escape closes the overlay. The old overlay had no scrim opacity, no focus
+  // handling and no keyboard dismissal at all.
   useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const scale = (useUiStore.getState().uiScale || 100) / 100;
-      const currentMouseX = e.clientX / scale;
-      const maxAllowedWidth = (window.innerWidth / scale) * 0.45;
-      const clamped = Math.max(200, Math.min(currentMouseX, maxAllowedWidth));
-      document.documentElement.style.setProperty('--sidebar-w', `${clamped}px`);
+    if (!isOverlay || sidebarCollapsed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarCollapsed(true);
     };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'ew-resize';
-
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
+      document.removeEventListener('keydown', onKey);
     };
-  }, [isResizing]);
+  }, [isOverlay, sidebarCollapsed, setSidebarCollapsed]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -204,8 +215,10 @@ export function Sidebar() {
                       setPendingPatient(p);
                     } else {
                       handleSelect(p);
-                      // Close sidebar overlay on selection for smaller screens
-                      if (window.innerWidth < 768) {
+                      // Close the overlay on selection. This read
+                      // `window.innerWidth < 768` while the CSS switched at
+                      // 448px, so the two never described the same state.
+                      if (isOverlay) {
                         setSidebarCollapsed(true);
                       }
                     }
@@ -264,50 +277,60 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar: inline */}
+      {/*
+        One <aside>, one mount of `sidebarContent` — as with the documentation
+        panel, this was two asides toggled by a CSS-only `@md:hidden`, so both
+        subtrees were live: two usePatients subscriptions, two debounce timers,
+        and two independent copies of the search box state.
+      */}
+      {isOverlay && !sidebarCollapsed && (
+        <div
+          onClick={() => setSidebarCollapsed(true)}
+          aria-hidden
+          className="fixed inset-0 top-[var(--topbar-h)] bg-black/30 z-[300] transition-opacity"
+        />
+      )}
       <aside
-        suppressHydrationWarning
+        ref={asideRef}
+        data-panel="sidebar"
         className={cn(
-          "bg-surface flex flex-col h-full shrink-0 hidden @md:flex relative",
-          sidebarCollapsed ? "w-0 overflow-hidden" : "w-[var(--sidebar-w)]",
-          isResizing ? "transition-none" : "transition-[width] duration-300 ease-in-out"
+          "bg-surface flex flex-col",
+          isOverlay
+            ? cn(
+                "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] border-r border-border overflow-y-auto",
+                "w-[min(var(--sidebar-w),85vw)] transition-transform duration-200 ease-out",
+                sidebarCollapsed ? "-translate-x-full" : "translate-x-0",
+              )
+            : cn(
+                "h-full shrink-0 relative",
+                sidebarCollapsed ? "w-0 overflow-hidden" : "w-[var(--sidebar-w)]",
+                isResizing ? "transition-none" : "transition-[width] duration-300 ease-in-out",
+              ),
         )}
       >
         {/* Continuous right border line above child background layers */}
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed && !isOverlay && (
           <div className="absolute top-0 right-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
         )}
         {/* Resize handle on the right edge */}
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed && !isOverlay && (
           <div
-            onMouseDown={handleMouseDown}
+            {...handleProps}
             className={cn(
               "absolute top-0 -right-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:bg-accent",
               isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
             )}
           />
         )}
-        <div className="w-[var(--sidebar-w)] min-w-[var(--sidebar-w)] flex flex-col h-full overflow-hidden">
+        <div
+          className={cn(
+            "flex flex-col h-full overflow-hidden",
+            isOverlay ? "w-full" : "w-[var(--sidebar-w)] min-w-[var(--sidebar-w)]",
+          )}
+        >
           {sidebarContent}
         </div>
-      </aside>
-
-      {/* Mobile/Tablet overlay sidebar */}
-      <div
-        onClick={() => setSidebarCollapsed(true)}
-        className={cn(
-          "fixed inset-0 bg-transparent z-[300] transition-opacity @md:hidden",
-          sidebarCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
-        )}
-      />
-      <aside
-        className={cn(
-          "fixed top-[var(--topbar-h)] left-0 bottom-0 z-[310] bg-surface border-r border-border overflow-y-auto @md:hidden",
-          "w-[var(--sidebar-w)] transition-transform duration-200 ease-out flex flex-col",
-          sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
-        )}
-      >
-        {sidebarContent}
       </aside>
 
       <NewPatientModal

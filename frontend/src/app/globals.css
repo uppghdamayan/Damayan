@@ -106,6 +106,20 @@
   --width-doc-panel: var(--documentation-panel-width);
   --width-timeline: var(--timeline-w);
 
+  /* DAMAYAN Layout breakpoints.
+     These generate the @min-<name>/<container>: and @max-<name>/<container>:
+     variants used across the layout components. Mirrored in
+     src/lib/breakpoints.ts for the JS side (uiStore.appWidth, resize clamps) —
+     keep the two files in sync.
+
+     Deliberately NOT named sm/md/lg: Tailwind v4 derives max-w-sm/md/lg from
+     the same --container-* namespace, and max-w-sm is already in use. */
+  --container-phone:   640px;
+  --container-tablet:  768px;
+  --container-laptop:  1024px;
+  --container-compact: 1101px;
+  --container-wide:    1440px;
+
   /* DAMAYAN Custom Box Shadows */
   --shadow-card: 0 4px 12px rgba(0,0,0,0.05);
   --shadow-btn-primary: 0 2px 4px rgba(10,110,95,0.15);
@@ -186,28 +200,62 @@
   --purple-bg:    #EDE9FE;
   --purple-border:#8B5CF6;
 
-  /* Layout dimensions */
+  /* Layout dimensions.
+     --sidebar-w / --documentation-panel-width are the *resolved* widths and are
+     computed on #shell below. The -default/-min/-max triples are what the
+     breakpoint tiers move; the drag handles only ever write -user, so a resize
+     can never escape its tier's bounds or survive a tier change. The plain
+     values here are the pre-#shell fallback for anything outside the shell. */
   --topbar-h:                   56px;
   --sidebar-w:                  280px;
   --documentation-panel-width:  420px;
   --timeline-w:                 260px;
+
+  --sidebar-w-default:          280px;
+  --sidebar-w-min:              200px;
+  --sidebar-w-max:              360px;
+
+  --doc-panel-w-default:        420px;
+  --doc-panel-w-min:            300px;
+  --doc-panel-w-max:            720px;
 }
 
-@container (max-width: 1439px) {
+#shell {
+  --sidebar-w: clamp(
+    var(--sidebar-w-min),
+    var(--sidebar-w-user, var(--sidebar-w-default)),
+    var(--sidebar-w-max)
+  );
+  --documentation-panel-width: clamp(
+    var(--doc-panel-w-min),
+    var(--doc-panel-w-user, var(--doc-panel-w-default)),
+    var(--doc-panel-w-max)
+  );
+}
+
+/* Compact desktop — both panels still in-flow columns, but narrower. */
+@container app (max-width: 1439px) {
   #shell {
-    --sidebar-w:                 220px;
-    --documentation-panel-width: 340px;
-    --timeline-w:                200px;
-    --topbar-h:                  52px;
+    --sidebar-w-default:   220px;
+    --sidebar-w-max:       300px;
+    --doc-panel-w-default: 340px;
+    --doc-panel-w-max:     560px;
+    --timeline-w:          200px;
+    --topbar-h:            52px;
   }
 }
 
-@container (max-width: 1023px) {
+/* Overlay tier — both panels become fixed overlays over the center column.
+   The doc panel is NOT 100% here: it stays a readable fixed width so the chart
+   behind it remains visible and clickable (it is non-modal by design). */
+@container app (max-width: 1023px) {
   #shell {
-    --sidebar-w:                 260px;  /* overlay drawer width */
-    --documentation-panel-width: 100%;   /* full-screen documentation panel overlay */
-    --timeline-w:                160px;
-    --topbar-h:                  48px;
+    --sidebar-w-default:   260px;
+    --sidebar-w-max:       320px;
+    --doc-panel-w-default: 440px;
+    --doc-panel-w-max:     560px;
+    --timeline-w:          160px;
+    --topbar-h:            48px;
   }
 }
 
@@ -303,7 +351,7 @@
     color: var(--border-strong);
   }
 
-  @media (max-width: 1023px) {
+  @container app (max-width: 1023px) {
     .field-input {
       height: 38px !important;
     }
@@ -478,4 +526,14 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text-secondary);
+}
+/* Moved out of ProgressNoteForm's inline <style> tag — it was re-injected on
+   every render of the note panel. */
+@keyframes slight-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.blink-animation {
+  animation: slight-blink 2s ease-in-out infinite;
 }

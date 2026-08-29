@@ -99,6 +99,16 @@ export class MedicationItemDto {
 
   @IsOptional()
   fromPast?: boolean;
+
+  // Field names the clinician explicitly edited within this note (e.g.
+  // ['dose']) — lets the frontend merge (mergeActiveMedications) know a
+  // later, unrelated master-list edit must not silently overwrite it.
+  // Server-side reconcileMedicationSnapshot never reads this; it rides
+  // through untouched inside the medicationSnapshot JSON column.
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  editedFields?: string[];
 }
 
 export class CreateProgressNoteDto {

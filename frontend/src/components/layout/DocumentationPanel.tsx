@@ -1,7 +1,9 @@
 'use client';
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useUiStore } from '@/stores/uiStore';
+import { usePanelResize } from '@/hooks/usePanelResize';
+import { BP, DOC_PANEL_MIN_PX, MIN_CENTER_W } from '@/lib/breakpoints';
 import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { Pen, Edit, ClipboardList, ArrowRight, PanelRightClose } from 'lucide-react';
@@ -14,9 +16,24 @@ import { Button } from '@/components/ui/button';
 
 export function DocumentationPanel() {
   const { user } = useAuthStore();
-  const { documentationPanelOpen, activeNoteEditor, closeNoteEditor, setDocumentationPanelOpen } = useUiStore();
-  const [isResizing, setIsResizing] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const {
+    documentationPanelOpen,
+    activeNoteEditor,
+    closeNoteEditor,
+    setDocumentationPanelOpen,
+    appWidth,
+    sidebarCollapsed,
+    docPanelWidthPx,
+    setDocPanelWidthPx,
+  } = useUiStore();
+  const panelRef = useRef<HTMLElement>(null);
+
+  // Below this width the panel stops being a column and becomes an overlay.
+  // The old switch was `@md`, which on Tailwind v4's container scale is 448px,
+  // not the 768px it reads as — so the overlay branch never ran on any real
+  // screen and 768-1023px was left with a full-height column it had no room
+  // for.
+  const isOverlay = appWidth > 0 && appWidth < BP.laptop;
   
   const router = useRouter();
   const params = useParams();
@@ -40,43 +57,27 @@ export function DocumentationPanel() {
   }, [patientId, closeNoteEditor, setDocumentationPanelOpen]);
 
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
+  // The two panels' clamps used to be independent — 45% of the viewport for the
+  // sidebar, 60% for this one — so dragging both to their maxima asked for 105%
+  // and drove the center column to zero. Both now budget around a guaranteed
+  // minimum for the chart in the middle.
+  const getMax = useCallback(() => {
+    const sidebarW = sidebarCollapsed
+      ? 0
+      : (document.querySelector<HTMLElement>('[data-panel="sidebar"]')?.offsetWidth ?? 0);
+    return Math.max(DOC_PANEL_MIN_PX, appWidth - sidebarW - MIN_CENTER_W);
+  }, [appWidth, sidebarCollapsed]);
 
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const scale = (useUiStore.getState().uiScale || 100) / 100;
-      const currentViewportWidth = window.innerWidth / scale;
-      const currentMouseX = e.clientX / scale;
-
-      const newWidth = currentViewportWidth - currentMouseX;
-      const maxAllowedWidth = currentViewportWidth * 0.6;
-      const clamped = Math.max(300, Math.min(newWidth, maxAllowedWidth));
-      document.documentElement.style.setProperty('--documentation-panel-width', `${clamped}px`);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    // Prevent text selection while resizing
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'ew-resize';
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-  }, [isResizing]);
+  const { isResizing, handleProps } = usePanelResize({
+    side: 'right',
+    cssVar: '--doc-panel-w-user',
+    elementRef: panelRef,
+    min: DOC_PANEL_MIN_PX,
+    getMax,
+    persistedPx: docPanelWidthPx,
+    onCommit: setDocPanelWidthPx,
+    enabled: !isOverlay,
+  });
 
   const panelContent = (
     <>
@@ -86,7 +87,10 @@ export function DocumentationPanel() {
           noteId={activeNoteEditor.noteId ?? dbDraft?.id ?? undefined} 
           onClose={() => {
             closeNoteEditor();
-            if (window.innerWidth < 768) {
+            // Match the branch the panel is actually rendering in. This was a
+            // hardcoded `window.innerWidth < 768` paired with a 448px CSS
+            // switch, so the two never agreed at any width.
+            if (isOverlay) {
               setDocumentationPanelOpen(false);
             }
           }} 
@@ -176,7 +180,10 @@ export function DocumentationPanel() {
           noteId={dbDraft?.id}
           onClose={() => {
             closeNoteEditor();
-            if (window.innerWidth < 768) {
+            // Match the branch the panel is actually rendering in. This was a
+            // hardcoded `window.innerWidth < 768` paired with a 448px CSS
+            // switch, so the two never agreed at any width.
+            if (isOverlay) {
               setDocumentationPanelOpen(false);
             }
           }} 
@@ -185,61 +192,70 @@ export function DocumentationPanel() {
     </>
   );
 
-  return (
-    <>
-      {/* Desktop in-flow documentation panel */}
-      <aside
-        ref={panelRef}
-        style={{
-          width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0,
-        }}
-        className={cn(
-          "bg-surface flex flex-col shrink-0 relative h-full hidden @md:flex",
-          documentationPanelOpen ? "" : "overflow-hidden",
-          isResizing ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-        )}
-      >
-        {/* Continuous left border line */}
-        {documentationPanelOpen && (
-          <div className="absolute top-0 left-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
-        )}
-        {/* Resize handle */}
-        {documentationPanelOpen && (
-          <div
-            onMouseDown={handleMouseDown}
-            className={cn(
-              "absolute top-0 -left-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
-              isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
-            )}
-          />
-        )}
-        <div className="w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)] flex flex-col h-full overflow-hidden">
-          {panelContent}
-        </div>
-      </aside>
+  /*
+    ONE <aside>, one React position, one mount of `panelContent`.
 
-      {/* Mobile/Tablet overlay documentation panel */}
+    This used to be two asides — an in-flow column and a `fixed` overlay —
+    toggled with `@md:hidden` / `@md:flex`. That is CSS-only, so BOTH subtrees
+    were always mounted: two ProgressNoteForm instances, two autosave loops
+    writing the same localStorage key, and two registrations against the single
+    global publish-handler slot in uiStore, where the last mount won and either
+    one unmounting cleared the other's handler.
+
+    Keeping it to one element also makes crossing the breakpoint a class swap
+    rather than a remount, so half-typed note text survives a window resize.
+  */
+  return (
+    <aside
+      ref={panelRef}
+      data-panel="documentation"
+      style={isOverlay ? undefined : { width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0 }}
+      className={cn(
+        "bg-surface flex flex-col",
+        isResizing ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+        isOverlay
+          // Non-modal by design: no scrim and no focus trap, so the chart and
+          // the tab bar behind stay readable and clickable while the clinician
+          // writes. Sits below the topbar rather than over it, which the old
+          // `top-0` overlay did not.
+          ? cn(
+              "fixed top-[var(--topbar-h)] right-0 bottom-0 z-[410] shadow-modal border-l border-border",
+              "w-[min(var(--documentation-panel-width,420px),100vw)]",
+              documentationPanelOpen ? "translate-x-0" : "translate-x-full pointer-events-none",
+            )
+          : cn(
+              "shrink-0 relative h-full",
+              documentationPanelOpen ? "" : "overflow-hidden",
+            ),
+      )}
+      aria-hidden={!documentationPanelOpen}
+    >
+      {/* Continuous left border line */}
+      {documentationPanelOpen && !isOverlay && (
+        <div className="absolute top-0 left-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
+      )}
+      {/* Resize handle */}
+      {documentationPanelOpen && !isOverlay && (
+        <div
+          {...handleProps}
+          className={cn(
+            "absolute top-0 -left-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:bg-accent",
+            isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
+          )}
+        />
+      )}
       <div
-        onClick={() => setDocumentationPanelOpen(false)}
         className={cn(
-          "fixed inset-0 bg-transparent z-[400] transition-opacity @md:hidden",
-          documentationPanelOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-      />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        className={cn(
-          "fixed top-0 right-0 bottom-0 z-[410] bg-surface flex flex-col @md:hidden",
-          "w-full transition-transform duration-200 ease-out",
-          documentationPanelOpen ? "translate-x-0" : "translate-x-full"
+          "flex flex-col h-full overflow-hidden",
+          isOverlay
+            ? "w-full"
+            : "w-[var(--documentation-panel-width,420px)] min-w-[var(--documentation-panel-width,420px)]",
         )}
       >
-        <div className="w-full flex flex-col h-full overflow-hidden">
-          {panelContent}
-        </div>
-      </aside>
-    </>
+        {panelContent}
+      </div>
+    </aside>
   );
 }
 

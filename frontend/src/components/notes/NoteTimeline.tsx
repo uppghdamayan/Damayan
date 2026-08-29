@@ -5,6 +5,7 @@ import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
 import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
+import { useMedNoteOverridesStore, medNoteOverrideKey } from '@/stores/medNoteOverridesStore';
 import { useDeletedNotes } from '@/hooks/useDeletedNotes';
 import { DeletedNote } from '@/types/deleted-note';
 import { useState, useMemo } from 'react';
@@ -46,23 +47,29 @@ function mergeMedsForDraft(
   medicationSnapshot: unknown,
   activeMedications: any[],
   inheritedMedications: any[],
+  removedNames?: Set<string>,
 ): any[] {
   const hasSnapshot = Array.isArray(medicationSnapshot);
   const validMeds = (hasSnapshot ? (medicationSnapshot as any[]) : [])
     .filter((m: any) => m && (typeof m === 'string' ? m.trim() : m.name))
     .map((m: any) => (typeof m === 'string' ? { name: m, dose: '' } : m));
 
-  if (hasSnapshot) return mergeActiveMedications(validMeds, activeMedications);
-  if (inheritedMedications.length > 0) return mergeActiveMedications(inheritedMedications, activeMedications);
+  if (hasSnapshot) return mergeActiveMedications(validMeds, activeMedications, removedNames);
+  if (inheritedMedications.length > 0) return mergeActiveMedications(inheritedMedications, activeMedications, removedNames);
 
-  return activeMedications.map((m: any) => ({
-    name: m.name,
-    dose: m.dose || undefined,
-    formulation: m.formulation || undefined,
-    quantity: m.quantity || undefined,
-    instructions: m.instructions || undefined,
-    fromPast: m.fromPast || false,
-  }));
+  // No snapshot and nothing inherited — raw active meds, minus anything the
+  // clinician just discontinued in this note (the same guard the two
+  // branches above get for free from mergeActiveMedications).
+  return activeMedications
+    .filter((m: any) => !removedNames?.has(String(m.name || '').trim().toLowerCase()))
+    .map((m: any) => ({
+      name: m.name,
+      dose: m.dose || undefined,
+      formulation: m.formulation || undefined,
+      quantity: m.quantity || undefined,
+      instructions: m.instructions || undefined,
+      fromPast: m.fromPast || false,
+    }));
 }
 
 
@@ -127,6 +134,16 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const liveDraftSnapshot = useDraftSnapshotStore((s) =>
     draftProgressNote ? s.byKey[`${patientId}:${draftProgressNote.id}`] : undefined
   );
+  // In-note discontinuations for the open draft — durable (persisted) so
+  // this stays correct even with the editor panel closed, unlike
+  // liveDraftSnapshot above. See medNoteOverridesStore.ts.
+  const removedMedNamesList = useMedNoteOverridesStore((s) =>
+    draftProgressNote ? s.byKey[medNoteOverrideKey(patientId, draftProgressNote.id)] : undefined
+  );
+  const removedMedNames = useMemo(
+    () => new Set(removedMedNamesList || []),
+    [removedMedNamesList],
+  );
 
   // Combine and sort
   const allNotesRaw = useMemo(() => {
@@ -190,14 +207,28 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           problemListSnapshot:
             liveDraftSnapshot?.problemListSnapshot ??
             mergeProblemsForDraft(note.problemListSnapshot, copyForward.activeProblems),
-          medicationSnapshot:
-            liveDraftSnapshot?.medicationSnapshot ??
-            mergeMedsForDraft(note.medicationSnapshot, copyForward.activeMedications, copyForward.inheritedMedications),
+          // Merge-always, seeded by the editor's live form state when
+          // mounted (else the persisted snapshot): the editor's array is
+          // only used to decide *membership* (in-progress isNew rows,
+          // just-clicked discontinuations), while this call still resyncs
+          // dose/formulation/quantity/instructions from the live master
+          // list itself. This is what keeps the timeline correct while the
+          // medication edit lock is held — ProgressNoteForm deliberately
+          // freezes its own merge in that state (to protect in-progress
+          // typing), but that freeze must not leak a stale field into this
+          // read-only view. `removedNames` covers discontinuations even
+          // once the editor unmounts and liveDraftSnapshot goes away.
+          medicationSnapshot: mergeMedsForDraft(
+            liveDraftSnapshot?.medicationSnapshot ?? note.medicationSnapshot,
+            copyForward.activeMedications,
+            copyForward.inheritedMedications,
+            removedMedNames,
+          ),
         };
       }
       return mapNoteToTimelineView(noteForView, isLatest, initialNoteAuthorId);
     });
-  }, [sortedRaw, activeInitialNote, draftProgressNote, copyForward, liveDraftSnapshot]);
+  }, [sortedRaw, activeInitialNote, draftProgressNote, copyForward, liveDraftSnapshot, removedMedNames]);
 
   const inheritedSourceId = carryForwardSource?.sourceNoteId ?? undefined;
 

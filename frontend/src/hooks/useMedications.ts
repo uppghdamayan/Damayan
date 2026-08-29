@@ -41,6 +41,13 @@ function invalidateMedications(qc: ReturnType<typeof useQueryClient>, patientId:
   // this, publishing a medication change in the Medications module never
   // refreshes the open note's sidebar snapshot.
   qc.invalidateQueries({ queryKey: ['carry-forward', patientId] });
+  // The note record's own persisted medicationSnapshot (ProgressNote row)
+  // is a second merge input alongside copyForward.activeMedications above —
+  // without refreshing it too, the two can be read from different points in
+  // time and the draft's list/timeline can show a stale dose/membership
+  // even though copyForward already has the live value.
+  qc.invalidateQueries({ queryKey: ['progress-notes', patientId] });
+  qc.invalidateQueries({ queryKey: ['progress-note'] }); // no noteId in scope here; small key space
 }
 
 export function useCreateMedication(patientId: string) {

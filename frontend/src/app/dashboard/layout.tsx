@@ -75,9 +75,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           className="flex flex-1 overflow-hidden"
         >
           <Sidebar />
+          {/*
+            Deliberately NOT a query container. `container-type: inline-size`
+            implies layout containment, which makes the element the containing
+            block for `position: fixed` descendants — and this column is
+            `overflow-hidden`, so every hand-rolled `fixed inset-0` modal the
+            tab screens render (VitalsForm, MedicationForm, ProblemEditModal,
+            DocumentGeneratorModal, DeleteConfirmModal…) would be clipped to the
+            column instead of covering the viewport. ScreenNav carries its own
+            small @container/nav around just the tab links, which holds no
+            modals.
+            min-w-0 is what allows flex-1 to shrink below its content width.
+          */}
           <div
             id="middle-column"
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 min-w-0 flex flex-col overflow-hidden"
           >
             {children}
           </div>

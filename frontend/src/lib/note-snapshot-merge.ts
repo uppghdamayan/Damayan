@@ -165,14 +165,23 @@ export function mergeActiveProblems(
  * a draft was never meaningful), resyncs dose/formulation/quantity/
  * instructions from the live medication, appends newly active meds, and
  * skips names the clinician explicitly discontinued in this note
- * (`removedNames`, sourced from ProgressNoteForm's `removedMedNamesRef` —
- * `undefined`/omitted behaves as an empty set, which is what the timeline
- * uses since it has no visibility into that in-note-only state).
+ * (`removedNames`, sourced from ProgressNoteForm/NoteTimeline's shared
+ * medNoteOverridesStore — both the editor and the timeline pass this now,
+ * so `undefined`/omitted should only happen for call sites that genuinely
+ * have no in-note-removal concept, e.g. `handleRevertMedications`).
+ *
+ * Source-of-truth rule: live master wins for dose/formulation/quantity/
+ * instructions UNLESS that field is named in the entry's own
+ * `editedFields` (set when the clinician edits that field via the in-note
+ * medication edit modal) — an in-note edit is never silently clobbered by
+ * a later, unrelated master-list change.
  *
  * Entries are projected to the editor's `NoteMedicationItem` shape
- * (name/dose/formulation/quantity/instructions/isNew/fromPast) rather than
- * spread verbatim, so a legacy `unit`/`source` field never survives the
- * merge — `unit` is folded into `dose` instead.
+ * (name/dose/formulation/quantity/instructions/isNew/fromPast/editedFields)
+ * rather than spread verbatim, so a legacy `unit`/`source` field never
+ * survives the merge — `unit` is folded into `dose` instead. `editedFields`
+ * MUST stay in this projection, or the next merge pass forgets which
+ * fields were edited in-note and live master silently wins for all of them.
  */
 export function mergeActiveMedications(
   existingMeds: any[],
@@ -210,21 +219,26 @@ export function mergeActiveMedications(
     // instructions/quantity edited on the medication itself (e.g. via the
     // Medications module) never made it in, since only brand-new names
     // were ever added below. Resync those fields from the live active
-    // medication so a published dose change actually shows up here.
+    // medication so a published dose change actually shows up here, unless
+    // the clinician explicitly edited that field in this note (editedFields).
     .map((m: any) => {
       if (!m || typeof m !== 'object' || m.isNew) return m;
       const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
       const live = name ? activeByName.get(name) : undefined;
-      const dose = m.dose !== undefined ? m.dose : (live?.dose || undefined);
+      const edited = new Set<string>(Array.isArray(m.editedFields) ? m.editedFields : []);
+      const pick = (field: string) =>
+        edited.has(field) ? m[field] : (live?.[field] ?? m[field]);
+      const dose = pick('dose');
       const legacyUnit = (m as any).unit;
       return {
         name: typeof m === 'string' ? m : m.name,
         dose: legacyUnit ? [dose, legacyUnit].filter(Boolean).join(' ') : dose,
-        formulation: m.formulation !== undefined ? m.formulation : (live?.formulation || undefined),
-        quantity: m.quantity !== undefined ? m.quantity : (live?.quantity || undefined),
-        instructions: m.instructions !== undefined ? m.instructions : (live?.instructions || undefined),
+        formulation: pick('formulation'),
+        quantity: pick('quantity'),
+        instructions: pick('instructions'),
         isNew: m.isNew,
         fromPast: m.fromPast ?? live?.fromPast ?? false,
+        editedFields: m.editedFields,
       };
     });
 

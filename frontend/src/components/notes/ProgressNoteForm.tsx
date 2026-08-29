@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
 import type { NoteAssessmentItem } from '@/lib/problem-utils';
 import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications } from '@/lib/note-snapshot-merge';
+import { compareDoses } from '@/lib/notes-utils';
 import { progressDraftKey } from '@/lib/note-drafts';
 import { 
   progressNoteDraftSchema, 
@@ -39,6 +40,7 @@ import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
+import { useMedNoteOverridesStore, medNoteOverrideKey } from '@/stores/medNoteOverridesStore';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 
@@ -175,10 +177,19 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // active in the master list. Consulted there to keep a deliberate removal
   // removed until Revert or a fresh note load clears it.
   const removedMedNamesRef = useRef<Set<string>>(new Set());
+  // Durable key for this note's in-note-discontinuation tombstones — see
+  // medNoteOverridesStore.ts. `removedMedNamesRef` stays the synchronous
+  // read the merge call sites below already use; this store is what makes
+  // the set survive an unmount/reload instead of resetting on every noteId
+  // change (that reset was the root cause of removals reappearing once the
+  // editor closed).
+  const medOverrideKey = medNoteOverrideKey(patientId, noteId);
 
   useEffect(() => {
-    removedMedNamesRef.current.clear();
-  }, [noteId]);
+    const persisted = useMedNoteOverridesStore.getState().byKey[medOverrideKey] || [];
+    removedMedNamesRef.current = new Set(persisted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medOverrideKey]);
 
   useEffect(() => {
     if (medicationListLockOwner === 'note' && !isMedicationEditMode) {
@@ -227,6 +238,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         .map((m: any) => (typeof m === 'string' ? m : m?.name)?.trim().toLowerCase())
         .filter(Boolean),
     );
+    const newlyRemoved: string[] = [];
     for (const m of prev) {
       if (!m) continue;
       const isNewItem = typeof m === 'object' && m.isNew;
@@ -234,12 +246,24 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
       if (name && !nextNames.has(name)) {
         removedMedNamesRef.current.add(name);
+        newlyRemoved.push(name);
       }
     }
     // A name back in `next` (e.g. re-added via the sub-form) is no longer a
     // pending discontinuation.
+    const noLongerRemoved: string[] = [];
     for (const name of nextNames) {
-      removedMedNamesRef.current.delete(name);
+      if (removedMedNamesRef.current.delete(name)) {
+        noLongerRemoved.push(name);
+      }
+    }
+    // Mirror onto the durable store so the removal (or its reversal)
+    // survives an unmount/reload and is visible to NoteTimeline.
+    if (newlyRemoved.length > 0) {
+      useMedNoteOverridesStore.getState().addRemoved(medOverrideKey, newlyRemoved);
+    }
+    if (noLongerRemoved.length > 0) {
+      useMedNoteOverridesStore.getState().removeRemoved(medOverrideKey, noLongerRemoved);
     }
     form.setValue('medicationSnapshot', next, { shouldDirty: true, shouldTouch: true });
   };
@@ -592,6 +616,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       { shouldDirty: true },
     );
     removedMedNamesRef.current.clear();
+    useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
     setIsMedicationEditMode(false);
     releaseMedicationLock();
   };
@@ -695,6 +720,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             publishMutation.mutate(noteId, {
               onSuccess: () => {
                 localStorage.removeItem(progressDraftKey(patientId, noteId));
+                useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
                 releaseProblemLock();
                 releaseMedicationLock();
                 resolve(true);
@@ -714,6 +740,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     createAndPublishMutation.mutate(cleanFormValues(formValues), {
       onSuccess: () => {
         localStorage.removeItem(progressDraftKey(patientId, noteId));
+        useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
         releaseProblemLock();
         releaseMedicationLock();
         resolve(true);
@@ -811,6 +838,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             instructions: m.instructions,
             isNew: m.isNew,
             fromPast: m.fromPast,
+            editedFields: m.editedFields,
           };
         }
         return m;
@@ -863,6 +891,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       deleteMutation.mutate(noteId, {
         onSuccess: () => {
           localStorage.removeItem(progressDraftKey(patientId, noteId));
+          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -896,6 +925,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           // clears this — without it, a stale draft's body and visitDatetime
           // leak into the very next new note opened for this patient.
           localStorage.removeItem(progressDraftKey(patientId, noteId));
+          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');
@@ -1011,6 +1041,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 setLocalAttachments([]);
               }
               localStorage.removeItem(progressDraftKey(patientId, noteId));
+              useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
               // Defensive — validateForPublish already blocks publishing
               // while the section is mid-edit, so this is normally already
               // released, but a published note has no further use for the
@@ -1052,6 +1083,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             setLocalAttachments([]);
           }
           localStorage.removeItem(progressDraftKey(patientId, noteId));
+          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -1130,38 +1162,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const isUpdateActive = !!form.formState.isDirty;
 
   return (
-    <div className="flex flex-col h-full bg-surface-2 panel-container relative">
+    // @container/notepanel replaces an inline <style> tag that re-injected a
+    // stylesheet on every render and defined .panel-container / .title-text /
+    // .btn-text / .header-btn nowhere else in the codebase. Naming the
+    // container also lets VitalsSummaryRow size against this panel rather than
+    // the window. The 410px threshold is deliberately unchanged, so the default
+    // 420px panel still shows full labels exactly as before.
+    <div className="@container/notepanel flex flex-col h-full bg-surface-2 relative">
       {/* Saving is surfaced inline via the per-button spinner and the "Autosaved"
           indicator (design-standard.md §7.3) — no full-panel blocking overlay, so the
           note stays readable and scrollable while a save round-trips. */}
-      <style>{`
-        .panel-container {
-          container-type: inline-size;
-        }
-        @container (max-width: 410px) {
-          .title-text {
-            display: none !important;
-          }
-          .btn-text {
-            display: none !important;
-          }
-          .header-btn {
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
-            gap: 0 !important;
-          }
-        }
-        @keyframes slight-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-        .blink-animation {
-          animation: slight-blink 2s ease-in-out infinite;
-        }
-      `}</style>
       {/* Sticky header */}
-      <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-10 shrink-0 bg-accent-light/40 border-b border-accent-mid/40">
-        <div className="flex flex-col">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 z-10 shrink-0 bg-accent-light/40 border-b border-accent-mid/40">
+        {/* min-w-0 on the title and shrink-0 on the actions: the row is
+            justify-between, so without these the title block held its width and
+            pushed the buttons off the right edge instead of yielding. */}
+        <div className="flex flex-col min-w-0">
           <span className="text-[13px] font-bold flex items-center gap-2 text-accent-hover">            <button
               onClick={() => {
                 const unadded = getUnaddedSections();
@@ -1180,7 +1196,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             >
               <PanelRightClose className="w-4 h-4" />
             </button>
-            <span className="title-text shrink-0">Progress Note</span>
+            <span className="shrink-0 truncate @max-[410px]/notepanel:hidden">Progress Note</span>
             {isSyncing && (
               <span title="Syncing patient data..." className="shrink-0 flex items-center">
                 <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
@@ -1188,9 +1204,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             )}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Status first to give way: the Autosaved pill and the DRAFT badge
+              report state, the buttons do work. */}
           {!noteId && (
-            <span className="font-mono text-[10px] text-green flex items-center gap-1 shrink-0" title={lastSaved ? `Last saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosaved'}>
+            <span className="font-mono text-[10px] text-green flex items-center gap-1 shrink-0 @max-[410px]/notepanel:hidden" title={lastSaved ? `Last saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosaved'}>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <circle cx="5" cy="5" r="4" fill="var(--green-border)" />
                 <path d="M3 5l1.5 1.5L7 3.5" stroke="white" strokeWidth="1.2" />
@@ -1215,7 +1233,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 disabled={isSaving || deleteMutation.isPending} 
                 variant="outline" 
                 size="xs"
-                className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 shrink-0 @max-[410px]/notepanel:px-2 @max-[410px]/notepanel:gap-0"
                 title={noteId ? 'Undraft' : 'Draft'}
               >
                 {deleteMutation.isPending || (isSaving && !noteId) ? (
@@ -1225,7 +1243,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 ) : (
                   <FileText className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span className="btn-text">{noteId ? 'Undraft' : 'Draft'}</span>
+                <span className="@max-[410px]/notepanel:hidden">{noteId ? 'Undraft' : 'Draft'}</span>
               </Button>
               {(form.formState.isDirty || localAttachments.length > 0) && !noteId && (
                 <Button 
@@ -1261,6 +1279,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                     });
 
                     localStorage.removeItem(progressDraftKey(patientId, noteId));
+                    useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
 
                     // Clear controlled inputs
                     setNewProbTitle('');
@@ -1292,11 +1311,11 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   disabled={isDisabled}
                   variant="outline"
                   size="xs"
-                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 shrink-0 @max-[410px]/notepanel:px-2 @max-[410px]/notepanel:gap-0"
                   title="Revert"
                 >
                   <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                  <span className="btn-text">Revert</span>
+                  <span className="@max-[410px]/notepanel:hidden">Revert</span>
                 </Button>
               )}
               {(form.formState.isDirty || localAttachments.length > 0) && noteId && (
@@ -1305,7 +1324,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   disabled={updateMutation.isPending} 
                   variant="outline" 
                   size="xs"
-                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                  className="h-6 px-2.5 text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 border-border text-text-secondary cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 shrink-0 @max-[410px]/notepanel:px-2 @max-[410px]/notepanel:gap-0"
                   title="Update Draft"
                 >
                   {updateMutation.isPending ? (
@@ -1313,7 +1332,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   ) : (
                     <Save className="w-3.5 h-3.5 shrink-0" />
                   )}
-                  <span className="btn-text">Update Draft</span>
+                  <span className="@max-[410px]/notepanel:hidden">Update Draft</span>
                 </Button>
               )}
               <Button 
@@ -1321,7 +1340,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 disabled={isSaving || publishMutation.isPending || createAndPublishMutation.isPending} 
                 variant="default" 
                 size="xs"
-                className="h-6 px-2.5 text-[11px] font-semibold bg-accent hover:bg-accent-hover text-white border-accent-hover cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 header-btn"
+                className="h-6 px-2.5 text-[11px] font-semibold bg-accent hover:bg-accent-hover text-white border-accent-hover cursor-pointer rounded-[4px] flex items-center justify-center gap-1.5 shrink-0 @max-[410px]/notepanel:px-2 @max-[410px]/notepanel:gap-0"
                 title="Finalize"
               >
                 {isSaving || publishMutation.isPending || createAndPublishMutation.isPending ? (
@@ -1329,7 +1348,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 ) : (
                   <Check className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span className="btn-text">Finalize</span>
+                <span className="@max-[410px]/notepanel:hidden">Finalize</span>
               </Button>
             </div>
           )}
@@ -1578,7 +1597,22 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           if (editMedIndex === null) return;
           const current = form.getValues('medicationSnapshot') || [];
           const updated = [...current];
-          updated[editMedIndex] = { ...updated[editMedIndex], ...values };
+          const before = updated[editMedIndex] || {};
+          // Record which pharmacologic fields the clinician actually changed
+          // in-note, so mergeActiveMedications never lets a later, unrelated
+          // master-list edit silently clobber them (note-snapshot-merge.ts).
+          const changedFields = (['dose', 'formulation', 'quantity', 'instructions'] as const).filter((field) => {
+            if (field === 'dose') {
+              const prevDose = String((before as any).dose ?? '');
+              const nextDose = String((values as any).dose ?? '');
+              if (!prevDose && !nextDose) return false;
+              return compareDoses(nextDose, prevDose).isDifferent;
+            }
+            return String((before as any)[field] ?? '').trim() !== String((values as any)[field] ?? '').trim();
+          });
+          const prevEdited: string[] = Array.isArray((before as any).editedFields) ? (before as any).editedFields : [];
+          const editedFields = Array.from(new Set([...prevEdited, ...changedFields]));
+          updated[editMedIndex] = { ...before, ...values, editedFields };
           form.setValue('medicationSnapshot', updated, { shouldDirty: true, shouldTouch: true });
           setEditMedIndex(null);
         }}

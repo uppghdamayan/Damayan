@@ -14,6 +14,10 @@ export interface NoteMedicationItem {
   instructions?: string;
   isNew?: boolean;
   fromPast?: boolean;
+  // Field names the clinician explicitly edited via the in-note medication
+  // edit modal — see note-snapshot-merge.ts's mergeActiveMedications for how
+  // this stops a later, unrelated master-list change from clobbering it.
+  editedFields?: string[];
 }
 
 interface NoteMedicationEditorProps {

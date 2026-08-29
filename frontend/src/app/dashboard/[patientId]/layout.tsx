@@ -132,7 +132,7 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
             {!isDashboard && patient && (
               <div className="bg-surface border border-border rounded-card p-4 flex gap-5 items-stretch flex-wrap shadow-card w-full mb-1">
                 {/* Left Column: Avatar + Name */}
-                <div className="flex gap-3.5 items-center flex-[1.2] min-w-[250px] border-r border-border pr-5">
+                <div className="flex gap-3.5 items-center flex-[1.2] basis-[250px] min-w-0 border-r border-border pr-5 @max-[1023px]/app:border-r-0 @max-[1023px]/app:pr-0">
                   <div className="w-11 h-11 rounded-full bg-accent-light border-2 border-accent flex items-center justify-center text-[15px] font-bold text-accent-hover flex-shrink-0">
                     {initials(patient.firstName, patient.lastName)}
                   </div>
@@ -150,8 +150,8 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
                 </div>
 
                 {/* Right Column: Demographics */}
-                <div className="flex flex-col gap-2 flex-1 min-w-[280px] justify-center pl-5">
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+                <div className="flex flex-col gap-2 flex-1 basis-[280px] min-w-0 justify-center pl-5 @max-[1023px]/app:pl-0">
+                  <div className="grid grid-cols-3 @max-[767px]/app:grid-cols-2 gap-x-4 gap-y-2">
                     <div>
                       <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Sex</span>
                       <strong className="text-text-primary text-[12px]">{sexLabel}</strong>
@@ -164,7 +164,7 @@ export default function PatientWorkspaceLayout({ children }: { children: React.R
                       <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Birthdate</span>
                       <strong className="text-text-primary text-[12px]" title={dob}>{dob}</strong>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-3 @max-[767px]/app:col-span-2">
                       <span className="text-[9px] font-semibold text-text-muted uppercase tracking-[0.5px] block">Address</span>
                       <span className="text-text-secondary text-[12px] truncate block" title={addressStr}>{addressStr}</span>
                     </div>
