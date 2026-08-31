@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { progressDraftKey } from '@/lib/note-drafts';
+import { clearNoteOverrides } from '@/stores/noteOverridesStore';
 import { BP } from '@/lib/breakpoints';
 
 const UI_SCALE_MIN = 80;
@@ -60,8 +61,8 @@ interface UiState {
   sidebarUserSet: boolean;
   documentationPanelOpen: boolean;
   activeScreen: ActiveScreen;
-  // Measured width of #app-root, fed by AppWidthEffect. 0 = not measured yet.
-  // This is the only width the store branches on, and deliberately not
+  // Measured width of document.body, fed by AppWidthEffect. 0 = not measured
+  // yet. This is the only width the store branches on, and deliberately not
   // window.innerWidth: it is the same box the `@container app` rules in
   // globals.css measure, so the JS branches and the CSS branches stay in
   // agreement even under the zoom-based UI scale.
@@ -167,6 +168,10 @@ export const useUiStore = create<UiState>()(
         if (typeof window !== 'undefined' && window.localStorage) {
           localStorage.removeItem(progressDraftKey(patientId, null));
         }
+        // An abandoned unsaved note's tombstones (recorded under the
+        // `:new` key — see noteOverridesStore.ts) would otherwise leak
+        // into the next "+ New Note" for this patient.
+        clearNoteOverrides(patientId, null);
         return {
           activeNoteEditor: { patientId, noteId: null, mode: 'new' as const },
           documentationPanelOpen: true,

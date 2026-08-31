@@ -30,6 +30,20 @@ export function flattenActiveProblemTree(
   return list;
 }
 
+// Tokens identifying a problem for tombstone purposes — both the id form
+// (stable across a rename) and the title form (needed for legacy/id-less
+// entries, and because a problem can be renamed in-note after the
+// tombstone was recorded). Callers should check membership against either
+// form present on an entry.
+export function problemTombstoneTokens(entry: any): string[] {
+  if (!entry || typeof entry !== 'object') return [];
+  const tokens: string[] = [];
+  if (entry.id) tokens.push(`id:${entry.id}`);
+  const title = entry.title?.trim().toLowerCase();
+  if (title) tokens.push(`title:${title}`);
+  return tokens;
+}
+
 /**
  * Merges a draft's stored problem snapshot with the live active Problem
  * List: drops snapshot entries tied to a Problem that's no longer active,
@@ -38,10 +52,18 @@ export function flattenActiveProblemTree(
  * nesting, diagnosis date) already captured in the snapshot. See the
  * inline comments for the full reasoning; this is a verbatim extraction
  * from ProgressNoteForm.tsx, no behavior change.
+ *
+ * `removedKeys` (opaque `problemTombstoneTokens` strings, sourced from
+ * ProgressNoteForm/NoteTimeline's shared noteOverridesStore) suppresses a
+ * problem the clinician explicitly deleted from this note's list, even
+ * though it's still ACTIVE on the master list — mirrors
+ * mergeActiveMedications' `removedNames`. `isNew` entries are never
+ * tombstoned (they have no master row to delete).
  */
 export function mergeActiveProblems(
   existingProblems: any[],
   activeProblems: any[],
+  removedKeys?: Set<string>,
 ): any[] {
   const flatActive = flattenActiveProblemTree(activeProblems);
 
@@ -68,6 +90,10 @@ export function mergeActiveProblems(
   // id needed to detect that directly).
   const existing = existingProblems.filter((p: any) => {
     if (!p || typeof p !== 'object') return true;
+    if (!p.isNew && removedKeys?.size) {
+      const tokens = problemTombstoneTokens(p);
+      if (tokens.some((t) => removedKeys.has(t))) return false;
+    }
     if (p.id) return activeIds.has(p.id);
     if (p.isNew || !p.id) return true;
     const title = p.title?.trim().toLowerCase();
@@ -91,6 +117,7 @@ export function mergeActiveProblems(
     const p = item.problem;
     if (!p.title) continue;
     const titleKey = p.title.trim().toLowerCase();
+    if (removedKeys?.has(`id:${p.id}`) || removedKeys?.has(`title:${titleKey}`)) continue;
 
     const matchIdx = (p.id && existingById.has(p.id))
       ? existingById.get(p.id)!

@@ -54,6 +54,11 @@ export function Sidebar() {
   // The two clamps were previously independent — 45% of the viewport here, 60%
   // there — so both at maximum asked for 105% and left the chart with nothing.
   const getMax = useCallback(() => {
+    // appWidth is 0 until AppWidthEffect's first measurement lands — treat
+    // that as "unconstrained" rather than collapsing the budget to the
+    // minimum, which made every drag before first measurement indistinguishable
+    // from frozen.
+    if (appWidth <= 0) return Infinity;
     const docW = documentationPanelOpen
       ? (document.querySelector<HTMLElement>('[data-panel="documentation"]')?.offsetWidth ?? 0)
       : 0;
@@ -312,16 +317,29 @@ export function Sidebar() {
         {!sidebarCollapsed && !isOverlay && (
           <div className="absolute top-0 right-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
         )}
-        {/* Resize handle on the right edge */}
+        {/*
+          Resize handle. Widened the hit target from 6px to 10px and given it a
+          permanent low-opacity grip line — at 6px fully-transparent it only
+          showed anything on a pixel-perfect hover, which read as "this can't
+          be resized" rather than as a control that's merely quiet at rest.
+        */}
         {!sidebarCollapsed && !isOverlay && (
           <div
             {...handleProps}
             className={cn(
-              "absolute top-0 -right-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
-              "focus-visible:outline-none focus-visible:bg-accent",
-              isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
+              "group/handle absolute top-0 -right-[5px] w-[10px] h-full cursor-ew-resize touch-none z-30 flex items-center justify-center",
+              "focus-visible:outline-none"
             )}
-          />
+          >
+            <div
+              className={cn(
+                "w-[3px] h-10 rounded-full transition-colors duration-150",
+                isResizing
+                  ? "bg-accent"
+                  : "bg-border-strong/50 group-hover/handle:bg-accent group-focus-visible/handle:bg-accent"
+              )}
+            />
+          </div>
         )}
         <div
           className={cn(

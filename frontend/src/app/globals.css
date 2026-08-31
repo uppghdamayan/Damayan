@@ -202,10 +202,14 @@
 
   /* Layout dimensions.
      --sidebar-w / --documentation-panel-width are the *resolved* widths and are
-     computed on #shell below. The -default/-min/-max triples are what the
-     breakpoint tiers move; the drag handles only ever write -user, so a resize
-     can never escape its tier's bounds or survive a tier change. The plain
-     values here are the pre-#shell fallback for anything outside the shell. */
+     computed on #shell below. The -default/-min triples are what the
+     breakpoint tiers move; the drag handles write -user and floor it here at
+     -min, but the ceiling is NOT set in CSS — usePanelResize.ts's `getMax` is
+     the single source of truth for the upper bound (each panel's own budget
+     against the center column's minimum width), so a resize is free to use
+     the full available space rather than being capped per breakpoint tier.
+     The plain values here are the pre-#shell fallback for anything outside
+     the shell. */
   --topbar-h:                   56px;
   --sidebar-w:                  280px;
   --documentation-panel-width:  420px;
@@ -213,33 +217,27 @@
 
   --sidebar-w-default:          280px;
   --sidebar-w-min:              200px;
-  --sidebar-w-max:              360px;
 
   --doc-panel-w-default:        420px;
   --doc-panel-w-min:            300px;
-  --doc-panel-w-max:            720px;
 }
 
 #shell {
-  --sidebar-w: clamp(
+  --sidebar-w: max(
     var(--sidebar-w-min),
-    var(--sidebar-w-user, var(--sidebar-w-default)),
-    var(--sidebar-w-max)
+    var(--sidebar-w-user, var(--sidebar-w-default))
   );
-  --documentation-panel-width: clamp(
+  --documentation-panel-width: max(
     var(--doc-panel-w-min),
-    var(--doc-panel-w-user, var(--doc-panel-w-default)),
-    var(--doc-panel-w-max)
+    var(--doc-panel-w-user, var(--doc-panel-w-default))
   );
 }
 
-/* Compact desktop — both panels still in-flow columns, but narrower. */
+/* Compact desktop — both panels still in-flow columns, but narrower default. */
 @container app (max-width: 1439px) {
   #shell {
     --sidebar-w-default:   220px;
-    --sidebar-w-max:       300px;
     --doc-panel-w-default: 340px;
-    --doc-panel-w-max:     560px;
     --timeline-w:          200px;
     --topbar-h:            52px;
   }
@@ -251,9 +249,7 @@
 @container app (max-width: 1023px) {
   #shell {
     --sidebar-w-default:   260px;
-    --sidebar-w-max:       320px;
     --doc-panel-w-default: 440px;
-    --doc-panel-w-max:     560px;
     --timeline-w:          160px;
     --topbar-h:            48px;
   }

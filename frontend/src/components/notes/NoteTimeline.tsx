@@ -5,7 +5,7 @@ import { TimelineEntry } from './TimelineEntry';
 import { useRouter } from 'next/navigation';
 import { useUiStore } from '@/stores/uiStore';
 import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
-import { useMedNoteOverridesStore, medNoteOverrideKey } from '@/stores/medNoteOverridesStore';
+import { useNoteOverridesStore, medNoteOverrideKey, problemNoteOverrideKey } from '@/stores/noteOverridesStore';
 import { useDeletedNotes } from '@/hooks/useDeletedNotes';
 import { DeletedNote } from '@/types/deleted-note';
 import { useState, useMemo } from 'react';
@@ -26,21 +26,30 @@ import { Skeleton } from '@/components/ui/skeleton';
  * from what the editor would show for the same note, whether or not the
  * editor is actually mounted right now.
  */
-function mergeProblemsForDraft(problemListSnapshot: unknown, activeProblems: any[]): any[] {
+function mergeProblemsForDraft(
+  problemListSnapshot: unknown,
+  activeProblems: any[],
+  removedKeys?: Set<string>,
+): any[] {
   const hasSnapshot = Array.isArray(problemListSnapshot);
   const validProblems = (hasSnapshot ? (problemListSnapshot as any[]) : [])
     .filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title))
     .map((p: any) => (typeof p === 'string' ? { title: p } : p));
 
-  if (hasSnapshot) return mergeActiveProblems(validProblems, activeProblems);
+  if (hasSnapshot) return mergeActiveProblems(validProblems, activeProblems, removedKeys);
 
-  return flattenActiveProblemTree(activeProblems).map(({ problem: p, depth }) => ({
-    id: p.id || undefined,
-    title: p.title,
-    parentId: p.parentId || undefined,
-    depth,
-    diagnosisDate: p.diagnosisDate || null,
-  }));
+  return flattenActiveProblemTree(activeProblems)
+    .filter(({ problem: p }) => {
+      const titleKey = p.title?.trim().toLowerCase();
+      return !(removedKeys?.has(`id:${p.id}`) || (titleKey && removedKeys?.has(`title:${titleKey}`)));
+    })
+    .map(({ problem: p, depth }) => ({
+      id: p.id || undefined,
+      title: p.title,
+      parentId: p.parentId || undefined,
+      depth,
+      diagnosisDate: p.diagnosisDate || null,
+    }));
 }
 
 function mergeMedsForDraft(
@@ -134,20 +143,54 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const liveDraftSnapshot = useDraftSnapshotStore((s) =>
     draftProgressNote ? s.byKey[`${patientId}:${draftProgressNote.id}`] : undefined
   );
-  // In-note discontinuations for the open draft — durable (persisted) so
-  // this stays correct even with the editor panel closed, unlike
-  // liveDraftSnapshot above. See medNoteOverridesStore.ts.
-  const removedMedNamesList = useMedNoteOverridesStore((s) =>
+  // In-note discontinuations/deletions for the open draft — durable
+  // (persisted) so this stays correct even with the editor panel closed,
+  // unlike liveDraftSnapshot above. See noteOverridesStore.ts.
+  const removedMedNamesList = useNoteOverridesStore((s) =>
     draftProgressNote ? s.byKey[medNoteOverrideKey(patientId, draftProgressNote.id)] : undefined
   );
   const removedMedNames = useMemo(
     () => new Set(removedMedNamesList || []),
     [removedMedNamesList],
   );
+  const removedProblemKeysList = useNoteOverridesStore((s) =>
+    draftProgressNote ? s.byKey[problemNoteOverrideKey(patientId, draftProgressNote.id)] : undefined
+  );
+  const removedProblemKeys = useMemo(
+    () => new Set(removedProblemKeysList || []),
+    [removedProblemKeysList],
+  );
+
+  // Live editor state for a genuinely unsaved note (noteId === null): there
+  // is no server-side DRAFT row yet, so `draftProgressNote` above is
+  // undefined and this note would otherwise have no timeline entry at all
+  // until the first Save Draft — an in-note problem/medication addition
+  // was invisible here until then. draftSnapshotStore now always writes
+  // under `${patientId}:new` while the editor is mounted (see
+  // ProgressNoteForm's draftSnapshotKey), so read it directly; no merge
+  // needed, the editor's live state already is the truth pre-save.
+  const pendingDraftSnapshot = useDraftSnapshotStore((s) => s.byKey[`${patientId}:new`]);
+  const hasPendingNewNote =
+    !draftProgressNote &&
+    activeNoteEditor.mode === 'new' &&
+    activeNoteEditor.patientId === patientId &&
+    !!pendingDraftSnapshot;
 
   // Combine and sort
   const allNotesRaw = useMemo(() => {
     const combined: any[] = [...progressNotes];
+    if (hasPendingNewNote) {
+      combined.push({
+        id: '__pending__',
+        status: 'DRAFT',
+        subjective: '',
+        objective: '',
+        mgmtPharm: '',
+        problemListSnapshot: pendingDraftSnapshot!.problemListSnapshot || [],
+        medicationSnapshot: pendingDraftSnapshot!.medicationSnapshot || [],
+        createdAt: new Date().toISOString(),
+      });
+    }
     const initialList = (initialNotes && initialNotes.length > 0)
       ? initialNotes
       : (activeInitialNote ? [activeInitialNote] : []);
@@ -166,9 +209,12 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
       }
     }
     return combined;
-  }, [progressNotes, initialNotes, activeInitialNote, deletedNotes]);
+  }, [progressNotes, initialNotes, activeInitialNote, deletedNotes, hasPendingNewNote, pendingDraftSnapshot]);
 
-  const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note);
+  // The synthetic pending entry must never count toward "+ New Note"
+  // gating — it isn't a real DB draft, it's a preview of the one being
+  // typed right now.
+  const hasDrafts = allNotesRaw.some((note) => note.status === 'DRAFT' && 'subjective' in note && note.id !== '__pending__');
 
   // Sort by visit.visitDatetime (falling back to createdAt when the visit
   // relation is missing), tied on createdAt — the exact same key and
@@ -204,9 +250,18 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
       if (draftProgressNote && note.id === draftProgressNote.id && copyForward) {
         noteForView = {
           ...note,
-          problemListSnapshot:
-            liveDraftSnapshot?.problemListSnapshot ??
-            mergeProblemsForDraft(note.problemListSnapshot, copyForward.activeProblems),
+          // Merge-always, seeded by live-if-present — same shape as the
+          // medication merge below and for the same reason: the editor's
+          // frozen array (while the problem edit lock is held) is only
+          // used to decide membership, not to skip the master-list resync,
+          // so a stale title/nesting never leaks into this read-only view.
+          // `removedKeys` covers in-note deletions even once the editor
+          // unmounts and liveDraftSnapshot goes away.
+          problemListSnapshot: mergeProblemsForDraft(
+            liveDraftSnapshot?.problemListSnapshot ?? note.problemListSnapshot,
+            copyForward.activeProblems,
+            removedProblemKeys,
+          ),
           // Merge-always, seeded by the editor's live form state when
           // mounted (else the persisted snapshot): the editor's array is
           // only used to decide *membership* (in-progress isNew rows,
@@ -228,7 +283,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
       }
       return mapNoteToTimelineView(noteForView, isLatest, initialNoteAuthorId);
     });
-  }, [sortedRaw, activeInitialNote, draftProgressNote, copyForward, liveDraftSnapshot, removedMedNames]);
+  }, [sortedRaw, activeInitialNote, draftProgressNote, copyForward, liveDraftSnapshot, removedMedNames, removedProblemKeys]);
 
   const inheritedSourceId = carryForwardSource?.sourceNoteId ?? undefined;
 
@@ -436,7 +491,10 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                   previousNote={previousNote}
                   isOpen={isOpenNote}
                   onToggle={() => handleToggleNote(note.id)}
-                  onClickEdit={() => {
+                  onClickEdit={
+                    // The synthetic pending entry has no DB row to open —
+                    // it's already the note the editor has open.
+                    note.id === '__pending__' ? () => {} : () => {
                     // Branches on the mapped view model instead of indexing
                     // back into the raw array by position — that indexing
                     // only worked because the old sort mutated the array in
@@ -449,7 +507,9 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
                     }
                   }}
                   onDelete={
-                    !note.isDeleted && note.authorId === user?.id && note.kind === 'initial' && !hasActiveProgressNotes
+                    note.id === '__pending__'
+                      ? undefined
+                    : !note.isDeleted && note.authorId === user?.id && note.kind === 'initial' && !hasActiveProgressNotes
                       ? () => setDeleteNoteId(note.id)
                       : !note.isDeleted && note.authorId === user?.id && note.kind === 'progress'
                         ? () => setDeleteDraftNoteId(note.id)

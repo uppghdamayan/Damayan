@@ -8,11 +8,11 @@
  * decides how the JS in `uiStore` and the resize handles behave, and the whole
  * design depends on both measuring the same thing.
  *
- * The quantity being measured is the width of `#app-root`, NOT
+ * The quantity being measured is the width of `document.body`, NOT
  * `window.innerWidth`. `UiScaleEffect` sets `zoom` on `<html>`, so the two
  * differ at any UI scale other than 100%. `uiStore.appWidth` is fed by a
- * ResizeObserver on `#app-root`, which puts it in the same coordinate space as
- * the container queries.
+ * ResizeObserver on `document.body`, which puts it in the same coordinate
+ * space as the container queries.
  */
 export const BP = {
   /** Below this the app is not usable; `NarrowScreenNotice` takes over. */
@@ -28,11 +28,13 @@ export const BP = {
 /** The center column may never be squeezed below this by panel resizing. */
 export const MIN_CENTER_W = 560;
 
+// No SIDEBAR_MAX_PX / DOC_PANEL_MAX_PX here on purpose: the ceiling for a
+// resize is derived at drag time (usePanelResize.ts's `getMax`) from the
+// current viewport and the other panel's width, not a fixed constant — see
+// globals.css's #shell comment for the full reasoning.
 export const SIDEBAR_MIN_PX = 200;
-export const SIDEBAR_MAX_PX = 360;
 
 export const DOC_PANEL_MIN_PX = 300;
-export const DOC_PANEL_MAX_PX = 720;
 
 /** sessionStorage key for dismissing the narrow-screen blocker. */
 export const NARROW_NOTICE_DISMISSED_KEY = 'damayan-narrow-notice-dismissed';

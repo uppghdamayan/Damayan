@@ -44,7 +44,11 @@ export function DocumentationPanel() {
   // timeline hold divergent caches for the same patient and `dbDraft` below
   // can go stale relative to what the timeline shows.
   const { data: progressNotesResponse } = useProgressNotes(patientId || null, 1, 100);
-  const dbDraft = progressNotesResponse?.data?.find(n => n.status === 'DRAFT');
+  // !n.isDeleted matches NoteTimeline.tsx's own `draftProgressNote` filter —
+  // without it, "+ New Note" could silently reopen a note whose DB row is
+  // already gone (soft-tracked only via DeletedNote), instead of a truly
+  // blank editor.
+  const dbDraft = progressNotesResponse?.data?.find(n => n.status === 'DRAFT' && !n.isDeleted);
   const hasNoInitialNote = patientId && !initialNoteLoading && (!initialNote || initialNote.status !== 'PUBLISHED');
 
   const prevPatientIdRef = useRef(patientId);
@@ -62,6 +66,8 @@ export function DocumentationPanel() {
   // and drove the center column to zero. Both now budget around a guaranteed
   // minimum for the chart in the middle.
   const getMax = useCallback(() => {
+    // See Sidebar.tsx's getMax for why 0 (unmeasured) means "unconstrained".
+    if (appWidth <= 0) return Infinity;
     const sidebarW = sidebarCollapsed
       ? 0
       : (document.querySelector<HTMLElement>('[data-panel="sidebar"]')?.offsetWidth ?? 0);
@@ -82,9 +88,14 @@ export function DocumentationPanel() {
   const panelContent = (
     <>
       {activeNoteEditor.mode !== null ? (
-        <ProgressNoteForm 
-          patientId={activeNoteEditor.patientId!} 
-          noteId={activeNoteEditor.noteId ?? dbDraft?.id ?? undefined} 
+        <ProgressNoteForm
+          patientId={activeNoteEditor.patientId!}
+          // Only fall back to the standing DB draft in 'edit' mode.
+          // 'new' mode means the user explicitly clicked "+ New Note"
+          // (uiStore.openNewProgressNote sets noteId: null deliberately) —
+          // falling back to dbDraft?.id there silently reopens an existing
+          // draft instead of starting blank.
+          noteId={activeNoteEditor.mode === 'new' ? (activeNoteEditor.noteId ?? undefined) : (activeNoteEditor.noteId ?? dbDraft?.id ?? undefined)}
           onClose={() => {
             closeNoteEditor();
             // Match the branch the panel is actually rendering in. This was a
@@ -212,7 +223,7 @@ export function DocumentationPanel() {
       style={isOverlay ? undefined : { width: documentationPanelOpen ? 'var(--documentation-panel-width, 420px)' : 0 }}
       className={cn(
         "bg-surface flex flex-col",
-        isResizing ? "transition-none" : "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+        isResizing ? "transition-none" : "transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
         isOverlay
           // Non-modal by design: no scrim and no focus trap, so the chart and
           // the tab bar behind stay readable and clickable while the clinician
@@ -234,16 +245,29 @@ export function DocumentationPanel() {
       {documentationPanelOpen && !isOverlay && (
         <div className="absolute top-0 left-0 w-[1px] h-full bg-border z-20 pointer-events-none" />
       )}
-      {/* Resize handle */}
+      {/*
+        Resize handle. Widened the hit target from 6px to 10px and given it a
+        permanent low-opacity grip line — at 6px fully-transparent it only
+        showed anything on a pixel-perfect hover, which read as "this can't be
+        resized" rather than as a control that's merely quiet at rest.
+      */}
       {documentationPanelOpen && !isOverlay && (
         <div
           {...handleProps}
           className={cn(
-            "absolute top-0 -left-[3px] w-[6px] h-full cursor-ew-resize z-30 transition-colors duration-150",
-            "focus-visible:outline-none focus-visible:bg-accent",
-            isResizing ? "bg-accent" : "bg-transparent hover:bg-accent"
+            "group/handle absolute top-0 -left-[5px] w-[10px] h-full cursor-ew-resize touch-none z-30 flex items-center justify-center",
+            "focus-visible:outline-none"
           )}
-        />
+        >
+          <div
+            className={cn(
+              "w-[3px] h-10 rounded-full transition-colors duration-150",
+              isResizing
+                ? "bg-accent"
+                : "bg-border-strong/50 group-hover/handle:bg-accent group-focus-visible/handle:bg-accent"
+            )}
+          />
+        </div>
       )}
       <div
         className={cn(

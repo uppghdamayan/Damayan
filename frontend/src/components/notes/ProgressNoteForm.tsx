@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { getCreatorName, buildAssessmentFlatOrder } from '@/lib/problem-utils';
 import type { NoteAssessmentItem } from '@/lib/problem-utils';
-import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications } from '@/lib/note-snapshot-merge';
+import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications, problemTombstoneTokens } from '@/lib/note-snapshot-merge';
 import { compareDoses } from '@/lib/notes-utils';
 import { progressDraftKey } from '@/lib/note-drafts';
 import { 
@@ -40,7 +40,7 @@ import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
-import { useMedNoteOverridesStore, medNoteOverrideKey } from '@/stores/medNoteOverridesStore';
+import { useNoteOverridesStore, medNoteOverrideKey, problemNoteOverrideKey, clearNoteOverrides } from '@/stores/noteOverridesStore';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useMedicationEditLock } from '@/hooks/useMedicationEditLock';
 
@@ -100,7 +100,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // Exclude the note currently being edited from its own carry-forward
   // source — otherwise an open draft can resolve to itself and "inherit"
   // its own (possibly still-blank) fields, skipping the real previous note.
-  const { data: copyForward, isLoading: copyLoading, isFetching: copyFetching, refetch: refetchCopyForward } = useCopyForwardData(patientId, noteId);
+  const { data: copyForward, isLoading: copyLoading, isFetching: copyFetching, refetch: refetchCopyForward } = useCopyForwardData(patientId, noteId ?? null);
 
   const hasLocalDraft = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -177,19 +177,40 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // active in the master list. Consulted there to keep a deliberate removal
   // removed until Revert or a fresh note load clears it.
   const removedMedNamesRef = useRef<Set<string>>(new Set());
-  // Durable key for this note's in-note-discontinuation tombstones — see
-  // medNoteOverridesStore.ts. `removedMedNamesRef` stays the synchronous
-  // read the merge call sites below already use; this store is what makes
-  // the set survive an unmount/reload instead of resetting on every noteId
-  // change (that reset was the root cause of removals reappearing once the
-  // editor closed).
+  // Tokens (see problemTombstoneTokens) for problems the clinician deleted
+  // from this note's in-note Problem List — same rationale as
+  // removedMedNamesRef, mirrored for problems.
+  const removedProblemKeysRef = useRef<Set<string>>(new Set());
+  // Durable keys for this note's in-note removal tombstones — see
+  // noteOverridesStore.ts. The refs stay the synchronous read the merge
+  // call sites below already use; the store is what makes the sets survive
+  // an unmount/reload instead of resetting on every noteId change (that
+  // reset was the root cause of removals reappearing once the editor
+  // closed). `noteId ?? 'new'` means an unsaved note's tombstones live
+  // under a `:new` key until §migrateOverrideKeys below moves them once a
+  // real note id exists — losing that migration is how a discontinuation/
+  // deletion resurrected right after the first Save Draft.
   const medOverrideKey = medNoteOverrideKey(patientId, noteId);
+  const problemOverrideKey = problemNoteOverrideKey(patientId, noteId);
 
+  // Self-heals the `'new'` → real-noteId transition: whenever noteId flips
+  // from this patient's unsaved key to a real id (whether via
+  // executeDraftToggle's own create success below, or any other path that
+  // changes `noteId`, e.g. DocumentationPanel resolving an existing DB
+  // draft), migrate rather than drop the tombstones recorded so far.
+  const prevOverrideNoteIdRef = useRef<string | null | undefined>(noteId);
   useEffect(() => {
-    const persisted = useMedNoteOverridesStore.getState().byKey[medOverrideKey] || [];
-    removedMedNamesRef.current = new Set(persisted);
+    const store = useNoteOverridesStore.getState();
+    const prevNoteId = prevOverrideNoteIdRef.current;
+    if (noteId && !prevNoteId) {
+      store.migrateKey(medNoteOverrideKey(patientId, null), medOverrideKey);
+      store.migrateKey(problemNoteOverrideKey(patientId, null), problemOverrideKey);
+    }
+    prevOverrideNoteIdRef.current = noteId;
+    removedMedNamesRef.current = new Set(store.byKey[medOverrideKey] || []);
+    removedProblemKeysRef.current = new Set(store.byKey[problemOverrideKey] || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medOverrideKey]);
+  }, [medOverrideKey, problemOverrideKey, noteId, patientId]);
 
   useEffect(() => {
     if (medicationListLockOwner === 'note' && !isMedicationEditMode) {
@@ -260,12 +281,45 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     // Mirror onto the durable store so the removal (or its reversal)
     // survives an unmount/reload and is visible to NoteTimeline.
     if (newlyRemoved.length > 0) {
-      useMedNoteOverridesStore.getState().addRemoved(medOverrideKey, newlyRemoved);
+      useNoteOverridesStore.getState().addRemoved(medOverrideKey, newlyRemoved);
     }
     if (noLongerRemoved.length > 0) {
-      useMedNoteOverridesStore.getState().removeRemoved(medOverrideKey, noLongerRemoved);
+      useNoteOverridesStore.getState().removeRemoved(medOverrideKey, noLongerRemoved);
     }
     form.setValue('medicationSnapshot', next, { shouldDirty: true, shouldTouch: true });
+  };
+
+  // Mirrors handleMedicationSnapshotChange for the Problem List: diffs old
+  // vs next by tombstone token (id-first, title fallback — see
+  // problemTombstoneTokens), records/clears durable removal tombstones so a
+  // problem deleted in-note stays deleted even though it's still ACTIVE on
+  // the master list, and writes the new array to form state. `isNew`
+  // entries are never tombstoned (no master row to delete).
+  const handleProblemSnapshotChange = (next: any[]) => {
+    const prev = form.getValues('problemListSnapshot') || [];
+    const nextTokens = new Set((next || []).flatMap((p: any) => problemTombstoneTokens(p)));
+    const newlyRemoved: string[] = [];
+    for (const p of prev) {
+      if (!p || typeof p !== 'object' || p.isNew) continue;
+      const tokens = problemTombstoneTokens(p);
+      if (tokens.length > 0 && !tokens.some((t) => nextTokens.has(t))) {
+        tokens.forEach((t) => removedProblemKeysRef.current.add(t));
+        newlyRemoved.push(...tokens);
+      }
+    }
+    const noLongerRemoved: string[] = [];
+    for (const token of nextTokens) {
+      if (removedProblemKeysRef.current.delete(token)) {
+        noLongerRemoved.push(token);
+      }
+    }
+    if (newlyRemoved.length > 0) {
+      useNoteOverridesStore.getState().addRemoved(problemOverrideKey, newlyRemoved);
+    }
+    if (noLongerRemoved.length > 0) {
+      useNoteOverridesStore.getState().removeRemoved(problemOverrideKey, noLongerRemoved);
+    }
+    form.setValue('problemListSnapshot', next, { shouldDirty: true, shouldTouch: true });
   };
 
   const activeProblemTree = useMemo(() => {
@@ -313,12 +367,40 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     return additions.length > 0 ? [...base, ...additions] : base;
   };
 
+  // Tracks the free-text fields' resolution across hydration re-runs so a
+  // `copyForward`/`problems`/`medications` invalidation — which changes
+  // this note's identity not at all — never wipes in-progress typing. Keyed
+  // by `noteId ?? '__new__'` so the very first hydration for any given note
+  // (including a brand-new one) always counts as an identity change and
+  // takes the server value, matching prior behavior for reload/switch/open.
+  const hydratedNoteKeyRef = useRef<string | null>(null);
+  const hydratedServerTextRef = useRef<Record<string, string>>({});
+  const FREE_TEXT_FIELDS = ['subjective', 'objective', 'labs', 'mgmtNonpharm', 'mgmtPharm'] as const;
+
   useEffect(() => {
     const activeProblems = copyForward?.activeProblems || [];
     const activeMeds = copyForward?.activeMedications || [];
 
     if (noteId && note) {
       const isPublished = note.status === 'PUBLISHED';
+      const noteKey = noteId ?? '__new__';
+      const identityChanged = hydratedNoteKeyRef.current !== noteKey;
+      // Per free-text field: server wins on identity change or publish
+      // (legitimate — reload, note switch, published view); server also
+      // wins if it changed since the last hydration AND the field isn't
+      // currently dirty (a genuine out-of-band update landing untouched);
+      // otherwise keep whatever's in form state right now, so an
+      // invalidation that doesn't actually change this note's own text
+      // never clobbers what the clinician is typing.
+      const resolveText = (field: string, serverValue: string): string => {
+        if (isPublished || identityChanged) return serverValue;
+        const lastServerValue = hydratedServerTextRef.current[field];
+        const isDirty = (form.formState.dirtyFields as any)[field];
+        if (lastServerValue !== undefined && serverValue !== lastServerValue && !isDirty) {
+          return serverValue;
+        }
+        return form.getValues(field as any) ?? serverValue;
+      };
       const draftProblems = note.problemListSnapshot as any[] | null | undefined;
       const hasProblemSnapshot = Array.isArray(draftProblems);
       const validProblems = (draftProblems || []).filter((p: any) => p && (typeof p === 'string' ? p.trim() : p.title)).map((p: any) => typeof p === 'string' ? { title: p } : p);
@@ -338,7 +420,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         : currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
           ? currentProblemsWhileEditing
           : hasProblemSnapshot
-            ? mergeActiveProblems(validProblems, activeProblems)
+            ? mergeActiveProblems(validProblems, activeProblems, removedProblemKeysRef.current)
             : activeProblemTree.map(({ problem: p, depth }) => ({
                 id: p.id || undefined,
                 title: p.title,
@@ -374,25 +456,45 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       const finalMeds = isPublished ? baseMeds : reuniteLocallyAddedMeds(baseMeds);
 
       const finalDiagnostics = note.diagnostics || [];
-      const finalMgmtPharm = !note.mgmtPharm && !isPublished
-        ? copyForward?.inheritedMgmtPharm || ''
-        : note.mgmtPharm || '';
-      const finalMgmtNonpharm = !note.mgmtNonpharm && !isPublished
-        ? copyForward?.inheritedMgmtNonpharm || ''
-        : note.mgmtNonpharm || '';
+      // Inherit from the previous note only on this note's very first
+      // hydration and only while the field is genuinely null/unset — once
+      // it's been persisted as an empty string, that's a deliberate empty
+      // and must never be re-substituted (previously `!note.mgmtPharm`
+      // matched both cases, so a cleared field could never stay cleared).
+      const serverMgmtPharm = note.mgmtPharm ?? (identityChanged && !isPublished ? copyForward?.inheritedMgmtPharm || '' : '');
+      const serverMgmtNonpharm = note.mgmtNonpharm ?? (identityChanged && !isPublished ? copyForward?.inheritedMgmtNonpharm || '' : '');
+
+      const serverText: Record<string, string> = {
+        subjective: note.subjective || '',
+        objective: note.objective || '',
+        labs: (note as any).labs || '',
+        mgmtNonpharm: serverMgmtNonpharm,
+        mgmtPharm: serverMgmtPharm,
+      };
+      const resolvedText: Record<string, string> = {};
+      for (const field of FREE_TEXT_FIELDS) {
+        resolvedText[field] = resolveText(field, serverText[field]);
+      }
+      hydratedNoteKeyRef.current = noteKey;
+      hydratedServerTextRef.current = serverText;
 
       form.reset({
-        subjective: note.subjective,
-        objective: note.objective,
-        labs: (note as any).labs || '',
-        mgmtNonpharm: finalMgmtNonpharm,
-        mgmtPharm: finalMgmtPharm,
+        subjective: resolvedText.subjective,
+        objective: resolvedText.objective,
+        labs: resolvedText.labs,
+        mgmtNonpharm: resolvedText.mgmtNonpharm,
+        mgmtPharm: resolvedText.mgmtPharm,
         diagnostics: finalDiagnostics,
         problemListSnapshot: finalProblems,
         medicationSnapshot: finalMeds,
         visitDatetime: note.visit?.visitDatetime || note.createdAt,
       });
     } else if (!noteId && !copyLoading) {
+      // Ensure the eventual transition to a real noteId (first Save Draft)
+      // is seen as an identity change by `resolveText` above, so the newly
+      // created note's own server text is trusted on that first hydration
+      // rather than being compared against this branch's local-only state.
+      hydratedNoteKeyRef.current = '__new__';
       const draft = localStorage.getItem(progressDraftKey(patientId, noteId));
       if (draft) {
         try {
@@ -405,7 +507,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           parsed.problemListSnapshot = currentProblemsWhileEditing && currentProblemsWhileEditing.length > 0
             ? currentProblemsWhileEditing
             : hasProblemSnapshot
-              ? mergeActiveProblems(validProblems, activeProblems)
+              ? mergeActiveProblems(validProblems, activeProblems, removedProblemKeysRef.current)
               : activeProblemTree.map(({ problem: p, depth }) => ({
                   id: p.id || undefined,
                   title: p.title,
@@ -505,7 +607,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         // title/nesting/date edits made in this note.
         const mergedProbs = isProblemEditMode
           ? currentValues.problemListSnapshot || []
-          : mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems);
+          : mergeActiveProblems(currentValues.problemListSnapshot || [], copyForward.activeProblems, removedProblemKeysRef.current);
 
         const currentMeds = currentValues.medicationSnapshot || [];
         const mergedMeds = isMedicationEditMode
@@ -528,13 +630,16 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   // NoteTimeline (via draftSnapshotStore) so the timeline entry for this
   // note stays 1:1 with what's shown here, including editor-local state
   // (in-note discontinuations, unsaved isNew rows) the timeline's own merge
-  // can't otherwise see. Only meaningful for a saved DRAFT — a brand-new
-  // note has no timeline entry yet, and a PUBLISHED note's timeline entry
-  // is the persisted content, matching the hydration bail at :649 above.
+  // can't otherwise see. Keyed the same way as noteOverridesStore
+  // (`noteId ?? 'new'`) so an UNSAVED note also gets a live channel —
+  // NoteTimeline synthesizes a pending timeline entry from this key before
+  // the note is ever saved (see its `${patientId}:new` read). A PUBLISHED
+  // note's timeline entry is the persisted content, matching the hydration
+  // bail below.
   const { setDraftSnapshot, clearDraftSnapshot } = useDraftSnapshotStore.getState();
-  const draftSnapshotKey = noteId ? `${patientId}:${noteId}` : null;
+  const draftSnapshotKey = `${patientId}:${noteId ?? 'new'}`;
   useEffect(() => {
-    if (!draftSnapshotKey || note?.status === 'PUBLISHED') return;
+    if (note?.status === 'PUBLISHED') return;
     setDraftSnapshot(draftSnapshotKey, {
       problemListSnapshot: formValues.problemListSnapshot || [],
       medicationSnapshot: formValues.medicationSnapshot || [],
@@ -572,6 +677,8 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       })),
       { shouldDirty: true },
     );
+    removedProblemKeysRef.current.clear();
+    useNoteOverridesStore.getState().clearRemoved(problemOverrideKey);
     setIsProblemEditMode(false);
     releaseProblemLock();
   };
@@ -616,7 +723,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       { shouldDirty: true },
     );
     removedMedNamesRef.current.clear();
-    useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+    useNoteOverridesStore.getState().clearRemoved(medOverrideKey);
     setIsMedicationEditMode(false);
     releaseMedicationLock();
   };
@@ -720,7 +827,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             publishMutation.mutate(noteId, {
               onSuccess: () => {
                 localStorage.removeItem(progressDraftKey(patientId, noteId));
-                useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+                clearNoteOverrides(patientId, noteId);
                 releaseProblemLock();
                 releaseMedicationLock();
                 resolve(true);
@@ -740,7 +847,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
     createAndPublishMutation.mutate(cleanFormValues(formValues), {
       onSuccess: () => {
         localStorage.removeItem(progressDraftKey(patientId, noteId));
-        useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+        clearNoteOverrides(patientId, noteId);
         releaseProblemLock();
         releaseMedicationLock();
         resolve(true);
@@ -891,7 +998,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       deleteMutation.mutate(noteId, {
         onSuccess: () => {
           localStorage.removeItem(progressDraftKey(patientId, noteId));
-          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+          clearNoteOverrides(patientId, noteId);
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -925,7 +1032,17 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           // clears this — without it, a stale draft's body and visitDatetime
           // leak into the very next new note opened for this patient.
           localStorage.removeItem(progressDraftKey(patientId, noteId));
-          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+          // Migrate, don't clear: this note's tombstones were recorded
+          // under the `:new` key while unsaved (noteId was still null in
+          // this closure) — clearing here is exactly how a discontinuation/
+          // deletion resurrected right after the first Save Draft.
+          if (newNoteId) {
+            const store = useNoteOverridesStore.getState();
+            store.migrateKey(medNoteOverrideKey(patientId, null), medNoteOverrideKey(patientId, newNoteId));
+            store.migrateKey(problemNoteOverrideKey(patientId, null), problemNoteOverrideKey(patientId, newNoteId));
+          } else {
+            clearNoteOverrides(patientId, null);
+          }
           onClose();
           setDocumentationPanelOpen(false);
           setActiveScreen('note-timeline');
@@ -1041,7 +1158,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                 setLocalAttachments([]);
               }
               localStorage.removeItem(progressDraftKey(patientId, noteId));
-              useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+              clearNoteOverrides(patientId, noteId);
               // Defensive — validateForPublish already blocks publishing
               // while the section is mid-edit, so this is normally already
               // released, but a published note has no further use for the
@@ -1083,7 +1200,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             setLocalAttachments([]);
           }
           localStorage.removeItem(progressDraftKey(patientId, noteId));
-          useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+          clearNoteOverrides(patientId, noteId);
           releaseProblemLock();
           releaseMedicationLock();
           onClose();
@@ -1279,7 +1396,9 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                     });
 
                     localStorage.removeItem(progressDraftKey(patientId, noteId));
-                    useMedNoteOverridesStore.getState().clearRemoved(medOverrideKey);
+                    clearNoteOverrides(patientId, noteId);
+                    removedMedNamesRef.current.clear();
+                    removedProblemKeysRef.current.clear();
 
                     // Clear controlled inputs
                     setNewProbTitle('');
@@ -1447,7 +1566,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                   render={({ field }) => (
                     <NoteProblemListEditor
                       value={field.value || []}
-                      onChange={(next) => field.onChange(next)}
+                      onChange={(next) => handleProblemSnapshotChange(next)}
                       activeProblems={copyForward?.activeProblems || []}
                       isPublished={isPublished}
                       isDisabled={isDisabled}
