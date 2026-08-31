@@ -64,6 +64,21 @@ export class VitalsController {
     return this.vitalsService.findLatest(patientId);
   }
 
+  @Get('as-of')
+  @ApiOperation({
+    summary:
+      'Get the first vital signs record at or before a cutoff timestamp — All roles',
+  })
+  @ApiOkResponse({
+    description: 'Vitals record as of the cutoff, or null if none recorded.',
+  })
+  async findAsOf(
+    @Param('patientId') patientId: string,
+    @Query('cutoff') cutoff: string,
+  ) {
+    return this.vitalsService.findAsOf(patientId, new Date(cutoff));
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.DOCTOR, Role.NURSE, Role.ADMIN)

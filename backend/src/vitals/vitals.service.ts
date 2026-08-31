@@ -78,6 +78,25 @@ export class VitalsService {
     });
   }
 
+  // ─────────────────────────────────────────────
+  // AS-OF — first record at or before a cutoff timestamp (or null).
+  // Used by: published note read-only views, so a note's vitals snapshot
+  // stays pinned to what was recorded at the time of the visit instead of
+  // drifting to whatever is most recent as new vitals get logged later.
+  // Deleted records are excluded, same as findLatest().
+  // ─────────────────────────────────────────────
+  async findAsOf(patientId: string, cutoff: Date): Promise<VitalSign | null> {
+    return this.prisma.vitalSign.findFirst({
+      where: { patientId, isDeleted: false, measuredAt: { lte: cutoff } },
+      orderBy: { measuredAt: 'asc' },
+      include: {
+        measuredByUser: {
+          select: { firstName: true, lastName: true, role: true },
+        },
+      },
+    });
+  }
+
   /**
    * Internal helper — NOT exposed as a route. Used by:
    *  - Phase 8 (Initial Note) to pre-fill the VitalsSummaryRow on note load

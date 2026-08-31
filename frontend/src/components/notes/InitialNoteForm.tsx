@@ -25,7 +25,7 @@ import {
   useInitialNoteVersions
 } from '@/hooks/useInitialNote';
 import { useCopyForwardData, useProgressNotes } from '@/hooks/useProgressNotes';
-import { useLatestVitals } from '@/hooks/useVitals';
+import { useLatestVitals, useVitalsAsOf } from '@/hooks/useVitals';
 import { usePatient } from '@/hooks/usePatients';
 import { useMedications } from '@/hooks/useMedications';
 import { buildMedicationSuggestions } from '@/lib/medication-utils';
@@ -319,6 +319,10 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const { data: note, isLoading } = useInitialNote(patientId);
   const { data: progressResponse, isLoading: progressLoading } = useProgressNotes(patientId);
   const { data: latestVitals } = useLatestVitals(patientId);
+  // Published note's Vital Signs card must show the reading recorded at the
+  // time of this visit, not whatever is most recent — otherwise it drifts as
+  // later vitals get logged.
+  const { data: vitalsAsOfNote } = useVitalsAsOf(patientId, note?.status === 'PUBLISHED' ? note.createdAt : null);
   const { data: patient } = usePatient(patientId);
   const { data: patientMedicationsResponse } = useMedications(patientId);
   const createMutation = useCreateInitialNote(patientId);
@@ -874,6 +878,14 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
   const o2Status = latestVitals ? classifyOxygenSaturation(latestVitals.oxygenSaturation) : 'unknown';
   const bpStatus = latestVitals ? classifyBloodPressure(latestVitals.sbp, latestVitals.dbp) : 'unknown';
 
+  // Published note's Vital Signs card statuses — computed from vitalsAsOfNote
+  // (the reading at the time of the visit), not latestVitals.
+  const asOfHrStatus = vitalsAsOfNote ? classifyHeartRate(vitalsAsOfNote.heartRate) : 'unknown';
+  const asOfRrStatus = vitalsAsOfNote ? classifyRespiratoryRate(vitalsAsOfNote.respiratoryRate) : 'unknown';
+  const asOfTempStatus = vitalsAsOfNote ? classifyTemperature(Number(vitalsAsOfNote.temperature)) : 'unknown';
+  const asOfO2Status = vitalsAsOfNote ? classifyOxygenSaturation(vitalsAsOfNote.oxygenSaturation) : 'unknown';
+  const asOfBpStatus = vitalsAsOfNote ? classifyBloodPressure(vitalsAsOfNote.sbp, vitalsAsOfNote.dbp) : 'unknown';
+
   const getStatusColor = (status: 'normal' | 'warn' | 'critical' | 'unknown') => {
     switch (status) {
       case 'critical': return 'text-red font-semibold';
@@ -1057,55 +1069,55 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                   Vital Signs
                 </span>
               </div>
-              {latestVitals && (
+              {vitalsAsOfNote && (
                 <div className="flex items-center gap-2 text-[10px] text-text-muted font-sans">
-                  <span>Recorded {new Date(latestVitals.measuredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(latestVitals.measuredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {latestVitals.measuredByUser && (
+                  <span>Recorded {new Date(vitalsAsOfNote.measuredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {new Date(vitalsAsOfNote.measuredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {vitalsAsOfNote.measuredByUser && (
                     <>
                       <span>•</span>
-                      <span>By {latestVitals.measuredByUser.firstName} {latestVitals.measuredByUser.lastName}</span>
+                      <span>By {vitalsAsOfNote.measuredByUser.firstName} {vitalsAsOfNote.measuredByUser.lastName}</span>
                     </>
                   )}
                 </div>
               )}
             </div>
             <div className="p-3.5">
-              {latestVitals ? (
+              {vitalsAsOfNote ? (
                 <div className="grid grid-cols-5 gap-2.5 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
                   {renderVitalCell(
                     'Blood Pressure',
-                    latestVitals.sbp || latestVitals.dbp ? `${latestVitals.sbp ?? '—'}/${latestVitals.dbp ?? '—'}` : '—',
+                    vitalsAsOfNote.sbp || vitalsAsOfNote.dbp ? `${vitalsAsOfNote.sbp ?? '—'}/${vitalsAsOfNote.dbp ?? '—'}` : '—',
                     'mmHg',
-                    bpStatus,
+                    asOfBpStatus,
                     'systolic / diastolic'
                   )}
                   {renderVitalCell(
                     'Heart Rate',
-                    latestVitals.heartRate?.toString() ?? '—',
+                    vitalsAsOfNote.heartRate?.toString() ?? '—',
                     'bpm',
-                    hrStatus,
-                    hrStatus === 'normal' ? 'Normal' : hrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    asOfHrStatus,
+                    asOfHrStatus === 'normal' ? 'Normal' : asOfHrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
                   )}
                   {renderVitalCell(
                     'Resp Rate',
-                    latestVitals.respiratoryRate?.toString() ?? '—',
+                    vitalsAsOfNote.respiratoryRate?.toString() ?? '—',
                     '/min',
-                    rrStatus,
-                    rrStatus === 'normal' ? 'Normal' : rrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    asOfRrStatus,
+                    asOfRrStatus === 'normal' ? 'Normal' : asOfRrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
                   )}
                   {renderVitalCell(
                     'Temperature',
-                    formatTemperature(Number(latestVitals.temperature)),
+                    formatTemperature(Number(vitalsAsOfNote.temperature)),
                     '°C',
-                    tempStatus,
-                    tempStatus === 'normal' ? 'Normal' : tempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    asOfTempStatus,
+                    asOfTempStatus === 'normal' ? 'Normal' : asOfTempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
                   )}
                   {renderVitalCell(
                     'SpO2',
-                    latestVitals.oxygenSaturation?.toString() ?? '—',
+                    vitalsAsOfNote.oxygenSaturation?.toString() ?? '—',
                     '%',
-                    o2Status,
-                    o2Status === 'normal' ? 'Normal' : o2Status === 'unknown' ? 'Not recorded' : 'Out of range'
+                    asOfO2Status,
+                    asOfO2Status === 'normal' ? 'Normal' : asOfO2Status === 'unknown' ? 'Not recorded' : 'Out of range'
                   )}
                 </div>
               ) : (

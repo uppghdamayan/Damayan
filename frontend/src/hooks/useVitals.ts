@@ -25,6 +25,18 @@ export function useLatestVitals(patientId: string | null) {
   });
 }
 
+// First vitals recorded at or before `cutoff` (e.g. a published note's createdAt) —
+// pins a note's vitals snapshot to the time of the visit instead of drifting to
+// whatever is most recent as new vitals get logged later.
+export function useVitalsAsOf(patientId: string | null, cutoff: string | null) {
+  return useQuery<VitalSign | null>({
+    queryKey: ['vitals', patientId, 'as-of', cutoff],
+    queryFn: () => apiRequest<VitalSign | null>(`/patients/${patientId}/vitals/as-of?cutoff=${encodeURIComponent(cutoff!)}`),
+    enabled: !!patientId && !!cutoff,
+    staleTime: 1000 * 20,
+  });
+}
+
 function invalidateVitals(qc: ReturnType<typeof useQueryClient>, patientId: string) {
   qc.invalidateQueries({ queryKey: ['vitals', patientId] });
   qc.invalidateQueries({ queryKey: ['audit-logs'] });
