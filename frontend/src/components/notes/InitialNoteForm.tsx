@@ -49,11 +49,7 @@ import { toast } from 'sonner';
 import { useUiStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { 
-  classifyBloodPressure, classifyHeartRate, classifyOxygenSaturation, 
-  classifyTemperature, classifyRespiratoryRate,
-  formatBloodPressure, formatTemperature
-} from '@/lib/vitals-utils';
+import { formatBloodPressure, formatTemperature } from '@/lib/vitals-utils';
 
 interface NoteActionBarProps {
   isSaving: boolean;
@@ -120,40 +116,25 @@ function NoteActionBar({
   );
 }
 
-function VitalMiniCell({ 
-  label, 
-  value, 
-  unit, 
-  status 
-}: { 
-  label: string; 
-  value: string | number; 
-  unit: string; 
-  status: 'normal' | 'warn' | 'critical' | 'unknown';
+function VitalMiniCell({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: string | number;
+  unit: string;
 }) {
-  const valueColorClass =
-    status === 'critical' ? 'text-red font-semibold' :
-    status === 'warn' ? 'text-amber font-semibold' :
-    'text-text-primary font-bold';
-
-  const dotColor =
-    status === 'critical' ? 'bg-red' :
-    status === 'warn' ? 'bg-amber' :
-    null;
-
   return (
     <div className="border border-border rounded-card px-2.5 py-2 flex flex-col bg-surface-2">
       <span className="text-[9.5px] font-bold uppercase tracking-[0.6px] mb-1 text-text-muted">
         {label}
       </span>
       <div className="flex items-center justify-between gap-1">
-        <span className={cn("font-mono text-[15px] leading-none", valueColorClass)}>
+        <span className="font-mono text-[15px] leading-none text-text-primary font-bold">
           {value}
           {value !== '—' && <span className="text-[10px] text-text-muted ml-[2.5px] font-normal">{unit}</span>}
         </span>
-        {dotColor && (
-          <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse", dotColor)} />
-        )}
       </div>
     </div>
   );
@@ -872,29 +853,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
 
   const isSaving = updateMutation.isPending || createMutation.isPending || publishMutation.isPending;
 
-  const hrStatus = latestVitals ? classifyHeartRate(latestVitals.heartRate) : 'unknown';
-  const rrStatus = latestVitals ? classifyRespiratoryRate(latestVitals.respiratoryRate) : 'unknown';
-  const tempStatus = latestVitals ? classifyTemperature(Number(latestVitals.temperature)) : 'unknown';
-  const o2Status = latestVitals ? classifyOxygenSaturation(latestVitals.oxygenSaturation) : 'unknown';
-  const bpStatus = latestVitals ? classifyBloodPressure(latestVitals.sbp, latestVitals.dbp) : 'unknown';
-
-  // Published note's Vital Signs card statuses — computed from vitalsAsOfNote
-  // (the reading at the time of the visit), not latestVitals.
-  const asOfHrStatus = vitalsAsOfNote ? classifyHeartRate(vitalsAsOfNote.heartRate) : 'unknown';
-  const asOfRrStatus = vitalsAsOfNote ? classifyRespiratoryRate(vitalsAsOfNote.respiratoryRate) : 'unknown';
-  const asOfTempStatus = vitalsAsOfNote ? classifyTemperature(Number(vitalsAsOfNote.temperature)) : 'unknown';
-  const asOfO2Status = vitalsAsOfNote ? classifyOxygenSaturation(vitalsAsOfNote.oxygenSaturation) : 'unknown';
-  const asOfBpStatus = vitalsAsOfNote ? classifyBloodPressure(vitalsAsOfNote.sbp, vitalsAsOfNote.dbp) : 'unknown';
-
-  const getStatusColor = (status: 'normal' | 'warn' | 'critical' | 'unknown') => {
-    switch (status) {
-      case 'critical': return 'text-red font-semibold';
-      case 'warn': return 'text-amber font-medium';
-      default: return 'text-[var(--text-secondary)]';
-    }
-  };
-
-  const measuredAt = latestVitals 
+  const measuredAt = latestVitals
     ? new Date(latestVitals.measuredAt).toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -913,17 +872,12 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
     label: string,
     valueStr: string,
     unit: string,
-    status: 'normal' | 'warn' | 'critical' | 'unknown',
     subText?: string
   ) => (
     <div className="bg-surface-2 border border-border rounded-lg px-3 py-2.5 flex flex-col gap-0.5">
       <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-text-muted">{label}</span>
       <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`font-mono text-[18px] ${
-          status === 'critical' ? 'text-red font-semibold' :
-          status === 'warn' ? 'text-amber font-medium' :
-          'text-text-primary font-bold'
-        } leading-none`}>
+        <span className="font-mono text-[18px] text-text-primary font-bold leading-none">
           {valueStr}
         </span>
         {valueStr !== '—' && valueStr !== '—/—' && <span className="text-[11px] text-text-muted">{unit}</span>}
@@ -1088,36 +1042,27 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                     'Blood Pressure',
                     vitalsAsOfNote.sbp || vitalsAsOfNote.dbp ? `${vitalsAsOfNote.sbp ?? '—'}/${vitalsAsOfNote.dbp ?? '—'}` : '—',
                     'mmHg',
-                    asOfBpStatus,
                     'systolic / diastolic'
                   )}
                   {renderVitalCell(
                     'Heart Rate',
                     vitalsAsOfNote.heartRate?.toString() ?? '—',
-                    'bpm',
-                    asOfHrStatus,
-                    asOfHrStatus === 'normal' ? 'Normal' : asOfHrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    'bpm'
                   )}
                   {renderVitalCell(
                     'Resp Rate',
                     vitalsAsOfNote.respiratoryRate?.toString() ?? '—',
-                    '/min',
-                    asOfRrStatus,
-                    asOfRrStatus === 'normal' ? 'Normal' : asOfRrStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    '/min'
                   )}
                   {renderVitalCell(
                     'Temperature',
                     formatTemperature(Number(vitalsAsOfNote.temperature)),
-                    '°C',
-                    asOfTempStatus,
-                    asOfTempStatus === 'normal' ? 'Normal' : asOfTempStatus === 'unknown' ? 'Not recorded' : 'Out of range'
+                    '°C'
                   )}
                   {renderVitalCell(
                     'SpO2',
                     vitalsAsOfNote.oxygenSaturation?.toString() ?? '—',
-                    '%',
-                    asOfO2Status,
-                    asOfO2Status === 'normal' ? 'Normal' : asOfO2Status === 'unknown' ? 'Not recorded' : 'Out of range'
+                    '%'
                   )}
                 </div>
               ) : (
@@ -1581,35 +1526,30 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
               </div>
               {/* Vitals grid — horizontal, compact */}
               <div className="px-4 py-3 grid grid-cols-5 gap-3 bg-surface-2/50 @max-[1439px]:grid-cols-3 @max-[1023px]:grid-cols-3 @max-[767px]:grid-cols-2">
-                <VitalMiniCell 
-                  label="BP" 
-                  value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'} 
-                  unit="mmHg" 
-                  status={bpStatus} 
+                <VitalMiniCell
+                  label="BP"
+                  value={latestVitals ? formatBloodPressure(latestVitals.sbp, latestVitals.dbp) : '—'}
+                  unit="mmHg"
                 />
-                <VitalMiniCell 
-                  label="HR" 
-                  value={latestVitals?.heartRate ?? '—'} 
-                  unit="bpm" 
-                  status={hrStatus} 
+                <VitalMiniCell
+                  label="HR"
+                  value={latestVitals?.heartRate ?? '—'}
+                  unit="bpm"
                 />
-                <VitalMiniCell 
-                  label="RR" 
-                  value={latestVitals?.respiratoryRate ?? '—'} 
-                  unit="/min" 
-                  status={rrStatus} 
+                <VitalMiniCell
+                  label="RR"
+                  value={latestVitals?.respiratoryRate ?? '—'}
+                  unit="/min"
                 />
-                <VitalMiniCell 
-                  label="Temp" 
-                  value={latestVitals?.temperature ? formatTemperature(Number(latestVitals.temperature)) : '—'} 
-                  unit="°C" 
-                  status={tempStatus} 
+                <VitalMiniCell
+                  label="Temp"
+                  value={latestVitals?.temperature ? formatTemperature(Number(latestVitals.temperature)) : '—'}
+                  unit="°C"
                 />
-                <VitalMiniCell 
-                  label="SpO2" 
-                  value={latestVitals?.oxygenSaturation ?? '—'} 
-                  unit="%" 
-                  status={o2Status} 
+                <VitalMiniCell
+                  label="SpO2"
+                  value={latestVitals?.oxygenSaturation ?? '—'}
+                  unit="%"
                 />
               </div>
               {!latestVitals && (

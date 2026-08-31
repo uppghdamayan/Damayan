@@ -1,16 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { 
-  isRecentlyUpdated, 
-  isStaleReading, 
-  formatTemperature, 
-  formatBloodPressure, 
-  classifyBloodPressure, 
-  classifyHeartRate, 
-  classifyRespiratoryRate, 
-  classifyTemperature, 
-  classifyOxygenSaturation 
+import {
+  isRecentlyUpdated,
+  isStaleReading,
+  formatTemperature,
+  formatBloodPressure,
 } from '@/lib/vitals-utils';
 import { useLatestVitals } from '@/hooks/useVitals';
 import { VitalsStripSkeleton } from './VitalsStripSkeleton';
@@ -35,19 +30,13 @@ export function VitalsCard({ patientId }: { patientId: string }) {
   const noReadingToday = !latest || isStaleReading(latest.measuredAt);
   const isRecent = latest && isRecentlyUpdated(latest.measuredAt);
 
-  const getColorClass = (severity: 'normal' | 'warn' | 'critical') => {
-    if (severity === 'critical') return 'text-red font-semibold';
-    if (severity === 'warn') return 'text-amber font-medium';
-    return 'text-text-primary font-bold';
-  };
-
-  const renderVitalCell = (label: string, valueStr: string, unit: string, severity: 'normal' | 'warn' | 'critical', timeStr?: string) => (
+  const renderVitalCell = (label: string, valueStr: string, unit: string, timeStr?: string) => (
     <div className="bg-surface-2 border border-border rounded-lg px-3 py-2.5 flex flex-col gap-0.5">
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-text-muted">{label}</span>
       </div>
       <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`font-mono text-[18px] ${getColorClass(severity)} leading-none`}>{valueStr}</span>
+        <span className="font-mono text-[18px] text-text-primary font-bold leading-none">{valueStr}</span>
         {valueStr !== '—' && valueStr !== '—/—' && <span className="text-[11px] text-text-muted">{unit}</span>}
       </div>
       <div className="text-[10px] text-text-muted font-mono mt-0.5">
@@ -99,35 +88,30 @@ export function VitalsCard({ patientId }: { patientId: string }) {
             'Blood Pressure',
             latest ? formatBloodPressure(latest.sbp, latest.dbp) : '—/—',
             'mmHg',
-            latest ? classifyBloodPressure(latest.sbp, latest.dbp) : 'normal',
             timeStr
           )}
           {renderVitalCell(
             'Heart Rate',
             latest?.heartRate?.toString() ?? '—',
             'bpm',
-            latest ? classifyHeartRate(latest.heartRate) : 'normal',
             timeStr
           )}
           {renderVitalCell(
             'Resp Rate',
             latest?.respiratoryRate?.toString() ?? '—',
             '/min',
-            latest ? classifyRespiratoryRate(latest.respiratoryRate) : 'normal',
             timeStr
           )}
           {renderVitalCell(
             'Temperature',
             latest ? formatTemperature(latest.temperature) : '—',
             '°C',
-            latest ? classifyTemperature(latest.temperature) : 'normal',
             timeStr
           )}
           {renderVitalCell(
             'SpO2',
             latest?.oxygenSaturation?.toString() ?? '—',
             '%',
-            latest ? classifyOxygenSaturation(latest.oxygenSaturation) : 'normal',
             timeStr
           )}
         </div>

@@ -1,13 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { 
-  formatTemperature, 
+import {
+  formatTemperature,
   formatBloodPressure,
-  classifyHeartRate,
-  classifyRespiratoryRate, 
-  classifyTemperature, 
-  classifyOxygenSaturation 
 } from '@/lib/vitals-utils';
 import type { VitalSign } from '@/types/vitals';
 import { useAuthStore } from '@/stores/authStore';
@@ -40,12 +36,6 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
       return new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime();
     });
   }, [vitals, deletingId]);
-
-  const getColorClass = (severity: 'normal' | 'warn' | 'critical') => {
-    if (severity === 'critical') return 'text-red font-semibold';
-    if (severity === 'warn') return 'text-amber font-medium';
-    return '';
-  };
 
   return (
     <div className="bg-surface border border-border border-l-[3px] border-l-accent rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
@@ -86,10 +76,6 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                 const dateStr = dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
                 
-                const hrClass = getColorClass(classifyHeartRate(v.heartRate));
-                const rrClass = getColorClass(classifyRespiratoryRate(v.respiratoryRate));
-                const tempClass = getColorClass(classifyTemperature(v.temperature));
-                const spo2Class = getColorClass(classifyOxygenSaturation(v.oxygenSaturation));
                 // Row is being deleted right now (mutation in flight) — transient ghost.
                 const isDeleting = deletingId === v.id;
                 // Row is permanently soft-deleted — persistent ghost, same as a
@@ -106,10 +92,10 @@ export function VitalsHistoryTable({ vitals, onEdit, onDelete, page, totalPages,
                       <div className="font-mono text-[10px] text-text-muted">{timeStr}</div>
                     </td>
                     <td className={`py-2.5 px-4 ${strikeClass}`}>{formatBloodPressure(v.sbp, v.dbp)}</td>
-                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : hrClass}`}>{v.heartRate ?? '—'}</td>
-                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : rrClass}`}>{v.respiratoryRate ?? '—'}</td>
-                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : tempClass}`}>{formatTemperature(v.temperature)}</td>
-                    <td className={`py-2.5 px-4 ${isGhost ? strikeClass : spo2Class}`}>{v.oxygenSaturation ? `${v.oxygenSaturation}%` : '—'}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>{v.heartRate ?? '—'}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>{v.respiratoryRate ?? '—'}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>{formatTemperature(v.temperature)}</td>
+                    <td className={`py-2.5 px-4 ${strikeClass}`}>{v.oxygenSaturation ? `${v.oxygenSaturation}%` : '—'}</td>
                     <td className={`py-2.5 px-4 ${strikeClass}`}>
                       {v.measuredByUser ? (
                         <div className="flex items-center gap-1.5">
