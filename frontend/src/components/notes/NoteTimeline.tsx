@@ -8,12 +8,13 @@ import { useDraftSnapshotStore } from '@/stores/draftSnapshotStore';
 import { useNoteOverridesStore, medNoteOverrideKey, problemNoteOverrideKey } from '@/stores/noteOverridesStore';
 import { useDeletedNotes } from '@/hooks/useDeletedNotes';
 import { DeletedNote } from '@/types/deleted-note';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { mapNoteToTimelineView } from '@/lib/notes-utils';
 import { flattenActiveProblemTree, mergeActiveProblems, mergeActiveMedications } from '@/lib/note-snapshot-merge';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal';
-import { ClipboardList, ArrowRight } from 'lucide-react';
+import { ClipboardList, ArrowRight, ChevronDown } from 'lucide-react';
+import { PaginationBar } from '@/components/ui/PaginationBar';
 import { useDeleteProgressNote } from '@/hooks/useProgressNotes';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -86,6 +87,8 @@ interface NoteTimelineProps {
   patientId: string;
 }
 
+const PAGE_SIZE_OPTIONS = [1, 5, 10, 20, 50];
+
 export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const router = useRouter();
   const { data: initialNotes, isLoading: initialLoading } = useInitialNotes(patientId);
@@ -111,6 +114,15 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [deleteDraftNoteId, setDeleteDraftNoteId] = useState<string | null>(null);
   const deleteProgressNoteMutation = useDeleteProgressNote(patientId);
+
+  // Timeline pagination. Deliberately client-side over the fully merged
+  // `mappedNotes` list rather than server-side: initial notes and deleted
+  // notes come from unpaginated endpoints and are merged/re-sorted here, and
+  // the diff baseline below walks the whole older history, so a server page
+  // of progress notes alone could not represent this list correctly.
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
 
   const handleToggleNote = (id: string) => {
     setExpandedNotes((prev) => {
@@ -287,6 +299,39 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
 
   const inheritedSourceId = carryForwardSource?.sourceNoteId ?? undefined;
 
+  const totalPages = Math.max(1, Math.ceil(mappedNotes.length / limit));
+  // Clamped on read rather than corrected in an effect, so a list that shrinks
+  // under the current page (e.g. deleting the only note on the last page) can
+  // never render a blank page and never costs a cascading re-render.
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * limit;
+  const pageNotes = mappedNotes.slice(pageStart, pageStart + limit);
+
+  // Reset to page 1 when the patient changes, or when a brand-new note
+  // appears — it's inserted at the top of this newest-first list, so it's
+  // only visible from page 1. Adjusted during render (React's "adjusting
+  // state when a prop changes" pattern) instead of in an effect.
+  const [pageAnchor, setPageAnchor] = useState({ patientId, pending: hasPendingNewNote });
+  if (pageAnchor.patientId !== patientId || pageAnchor.pending !== hasPendingNewNote) {
+    const shouldReset = pageAnchor.patientId !== patientId || hasPendingNewNote;
+    setPageAnchor({ patientId, pending: hasPendingNewNote });
+    if (shouldReset) setPage(1);
+  }
+
+  // Without this, page 2 opens at whatever scroll offset page 1 was left at.
+  useEffect(() => {
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [safePage]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(Math.min(Math.max(1, newPage), totalPages));
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  };
+
   // Only show skeleton on initial load when there's no data yet.
   // This prevents brief loading flashes when queries are invalidated after mutations.
   const isInitialLoading = initialLoading && initialNotes === undefined;
@@ -296,14 +341,14 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
 
   if (isInitialLoading || isProgressLoading || isActionLoading || isDeletedLoading) {
     return (
-      <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
-        <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full min-h-0 bg-surface-2 p-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-2 flex-shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Timeline</h2>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 relative">
+        <div className="flex flex-col gap-3 relative flex-1 min-h-0 overflow-y-auto">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="relative pl-8 pb-5 last:pb-0">
               {/* Connecting line to the next item */}
@@ -362,8 +407,8 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
   const hasActiveProgressNotes = mappedNotes.some(n => n.kind === 'progress' && !n.isDeleted);
 
   return (
-    <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full bg-surface-2 p-4 overflow-y-auto">
-      <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-col gap-4 w-full flex-shrink-0 border-r border-border h-full min-h-0 bg-surface-2 p-4 overflow-hidden">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <h2 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Timeline</h2>
           {expandedNotes.size > 0 && (
@@ -378,6 +423,21 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {mappedNotes.length > PAGE_SIZE_OPTIONS[0] && (
+            <div className="relative flex items-center">
+              <select
+                value={limit}
+                onChange={(e) => handleLimitChange(Number(e.target.value))}
+                aria-label="Notes per page"
+                className="h-8 pl-3 pr-7 rounded-full bg-surface border border-border text-[11px] font-semibold text-text-secondary outline-none cursor-pointer appearance-none hover:border-border-strong hover:text-text-primary focus:border-accent transition-all duration-150"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt} / page</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-text-muted absolute right-2.5 pointer-events-none" />
+            </div>
+          )}
 
           {activeInitialNote?.status === 'PUBLISHED' && !hasDrafts && (
             <button 
@@ -390,7 +450,7 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 relative">
+      <div ref={listScrollRef} className="flex flex-col gap-3 relative flex-1 min-h-0 overflow-y-auto">
         {mappedNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center p-8 bg-surface border border-border rounded-card shadow-card mt-4 min-h-[260px]">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-4 transition-transform hover:scale-110 duration-300">
@@ -423,7 +483,13 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             )}
           </div>
         ) : (
-          mappedNotes.map((note, index) => {
+          pageNotes.map((note, localIndex) => {
+            // `localIndex` positions the entry within the current page (used
+            // only for the connector rail); `absoluteIndex` is its position in
+            // the full history, which is what the diff baseline must search
+            // from — otherwise the "Inherited by today's note" chain would
+            // break at every page boundary.
+            const absoluteIndex = pageStart + localIndex;
             // Diff baseline: chronologically diff against the next note older in sorted order that is authored by a DOCTOR.
             // Decided per fix.md §6.3, and updated to skip NURSE/PHARMACIST notes which lack clinical snapshots.
             // Strict linear guard: deleted notes (soft-deleted or hard-deleted-but-tracked via
@@ -433,13 +499,15 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
             // it fragments the "Inherited by today's note" chain instead of the linear live history.
             const previousNote = note.kind === 'initial'
               ? null
-              : (mappedNotes.slice(index + 1).find(n => !n.isDeleted && n.status !== 'DRAFT' && n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id && !n.isDeleted && n.status !== 'DRAFT') : null) || null);
+              : (mappedNotes.slice(absoluteIndex + 1).find(n => !n.isDeleted && n.status !== 'DRAFT' && n.authorRole !== 'NURSE' && n.authorRole !== 'PHARMACIST') || (inheritedSourceId ? mappedNotes.find(n => n.id === inheritedSourceId && n.id !== note.id && !n.isDeleted && n.status !== 'DRAFT') : null) || null);
             const isOpenNote = expandedNotes.has(note.id);
 
             return (
               <div key={note.id} className="relative pl-8 pb-5 last:pb-0">
-                {/* Connecting line to the next item */}
-                {index < mappedNotes.length - 1 && (
+                {/* Connecting line to the next item on THIS page — the last
+                    entry of a page terminates the rail at its own dot instead
+                    of trailing into the pagination bar. */}
+                {localIndex < pageNotes.length - 1 && (
                   <div 
                     className="absolute bg-border-strong/50" 
                     style={{ left: '15px', top: '36px', bottom: '-34px', width: '2px' }} 
@@ -522,6 +590,14 @@ export function NoteTimeline({ patientId }: NoteTimelineProps) {
           })
         )}
       </div>
+
+      {/* -mt-2 trims the parent's gap-4 so the divider reads as the panel's
+          footer rather than a floating line. The bar brings its own py-2. */}
+      {totalPages > 1 && (
+        <div className="flex-shrink-0 -mt-2 border-t border-border">
+          <PaginationBar page={safePage} totalPages={totalPages} onPageChange={handlePageChange} />
+        </div>
+      )}
 
       <DeleteConfirmModal
         open={!!deleteNoteId}
