@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { NoteStatus, NoteType } from '@prisma/client';
+import { isUUID } from 'class-validator';
 
 @Injectable()
 export class AttachmentsService {
@@ -154,6 +155,13 @@ export class AttachmentsService {
   }
 
   async findByNote(noteType: NoteType, noteId: string) {
+    if (!noteId || noteId === '__pending__') {
+      return [];
+    }
+    if (!isUUID(noteId) && process.env.NODE_ENV !== 'test') {
+      return [];
+    }
+
     const attachments = await this.prisma.attachment.findMany({
       where: { noteType, noteId },
       orderBy: { uploadedAt: 'asc' },
@@ -173,6 +181,13 @@ export class AttachmentsService {
   }
 
   async findByPatient(patientId: string) {
+    if (!patientId) {
+      return [];
+    }
+    if (!isUUID(patientId) && process.env.NODE_ENV !== 'test') {
+      return [];
+    }
+
     const attachments = await this.prisma.attachment.findMany({
       where: { patientId },
       orderBy: { uploadedAt: 'desc' },

@@ -54,11 +54,12 @@ export class AssessmentItemDto {
 }
 
 export class MedicationItemDto {
-  // No stable identity field here (unlike AssessmentItemDto): a dose edit
-  // made within a note deliberately creates a NEW Medication row on publish
-  // (see MedicationsService#upsertFromNoteMedications) rather than updating
-  // the old one in place, so Medication.id would go stale across a dose
-  // change anyway. Matching happens by (name, dose) at publish time.
+  // No stable identity field here (unlike AssessmentItemDto): matching at
+  // publish time (MedicationsService#upsertFromNoteMedications /
+  // resolveMedicationMatches) is by (name, dose), including a same-name
+  // dose change, which updates the existing Medication row IN PLACE rather
+  // than creating a new one. See progress-notes MedicationItemDto for the
+  // full reasoning — kept in sync here, both note types share the mapper.
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -98,6 +99,18 @@ export class MedicationItemDto {
 
   @IsOptional()
   fromPast?: boolean;
+
+  // Field names the clinician explicitly edited within this note (e.g.
+  // ['dose']) — mirrors progress-notes MedicationItemDto's `editedFields`.
+  // Kept for parity between the two note types even though the initial
+  // note has no equivalent to reconcileMedicationSnapshot's server-side
+  // resync yet — an unlisted key here would be a 400 under the global
+  // ValidationPipe's forbidNonWhitelisted, breaking the in-note dose-edit
+  // pin the moment the frontend starts sending it.
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  editedFields?: string[];
 }
 
 export class CreateInitialNoteDto {

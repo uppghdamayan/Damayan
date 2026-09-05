@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
+import { resolveMedicationMatches } from './medications.utils';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -244,16 +245,22 @@ export class MedicationsService {
   // PHASE 8/9 INTEGRATION POINT — see Section 2 of this file for the full contract.
   //
   // Upserts medications from a note's medication list on publish/save.
-  // Case-insensitive match on (name, dose, unit) against the patient's existing
-  // ACTIVE medications:
-  //   - exact match (name+dose+unit) → no-op (already on the list)
-  //   - name matches but dose/unit differs → treated as a NEW entry (dose
-  //     changes are clinically significant; never silently overwrite a dose)
-  //   - no match → create new active medication
+  // Matching against the patient's existing medications is resolved by
+  // `resolveMedicationMatches` (medications.utils.ts) in three passes:
+  //   - exact match (name+dose, case/whitespace-insensitive) → no-op, or
+  //     reactivation if the matched row was inactive
+  //   - name matches, dose differs, and the match is unambiguous (exactly
+  //     one unresolved item and one unclaimed active row for that name) →
+  //     the existing row is updated IN PLACE (same id, stays active); the
+  //     dose is clinically significant so the change is still recorded as
+  //     its own 'Updated' MedicationLog entry, but the row itself survives
+  //   - no match, or an ambiguous same-name/multi-dose group → create new
+  //     active medication
   // Medications on the patient's current active list that are missing from
-  // the note's list ARE auto-deactivated here (see the "Deactivate missing
-  // items" loop below), mirroring ProblemsService#upsertFromAssessment's
-  // auto-resolve behavior for problems dropped from a note's assessment.
+  // the note's list (and weren't claimed by an in-place dose update) ARE
+  // auto-deactivated here (see the "Deactivate missing items" loop below),
+  // mirroring ProblemsService#upsertFromAssessment's auto-resolve behavior
+  // for problems dropped from a note's assessment.
   // ─────────────────────────────────────────────
   // Note: unlike upsertFromNoteMedications' medicationLog writes, entries here
   // also feed the centralized Logs page's AuditLog table. This method is
@@ -308,131 +315,183 @@ export class MedicationsService {
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
-    const keptIds = new Set<string>();
     const userRole = await this.getUserRole(userId, client);
 
+    // Ordered active-first, then oldest-first, so resolveMedicationMatches'
+    // pass 1 resolves legacy duplicate rows (same name+dose, both active)
+    // deterministically rather than depending on unspecified DB row order.
     const existing = await client.medication.findMany({
       where: { patientId },
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
     });
+
+    const { exact, doseChange, creates, claimedIds } = resolveMedicationMatches(
+      existing,
+      items,
+    );
+    const keptIds = claimedIds;
 
     const promises: Promise<any>[] = [];
 
-    for (const item of items) {
-      const normalize = (s: string) =>
-        s.trim().toLowerCase().replace(/\s+/g, ' ');
-      const match = existing.find(
-        (m) =>
-          normalize(m.name) === normalize(item.name) &&
-          normalize(String(m.dose ?? '')) ===
-            normalize(String(item.dose ?? '')),
-      );
-      if (match) {
-        keptIds.add(match.id);
+    // `undefined` on `item` means "this snapshot didn't carry the field"
+    // (e.g. a legacy snapshot predating it) and must leave the existing
+    // value alone — treating it as "clear" would silently wipe production
+    // medication data on every publish. Shared by pass 1 and pass 2 so the
+    // rule can't drift between them.
+    const buildFieldUpdates = (
+      match: (typeof existing)[number],
+      item: (typeof items)[number],
+    ) => {
+      const data: Prisma.MedicationUncheckedUpdateInput = {};
+      const changes: string[] = [];
 
-        const data: Prisma.MedicationUncheckedUpdateInput = {};
-        const changes: string[] = [];
-
-        if (!match.isActive) {
-          data.isActive = true;
+      if (item.formulation !== undefined) {
+        const next = item.formulation?.trim() || null;
+        if (next !== match.formulation) {
+          data.formulation = next;
+          changes.push(`formulation → '${next ?? 'none'}'`);
         }
-
-        // Update non-dose fields on a name+dose match — the dose itself is
-        // deliberately never overwritten here (a dose change is handled by
-        // the no-match branch below, which creates a new row instead).
-        // `undefined` on `item` means "this snapshot didn't carry the field"
-        // (e.g. a legacy snapshot predating it) and must leave the existing
-        // value alone — treating it as "clear" would silently wipe
-        // production medication data on every publish.
-        if (item.formulation !== undefined) {
-          const next = item.formulation?.trim() || null;
-          if (next !== match.formulation) {
-            data.formulation = next;
-            changes.push(`formulation → '${next ?? 'none'}'`);
-          }
-        }
-        if (item.instructions !== undefined) {
-          const next = item.instructions?.trim() || null;
-          if (next !== match.instructions) {
-            data.instructions = next;
-            changes.push(`instructions → '${next ?? 'none'}'`);
-          }
-        }
-        if (item.quantity !== undefined) {
-          const next = item.quantity ?? null;
-          if (next !== match.quantity) {
-            data.quantity = next;
-            changes.push(`quantity → '${next ?? 'none'}'`);
-          }
-        }
-
-        if (!match.isActive) {
-          promises.push(
-            client.medication
-              .update({ where: { id: match.id }, data })
-              .then(async () => {
-                await client.medicationLog.create({
-                  data: {
-                    patientId,
-                    medicationId: match.id,
-                    action: 'Reactivated',
-                    description: `Reactivated medication '${match.name}' from ${sourceNote}`,
-                    editorId: userId,
-                  },
-                });
-                await this.logAudit(
-                  patientId,
-                  userId,
-                  userRole,
-                  'UPDATE',
-                  match.id,
-                  match.name,
-                  sourceNote,
-                );
-              }),
-          );
-        } else if (changes.length > 0) {
-          data.updatedBy = userId;
-          promises.push(
-            client.medication
-              .update({ where: { id: match.id }, data })
-              .then(async () => {
-                await client.medicationLog.create({
-                  data: {
-                    patientId,
-                    medicationId: match.id,
-                    action: 'Updated',
-                    description: `Updated '${match.name}' from ${sourceNote}: ${changes.join(', ')}`,
-                    editorId: userId,
-                  },
-                });
-                await this.logAudit(
-                  patientId,
-                  userId,
-                  userRole,
-                  'UPDATE',
-                  match.id,
-                  match.name,
-                  sourceNote,
-                );
-              }),
-          );
-        }
-        continue;
       }
+      if (item.instructions !== undefined) {
+        const next = item.instructions?.trim() || null;
+        if (next !== match.instructions) {
+          data.instructions = next;
+          changes.push(`instructions → '${next ?? 'none'}'`);
+        }
+      }
+      if (item.quantity !== undefined) {
+        const next = item.quantity ?? null;
+        if (next !== match.quantity) {
+          data.quantity = next;
+          changes.push(`quantity → '${next ?? 'none'}'`);
+        }
+      }
+      return { data, changes };
+    };
 
-      // A same-name, active row with a different dose is a dose change,
-      // not a brand-new medication — the row itself still gets
-      // discontinued+recreated below (dose is never silently overwritten,
-      // per the note above), but the log must carry an 'Updated' entry too
-      // so the dose change is visible under the Updated filter instead of
-      // only showing as a Discontinued/Created pair.
+    // Pass 1 — exact name+dose matches. Never writes `dose` itself: after
+    // normalization the values are already equal, so writing item.dose here
+    // would only rewrite casing/whitespace and emit a churn log on every
+    // publish. Dose changes are handled by pass 2 below.
+    for (const [itemIndex, medId] of exact) {
+      const item = items[itemIndex];
+      const match = existing.find((m) => m.id === medId)!;
+      const { data, changes } = buildFieldUpdates(match, item);
+
+      if (!match.isActive) {
+        data.isActive = true;
+        promises.push(
+          client.medication
+            .update({ where: { id: match.id }, data })
+            .then(async () => {
+              await client.medicationLog.create({
+                data: {
+                  patientId,
+                  medicationId: match.id,
+                  action: 'Reactivated',
+                  description: `Reactivated medication '${match.name}' from ${sourceNote}`,
+                  editorId: userId,
+                },
+              });
+              await this.logAudit(
+                patientId,
+                userId,
+                userRole,
+                'UPDATE',
+                match.id,
+                match.name,
+                sourceNote,
+              );
+            }),
+        );
+      } else if (changes.length > 0) {
+        data.updatedBy = userId;
+        promises.push(
+          client.medication
+            .update({ where: { id: match.id }, data })
+            .then(async () => {
+              await client.medicationLog.create({
+                data: {
+                  patientId,
+                  medicationId: match.id,
+                  action: 'Updated',
+                  description: `Updated '${match.name}' from ${sourceNote}: ${changes.join(', ')}`,
+                  editorId: userId,
+                },
+              });
+              await this.logAudit(
+                patientId,
+                userId,
+                userRole,
+                'UPDATE',
+                match.id,
+                match.name,
+                sourceNote,
+              );
+            }),
+        );
+      }
+    }
+
+    // Pass 2 — unambiguous same-name dose changes. Updates the existing row
+    // IN PLACE (same id, stays active) instead of discontinuing it and
+    // creating a duplicate — a dose edit is a revision of the medication,
+    // not the end of one. The dose change is still its own 'Updated' log
+    // entry so it's visible under the Updated filter.
+    for (const [itemIndex, medId] of doseChange) {
+      const item = items[itemIndex];
+      const match = existing.find((m) => m.id === medId)!;
+      const { data, changes } = buildFieldUpdates(match, item);
+
+      const newDose = item.dose.trim();
+      data.dose = newDose;
+      changes.push(
+        `dose changed to '${newDose}' (from '${match.dose ?? 'none'}')`,
+      );
+      data.updatedBy = userId;
+
+      promises.push(
+        client.medication
+          .update({ where: { id: match.id }, data })
+          .then(async () => {
+            await client.medicationLog.create({
+              data: {
+                patientId,
+                medicationId: match.id,
+                action: 'Updated',
+                description: `Updated '${match.name}' from ${sourceNote}: ${changes.join(', ')}`,
+                editorId: userId,
+              },
+            });
+            await this.logAudit(
+              patientId,
+              userId,
+              userRole,
+              'UPDATE',
+              match.id,
+              match.name,
+              sourceNote,
+            );
+          }),
+      );
+    }
+
+    // Pass 3 — genuinely new medications, plus the ambiguous case (two or
+    // more active rows sharing a name all changing dose in the same save)
+    // which still falls back to discontinue+create rather than risk
+    // mis-pairing rows. `doseChangedFrom` recomputes against `keptIds` (which
+    // already holds every pass 1/2 claim), so it only ever matches a row
+    // left over from that ambiguous case, and still carries the dose change
+    // as its own 'Updated' log entry alongside the Created one.
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    for (const itemIndex of creates) {
+      const item = items[itemIndex];
       const doseChangedFrom = existing.find(
         (m) =>
           m.isActive &&
           !keptIds.has(m.id) &&
           normalize(m.name) === normalize(item.name) &&
-          normalize(String(m.dose ?? '')) !==
-            normalize(String(item.dose ?? '')),
+          normalize(String(m.dose ?? '')) !== normalize(String(item.dose ?? '')),
       );
 
       promises.push(

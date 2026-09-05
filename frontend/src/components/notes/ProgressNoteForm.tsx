@@ -437,7 +437,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
           : hasMedSnapshot
             ? mergeActiveMedications(validMeds, activeMeds, removedMedNamesRef.current)
             : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
-              ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
+              ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current, false)
               : activeMeds.map((m: any) => ({
                   name: m.name,
                   dose: m.dose || undefined,
@@ -525,7 +525,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
             : hasMedSnapshot
               ? mergeActiveMedications(validMeds, activeMeds, removedMedNamesRef.current)
               : copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0
-                ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
+                ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current, false)
                 : activeMeds.map((m: any) => ({
                     name: m.name,
                     dose: m.dose || undefined,
@@ -557,7 +557,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
       }
 
       const initialMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
-        ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current)
+        ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, removedMedNamesRef.current, false)
         : activeMeds.map((m: any) => ({
             name: m.name,
             dose: m.dose || undefined,
@@ -640,12 +640,21 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const draftSnapshotKey = `${patientId}:${noteId ?? 'new'}`;
   useEffect(() => {
     if (note?.status === 'PUBLISHED') return;
+    // A brand-new, unsaved note (no DB row yet) seeds its snapshot with
+    // copy-forward defaults the instant this form mounts — writing that
+    // straight to the store would make NoteTimeline's synthetic pending
+    // entry (hasPendingNewNote) appear immediately, so "+ New Note" would
+    // look like it created a DRAFT card before the clinician touched
+    // anything. Only start publishing once the form is actually dirty —
+    // an existing DB draft (noteId set) has no such concern, its Timeline
+    // entry already exists independently of this snapshot.
+    if (!noteId && !form.formState.isDirty) return;
     setDraftSnapshot(draftSnapshotKey, {
       problemListSnapshot: formValues.problemListSnapshot || [],
       medicationSnapshot: formValues.medicationSnapshot || [],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftSnapshotKey, formValues.problemListSnapshot, formValues.medicationSnapshot, note?.status]);
+  }, [draftSnapshotKey, formValues.problemListSnapshot, formValues.medicationSnapshot, note?.status, noteId, form.formState.isDirty]);
 
   useEffect(() => {
     if (!draftSnapshotKey) return;
@@ -708,7 +717,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
   const handleRevertMedications = () => {
     const activeMeds = copyForward?.activeMedications || [];
     const initialMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
-      ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds)
+      ? mergeActiveMedications(copyForward.inheritedMedications, activeMeds, undefined, false)
       : activeMeds.map((m: any) => ({
           name: m.name,
           dose: m.dose || undefined,
@@ -1373,7 +1382,7 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
                       diagnosisDate: null,
                     }));
                     const defaultMeds = (copyForward?.inheritedMedications && copyForward.inheritedMedications.length > 0)
-                      ? mergeActiveMedications(copyForward.inheritedMedications, copyForward?.activeMedications || [], removedMedNamesRef.current)
+                      ? mergeActiveMedications(copyForward.inheritedMedications, copyForward?.activeMedications || [], removedMedNamesRef.current, false)
                       : (copyForward?.activeMedications || []).map((m: any) => ({
                           name: m.name,
                           dose: m.dose || undefined,

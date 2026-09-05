@@ -55,11 +55,18 @@ export class AssessmentItemDto {
 }
 
 export class MedicationItemDto {
-  // No stable identity field here (unlike AssessmentItemDto): a dose edit
-  // made within a note deliberately creates a NEW Medication row on publish
-  // (see MedicationsService#upsertFromNoteMedications) rather than updating
-  // the old one in place, so Medication.id would go stale across a dose
-  // change anyway. Matching happens by (name, dose) at publish time.
+  // No stable identity field here (unlike AssessmentItemDto): matching at
+  // publish time (MedicationsService#upsertFromNoteMedications /
+  // resolveMedicationMatches) is by (name, dose), including a same-name
+  // dose change, which updates the existing Medication row IN PLACE rather
+  // than creating a new one. An id is nevertheless unnecessary — every
+  // already-persisted medicationSnapshot predates any such field, and
+  // MedicationsService#remove is a hard delete, so a stored id could point
+  // at a nonexistent row. Name+dose matching stays the source of truth;
+  // adding an id would only be additive hardening for the rare case of two
+  // active rows sharing a name that BOTH change dose in the same save
+  // (ambiguous — falls back to discontinue+create, see
+  // resolveMedicationMatches).
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -101,10 +108,9 @@ export class MedicationItemDto {
   fromPast?: boolean;
 
   // Field names the clinician explicitly edited within this note (e.g.
-  // ['dose']) — lets the frontend merge (mergeActiveMedications) know a
+  // ['dose']) — lets both the frontend merge (mergeActiveMedications) and
+  // the server-side ProgressNotesService#reconcileMedicationSnapshot know a
   // later, unrelated master-list edit must not silently overwrite it.
-  // Server-side reconcileMedicationSnapshot never reads this; it rides
-  // through untouched inside the medicationSnapshot JSON column.
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

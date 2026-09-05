@@ -143,6 +143,8 @@ function NoteAttachmentItem({ att }: { att: any }) {
 }
 
 function NoteAttachmentsSection({ note }: { note: TimelineNoteView }) {
+  if (note.id === '__pending__') return null;
+
   const noteType = note.kind === 'initial' ? 'INITIAL_NOTE' : 'PROGRESS_NOTE';
   const { data: attachments, isLoading } = useAttachmentsByNote(noteType, note.id);
 

@@ -198,22 +198,35 @@ export function mergeActiveProblems(
  * have no in-note-removal concept, e.g. `handleRevertMedications`).
  *
  * Source-of-truth rule: live master wins for dose/formulation/quantity/
- * instructions UNLESS that field is named in the entry's own
- * `editedFields` (set when the clinician edits that field via the in-note
- * medication edit modal) — an in-note edit is never silently clobbered by
- * a later, unrelated master-list change.
+ * instructions UNLESS `pinEdits` is true (the default) AND that field is
+ * named in the entry's own `editedFields` (set when the clinician edits
+ * that field via the in-note medication edit modal) — an in-note edit is
+ * never silently clobbered by a later, unrelated master-list change.
+ *
+ * `pinEdits` must be passed `false` when `existingMeds` is a CARRIED-FORWARD
+ * snapshot from a *different*, previously published note (e.g.
+ * `copyForward.inheritedMedications`) rather than this note's own
+ * in-progress `medicationSnapshot` — an `editedFields` pin recorded against
+ * the earlier note has no business overriding the live master row for a
+ * brand-new note that hasn't touched that field yet. Mirrors the backend
+ * twin `mergeActiveMedications` in `medications.utils.ts`, which always
+ * treats its input as carried-forward and never honors `editedFields` at
+ * all. When `pinEdits` is false, `editedFields` is also stripped from the
+ * projected entry so the pin can't resurface on a later merge pass.
  *
  * Entries are projected to the editor's `NoteMedicationItem` shape
  * (name/dose/formulation/quantity/instructions/isNew/fromPast/editedFields)
  * rather than spread verbatim, so a legacy `unit`/`source` field never
  * survives the merge — `unit` is folded into `dose` instead. `editedFields`
- * MUST stay in this projection, or the next merge pass forgets which
- * fields were edited in-note and live master silently wins for all of them.
+ * MUST stay in this projection when `pinEdits` is true, or the next merge
+ * pass forgets which fields were edited in-note and live master silently
+ * wins for all of them.
  */
 export function mergeActiveMedications(
   existingMeds: any[],
   activeMedications: any[],
   removedNames?: Set<string>,
+  pinEdits = true,
 ): any[] {
   const activeByName = new Map(
     (activeMedications || [])
@@ -252,7 +265,9 @@ export function mergeActiveMedications(
       if (!m || typeof m !== 'object' || m.isNew) return m;
       const name = (typeof m === 'string' ? m : m.name)?.trim().toLowerCase();
       const live = name ? activeByName.get(name) : undefined;
-      const edited = new Set<string>(Array.isArray(m.editedFields) ? m.editedFields : []);
+      const edited = new Set<string>(
+        pinEdits && Array.isArray(m.editedFields) ? m.editedFields : [],
+      );
       const pick = (field: string) =>
         edited.has(field) ? m[field] : (live?.[field] ?? m[field]);
       const dose = pick('dose');
@@ -265,7 +280,7 @@ export function mergeActiveMedications(
         instructions: pick('instructions'),
         isNew: m.isNew,
         fromPast: m.fromPast ?? live?.fromPast ?? false,
-        editedFields: m.editedFields,
+        editedFields: pinEdits ? m.editedFields : undefined,
       };
     });
 

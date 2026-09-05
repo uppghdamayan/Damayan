@@ -65,7 +65,7 @@ function mergeMedsForDraft(
     .map((m: any) => (typeof m === 'string' ? { name: m, dose: '' } : m));
 
   if (hasSnapshot) return mergeActiveMedications(validMeds, activeMedications, removedNames);
-  if (inheritedMedications.length > 0) return mergeActiveMedications(inheritedMedications, activeMedications, removedNames);
+  if (inheritedMedications.length > 0) return mergeActiveMedications(inheritedMedications, activeMedications, removedNames, false);
 
   // No snapshot and nothing inherited — raw active meds, minus anything the
   // clinician just discontinued in this note (the same guard the two

@@ -114,6 +114,58 @@ export class InitialNotesService {
     });
   }
 
+  // ─────────────────────────────────────────────
+  // Mirrors ProgressNotesService#reconcileMedicationSnapshot — see there for
+  // the full reasoning. Drops carried-over entries for a medication that's
+  // no longer active (matched by name, not name+dose, so an in-note dose
+  // edit is never mistaken for a deletion), and resyncs dose/formulation/
+  // quantity/instructions from the live active medication on every kept,
+  // non-`isNew` entry UNLESS that field is listed in the entry's own
+  // `editedFields`. Without this, a dose edited on the Medications master
+  // list while this draft sits open would never reach the snapshot, and the
+  // stale old-dose entry would get treated as a second dose change on top
+  // of the master-list edit on the next save, clobbering it back.
+  // ─────────────────────────────────────────────
+  private async reconcileMedicationSnapshot(
+    patientId: string,
+    snapshot: any[] | undefined,
+    tx: Prisma.TransactionClient | PrismaService,
+  ): Promise<any[] | undefined> {
+    if (!snapshot) return snapshot;
+
+    const activeMeds = await this.medicationsService.findActiveForPatient(
+      patientId,
+      tx,
+    );
+    const activeByName = new Map(
+      activeMeds.map((m) => [m.name.trim().toLowerCase(), m]),
+    );
+
+    return snapshot
+      .filter((m) => {
+        if (!m || !m.name) return false;
+        if (m.isNew) return true;
+        return activeByName.has(String(m.name).trim().toLowerCase());
+      })
+      .map((m) => {
+        if (!m || m.isNew) return m;
+        const live = activeByName.get(String(m.name).trim().toLowerCase());
+        if (!live) return m;
+        const edited = new Set<string>(
+          Array.isArray(m.editedFields) ? m.editedFields : [],
+        );
+        const pick = (field: string, liveValue: unknown) =>
+          edited.has(field) ? m[field] : (liveValue ?? m[field]);
+        return {
+          ...m,
+          dose: pick('dose', live.dose),
+          formulation: pick('formulation', live.formulation),
+          quantity: pick('quantity', live.quantity),
+          instructions: pick('instructions', live.instructions),
+        };
+      });
+  }
+
   async update(
     patientId: string,
     id: string,
@@ -132,6 +184,20 @@ export class InitialNotesService {
     }
 
     const { visitDatetime, ...updateData } = dto;
+
+    // Only reconcile for drafts — a published note's snapshot is a locked
+    // historical record (Prescribed Medications are frozen post-publish, see
+    // below) and should not be silently rewritten by this guard.
+    if (
+      updateData.medicationSnapshot !== undefined &&
+      note.status === NoteStatus.DRAFT
+    ) {
+      updateData.medicationSnapshot = await this.reconcileMedicationSnapshot(
+        patientId,
+        updateData.medicationSnapshot,
+        this.prisma,
+      );
+    }
 
     // For published notes: Prescribed Medications under Plan are locked.
     // Only Past Medications (source: 'past') under History module are editable.

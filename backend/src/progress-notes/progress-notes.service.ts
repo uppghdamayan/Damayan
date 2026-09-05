@@ -113,6 +113,16 @@ export class ProgressNotesService {
   // point of the dose-change badge) — the active record's dose only gets
   // updated later, on publish, so matching on dose here would wrongly treat
   // every in-note dose edit as a deleted medication.
+  //
+  // Also resyncs dose/formulation/quantity/instructions from the live active
+  // medication on every kept, non-`isNew` entry — UNLESS that field is
+  // listed in the entry's own `editedFields` (mirrors the frontend's
+  // mergeActiveMedications in note-snapshot-merge.ts). Without this, a dose
+  // edited on the Medications master list while this draft sits open would
+  // never reach the snapshot; the draft's stale old-dose entry would then
+  // fail the name+dose match in upsertFromNoteMedications on the next save
+  // and get treated as a dose change on top of the master-list edit,
+  // clobbering it back to the old value.
   // ─────────────────────────────────────────────
   private async reconcileMedicationSnapshot(
     patientId: string,
@@ -125,15 +135,33 @@ export class ProgressNotesService {
       patientId,
       tx,
     );
-    const activeNames = new Set(
-      activeMeds.map((m) => m.name.trim().toLowerCase()),
+    const activeByName = new Map(
+      activeMeds.map((m) => [m.name.trim().toLowerCase(), m]),
     );
 
-    return snapshot.filter((m) => {
-      if (!m || !m.name) return false;
-      if (m.isNew) return true;
-      return activeNames.has(String(m.name).trim().toLowerCase());
-    });
+    return snapshot
+      .filter((m) => {
+        if (!m || !m.name) return false;
+        if (m.isNew) return true;
+        return activeByName.has(String(m.name).trim().toLowerCase());
+      })
+      .map((m) => {
+        if (!m || m.isNew) return m;
+        const live = activeByName.get(String(m.name).trim().toLowerCase());
+        if (!live) return m;
+        const edited = new Set<string>(
+          Array.isArray(m.editedFields) ? m.editedFields : [],
+        );
+        const pick = (field: string, liveValue: unknown) =>
+          edited.has(field) ? m[field] : (liveValue ?? m[field]);
+        return {
+          ...m,
+          dose: pick('dose', live.dose),
+          formulation: pick('formulation', live.formulation),
+          quantity: pick('quantity', live.quantity),
+          instructions: pick('instructions', live.instructions),
+        };
+      });
   }
 
   async resolveCarryForwardSource(

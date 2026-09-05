@@ -290,7 +290,7 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     expect(result[0].name).toBe('Amlodipine');
   });
 
-  it('matches on name only, so an in-note dose edit survives reconcile', async () => {
+  it('matches on name only, so an in-note dose edit is not treated as a deletion', async () => {
     const mockMedicationsService = {
       findActiveForPatient: jest
         .fn()
@@ -310,8 +310,85 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     // The clinician edited the dose within the note; the active record's
     // dose hasn't been updated yet (that only happens on publish). Matching
     // on name alone (not name+dose) must keep this entry, not treat the
-    // dose mismatch as "no longer active".
+    // dose mismatch as "no longer active" — but since this entry doesn't
+    // carry `editedFields: ['dose']`, the live master dose still resyncs
+    // over it (see the two tests below for the `editedFields` pin itself).
     const snapshot = [{ name: 'Amlodipine', dose: '5 mg' }];
+
+    const result = await (service as any).reconcileMedicationSnapshot(
+      'patient-1',
+      snapshot,
+      {} as any,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Amlodipine');
+  });
+
+  it('resyncs dose/formulation/quantity/instructions from the live medication when editedFields is absent', async () => {
+    const mockMedicationsService = {
+      findActiveForPatient: jest.fn().mockResolvedValue([
+        {
+          name: 'Amlodipine',
+          dose: '10 mg',
+          formulation: 'Tablet',
+          quantity: 30,
+          instructions: 'Take 1 tab daily',
+        },
+      ]),
+    };
+
+    const service = new ProgressNotesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    // A stale entry left over from before a master-list dose edit was made
+    // while this draft was open. No editedFields — nothing in this note
+    // pins the old value, so the live master row must win.
+    const snapshot = [{ name: 'Amlodipine', dose: '5 mg' }];
+
+    const result = await (service as any).reconcileMedicationSnapshot(
+      'patient-1',
+      snapshot,
+      {} as any,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].dose).toBe('10 mg');
+    expect(result[0].formulation).toBe('Tablet');
+    expect(result[0].quantity).toBe(30);
+    expect(result[0].instructions).toBe('Take 1 tab daily');
+  });
+
+  it('leaves a field alone when it is listed in the entry\'s own editedFields', async () => {
+    const mockMedicationsService = {
+      findActiveForPatient: jest
+        .fn()
+        .mockResolvedValue([{ name: 'Amlodipine', dose: '10 mg' }]),
+    };
+
+    const service = new ProgressNotesService(
+      {} as any,
+      {} as any,
+      {} as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    // The clinician deliberately edited the dose via the in-note medication
+    // edit modal, which records `editedFields: ['dose']` — that pin must
+    // survive the resync even though it now disagrees with the live master.
+    const snapshot = [
+      { name: 'Amlodipine', dose: '5 mg', editedFields: ['dose'] },
+    ];
 
     const result = await (service as any).reconcileMedicationSnapshot(
       'patient-1',

@@ -108,4 +108,16 @@ describe('AttachmentsService', () => {
       expect(result).toEqual({ success: true });
     });
   });
+
+  describe('findByNote', () => {
+    it('returns empty array immediately when noteId is __pending__', async () => {
+      const result = await service.findByNote(NoteType.PROGRESS_NOTE, '__pending__');
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when noteId is empty', async () => {
+      const result = await service.findByNote(NoteType.PROGRESS_NOTE, '');
+      expect(result).toEqual([]);
+    });
+  });
 });
