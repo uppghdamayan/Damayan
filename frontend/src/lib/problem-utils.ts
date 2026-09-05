@@ -1,5 +1,5 @@
 import { arrayMove } from '@dnd-kit/sortable';
-import type { Problem, ProblemNode } from '@/types/problem';
+import type { Problem, ProblemNode, ProblemStatusValue } from '@/types/problem';
 
 type Creator = { firstName: string; lastName: string; role: string } | null | undefined;
 
@@ -51,6 +51,65 @@ export function isDescendant(problems: Problem[], potentialDescendantId: string,
   const descendant = problems.find(p => p.id === potentialDescendantId);
   if (!descendant || !descendant.parentId) return false;
   return isDescendant(problems, descendant.parentId, ancestorId);
+}
+
+// Derives, for every problem, the parent it should visually sit under once a
+// set of *staged but unpublished* status changes is taken into account — a
+// pure re-implementation of the master Problem List's server-side "Business
+// rule 5" (problems.service.ts update(): when a problem goes non-ACTIVE, its
+// first surviving ACTIVE child is promoted into its slot and any remaining
+// children are re-parented under that heir). Recomputed fresh from `problems`
+// + the two callbacks on every render (see ProblemListScreen's
+// draftActiveProblems/effectiveParents), so undoing a staged removal/resolve
+// — by deleting its entry from draftStatuses — automatically restores the
+// original tree with no separate undo bookkeeping. This replaces the old
+// mutation-based mirrorPromotionInDraft, which wrote directly into
+// draftParents and so had no way to be undone.
+export function applyStagedPromotions(
+  problems: Problem[],
+  effectiveStatus: (p: Problem) => ProblemStatusValue,
+  baseParentOf: (p: Problem) => string | null,
+): Record<string, string | null> {
+  const result: Record<string, string | null> = {};
+  problems.forEach((p) => {
+    result[p.id] = baseParentOf(p);
+  });
+
+  // Iterate to a fixed point — promoting a heir can itself need promoting if
+  // its new parent (the original problem's parent) is also non-ACTIVE, or a
+  // chain of several non-ACTIVE ancestors is staged in the same draft.
+  // Bounded by problems.length so a data cycle can't hang the render.
+  for (let iteration = 0; iteration < problems.length + 1; iteration++) {
+    let changed = false;
+    problems.forEach((inactiveCandidate) => {
+      if (effectiveStatus(inactiveCandidate) === 'ACTIVE') return;
+      const children = problems
+        .filter(
+          (c) =>
+            c.id !== inactiveCandidate.id &&
+            effectiveStatus(c) === 'ACTIVE' &&
+            result[c.id] === inactiveCandidate.id,
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      if (children.length === 0) return;
+
+      const [heir, ...rest] = children;
+      const heirsNewParent = result[inactiveCandidate.id];
+      if (result[heir.id] !== heirsNewParent) {
+        result[heir.id] = heirsNewParent;
+        changed = true;
+      }
+      rest.forEach((sibling) => {
+        if (result[sibling.id] !== heir.id) {
+          result[sibling.id] = heir.id;
+          changed = true;
+        }
+      });
+    });
+    if (!changed) break;
+  }
+
+  return result;
 }
 
 export function isRecentlyUpdated(dateStr: string | null | undefined): boolean {

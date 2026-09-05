@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,14 +22,13 @@ import {
   useProblems,
   useCreateProblem,
   useUpdateProblem,
-  useDeleteProblem,
   useReorderProblems,
   useProblemLogs,
 } from '@/hooks/useProblems';
 import { useInitialNote } from '@/hooks/useInitialNote';
 import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { usePatient } from '@/hooks/usePatients';
-import { buildProblemTree, isDescendant, getCreatorName } from '@/lib/problem-utils';
+import { buildProblemTree, isDescendant, getCreatorName, applyStagedPromotions } from '@/lib/problem-utils';
 import { zoomModifier } from '@/lib/dnd-utils';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useAuthStore } from '@/stores/authStore';
@@ -82,8 +81,11 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const { data: logsData, isLoading: logsLoading } = useProblemLogs(patientId);
   const { data: patient } = usePatient(patientId);
   const createProblem = useCreateProblem(patientId);
+  // Status changes (Resolve/Reactivate/Remove) are now staged locally and
+  // applied through updateProblem only at Publish time — see
+  // handleStatusChange/handleConfirmDelete/handlePublish below. useDeleteProblem
+  // (a soft-delete DELETE) is no longer called from this screen.
   const updateProblem = useUpdateProblem(patientId);
-  const deleteProblem = useDeleteProblem(patientId);
   const reorderProblems = useReorderProblems(patientId);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -97,6 +99,11 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   const [draftParents, setDraftParents] = useState<Record<string, string | null> | null>(null);
   const [draftTitles, setDraftTitles] = useState<Record<string, string> | null>(null);
   const [draftDiagnosisDates, setDraftDiagnosisDates] = useState<Record<string, string | null> | null>(null);
+  // Staged status transitions (ACTIVE/RESOLVED/REMOVED) — Remove, the status
+  // dropdown, Reactivate, and drag-between-tables all write here instead of
+  // persisting immediately, so Revert (and the per-row Undo below) can undo
+  // them just like reorder/nesting/rename/date changes.
+  const [draftStatuses, setDraftStatuses] = useState<Record<string, ProblemStatusValue> | null>(null);
   const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
 
   // Acquires the edit lock (if not already held) before entering draft mode.
@@ -111,7 +118,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   };
 
   // Ref to always hold the latest draft values for cleanup functions (avoids stale closures)
-  const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null, draftTitles: Record<string, string> | null, draftDiagnosisDates: Record<string, string | null> | null }>({ isEditMode: false, draftOrder: null, draftParents: null, draftTitles: null, draftDiagnosisDates: null });
+  const draftRef = useRef<{ isEditMode: boolean; draftOrder: string[] | null, draftParents: Record<string, string | null> | null, draftTitles: Record<string, string> | null, draftDiagnosisDates: Record<string, string | null> | null, draftStatuses: Record<string, ProblemStatusValue> | null }>({ isEditMode: false, draftOrder: null, draftParents: null, draftTitles: null, draftDiagnosisDates: null, draftStatuses: null });
   // Ref to track which patient's draft has been restored (prevents double-restore)
   const lastRestoredPatientRef = useRef<string | null>(null);
 
@@ -119,10 +126,19 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   // Keep draftRef in sync so cleanup functions always see current values
   useEffect(() => {
-    draftRef.current = { isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates };
-  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates]);
+    draftRef.current = { isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates, draftStatuses };
+  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates, draftStatuses]);
 
   const problems = data?.data ?? [];
+
+  // A problem's status as it would appear if the current draft were
+  // published — the raw server status while not in edit mode, or the
+  // staged override once one exists. Stable across renders unless
+  // isEditMode/draftStatuses actually change.
+  const effectiveStatusOf = useCallback(
+    (p: Problem): ProblemStatusValue => (isEditMode ? (draftStatuses?.[p.id] ?? p.status) : p.status),
+    [isEditMode, draftStatuses],
+  );
 
   const lastPublishedEdit = useMemo(() => {
     if (problems.length === 0) return null;
@@ -159,28 +175,52 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     });
   }, [lastPublishedEdit]);
   
-  const activeProblems = useMemo(() => problems.filter(p => p.status === 'ACTIVE'), [problems]);
-  const resolvedProblems = useMemo(() => problems.filter(p => p.status === 'RESOLVED'), [problems]);
-  
+  // Preview of the master Problem List's server-side child-promotion rule
+  // (problems.service.ts "Business rule 5") against the *staged* statuses —
+  // pure and recomputed every render, so undoing a staged removal/resolve
+  // (deleting its entry from draftStatuses) automatically restores the
+  // original tree with no separate undo bookkeeping. Replaces the old
+  // mutation-based mirrorPromotionInDraft.
+  const effectiveParents = useMemo(
+    () =>
+      applyStagedPromotions(
+        problems,
+        effectiveStatusOf,
+        (p) => (isEditMode && draftParents && p.id in draftParents ? draftParents[p.id] : p.parentId),
+      ),
+    [problems, effectiveStatusOf, isEditMode, draftParents],
+  );
+
   const draftActiveProblems = useMemo(() => {
-    if (!isEditMode) return activeProblems;
-    return activeProblems.map(p => {
-      let overrides: Partial<Problem> = {};
-      if (draftParents && p.id in draftParents) {
-        overrides.parentId = draftParents[p.id];
-      }
-      if (draftTitles && p.id in draftTitles) {
-        overrides.title = draftTitles[p.id];
-      }
-      if (draftDiagnosisDates && p.id in draftDiagnosisDates) {
-        overrides.diagnosisDate = draftDiagnosisDates[p.id];
-      }
-      if (Object.keys(overrides).length > 0) {
-        return { ...p, ...overrides };
-      }
-      return p;
-    });
-  }, [activeProblems, isEditMode, draftParents, draftTitles, draftDiagnosisDates]);
+    return problems
+      .filter((p) => effectiveStatusOf(p) === 'ACTIVE')
+      .map((p) => {
+        const parentId = effectiveParents[p.id] ?? null;
+        const title = isEditMode && draftTitles && p.id in draftTitles ? draftTitles[p.id] : p.title;
+        const diagnosisDate =
+          isEditMode && draftDiagnosisDates && p.id in draftDiagnosisDates ? draftDiagnosisDates[p.id] : p.diagnosisDate;
+        return { ...p, status: 'ACTIVE' as const, parentId, title, diagnosisDate };
+      });
+  }, [problems, effectiveStatusOf, effectiveParents, isEditMode, draftTitles, draftDiagnosisDates]);
+
+  const draftResolvedProblems = useMemo(
+    () =>
+      problems
+        .filter((p) => effectiveStatusOf(p) === 'RESOLVED')
+        .map((p) => ({ ...p, status: 'RESOLVED' as const })),
+    [problems, effectiveStatusOf],
+  );
+
+  // Problems staged for removal this session (status change hasn't been
+  // published yet) — surfaced in a pending-removal strip with a per-row Undo
+  // so a mis-click doesn't require a full Revert to fix.
+  const pendingRemovals = useMemo(
+    () =>
+      isEditMode && draftStatuses
+        ? problems.filter((p) => draftStatuses[p.id] === 'REMOVED' && p.status !== 'REMOVED')
+        : [],
+    [isEditMode, draftStatuses, problems],
+  );
 
   const tree = useMemo(() => buildProblemTree(draftActiveProblems), [draftActiveProblems]);
 
@@ -218,23 +258,29 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftParents(null);
     setDraftTitles(null);
     setDraftDiagnosisDates(null);
+    setDraftStatuses(null);
     setLastAutoSaved(null);
     const saved = localStorage.getItem(`damayan_problem_draft_${patientId}`);
     if (!saved) return;
     try {
-      const parsed = JSON.parse(saved) as { order: string[]; parents?: Record<string, string | null>; titles?: Record<string, string>; diagnosisDates?: Record<string, string | null>; savedAt: string };
-      if (Array.isArray(parsed.order) && parsed.order.length > 0) {
-        setDraftOrder(parsed.order);
+      const parsed = JSON.parse(saved) as { order?: string[]; parents?: Record<string, string | null>; titles?: Record<string, string>; diagnosisDates?: Record<string, string | null>; statuses?: Record<string, ProblemStatusValue>; savedAt: string };
+      const hasOrder = Array.isArray(parsed.order) && parsed.order.length > 0;
+      const hasStatuses = !!parsed.statuses && Object.keys(parsed.statuses).length > 0;
+      // A draft consisting only of staged status changes (no reorder yet)
+      // still needs restoring — order is optional, unlike before.
+      if (hasOrder || hasStatuses) {
+        setDraftOrder(hasOrder ? parsed.order! : null);
         setDraftParents(parsed.parents || null);
         setDraftTitles(parsed.titles || null);
         setDraftDiagnosisDates(parsed.diagnosisDates || null);
+        setDraftStatuses(parsed.statuses || null);
         setIsEditMode(true);
         // Best-effort: a restored draft implies this side already held the
         // lock before reload (the persisted lock should already reflect
         // that), but re-acquiring here keeps it consistent even if the
         // store's rehydration raced this effect.
         tryAcquire();
-        toast.info('Restored your unsaved draft order. Publish or revert when ready.', { duration: 5000 });
+        toast.info('Restored your unsaved draft. Publish or revert when ready.', { duration: 5000 });
       }
     } catch {
       localStorage.removeItem(`damayan_problem_draft_${patientId}`);
@@ -243,25 +289,25 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   // Auto-save draft to localStorage every 10 seconds while in edit mode
   useEffect(() => {
-    if (!isEditMode || !draftOrder) return;
+    if (!isEditMode || (!draftOrder && !draftStatuses)) return;
     const interval = setInterval(() => {
       localStorage.setItem(
         `damayan_problem_draft_${patientId}`,
-        JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() })
+        JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, statuses: draftStatuses, savedAt: new Date().toISOString() })
       );
       setLastAutoSaved(new Date());
     }, 10000);
     return () => clearInterval(interval);
-  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates, patientId]);
+  }, [isEditMode, draftOrder, draftParents, draftTitles, draftDiagnosisDates, draftStatuses, patientId]);
 
   // Persist draft to localStorage on unmount (patient switch, tab close) and on page reload
   useEffect(() => {
     const persistDraft = () => {
-      const { isEditMode: editMode, draftOrder: order, draftParents: parents, draftTitles: titles, draftDiagnosisDates: diagnosisDates } = draftRef.current;
-      if (editMode && order) {
+      const { isEditMode: editMode, draftOrder: order, draftParents: parents, draftTitles: titles, draftDiagnosisDates: diagnosisDates, draftStatuses: statuses } = draftRef.current;
+      if (editMode && (order || statuses)) {
         localStorage.setItem(
           `damayan_problem_draft_${patientId}`,
-          JSON.stringify({ order, parents, titles, diagnosisDates, savedAt: new Date().toISOString() })
+          JSON.stringify({ order, parents, titles, diagnosisDates, statuses, savedAt: new Date().toISOString() })
         );
       }
     };
@@ -371,26 +417,40 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
   };
 
-  const handleStatusChange = async (p: Problem, status: ProblemStatusValue) => {
-    if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
-    if (isLockedByOther) {
-      tryAcquire(); // surfaces the "locked by a note" toast
-      return;
+  // Status changes (Resolve/Reactivate/Remove, plus drag-between-tables) are
+  // staged into draftStatuses instead of persisted immediately — same model
+  // as reorder/nesting/rename/date, so Revert (and the per-row Undo) can undo
+  // them. Applied to the server only in handlePublish's Phase A. The tree's
+  // child-promotion preview (effectiveParents, from applyStagedPromotions) is
+  // recomputed automatically from draftStatuses, so no separate mirroring
+  // step is needed here.
+  const handleStatusChange = (p: Problem, status: ProblemStatusValue) => {
+    if (!hasPublishedInitialNote || !ensureEditMode()) return;
+
+    if (!draftOrder) {
+      setDraftOrder(flatActiveProblems.map((x) => x.problem.id));
     }
-    try {
-      await updateProblem.mutateAsync({ id: p.id, status });
-      if (status === 'RESOLVED' || status === 'REMOVED') {
-        mirrorPromotionInDraft(p);
-      }
-      const messages: Record<ProblemStatusValue, string> = {
-        ACTIVE: `'${p.title}' has been reactivated.`,
-        RESOLVED: `'${p.title}' has been resolved.`,
-        REMOVED: `'${p.title}' has been removed.`,
-      };
-      toast.success(messages[status]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update status.');
-    }
+    setDraftStatuses((prev) => ({ ...prev, [p.id]: status }));
+
+    const messages: Record<ProblemStatusValue, string> = {
+      ACTIVE: `'${p.title}' marked active (Draft) — publish to share.`,
+      RESOLVED: `'${p.title}' marked resolved (Draft) — publish to share.`,
+      REMOVED: `'${p.title}' removed from the list (Draft) — publish to share.`,
+    };
+    toast.success(messages[status]);
+  };
+
+  // Un-stages a pending removal without a full Revert — deletes its entry
+  // from draftStatuses so the row falls back to its real server status and
+  // effectiveParents recomputes its original spot in the tree.
+  const handleUndoRemoval = (p: Problem) => {
+    setDraftStatuses((prev) => {
+      if (!prev || !(p.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[p.id];
+      return next;
+    });
+    toast.info(`'${p.title}' restored to the list (Draft).`);
   };
 
   const handleParentChange = (p: Problem, newParentId: string | null) => {
@@ -426,89 +486,32 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
   };
 
-  // Shared by delete (status -> REMOVED, item leaves the tree entirely) and
-  // resolve (status -> RESOLVED, item stays in the Resolved section but
-  // drops out of the *active* tree). Either way the server has already
-  // promoted the problem's first surviving child into its slot (see
-  // problems.service.ts "Business rule 5") and the refetch will carry that
-  // through — this just keeps the *unpublished* local draft (draftOrder/
-  // draftParents/draftTitles/draftDiagnosisDates) from disagreeing with it.
-  // Left unpruned, a stale draftParents entry could re-nest a promoted child
-  // back under the now-inactive problem on the next Publish.
-  const mirrorPromotionInDraft = (changedProblem: Problem) => {
-    if (!isEditMode) return;
-    const changedId = changedProblem.id;
-    const children = draftActiveProblems.filter(
-      (p) =>
-        p.id !== changedId &&
-        (draftParents && p.id in draftParents ? draftParents[p.id] : p.parentId) === changedId,
-    );
-    if (children.length === 0) return;
-    const changedParentId =
-      draftParents && changedId in draftParents ? draftParents[changedId] : changedProblem.parentId;
-
-    setDraftParents((prev) => {
-      const base = { ...(prev || {}) };
-      const [heir, ...rest] = children;
-      base[heir.id] = changedParentId;
-      rest.forEach((sibling) => {
-        base[sibling.id] = heir.id;
-      });
-      return base;
-    });
-  };
-
   const handleDelete = (p: Problem) => {
     if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     setProblemToDelete(p);
     setDeleteModalOpen(true);
   };
 
+  // Staged, not persisted — same as handleStatusChange. Remove is just a
+  // status change to REMOVED; the shared status/promotion machinery (draft
+  // ordering seed, effectiveParents preview) applies unchanged.
   const handleConfirmDelete = () => {
-    if (!problemToDelete || !hasPublishedInitialNote || !hasDraftNoteInProgress) return;
-    if (isLockedByOther) {
-      tryAcquire(); // surfaces the "locked by a note" toast
+    if (!problemToDelete || !hasPublishedInitialNote) return;
+    if (!ensureEditMode()) {
       setDeleteModalOpen(false);
       setProblemToDelete(null);
       return;
     }
+
     const deletedId = problemToDelete.id;
-    deleteProblem.mutate(deletedId, {
-      onSuccess: () => {
-        mirrorPromotionInDraft(problemToDelete);
+    if (!draftOrder) {
+      setDraftOrder(flatActiveProblems.map((x) => x.problem.id));
+    }
+    setDraftStatuses((prev) => ({ ...prev, [deletedId]: 'REMOVED' }));
 
-        if (isEditMode) {
-          // The deleted problem itself leaves the draft entirely (unlike
-          // resolve, which keeps it in the tree at its old slot/status).
-          setDraftOrder((prev) => (prev ? prev.filter((id) => id !== deletedId) : prev));
-          setDraftParents((prev) => {
-            if (!prev || !(deletedId in prev)) return prev;
-            const next = { ...prev };
-            delete next[deletedId];
-            return next;
-          });
-          setDraftTitles((prev) => {
-            if (!prev || !(deletedId in prev)) return prev;
-            const next = { ...prev };
-            delete next[deletedId];
-            return next;
-          });
-          setDraftDiagnosisDates((prev) => {
-            if (!prev || !(deletedId in prev)) return prev;
-            const next = { ...prev };
-            delete next[deletedId];
-            return next;
-          });
-        }
-
-        toast.success(`'${problemToDelete.title}' has been removed from the problem list.`);
-        setDeleteModalOpen(false);
-        setProblemToDelete(null);
-      },
-      onError: (err) => {
-        toast.error(err instanceof Error ? err.message : 'Failed to remove problem.');
-      },
-    });
+    toast.success(`'${problemToDelete.title}' removed from the problem list (Draft) — publish to share, or Revert/Undo to restore.`);
+    setDeleteModalOpen(false);
+    setProblemToDelete(null);
   };
 
   const handleReorder = (items: { id: string; sortOrder: number }[]) => {
@@ -522,29 +525,60 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftParents(null);
     setDraftTitles(null);
     setDraftDiagnosisDates(null);
+    setDraftStatuses(null);
     setLastAutoSaved(null);
     localStorage.removeItem(draftStorageKey);
     release();
-    toast.info('Changes reverted to original order and nesting.');
+    toast.info('All problem list changes reverted — order, nesting, titles, dates, statuses and removals.');
   };
 
   // Save Draft: persists to localStorage only — does NOT call the API
   // so other co-doctors never see unpublished edits
   const handleSaveDraft = () => {
-    if (!hasPublishedInitialNote || !hasDraftNoteInProgress || !draftOrder) return;
-    localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, savedAt: new Date().toISOString() }));
+    if (!hasPublishedInitialNote || !hasDraftNoteInProgress || (!draftOrder && !draftStatuses)) return;
+    localStorage.setItem(draftStorageKey, JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, statuses: draftStatuses, savedAt: new Date().toISOString() }));
     setLastAutoSaved(new Date());
     toast.success('Draft saved locally. Publish when ready to share with co-doctors.');
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
-    const items = displayFlatProblems.map((item, index) => ({ 
-      id: item.problem.id, 
+
+    // Phase A — apply staged status changes first. Each non-ACTIVE
+    // transition triggers the server's own child-promotion pass
+    // (problems.service.ts "Business rule 5"), so these must land before
+    // Phase B re-asserts final tree shape. Applied sequentially — concurrent
+    // calls would interleave against a tree that's shifting under them.
+    const statusEntries = Object.entries(draftStatuses || {}).filter(
+      ([id, status]) => problems.find((p) => p.id === id)?.status !== status,
+    );
+
+    let appliedCount = 0;
+    for (const [id, status] of statusEntries) {
+      try {
+        await updateProblem.mutateAsync({ id, status: status as ProblemStatusValue });
+        appliedCount++;
+      } catch (err) {
+        toast.error(
+          `Applied ${appliedCount} of ${statusEntries.length} status changes before failing: ${
+            err instanceof Error ? err.message : 'Failed to publish changes.'
+          }`,
+        );
+        return; // Stop — stay in edit mode, keep the remaining draft intact.
+      }
+    }
+
+    // Phase B — reorder + nesting + renames, now that the tree's shape is
+    // settled. parentId comes from effectiveParents (the same staged
+    // promotion preview shown on screen), making this call the final
+    // authority on tree shape and overwriting whatever promotion the server
+    // just applied in Phase A.
+    const items = displayFlatProblems.map((item, index) => ({
+      id: item.problem.id,
       sortOrder: index,
-      ...(draftParents && draftParents[item.problem.id] !== undefined ? { parentId: draftParents[item.problem.id] } : {}),
+      parentId: effectiveParents[item.problem.id] ?? null,
       ...(draftTitles && draftTitles[item.problem.id] !== undefined ? { title: draftTitles[item.problem.id] } : {}),
-      ...(draftDiagnosisDates && draftDiagnosisDates[item.problem.id] !== undefined ? { diagnosisDate: draftDiagnosisDates[item.problem.id] } : {})
+      ...(draftDiagnosisDates && draftDiagnosisDates[item.problem.id] !== undefined ? { diagnosisDate: draftDiagnosisDates[item.problem.id] } : {}),
     }));
     reorderProblems.mutate({ items }, {
       onSuccess: () => {
@@ -553,6 +587,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         setDraftParents(null);
         setDraftTitles(null);
         setDraftDiagnosisDates(null);
+        setDraftStatuses(null);
         setLastAutoSaved(null);
         localStorage.removeItem(draftStorageKey);
         release();
@@ -580,7 +615,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setActiveDragRect(active.rect.current.initial ?? null);
 
     if (activeData?.type === 'resolved') {
-      const p = resolvedProblems.find(x => x.id === active.id);
+      const p = draftResolvedProblems.find((x) => x.id === active.id);
       setActiveResolvedDragItem(p || null);
     } else {
       const activeItem = displayFlatProblems.find((p) => p.problem.id === active.id);
@@ -661,15 +696,15 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     // Dragging from Resolved
     if (activeData?.type === 'resolved') {
       if (over.id === 'active-table' || flatActiveProblems.some(p => p.problem.id === over.id)) {
-        const problem = resolvedProblems.find(p => p.id === active.id);
+        const problem = draftResolvedProblems.find((p) => p.id === active.id);
         if (problem) {
           handleStatusChange(problem, 'ACTIVE');
         }
       } else if (over.id !== 'resolved-table' && active.id !== over.id) {
-        const oldIndex = resolvedProblems.findIndex((p) => p.id === active.id);
-        const newIndex = resolvedProblems.findIndex((p) => p.id === over.id);
+        const oldIndex = draftResolvedProblems.findIndex((p) => p.id === active.id);
+        const newIndex = draftResolvedProblems.findIndex((p) => p.id === over.id);
         if (oldIndex !== -1 && newIndex !== -1) {
-          const reorderedList = arrayMove(resolvedProblems, oldIndex, newIndex);
+          const reorderedList = arrayMove(draftResolvedProblems, oldIndex, newIndex);
           handleReorder(reorderedList.map((item, index) => ({ id: item.id, sortOrder: index })));
         }
       }
@@ -677,7 +712,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     }
 
     // Dragging from Active to Resolved
-    if (over.id === 'resolved-table' || resolvedProblems.some(p => p.id === over.id)) {
+    if (over.id === 'resolved-table' || draftResolvedProblems.some(p => p.id === over.id)) {
       const activeProblem = flatActiveProblems.find(p => p.problem.id === active.id)?.problem;
       if (activeProblem) {
         handleStatusChange(activeProblem, 'RESOLVED');
@@ -733,7 +768,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
 
   if (isLoading || initialNoteLoading) return <ProblemListSkeleton />;
 
-  const isOverResolvedTableOrItem = currentOverId === 'resolved-table' || resolvedProblems.some(p => p.id === currentOverId);
+  const isOverResolvedTableOrItem = currentOverId === 'resolved-table' || draftResolvedProblems.some(p => p.id === currentOverId);
   const showResolvedDropOverlay = isOverResolvedTableOrItem && activeDragItem !== null;
 
   const isOverActiveTableOrItem = currentOverId === 'active-table' || displayFlatProblems.some(p => p.problem.id === currentOverId);
@@ -854,7 +889,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                   Master Problem List
                 </h3>
                 <span className="ch-badge badge-active text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-accent text-accent-hover bg-accent-light">
-                  {activeProblems.length} Active
+                  {draftActiveProblems.length} Active
                 </span>
               </div>
               
@@ -900,7 +935,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             isTableDragging={isTableDragging}
             activeDragItem={activeDragItem}
             dragOverState={dragOverState}
-            allOptions={activeProblems}
+            allOptions={draftActiveProblems}
             canManage={effectiveCanManage}
             hasInitialNote={hasPublishedInitialNote}
             isEditMode={isEditMode}
@@ -911,12 +946,14 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             onRevert={handleRevert}
             onSaveDraft={handleSaveDraft}
             onPublish={handlePublish}
-            isSaving={reorderProblems.isPending}
+            isSaving={reorderProblems.isPending || updateProblem.isPending}
             lastAutoSaved={lastAutoSaved}
             onEdit={handleEdit}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
             onParentChange={handleParentChange}
+            pendingRemovals={pendingRemovals}
+            onUndoRemoval={handleUndoRemoval}
           />
         </div>
 
@@ -948,7 +985,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                 Resolved Problems
               </h3>
               <span className="ch-badge badge-resolved text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-green-border text-green bg-green-bg">
-                {resolvedProblems.length} Resolved
+                {draftResolvedProblems.length} Resolved
               </span>
             </div>
 
@@ -963,7 +1000,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           </div>
 
           <ResolvedProblemTable
-            problems={resolvedProblems}
+            problems={draftResolvedProblems}
             canManage={effectiveCanManage}
             onReactivate={(p) => handleStatusChange(p, 'ACTIVE')}
             onDelete={handleDelete}
@@ -1006,7 +1043,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                 depth={activeDragItem.depth}
                 canManage={canManage}
                 isDragging={false}
-                allOptions={activeProblems}
+                allOptions={draftActiveProblems}
                 dragOverState={null}
                 onEdit={() => {}}
                 onStatusChange={() => {}}
@@ -1042,7 +1079,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         editing={editing}
-        allOptions={activeProblems}
+        allOptions={draftActiveProblems}
         onSave={handleSave}
         saving={createProblem.isPending || updateProblem.isPending}
       />
@@ -1055,8 +1092,8 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         }}
         onConfirm={handleConfirmDelete}
         title="Remove Problem"
-        message={`Are you sure you want to remove "${problemToDelete?.title}" from the problem list? This action cannot be undone.`}
-        isDeleting={deleteProblem.isPending}
+        message={`Remove "${problemToDelete?.title}" from the problem list? This is different from Resolve — a removed problem is taken off the list entirely instead of being kept in the Resolved section. The change is staged and is not shared with co-doctors until you Publish; Revert (or Undo) reverses it.`}
+        isDeleting={false}
       />
     </div>
   );

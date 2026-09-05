@@ -46,6 +46,11 @@ interface ActiveProblemTableProps {
   onStatusChange: (p: Problem, status: ProblemStatusValue) => void;
   onDelete: (p: Problem) => void;
   onParentChange: (p: Problem, newParentId: string | null) => void;
+  // Problems staged for removal this session but not yet published — shown
+  // in a strip below the table with a per-row Undo, so a mis-click doesn't
+  // require a full Revert to fix.
+  pendingRemovals?: Problem[];
+  onUndoRemoval?: (p: Problem) => void;
 }
 
 function getProblemDepth(problems: Problem[], problemId: string): number {
@@ -265,9 +270,10 @@ export function ActiveProblemRow({
             </button>
             <button
               onClick={onDelete}
+              title="Remove from list — different from Resolve; the problem is taken off the list entirely"
               className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer flex-shrink-0"
             >
-              Remove
+              Remove from list
             </button>
           </>
         )}
@@ -359,6 +365,8 @@ export function ActiveProblemTable({
   onStatusChange,
   onDelete,
   onParentChange,
+  pendingRemovals,
+  onUndoRemoval,
 }: ActiveProblemTableProps) {
   const ids = useMemo(() => flatProblems.map(item => item.problem.id), [flatProblems]);
 
@@ -404,7 +412,7 @@ export function ActiveProblemTable({
             </span>
             <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-amber-700">Editing Order</span>
             <span className="text-[10px] text-amber-600/80 hidden @md:inline">
-              — Changes are local and not yet visible to other doctors.
+              — Order, nesting, titles, dates, statuses and removals are staged locally and not yet visible to other doctors.
             </span>
             {lastAutoSaved && (
               <span className="text-[9px] text-amber-500/70 hidden @lg:inline flex-shrink-0">
@@ -484,6 +492,33 @@ export function ActiveProblemTable({
               </SortableContext>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Pending-removal strip — staged Remove clicks land here instead of
+          disappearing outright, so a mis-click can be undone per-row without
+          reaching for the full Revert. */}
+      {isEditMode && pendingRemovals && pendingRemovals.length > 0 && (
+        <div className="border-t border-red-border/40 bg-red-bg/30">
+          <div className="px-[14px] py-1.5 text-[9px] font-bold uppercase tracking-[0.6px] text-red/80">
+            Pending Removal (Draft) — not yet published
+          </div>
+          {pendingRemovals.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between gap-3 px-[14px] py-2 border-t border-red-border/30"
+            >
+              <span className="text-[12px] text-text-secondary line-through decoration-red/50 truncate min-w-0">
+                {p.title}
+              </span>
+              <button
+                onClick={() => onUndoRemoval?.(p)}
+                className="h-[22px] px-2.5 rounded text-[10px] font-semibold text-red border border-red-border hover:bg-red-bg transition-all duration-150 cursor-pointer flex-shrink-0"
+              >
+                ↺ Undo
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -121,9 +121,10 @@ export function ResolvedRow({
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              title="Remove from list — different from Resolve; the problem is taken off the list entirely"
               className="h-[22px] px-2 rounded text-[10px] font-semibold bg-red-bg text-red border border-red-border hover:bg-red-bg/80 transition-all duration-150 cursor-pointer flex-shrink-0"
             >
-              Remove
+              Remove from list
             </button>
           </>
         )}
