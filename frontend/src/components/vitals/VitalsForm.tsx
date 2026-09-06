@@ -171,25 +171,25 @@ export function VitalsFormModal({ open, onClose, patientId, editing, onSave, sav
           <div className="grid grid-cols-2 @max-[1023px]:grid-cols-1 gap-4">
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Date <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
+              {/* TEMPORARY: date unlocked for test-data cleanup — revert to disabled/readOnly when done. */}
               <input
                 type="date"
-                disabled
-                readOnly
-                title="Date is set automatically and cannot be edited"
-                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface-2 text-[13px] font-mono text-text-muted outline-none cursor-not-allowed"
+                disabled={saving}
+                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed"
                 value={measureDate}
+                onChange={(e) => setMeasureDate(e.target.value)}
               />
             </div>
 
             <div className="col-span-1">
               <label className="block text-[11px] font-bold uppercase tracking-[0.5px] text-text-secondary mb-1">Time <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span></label>
+              {/* TEMPORARY: time unlocked for test-data cleanup — revert to disabled/readOnly when done. */}
               <input
                 type="time"
-                disabled
-                readOnly
-                title="Time is set automatically and cannot be edited"
-                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface-2 text-[13px] font-mono text-text-muted outline-none cursor-not-allowed"
+                disabled={saving}
+                className="w-full h-[34px] px-2 border border-border rounded-[6px] bg-surface text-[13px] font-mono text-text-primary outline-none focus:border-accent focus:shadow-accent-focus disabled:bg-surface-2 disabled:text-text-muted disabled:cursor-not-allowed"
                 value={measureTime}
+                onChange={(e) => setMeasureTime(e.target.value)}
               />
             </div>
 
