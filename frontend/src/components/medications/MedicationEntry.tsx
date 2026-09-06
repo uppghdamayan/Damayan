@@ -3,8 +3,8 @@
 import { cn } from '@/lib/utils';
 import type { Medication } from '@/types/medication';
 
-export const MED_COLUMN_LAYOUT = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 160px 160px';
-export const MED_COLUMN_LAYOUT_DISCONTINUES = '1.8fr 1.2fr 1.2fr 1.2fr 0.8fr 160px';
+export const MED_COLUMN_LAYOUT = 'minmax(140px, 1.8fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(120px, 1.2fr) 0.8fr 160px 160px';
+export const MED_COLUMN_LAYOUT_DISCONTINUES = 'minmax(140px, 1.8fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(120px, 1.2fr) 0.8fr 160px';
 
 interface MedicationEntryProps {
   medication: Medication;
@@ -71,13 +71,13 @@ export function MedicationEntry({
   return (
     <div 
       className={cn(
-        'relative grid items-center gap-4 pl-[14px] pr-[28px] py-2.5 bg-surface transition-all duration-150 animate-row-entry after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[""] last:after:hidden hover:bg-surface-2/50',
+        'relative grid items-start gap-4 pl-[14px] pr-[28px] py-2.5 bg-surface transition-all duration-150 animate-row-entry after:absolute after:bottom-0 after:left-[14px] after:right-[14px] after:border-b after:border-border/80 after:content-[""] last:after:hidden hover:bg-surface-2/50',
         isOptimistic && 'opacity-50 pointer-events-none'
       )}
       style={{ gridTemplateColumns: hideStatus ? MED_COLUMN_LAYOUT_DISCONTINUES : MED_COLUMN_LAYOUT }}
     >
-      <div className={cn("text-[13px] font-bold truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-primary" : "text-text-muted line-through")}>
-        <span className={cn("truncate", getHighlightClass('name'))}>{medication.name}</span>
+      <div className={cn("text-[13px] font-bold break-words pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-primary" : "text-text-muted line-through")}>
+        <span className={cn("break-words", getHighlightClass('name'))}>{medication.name}</span>
         {isOptimistic && (
           <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0 ml-1.5" />
         )}
@@ -106,16 +106,16 @@ export function MedicationEntry({
         ) : null}
       </div>
 
-      <div className={cn("text-[12px] font-medium truncate pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        <span className={cn("truncate", getHighlightClass('formulation'))}>{medication.formulation || '-'}</span>
+      <div className={cn("text-[12px] font-medium break-words pr-2 flex items-center flex-wrap min-w-0", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
+        <span className={cn("break-words", getHighlightClass('formulation'))}>{medication.formulation || '-'}</span>
       </div>
 
       <div className={cn("text-[12px] font-mono flex items-center flex-wrap min-w-0", medication.isActive ? "text-accent font-semibold" : "text-text-muted")}>
         <span className={getHighlightClass('dose')}>{medication.dose}</span>
       </div>
 
-      <div className={cn("text-[12px] truncate pr-2 flex items-center flex-wrap min-w-0 gap-1.5", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
-        <span className={cn("truncate", getHighlightClass('instructions'))}>{medication.instructions || '-'}</span>
+      <div className={cn("text-[12px] break-words pr-2 flex items-center flex-wrap min-w-0 gap-1.5", medication.isActive ? "text-text-secondary" : "text-text-muted")}>
+        <span className={cn("break-words", getHighlightClass('instructions'))}>{medication.instructions || '-'}</span>
         {medication.isActive && (draftChangedFields?.includes('instructions') || recentlyPublishedFields?.includes('instructions')) && (
           <span className={cn(
             "px-1.5 py-0.5 rounded border inline-flex items-center text-[9px] font-bold uppercase tracking-[0.5px] shrink-0",

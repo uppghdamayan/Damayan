@@ -113,13 +113,13 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
                   isOptimistic && "opacity-50 pointer-events-none"
                 )}
               >
-                <div className="text-[12px] text-text-primary font-medium truncate pr-2 flex items-center gap-1.5">
+                <div className="text-[12px] text-text-primary font-medium break-words pr-2 flex items-center gap-1.5">
                   {m.name}
                   {isOptimistic && <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0" />}
                 </div>
-                <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
-                <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
-                <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>
+                <div className="text-[11px] text-text-secondary break-words pr-2">{m.formulation || '—'}</div>
+                <div className="font-mono text-[11px] text-accent font-medium break-words pr-2">{m.dose}</div>
+                <div className="text-[11px] text-text-muted break-words">{m.instructions || '—'}</div>
               </div>
             );
           })}
@@ -143,13 +143,13 @@ export function MedicationListCard({ patientId }: { patientId: string }) {
                         isOptimistic && "opacity-50 pointer-events-none"
                       )}
                     >
-                      <div className="text-[12px] text-text-primary font-medium truncate pr-2 flex items-center gap-1.5">
+                      <div className="text-[12px] text-text-primary font-medium break-words pr-2 flex items-center gap-1.5">
                         {m.name}
                         {isOptimistic && <div className="h-3 w-3 rounded-full border-2 border-accent border-r-transparent animate-spin flex-shrink-0" />}
                       </div>
-                      <div className="text-[11px] text-text-secondary truncate pr-2">{m.formulation || '—'}</div>
-                      <div className="font-mono text-[11px] text-accent font-medium whitespace-nowrap truncate pr-2">{m.dose}</div>
-                      <div className="text-[11px] text-text-muted truncate">{m.instructions || '—'}</div>
+                      <div className="text-[11px] text-text-secondary break-words pr-2">{m.formulation || '—'}</div>
+                      <div className="font-mono text-[11px] text-accent font-medium break-words pr-2">{m.dose}</div>
+                      <div className="text-[11px] text-text-muted break-words">{m.instructions || '—'}</div>
                     </div>
                   );
                 })}

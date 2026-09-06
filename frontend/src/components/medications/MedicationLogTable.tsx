@@ -297,7 +297,7 @@ export function MedicationLogTable({ logs, isLoading }: MedicationLogTableProps)
                   </span>
                 </div>
                 
-                <div className="text-[13px] font-medium text-text-secondary truncate">
+                <div className="text-[13px] font-medium text-text-secondary break-words">
                   {log.editor.role === 'DOCTOR' ? `Dr. ${log.editor.lastName}` : log.editor.role === 'NURSE' ? `Nurse ${log.editor.lastName}` : `${log.editor.firstName} ${log.editor.lastName}`}
                 </div>
                 
