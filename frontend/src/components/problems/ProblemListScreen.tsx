@@ -890,7 +890,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             <LockedOverlay
               toastId="problem-list-locked"
               message={
-                !hasPublishedInitialNote
+                initialNote && initialNote.status === 'DRAFT'
+                  ? 'Showing problems from the open Initial Note draft — edit them there. Publish the note to unlock this list.'
+                  : !hasPublishedInitialNote
                   ? 'Read only — publish an Initial Note before editing the problem list.'
                   : 'Editing locked — start or open a note draft to edit the problem list.'
               }
@@ -998,7 +1000,9 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             <LockedOverlay
               toastId="problem-list-locked"
               message={
-                !hasPublishedInitialNote
+                initialNote && initialNote.status === 'DRAFT'
+                  ? 'Showing problems from the open Initial Note draft — edit them there. Publish the note to unlock this list.'
+                  : !hasPublishedInitialNote
                   ? 'Read only — publish an Initial Note before editing the problem list.'
                   : 'Editing locked — start or open a note draft to edit the problem list.'
               }

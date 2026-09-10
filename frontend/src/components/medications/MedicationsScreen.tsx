@@ -33,11 +33,33 @@ type PendingMedicationCreate = Omit<
   tempId: string;
 };
 
+// Field edits (name/dose/formulation/instructions/quantity) and status
+// changes (Active/Inactive) are staged in two separate buckets rather than
+// one merged `updates` map — keeping them apart means a dose edit can never
+// pick up a stale `isActive: false` left behind by an earlier Deactivate
+// click (or a previous session's persisted draft) and get swept into the
+// Discontinued table on save. See handleSave / handleStatusChange below.
+type MedicationFieldEdit = Omit<Partial<Medication>, 'isActive'>;
+
 type PendingChanges = {
   creates: PendingMedicationCreate[];
-  updates: Record<string, Partial<Medication>>;
+  updates: Record<string, MedicationFieldEdit>;
+  statusChanges: Record<string, boolean>;
   deletes: string[];
 };
+
+const MEDICATION_FIELD_KEYS = ['name', 'dose', 'formulation', 'instructions', 'quantity'] as const;
+
+/** Keeps only the known field-edit keys — strips any stale `isActive` (or
+ * other unknown key) a legacy persisted draft might still be carrying. */
+function sanitizeFieldEdit(raw: any): MedicationFieldEdit {
+  const clean: MedicationFieldEdit = {};
+  if (!raw || typeof raw !== 'object') return clean;
+  for (const key of MEDICATION_FIELD_KEYS) {
+    if (raw[key] !== undefined) (clean as any)[key] = raw[key];
+  }
+  return clean;
+}
 
 export function MedicationsScreen({ patientId }: { patientId: string }) {
   const router = useRouter();
@@ -83,7 +105,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   const [medicationToDelete, setMedicationToDelete] = useState<Medication | null>(null);
 
   // Draft state
-  const [pendingChanges, setPendingChanges] = useState<PendingChanges>({ creates: [], updates: {}, deletes: [] });
+  const [pendingChanges, setPendingChanges] = useState<PendingChanges>({ creates: [], updates: {}, statusChanges: {}, deletes: [] });
   const [isPublishing, setIsPublishing] = useState(false);
   const [lastAutoSaved, setLastAutoSaved] = useState<Date | null>(null);
   const [recentlyPublished, setRecentlyPublished] = useState<Record<string, string[]>>({});
@@ -105,9 +127,14 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           isActive: c.isActive ?? true,
           tempId: c.tempId || c.id || `temp-${Math.random().toString(36).slice(2, 9)}`,
         }));
+        const updates: Record<string, MedicationFieldEdit> = {};
+        for (const [id, raw] of Object.entries(parsed.updates || {})) {
+          updates[id] = sanitizeFieldEdit(raw);
+        }
         setPendingChanges({
           creates,
-          updates: parsed.updates || {},
+          updates,
+          statusChanges: parsed.statusChanges || {},
           deletes: parsed.deletes || [],
         });
         setLastAutoSaved(new Date());
@@ -127,7 +154,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     }
   }, [patientId, draftStorageKey, publishedStorageKey]);
 
-  const isEditMode = pendingChanges.creates.length > 0 || Object.keys(pendingChanges.updates).length > 0 || pendingChanges.deletes.length > 0;
+  const isEditMode = pendingChanges.creates.length > 0 || Object.keys(pendingChanges.updates).length > 0 || Object.keys(pendingChanges.statusChanges).length > 0 || pendingChanges.deletes.length > 0;
 
   useEffect(() => {
     if (isEditMode) {
@@ -153,8 +180,14 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     let list = [...rawData];
     list = list.filter((m) => !pendingChanges.deletes.includes(m.id));
     list = list.map((m) => {
-      if (pendingChanges.updates[m.id]) {
-        return { ...m, ...pendingChanges.updates[m.id] } as Medication;
+      if (pendingChanges.updates[m.id] || m.id in pendingChanges.statusChanges) {
+        return {
+          ...m,
+          ...pendingChanges.updates[m.id],
+          ...(m.id in pendingChanges.statusChanges
+            ? { isActive: pendingChanges.statusChanges[m.id] }
+            : {}),
+        } as Medication;
       }
       return m;
     });
@@ -297,7 +330,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     } else {
       setPendingChanges(prev => ({
         ...prev,
-        updates: { ...prev.updates, [m.id]: { ...prev.updates[m.id], isActive } },
+        statusChanges: { ...prev.statusChanges, [m.id]: isActive },
       }));
     }
   };
@@ -330,9 +363,12 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       setPendingChanges(prev => {
         const nextUpdates = { ...prev.updates };
         delete nextUpdates[targetId];
+        const nextStatusChanges = { ...prev.statusChanges };
+        delete nextStatusChanges[targetId];
         return {
           ...prev,
           updates: nextUpdates,
+          statusChanges: nextStatusChanges,
           deletes: prev.deletes.includes(targetId) ? prev.deletes : [...prev.deletes, targetId],
         };
       });
@@ -342,7 +378,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
   };
 
   const handleRevert = () => {
-    setPendingChanges({ creates: [], updates: {}, deletes: [] });
+    setPendingChanges({ creates: [], updates: {}, statusChanges: {}, deletes: [] });
     setLastAutoSaved(null);
     localStorage.removeItem(draftStorageKey);
     release();
@@ -360,8 +396,25 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
     if (!hasPublishedInitialNote || !hasDraftNoteInProgress) return;
     setIsPublishing(true);
     try {
+      // Field edits and status changes are staged in separate buckets (see
+      // PendingChanges) but publish as one PATCH per medication — merge them
+      // back together here, keyed by id.
+      const mergedUpdateIds = new Set([
+        ...Object.keys(pendingChanges.updates),
+        ...Object.keys(pendingChanges.statusChanges),
+      ]);
+      const mergedUpdates: Record<string, Partial<Medication>> = {};
+      for (const id of mergedUpdateIds) {
+        mergedUpdates[id] = {
+          ...pendingChanges.updates[id],
+          ...(id in pendingChanges.statusChanges
+            ? { isActive: pendingChanges.statusChanges[id] }
+            : {}),
+        };
+      }
+
       const publishedChanges: Record<string, string[]> = {};
-      for (const [id, updates] of Object.entries(pendingChanges.updates)) {
+      for (const [id, updates] of Object.entries(mergedUpdates)) {
         if (pendingChanges.deletes.includes(id)) continue;
         const original = rawData.find((r) => r.id === id);
         if (original) {
@@ -372,7 +425,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           if (updates.instructions !== undefined && updates.instructions !== original.instructions) fields.push('instructions');
           if (updates.quantity !== undefined && updates.quantity !== original.quantity) fields.push('quantity');
           if (updates.isActive !== undefined && updates.isActive !== original.isActive) fields.push('isActive');
-          
+
           if (fields.length > 0) {
             publishedChanges[id] = fields;
           }
@@ -385,7 +438,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       }
 
       // 2. Process updates for non-deleted items
-      for (const [id, updates] of Object.entries(pendingChanges.updates)) {
+      for (const [id, updates] of Object.entries(mergedUpdates)) {
         if (pendingChanges.deletes.includes(id)) continue;
         await updateMedication.mutateAsync({ id, ...updates });
       }
@@ -407,7 +460,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
         }
       }
 
-      setPendingChanges({ creates: [], updates: {}, deletes: [] });
+      setPendingChanges({ creates: [], updates: {}, statusChanges: {}, deletes: [] });
       setLastAutoSaved(null);
       localStorage.removeItem(draftStorageKey);
       release();
@@ -431,15 +484,16 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       return ['_isNew'];
     }
     const updates = pendingChanges.updates[m.id];
+    const statusChange = pendingChanges.statusChanges[m.id];
     const original = rawData.find((r) => r.id === m.id);
-    if (updates && original) {
+    if ((updates || statusChange !== undefined) && original) {
       const fields: string[] = [];
-      if (updates.name !== undefined && updates.name !== original.name) fields.push('name');
-      if (updates.formulation !== undefined && updates.formulation !== original.formulation) fields.push('formulation');
-      if (updates.dose !== undefined && updates.dose !== original.dose) fields.push('dose');
-      if (updates.instructions !== undefined && updates.instructions !== original.instructions) fields.push('instructions');
-      if (updates.quantity !== undefined && updates.quantity !== original.quantity) fields.push('quantity');
-      if (updates.isActive !== undefined && updates.isActive !== original.isActive) fields.push('isActive');
+      if (updates?.name !== undefined && updates.name !== original.name) fields.push('name');
+      if (updates?.formulation !== undefined && updates.formulation !== original.formulation) fields.push('formulation');
+      if (updates?.dose !== undefined && updates.dose !== original.dose) fields.push('dose');
+      if (updates?.instructions !== undefined && updates.instructions !== original.instructions) fields.push('instructions');
+      if (updates?.quantity !== undefined && updates.quantity !== original.quantity) fields.push('quantity');
+      if (statusChange !== undefined && statusChange !== original.isActive) fields.push('isActive');
       return fields;
     }
     return undefined;
@@ -541,7 +595,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           <LockedOverlay
             toastId="medication-list-locked"
             message={
-              !hasPublishedInitialNote
+              initialNote && initialNote.status === 'DRAFT'
+                ? 'Showing medications from the open Initial Note draft — edit them there. Publish the note to unlock this list.'
+                : !hasPublishedInitialNote
                 ? 'Read only — publish an Initial Note before editing the medication list.'
                 : 'Editing locked — start or open a note draft to edit the medication list.'
             }
@@ -700,7 +756,9 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           <LockedOverlay
             toastId="medication-list-locked"
             message={
-              !hasPublishedInitialNote
+              initialNote && initialNote.status === 'DRAFT'
+                ? 'Showing medications from the open Initial Note draft — edit them there. Publish the note to unlock this list.'
+                : !hasPublishedInitialNote
                 ? 'Read only — publish an Initial Note before editing the medication list.'
                 : 'Editing locked — start or open a note draft to edit the medication list.'
             }

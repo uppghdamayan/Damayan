@@ -477,6 +477,10 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
   it('reverts problems to previous note snapshot when a draft is deleted', async () => {
     const mockProblemsService = {
       upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+      removeIntroducedAndRerootOrphans: jest.fn(),
+    };
+    const mockMedicationsService = {
+      upsertFromNoteMedications: jest.fn(),
     };
     const mockProgressNoteFindFirst = jest.fn().mockResolvedValue(null);
     const mockInitialNoteFindFirst = jest.fn().mockResolvedValue({
@@ -520,7 +524,7 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
       mockPrisma as any,
       {} as any,
       mockProblemsService as any,
-      {} as any,
+      mockMedicationsService as any,
       {} as any,
       {} as any,
       {} as any,
@@ -540,5 +544,236 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
     expect(mockPrisma.progressNote.delete).toHaveBeenCalledWith({
       where: { id: 'draft-1' },
     });
+  });
+
+  it('syncs medications to master on a DRAFT update, with deactivateMissing:false', async () => {
+    const mockProblemsService = {
+      upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+    };
+    const mockMedicationsService = {
+      upsertFromNoteMedications: jest.fn().mockResolvedValue(undefined),
+      findActiveForPatient: jest.fn().mockResolvedValue([]),
+    };
+    const mockPrisma = {
+      progressNote: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'progress-1',
+          status: 'DRAFT',
+          medicationSnapshot: [],
+          visit: { patientId: 'patient-1' },
+          author: { role: 'DOCTOR' },
+        }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'progress-1', ...data }),
+          ),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      {} as any,
+      mockProblemsService as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.update(
+      'progress-1',
+      {
+        // isNew:true — reconcileMedicationSnapshot only keeps a non-isNew
+        // entry when it matches a currently-active medication (there are
+        // none here), so a freshly-added-in-note item must carry it to
+        // survive reconciliation and reach the sync call below.
+        medicationSnapshot: [
+          { name: 'Losartan', dose: '50 mg', isNew: true },
+        ] as any,
+      },
+      'user-1',
+    );
+
+    expect(mockMedicationsService.upsertFromNoteMedications).toHaveBeenCalledWith(
+      'patient-1',
+      expect.arrayContaining([expect.objectContaining({ name: 'Losartan' })]),
+      'user-1',
+      'Progress Note',
+      mockPrisma,
+      { deactivateMissing: false },
+    );
+    // Problems weren't part of this save — left untouched.
+    expect(mockProblemsService.upsertFromAssessment).not.toHaveBeenCalled();
+  });
+
+  it('discontinues an explicitly-removed medication on DRAFT update, bypassing deactivateMissing:false', async () => {
+    const mockProblemsService = {
+      upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+    };
+    const mockMedicationsService = {
+      upsertFromNoteMedications: jest.fn().mockResolvedValue(undefined),
+      discontinueNamed: jest.fn().mockResolvedValue(undefined),
+      findActiveForPatient: jest.fn().mockResolvedValue([]),
+    };
+    const mockPrisma = {
+      progressNote: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'progress-1',
+          status: 'DRAFT',
+          medicationSnapshot: [],
+          visit: { patientId: 'patient-1' },
+          author: { role: 'DOCTOR' },
+        }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'progress-1', ...data }),
+          ),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      {} as any,
+      mockProblemsService as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.update(
+      'progress-1',
+      {
+        medicationSnapshot: [] as any,
+        removedMedicationNames: ['Amlodipine'],
+      } as any,
+      'user-1',
+    );
+
+    expect(mockMedicationsService.discontinueNamed).toHaveBeenCalledWith(
+      'patient-1',
+      ['Amlodipine'],
+      'user-1',
+      'Progress Note',
+      mockPrisma,
+    );
+  });
+
+  it('a nurse-authored draft never syncs problems or medications to master', async () => {
+    const mockProblemsService = {
+      upsertFromAssessment: jest.fn(),
+    };
+    const mockMedicationsService = {
+      upsertFromNoteMedications: jest.fn(),
+      findActiveForPatient: jest.fn().mockResolvedValue([]),
+    };
+    const mockPrisma = {
+      progressNote: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'progress-1',
+          status: 'DRAFT',
+          medicationSnapshot: [],
+          visit: { patientId: 'patient-1' },
+          author: { role: 'NURSE' },
+        }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'progress-1', ...data }),
+          ),
+      },
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      {} as any,
+      mockProblemsService as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.update(
+      'progress-1',
+      {
+        problemListSnapshot: [{ title: 'New problem' }] as any,
+        medicationSnapshot: [{ name: 'Losartan', dose: '50 mg' }] as any,
+      },
+      'user-1',
+    );
+
+    expect(mockProblemsService.upsertFromAssessment).not.toHaveBeenCalled();
+    expect(mockMedicationsService.upsertFromNoteMedications).not.toHaveBeenCalled();
+  });
+
+  it('reverts medications introduced by a deleted DRAFT to the previous baseline', async () => {
+    const mockProblemsService = {
+      upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+      removeIntroducedAndRerootOrphans: jest.fn(),
+    };
+    const mockMedicationsService = {
+      upsertFromNoteMedications: jest.fn(),
+    };
+    const mockPrisma = {
+      progressNote: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'draft-1',
+          authorId: 'user-1',
+          status: 'DRAFT',
+          visitId: 'visit-1',
+          visit: { patientId: 'patient-1' },
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        delete: jest.fn().mockResolvedValue({ id: 'draft-1' }),
+      },
+      initialNote: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'initial-1',
+          mgmtNonpharm: '',
+          mgmtPharm: '',
+          diagnostics: [],
+          createdAt: new Date(),
+          visit: { visitDatetime: new Date() },
+        }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'initial-1',
+          assessment: [],
+          medicationSnapshot: [{ name: 'Losartan', dose: '50 mg' }],
+        }),
+      },
+      visit: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        delete: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+      },
+      $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
+    };
+
+    const service = new ProgressNotesService(
+      mockPrisma as any,
+      {} as any,
+      mockProblemsService as any,
+      mockMedicationsService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.deleteDraft('patient-1', 'draft-1', 'user-1');
+
+    // Reverts to the previous baseline (the Initial Note's medications),
+    // with the default deactivateMissing (true) — unlike draft-save sync,
+    // a delete-revert must discontinue what the deleted draft introduced.
+    expect(mockMedicationsService.upsertFromNoteMedications).toHaveBeenCalledWith(
+      'patient-1',
+      expect.arrayContaining([expect.objectContaining({ name: 'Losartan' })]),
+      'user-1',
+      'Progress Note',
+      mockPrisma,
+    );
   });
 });

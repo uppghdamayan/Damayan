@@ -79,12 +79,15 @@ export function normalizeMedText(s: string): string {
  *     50mg PM) — the unchanged one is claimed here, before dose-change
  *     matching ever runs, so it can't be mistaken for the changed one.
  *  2. Same-name dose change: for each normalized name still unresolved after
- *     pass 1, claim the single remaining active row for that name ONLY when
- *     there is exactly one unresolved item and exactly one unclaimed active
- *     row for that name. Any other cardinality (two items, one row; one
- *     item, two rows; etc.) is ambiguous and is left to pass 3, which
- *     discontinues the old row(s) and creates new one(s) instead of risking
- *     a mis-pairing.
+ *     pass 1, claim the remaining active row(s) for that name when the
+ *     counts line up — one unresolved item to one unclaimed active row, or
+ *     N items to N rows (paired positionally: both lists are already in a
+ *     deterministic order — the note's own array order for items, active-
+ *     first/oldest-first for `existing` — so e.g. two items and two rows for
+ *     "Metoprolol" pair 1st-with-1st, 2nd-with-2nd rather than guessing).
+ *     Any other cardinality (two items, one row; one item, two rows; etc.)
+ *     is ambiguous and is left to pass 3, which discontinues the old row(s)
+ *     and creates new one(s) instead of risking a mis-pairing.
  *  3. Everything still unresolved is a create (brand-new medication, or the
  *     ambiguous case above).
  *
@@ -158,9 +161,14 @@ export function resolveMedicationMatches(
         !claimedIds.has(m.id) &&
         normalizeMedText(m.name) === name,
     );
-    if (indices.length === 1 && candidates.length === 1) {
-      doseChange.set(indices[0], candidates[0].id);
-      claimedIds.add(candidates[0].id);
+    if (indices.length > 0 && indices.length === candidates.length) {
+      // Positional pairing — both arrays are already deterministically
+      // ordered (see the function doc comment), so 1:1 counts is enough to
+      // pair confidently even when N > 1.
+      for (let i = 0; i < indices.length; i++) {
+        doseChange.set(indices[i], candidates[i].id);
+        claimedIds.add(candidates[i].id);
+      }
     }
   }
 

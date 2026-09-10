@@ -25,6 +25,10 @@ export interface ProgressNote {
   diagnostics?: string[];
   problemListSnapshot?: any[];
   medicationSnapshot?: any[];
+  // Request-only: names explicitly removed from medicationSnapshot via the
+  // note's trash icon (see ProgressNoteForm's removedMedNamesRef). Never
+  // present on a note the API returns.
+  removedMedicationNames?: string[];
   status: 'DRAFT' | 'PUBLISHED';
   lastEditedBy?: string;
   lastEditedAt?: string;
@@ -141,6 +145,11 @@ export function useCreateProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      // Draft create/update now syncs medications into the master list too
+      // (see ProgressNotesService#syncFromSnapshots) — without this the
+      // Medications module keeps serving its stale cached list.
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medication-logs', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
       clearProgressDrafts(patientId);
@@ -197,6 +206,11 @@ export function useUpdateProgressNote(patientId: string) {
       queryClient.setQueryData(['progress-note', data.id], data);
       queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
       queryClient.invalidateQueries({ queryKey: ['problem-logs', patientId] });
+      // Draft saves now sync medications into the master list too (see
+      // ProgressNotesService#syncFromSnapshots) — without this the
+      // Medications module keeps serving its stale cached list.
+      queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['medication-logs', patientId] });
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },

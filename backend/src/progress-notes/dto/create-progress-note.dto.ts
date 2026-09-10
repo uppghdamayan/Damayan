@@ -162,4 +162,19 @@ export class CreateProgressNoteDto {
   @Type(() => MedicationItemDto)
   @IsOptional()
   medicationSnapshot?: MedicationItemDto[];
+
+  // Names (lowercased client-side, see ProgressNoteForm's removedMedNamesRef)
+  // of medications the clinician explicitly removed from this note's list via
+  // its trash icon — distinct from a medication simply absent from
+  // `medicationSnapshot`, which can happen for reasons that must NOT
+  // discontinue anything (a mid-edit draft that hasn't picked up a
+  // concurrently-added master-list medication yet, an editor rendering only
+  // Prescribed while Past meds live elsewhere, etc. — see
+  // upsertFromNoteMedications' `deactivateMissing` option). Only names listed
+  // here are discontinued on a DRAFT save; everything else is left alone
+  // until publish.
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  removedMedicationNames?: string[];
 }

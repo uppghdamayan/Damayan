@@ -80,6 +80,11 @@ describe('InitialNotesService — logs and version history', () => {
       },
       problem: { updateMany: jest.fn() },
       medication: { updateMany: jest.fn() },
+      problemLog: { findMany: jest.fn().mockResolvedValue([]) },
+      medicationLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+      },
     };
 
     prisma = {
@@ -108,6 +113,7 @@ describe('InitialNotesService — logs and version history', () => {
           useValue: {
             findActiveForPatient: jest.fn().mockResolvedValue([]),
             upsertFromAssessment: jest.fn().mockResolvedValue(new Map()),
+            removeIntroducedAndRerootOrphans: jest.fn(),
           },
         },
         {
@@ -410,6 +416,73 @@ describe('InitialNotesService — logs and version history', () => {
       );
       expect(logData.versionId).toBeNull();
     });
+
+    it('syncs the assessment and medication snapshot into the master lists and heals tempIds', async () => {
+      const problemsService = (service as any).problemsService;
+      const medicationsService = (service as any).medicationsService;
+      const draftAssessment = [{ title: 'Migraine', tempId: 'temp-1' }];
+      const draftMeds = [{ name: 'Sumatriptan', dose: '50mg', source: 'prescribed' }];
+      prisma.initialNote.findUnique.mockResolvedValue(
+        makeNote({ status: 'DRAFT', assessment: [], medicationSnapshot: [] }),
+      );
+      tx.initialNote.update.mockResolvedValueOnce(
+        makeNote({
+          status: 'DRAFT',
+          assessment: draftAssessment,
+          medicationSnapshot: draftMeds,
+        }),
+      );
+      const resolved = new Map([['temp-1', 'problem-real-1']]);
+      (problemsService.upsertFromAssessment as jest.Mock).mockResolvedValueOnce(
+        resolved,
+      );
+
+      await service.update(
+        PATIENT_ID,
+        NOTE_ID,
+        { assessment: draftAssessment as any, medicationSnapshot: draftMeds as any },
+        USER_ID,
+      );
+
+      expect(problemsService.upsertFromAssessment).toHaveBeenCalledWith(
+        PATIENT_ID,
+        expect.arrayContaining([expect.objectContaining({ tempId: 'temp-1' })]),
+        USER_ID,
+        'Initial Note',
+        tx,
+        { resolveMissing: false },
+      );
+      expect(medicationsService.upsertFromNoteMedications).toHaveBeenCalledWith(
+        PATIENT_ID,
+        expect.arrayContaining([expect.objectContaining({ name: 'Sumatriptan' })]),
+        USER_ID,
+        'Initial Note',
+        tx,
+        { deactivateMissing: false },
+      );
+      // Second tx.initialNote.update call persists the healed assessment.
+      const healedCall = tx.initialNote.update.mock.calls[1][0];
+      expect(healedCall.data.assessment[0]).toMatchObject({
+        id: 'problem-real-1',
+      });
+      expect(healedCall.data.assessment[0].tempId).toBeUndefined();
+    });
+
+    it('does not sync when neither assessment nor medicationSnapshot is part of the save', async () => {
+      const problemsService = (service as any).problemsService;
+      const medicationsService = (service as any).medicationsService;
+      prisma.initialNote.findUnique.mockResolvedValue(
+        makeNote({ status: 'DRAFT' }),
+      );
+      tx.initialNote.update.mockResolvedValue(
+        makeNote({ status: 'DRAFT', hpi: 'Revised.' }),
+      );
+
+      await service.update(PATIENT_ID, NOTE_ID, { hpi: 'Revised.' }, USER_ID);
+
+      expect(problemsService.upsertFromAssessment).not.toHaveBeenCalled();
+      expect(medicationsService.upsertFromNoteMedications).not.toHaveBeenCalled();
+    });
   });
 
   describe('create', () => {
@@ -426,6 +499,32 @@ describe('InitialNotesService — logs and version history', () => {
       const logData = tx.initialNoteLog.create.mock.calls[0][0].data;
       expect(logData.action).toBe('Created');
       expect(logData.initialNoteId).toBe(NOTE_ID);
+    });
+
+    it('syncs a non-empty assessment/medicationSnapshot on the very first draft save', async () => {
+      prisma.initialNote.findFirst.mockResolvedValue(null);
+      const problemsService = (service as any).problemsService;
+      const medicationsService = (service as any).medicationsService;
+      const created = makeNote({
+        status: 'DRAFT',
+        assessment: [{ title: 'Migraine' }],
+        medicationSnapshot: [{ name: 'Sumatriptan', dose: '50mg' }],
+      });
+      tx.initialNote.create.mockResolvedValue(created);
+      tx.initialNote.update.mockResolvedValue(created);
+
+      await service.create(
+        PATIENT_ID,
+        {
+          visitDatetime: '2026-07-20T02:00:00Z',
+          assessment: [{ title: 'Migraine' }] as any,
+          medicationSnapshot: [{ name: 'Sumatriptan', dose: '50mg' }] as any,
+        },
+        USER_ID,
+      );
+
+      expect(problemsService.upsertFromAssessment).toHaveBeenCalled();
+      expect(medicationsService.upsertFromNoteMedications).toHaveBeenCalled();
     });
   });
 
@@ -465,6 +564,64 @@ describe('InitialNotesService — logs and version history', () => {
       expect(tx.initialNote.delete).toHaveBeenCalledWith({
         where: { id: NOTE_ID },
       });
+    });
+
+    it('reverts problems/medications this draft introduced, leaves pre-existing ones alone', async () => {
+      const problemsService = (service as any).problemsService;
+      prisma.initialNote.findUnique.mockResolvedValue({
+        ...makeNote({ status: 'DRAFT' }),
+        visit: { patientId: PATIENT_ID },
+      });
+      tx.problemLog.findMany.mockResolvedValue([
+        { problemId: 'problem-introduced-1' },
+      ]);
+      tx.medicationLog.findMany.mockResolvedValue([
+        { medicationId: 'med-introduced-1' },
+      ]);
+
+      await service.remove(PATIENT_ID, NOTE_ID, USER_ID);
+
+      expect(tx.problemLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            patientId: PATIENT_ID,
+            action: 'Created',
+            description: { endsWith: 'from Initial Note' },
+          }),
+        }),
+      );
+      expect(problemsService.removeIntroducedAndRerootOrphans).toHaveBeenCalledWith(
+        PATIENT_ID,
+        ['problem-introduced-1'],
+        USER_ID,
+        'Initial Note',
+        tx,
+      );
+      expect(tx.medication.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['med-introduced-1'] }, isActive: true },
+        data: { isActive: false },
+      });
+      expect(tx.medicationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            medicationId: 'med-introduced-1',
+            action: 'Discontinued',
+          }),
+        }),
+      );
+    });
+
+    it('does not touch problems/medications when the draft introduced none', async () => {
+      const problemsService = (service as any).problemsService;
+      prisma.initialNote.findUnique.mockResolvedValue({
+        ...makeNote({ status: 'DRAFT' }),
+        visit: { patientId: PATIENT_ID },
+      });
+
+      await service.remove(PATIENT_ID, NOTE_ID, USER_ID);
+
+      expect(problemsService.removeIntroducedAndRerootOrphans).not.toHaveBeenCalled();
+      expect(tx.medication.updateMany).not.toHaveBeenCalled();
     });
   });
 

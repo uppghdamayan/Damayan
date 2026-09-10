@@ -959,6 +959,12 @@ export function ProgressNoteForm({ patientId, noteId, onClose }: ProgressNoteFor
         }
         return m;
       }),
+      // Explicit in-note removals (trash icon), tracked in removedMedNamesRef
+      // — see its doc comment. Lets a DRAFT save discontinue exactly these
+      // named medications on the master list immediately, without treating
+      // every other name merely absent from medicationSnapshot as removed
+      // (see MedicationsService#discontinueNamed).
+      removedMedicationNames: Array.from(removedMedNamesRef.current),
     };
   };
 

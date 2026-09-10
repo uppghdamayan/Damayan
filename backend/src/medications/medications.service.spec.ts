@@ -210,11 +210,46 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
     }
   });
 
-  it('falls back to discontinue+create when both same-name active doses change at once (ambiguous)', async () => {
+  it('pairs both same-name active doses in place, positionally, when counts match (2:2)', async () => {
     const existing = [
       med({ id: 'med-1', name: 'Metoprolol', dose: '25 mg' }),
       med({ id: 'med-2', name: 'Metoprolol', dose: '50 mg' }),
     ];
+    const { service, client, medicationCreate, medicationUpdate } =
+      buildService(existing);
+
+    await service.upsertFromNoteMedications(
+      'patient-1',
+      [
+        { name: 'Metoprolol', dose: '12.5 mg' },
+        { name: 'Metoprolol', dose: '75 mg' },
+      ],
+      'user-1',
+      'Progress Note',
+      client as any,
+    );
+
+    expect(medicationCreate).not.toHaveBeenCalled();
+    expect(medicationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'med-1' },
+        data: expect.objectContaining({ dose: '12.5 mg' }),
+      }),
+    );
+    expect(medicationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'med-2' },
+        data: expect.objectContaining({ dose: '75 mg' }),
+      }),
+    );
+    // Neither row was discontinued — both stayed active, in place.
+    for (const call of medicationUpdate.mock.calls) {
+      expect(call[0].data).not.toHaveProperty('isActive', false);
+    }
+  });
+
+  it('falls back to discontinue+create when the same-name group is ambiguous (2 items, 1 row)', async () => {
+    const existing = [med({ id: 'med-1', name: 'Metoprolol', dose: '25 mg' })];
     const { service, client, medicationCreate, medicationUpdate } =
       buildService(existing);
 
@@ -236,13 +271,7 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
         data: { isActive: false },
       }),
     );
-    expect(medicationUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'med-2' },
-        data: { isActive: false },
-      }),
-    );
-    // Neither existing row was ever mis-paired into a dose write.
+    // The old row was never mis-paired into a dose write.
     for (const call of medicationUpdate.mock.calls) {
       expect(call[0].data).not.toHaveProperty('dose');
     }
@@ -447,6 +476,30 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
     );
   });
 
+  it('leaves an active med absent from the note list alone when deactivateMissing:false', async () => {
+    const existing = [
+      med(),
+      med({ id: 'med-2', name: 'Losartan', dose: '50 mg' }),
+    ];
+    const { service, client, medicationUpdate } = buildService(existing);
+
+    await service.upsertFromNoteMedications(
+      'patient-1',
+      [{ name: 'Amlodipine', dose: '10 mg' }],
+      'user-1',
+      'Progress Note',
+      client as any,
+      { deactivateMissing: false },
+    );
+
+    expect(medicationUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'med-2' },
+        data: { isActive: false },
+      }),
+    );
+  });
+
   it('writes no MedicationLog when nothing changed', async () => {
     const existing = [med()];
     const { service, client, medicationUpdate, medicationLogCreate } =
@@ -470,5 +523,70 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
 
     expect(medicationUpdate).not.toHaveBeenCalled();
     expect(medicationLogCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe('MedicationsService.discontinueNamed', () => {
+  it('discontinues only the named active medications, by name (case/whitespace-insensitive)', async () => {
+    const existing = [
+      med({ id: 'med-1', name: 'Amlodipine' }),
+      med({ id: 'med-2', name: 'Losartan', dose: '50 mg' }),
+    ];
+    const { service, client, medicationUpdate, medicationLogCreate } =
+      buildService(existing);
+
+    await service.discontinueNamed(
+      'patient-1',
+      ['  amlodipine  '],
+      'user-1',
+      'Progress Note',
+      client as any,
+    );
+
+    expect(medicationUpdate).toHaveBeenCalledWith({
+      where: { id: 'med-1' },
+      data: { isActive: false },
+    });
+    expect(medicationUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'med-2' } }),
+    );
+    expect(medicationLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          medicationId: 'med-1',
+          action: 'Discontinued',
+        }),
+      }),
+    );
+  });
+
+  it('is a no-op given an empty name list', async () => {
+    const existing = [med()];
+    const { service, client, medicationUpdate } = buildService(existing);
+
+    await service.discontinueNamed(
+      'patient-1',
+      [],
+      'user-1',
+      'Progress Note',
+      client as any,
+    );
+
+    expect(medicationUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for a name that matches no active medication', async () => {
+    const existing = [med({ name: 'Amlodipine' })];
+    const { service, client, medicationUpdate } = buildService(existing);
+
+    await service.discontinueNamed(
+      'patient-1',
+      ['Nonexistent Drug'],
+      'user-1',
+      'Progress Note',
+      client as any,
+    );
+
+    expect(medicationUpdate).not.toHaveBeenCalled();
   });
 });

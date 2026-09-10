@@ -288,14 +288,33 @@ export class ProgressNotesService {
             tx,
           );
 
-        const healedProblemListSnapshot =
-          dto.problemListSnapshot !== undefined && canSyncProblems
-            ? await this.syncProblemsFromSnapshot(
+        const shouldSyncProblems =
+          dto.problemListSnapshot !== undefined && canSyncProblems;
+        // Medications are keyed off the already-reconciled snapshot (not
+        // dto.medicationSnapshot raw) so what's upserted into master agrees
+        // with what's stored on the note — same ordering rule as update().
+        const shouldSyncMedications =
+          dto.medicationSnapshot !== undefined && canSyncProblems;
+
+        const syncedProblemListSnapshot =
+          shouldSyncProblems || shouldSyncMedications
+            ? await this.syncFromSnapshots(
                 patientId,
-                dto.problemListSnapshot as any[],
+                shouldSyncProblems
+                  ? (dto.problemListSnapshot as any[])
+                  : undefined,
+                shouldSyncMedications
+                  ? (reconciledMedicationSnapshot as any[])
+                  : undefined,
                 userId,
                 tx,
+                shouldSyncMedications ? dto.removedMedicationNames : undefined,
               )
+            : undefined;
+
+        const healedProblemListSnapshot =
+          syncedProblemListSnapshot !== undefined
+            ? syncedProblemListSnapshot
             : dto.problemListSnapshot !== undefined
               ? (dto.problemListSnapshot as any)
               : (activeProblems as any);
@@ -365,26 +384,85 @@ export class ProgressNotesService {
     return this.publish(patientId, note.id, userId);
   }
 
-  // Shared by update() (draft save) and publish() — upserts the note's
-  // problemListSnapshot into the live Problem rows, then heals tempId's
-  // (and any parentId pointing at one) into the real ids upsert just
-  // assigned. Draft saves call this too now so the Master Problem List
-  // reflects an in-note edit as soon as it's saved, not only at publish —
-  // "the draft is already the master, unless reverted".
-  private async syncProblemsFromSnapshot(
+  // Shared by create()/update() (draft save) — upserts the note's
+  // problemListSnapshot into the live Problem rows and its medicationSnapshot
+  // into the live Medication rows, then heals problem tempId's (and any
+  // parentId pointing at one) into the real ids upsert just assigned.
+  // Medications need no equivalent healing — they're matched by name+dose,
+  // not by a client-generated id, so nothing in the stored snapshot needs
+  // rewriting once upserted.
+  //
+  // Draft saves call this too now so the Master Problem List / Medications
+  // module reflect an in-note edit as soon as it's saved, not only at
+  // publish — "the draft is already the master, unless reverted".
+  //
+  // Each half runs only when its raw snapshot is provided (`undefined` means
+  // "this save didn't touch that snapshot" — leave that master list alone).
+  // Medications sync with `{ deactivateMissing: false }`: a draft's
+  // medication list is being actively edited and is often temporarily
+  // shorter than the master list (see MedicationsScreen vs. the note
+  // sidebar), so an item's absence must not discontinue anything until the
+  // note is published — same rationale as the Initial Note's identical
+  // sync, and as `resolveMissing: false` below for problems... except
+  // problems intentionally keep `resolveMissing` at its default (true):
+  // clearing a problem out of the note's assessment during a draft save has
+  // always meant "resolved" for Progress Notes (see the call below), and
+  // that behavior predates this change — only the medications half is new.
+  private async syncFromSnapshots(
     patientId: string,
-    problemListSnapshotRaw: any[],
+    problemListSnapshotRaw: any[] | undefined,
+    medicationSnapshotRaw: any[] | undefined,
     userId: string,
     tx: Prisma.TransactionClient,
-  ): Promise<any[]> {
-    const snapshotItems = mapAssessmentSnapshot(problemListSnapshotRaw);
-    const resolvedIdByKey = await this.problemsService.upsertFromAssessment(
-      patientId,
-      snapshotItems,
-      userId,
-      'Progress Note',
-      tx,
-    );
+    // Names the clinician explicitly removed from this note's medication
+    // list (its trash icon) — see CreateProgressNoteDto#removedMedicationNames
+    // and MedicationsService#discontinueNamed. Applied unconditionally,
+    // unlike the `deactivateMissing: false` snapshot sync below: an explicit
+    // removal carries none of the "list is just temporarily short" ambiguity
+    // that option exists to guard against.
+    removedMedicationNames?: string[],
+  ): Promise<any[] | undefined> {
+    const medicationItems =
+      medicationSnapshotRaw !== undefined
+        ? mapMedicationSnapshot(medicationSnapshotRaw)
+        : null;
+
+    const [resolvedIdByKey] = await Promise.all([
+      problemListSnapshotRaw !== undefined
+        ? this.problemsService.upsertFromAssessment(
+            patientId,
+            mapAssessmentSnapshot(problemListSnapshotRaw),
+            userId,
+            'Progress Note',
+            tx,
+          )
+        : Promise.resolve(null),
+      medicationItems
+        ? this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            medicationItems,
+            userId,
+            'Progress Note',
+            tx,
+            { deactivateMissing: false },
+          )
+        : Promise.resolve(),
+    ]);
+
+    if (medicationItems && removedMedicationNames?.length) {
+      await this.medicationsService.discontinueNamed(
+        patientId,
+        removedMedicationNames,
+        userId,
+        'Progress Note',
+        tx,
+      );
+    }
+
+    if (problemListSnapshotRaw === undefined || !resolvedIdByKey) {
+      return undefined;
+    }
+
     return (problemListSnapshotRaw || []).map((item) => {
       if (!item || typeof item !== 'object') return item;
       const key = item.id || item.tempId;
@@ -462,19 +540,31 @@ export class ProgressNotesService {
       }),
     });
 
-    // Draft, has a problem-list edit to save, and this author is allowed to
-    // touch the master list — sync now instead of waiting for publish.
-    if (
+    // Draft, has a problem-list and/or medication-list edit to save, and this
+    // author is allowed to touch the master lists — sync now instead of
+    // waiting for publish.
+    const shouldSyncProblems =
       updateData.problemListSnapshot !== undefined &&
       note.status === NoteStatus.DRAFT &&
-      canSyncProblems
-    ) {
+      canSyncProblems;
+    const shouldSyncMedications =
+      updateData.medicationSnapshot !== undefined &&
+      note.status === NoteStatus.DRAFT &&
+      canSyncProblems;
+
+    if (shouldSyncProblems || shouldSyncMedications) {
       return this.prisma.$transaction(async (tx) => {
-        const healedSnapshot = await this.syncProblemsFromSnapshot(
+        const healedSnapshot = await this.syncFromSnapshots(
           note.visit.patientId,
-          updateData.problemListSnapshot as any[],
+          shouldSyncProblems
+            ? (updateData.problemListSnapshot as any[])
+            : undefined,
+          shouldSyncMedications
+            ? (updateData.medicationSnapshot as any[])
+            : undefined,
           userId,
           tx,
+          shouldSyncMedications ? updateData.removedMedicationNames : undefined,
         );
         return tx.progressNote.update({
           where: { id },
@@ -526,13 +616,17 @@ export class ProgressNotesService {
           );
 
           const [updatedSnapshot] = await Promise.all([
-            // Draft saves already sync problems into master via update() —
-            // this call is a no-op re-sync when nothing changed since the
-            // last save, and the only path left for a note published in
-            // one shot without an intermediate draft save.
-            this.syncProblemsFromSnapshot(
+            // Draft saves already sync problems (and now medications) into
+            // master via update() — this call is a no-op re-sync when
+            // nothing changed since the last save, and the only path left
+            // for a note published in one shot without an intermediate
+            // draft save. Medications are synced separately below (with the
+            // default `deactivateMissing: true`, unlike draft saves), so
+            // pass `undefined` here to avoid syncing them twice.
+            this.syncFromSnapshots(
               patientId,
               note.problemListSnapshot as any[],
+              undefined,
               userId,
               tx,
             ),
@@ -655,6 +749,57 @@ export class ProgressNotesService {
     );
   }
 
+  // Twin of revertProblemsToPreviousNote, for medications. Unlike problems,
+  // there's no "introduced" cleanup pass needed: upsertFromNoteMedications'
+  // default deactivateMissing behavior already discontinues anything in the
+  // previous snapshot's complement, which for a deleted note's own additions
+  // means "not in the previous snapshot" → discontinued, exactly right.
+  private async revertMedicationsToPreviousNote(
+    patientId: string,
+    excludeNoteId: string | null,
+    userId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    let prevSnapshotMeds: any[] = [];
+    const carryForward = await this.resolveCarryForwardSource(
+      patientId,
+      excludeNoteId,
+      tx,
+    );
+
+    if (carryForward.sourceKind === 'progress' && carryForward.sourceNoteId) {
+      const prevProgress = await tx.progressNote.findUnique({
+        where: { id: carryForward.sourceNoteId },
+        select: { medicationSnapshot: true },
+      });
+      prevSnapshotMeds = (prevProgress?.medicationSnapshot as any[]) || [];
+    } else if (
+      carryForward.sourceKind === 'initial' &&
+      carryForward.sourceNoteId
+    ) {
+      const initialNote = await tx.initialNote.findUnique({
+        where: { id: carryForward.sourceNoteId },
+        select: { medicationSnapshot: true },
+      });
+      if (initialNote) {
+        prevSnapshotMeds = (initialNote.medicationSnapshot as any[]) || [];
+      }
+    }
+
+    const validMeds = mapMedicationSnapshot(prevSnapshotMeds);
+
+    // Default deactivateMissing (true) — deliberately unlike the draft-save
+    // sync above: reverting a delete must discontinue anything the deleted
+    // note contributed that isn't in the previous snapshot.
+    await this.medicationsService.upsertFromNoteMedications(
+      patientId,
+      validMeds,
+      userId,
+      'Progress Note',
+      tx,
+    );
+  }
+
   async deleteDraft(patientId: string, id: string, userId: string) {
     return this.prisma.$transaction(
       async (tx) => {
@@ -707,46 +852,7 @@ export class ProgressNotesService {
             (note.problemListSnapshot as any[]) || [],
           );
 
-          let prevSnapshotMeds: any[] = [];
-          const carryForward = await this.resolveCarryForwardSource(
-            patientId,
-            id,
-            tx,
-          );
-
-          if (
-            carryForward.sourceKind === 'progress' &&
-            carryForward.sourceNoteId
-          ) {
-            const prevProgress = await tx.progressNote.findUnique({
-              where: { id: carryForward.sourceNoteId },
-              select: { medicationSnapshot: true },
-            });
-            prevSnapshotMeds =
-              (prevProgress?.medicationSnapshot as any[]) || [];
-          } else if (
-            carryForward.sourceKind === 'initial' &&
-            carryForward.sourceNoteId
-          ) {
-            const initialNote = await tx.initialNote.findUnique({
-              where: { id: carryForward.sourceNoteId },
-              select: { medicationSnapshot: true },
-            });
-            if (initialNote) {
-              prevSnapshotMeds =
-                (initialNote.medicationSnapshot as any[]) || [];
-            }
-          }
-
-          const validMeds = mapMedicationSnapshot(prevSnapshotMeds);
-
-          await this.medicationsService.upsertFromNoteMedications(
-            patientId,
-            validMeds,
-            userId,
-            'Progress Note',
-            tx,
-          );
+          await this.revertMedicationsToPreviousNote(patientId, id, userId, tx);
 
           await tx.deletedNote.create({
             data: {
@@ -795,7 +901,10 @@ export class ProgressNotesService {
         }
 
         // Hard delete for DRAFT — attachments are kept (see note above).
-        // Revert Master Problem List to previous published note baseline.
+        // Revert Master Problem List / Medications to previous published
+        // note baseline — now that draft saves sync both lists live, a
+        // deleted draft must undo what it introduced, same as a published
+        // note's delete already does above.
         await this.revertProblemsToPreviousNote(
           patientId,
           id,
@@ -803,6 +912,7 @@ export class ProgressNotesService {
           tx,
           (note.problemListSnapshot as any[]) || [],
         );
+        await this.revertMedicationsToPreviousNote(patientId, id, userId, tx);
 
         await tx.progressNote.delete({ where: { id } });
 
@@ -887,7 +997,7 @@ export class ProgressNotesService {
           }
         }
 
-        // Revert Master Problem List to baseline
+        // Revert Master Problem List / Medications to baseline
         await this.revertProblemsToPreviousNote(
           patientId,
           null,
@@ -895,6 +1005,7 @@ export class ProgressNotesService {
           tx,
           combinedSnapshot,
         );
+        await this.revertMedicationsToPreviousNote(patientId, null, userId, tx);
 
         return { count: count.count };
       },

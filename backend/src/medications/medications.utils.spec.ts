@@ -107,11 +107,26 @@ describe('resolveMedicationMatches', () => {
     expect(result.claimedIds).toEqual(new Set(['row-1', 'row-2']));
   });
 
-  it('2:2 — both same-name active rows change dose is fully ambiguous: both create, nothing claimed', () => {
+  it('2:2 — both same-name active rows change dose: paired positionally in place, nothing created', () => {
     const existing = [
       row({ id: 'row-1', dose: '25 mg' }),
       row({ id: 'row-2', dose: '50 mg' }),
     ];
+    const items = [
+      { name: 'Amlodipine', dose: '12.5 mg' },
+      { name: 'Amlodipine', dose: '75 mg' },
+    ];
+
+    const result = resolveMedicationMatches(existing, items);
+
+    expect(result.doseChange.get(0)).toBe('row-1');
+    expect(result.doseChange.get(1)).toBe('row-2');
+    expect(result.creates).toEqual([]);
+    expect(result.claimedIds).toEqual(new Set(['row-1', 'row-2']));
+  });
+
+  it('2 items, 1 candidate — still ambiguous: both create, nothing claimed', () => {
+    const existing = [row({ id: 'row-1', dose: '25 mg' })];
     const items = [
       { name: 'Amlodipine', dose: '12.5 mg' },
       { name: 'Amlodipine', dose: '75 mg' },

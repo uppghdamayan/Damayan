@@ -110,7 +110,97 @@ export class InitialNotesService {
         created.id,
       );
 
+      // Draft is already the master, unless reverted (see syncFromSnapshots) —
+      // the Problem List / Medications modules must show this draft's content
+      // immediately, not only once it's published.
+      const healedAssessment = await this.syncFromSnapshots(
+        patientId,
+        created.assessment as any[],
+        created.medicationSnapshot as any[],
+        userId,
+        tx,
+      );
+      if (healedAssessment) {
+        return tx.initialNote.update({
+          where: { id: created.id },
+          data: { assessment: healedAssessment as any },
+        });
+      }
+
       return created;
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Mirrors ProgressNotesService#syncFromSnapshots. Runs on every DRAFT
+  // create/save (not just publish) so
+  // the Problem List / Medications modules reflect the note as soon as it's
+  // saved — "the draft is already the master, unless reverted". Returns the
+  // tempId-healed assessment array to persist back onto the note (so a
+  // second save doesn't re-create the same problems under fresh tempIds), or
+  // null when there was nothing to sync.
+  // ─────────────────────────────────────────────
+  private async syncFromSnapshots(
+    patientId: string,
+    assessmentRaw: any[] | null | undefined,
+    medicationSnapshotRaw: any[] | null | undefined,
+    userId: string,
+    tx: PrismaTx,
+  ): Promise<any[] | null> {
+    const hasAssessment = Array.isArray(assessmentRaw) && assessmentRaw.length > 0;
+    const hasMedications =
+      Array.isArray(medicationSnapshotRaw) && medicationSnapshotRaw.length > 0;
+    if (!hasAssessment && !hasMedications) return null;
+
+    const medicationItems = mapMedicationSnapshot(medicationSnapshotRaw);
+
+    const [resolvedIdByKey] = await Promise.all([
+      hasAssessment
+        ? this.problemsService.upsertFromAssessment(
+            patientId,
+            mapAssessmentSnapshot(assessmentRaw),
+            userId,
+            'Initial Note',
+            tx,
+            { resolveMissing: false },
+          )
+        : Promise.resolve(new Map<string, string>()),
+      medicationItems.length > 0
+        ? this.medicationsService.upsertFromNoteMedications(
+            patientId,
+            medicationItems,
+            userId,
+            'Initial Note',
+            tx,
+            // A draft's medication list is mid-edit and often temporarily
+            // shorter than the master list — absence must not discontinue
+            // anything until publish. Same rationale as resolveMissing above.
+            { deactivateMissing: false },
+          )
+        : Promise.resolve(),
+    ]);
+
+    if (!hasAssessment) return null;
+
+    // Heal tempId's into real id's (and parentId references to them) so the
+    // stored snapshot points at real Problem rows — see publish() for the
+    // identical logic and full rationale.
+    return (assessmentRaw as any[]).map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const key = item.id || item.tempId;
+      const healedParentId =
+        item.parentId && resolvedIdByKey.has(item.parentId)
+          ? resolvedIdByKey.get(item.parentId)
+          : item.parentId;
+      if (key && resolvedIdByKey.has(key)) {
+        const newId = resolvedIdByKey.get(key);
+        const { tempId, isNew, ...rest } = item;
+        return { ...rest, id: newId, parentId: healedParentId };
+      }
+      if (healedParentId !== item.parentId) {
+        return { ...item, parentId: healedParentId };
+      }
+      return item;
     });
   }
 
@@ -164,6 +254,90 @@ export class InitialNotesService {
           instructions: pick('instructions', live.instructions),
         };
       });
+  }
+
+  // ─────────────────────────────────────────────
+  // Undoes syncFromSnapshots when a DRAFT is deleted before ever publishing.
+  // A draft's problems/medications are "the master, unless reverted" — this
+  // is the revert. Rather than tracking a separate introduced-by-this-note
+  // list, it reads the trail syncFromSnapshots already leaves behind: every
+  // problem/medication IT created carries a 'Created' log entry whose
+  // description ends "from Initial Note" (see ProblemsService#upsertFrom
+  // Assessment / MedicationsService#upsertFromNoteMedications). A problem or
+  // medication the patient already had before this draft opened was never
+  // 'Created' by it, so it's untouched here — only rows this draft actually
+  // introduced are removed/deactivated.
+  // ─────────────────────────────────────────────
+  private async revertDraftSync(
+    patientId: string,
+    note: InitialNote,
+    userId: string,
+    tx: PrismaTx,
+  ): Promise<void> {
+    const [introducedProblemLogs, introducedMedicationLogs] =
+      await Promise.all([
+        tx.problemLog.findMany({
+          where: {
+            patientId,
+            action: 'Created',
+            description: { endsWith: 'from Initial Note' },
+            problemId: { not: null },
+            // Initial Note is a singleton per patient today, so this is
+            // belt-and-suspenders — but it's what keeps this query correct
+            // if that constraint ever loosens, and matches the same guard
+            // on the Progress Note side (which does have several per
+            // patient).
+            createdAt: { gte: note.createdAt },
+          },
+          select: { problemId: true },
+        }),
+        tx.medicationLog.findMany({
+          where: {
+            patientId,
+            action: 'Created',
+            description: { endsWith: 'from Initial Note' },
+            medicationId: { not: null },
+            createdAt: { gte: note.createdAt },
+          },
+          select: { medicationId: true },
+        }),
+      ]);
+
+    const introducedProblemIds = introducedProblemLogs
+      .map((l) => l.problemId)
+      .filter((id): id is string => !!id);
+    const introducedMedicationIds = introducedMedicationLogs
+      .map((l) => l.medicationId)
+      .filter((id): id is string => !!id);
+
+    if (introducedProblemIds.length > 0) {
+      await this.problemsService.removeIntroducedAndRerootOrphans(
+        patientId,
+        introducedProblemIds,
+        userId,
+        'Initial Note',
+        tx,
+      );
+    }
+
+    if (introducedMedicationIds.length > 0) {
+      await tx.medication.updateMany({
+        where: { id: { in: introducedMedicationIds }, isActive: true },
+        data: { isActive: false },
+      });
+      for (const medicationId of introducedMedicationIds) {
+        await tx.medicationLog.create({
+          data: {
+            patientId,
+            medicationId,
+            action: 'Discontinued',
+            description:
+              'Discontinued medication — the Initial Note draft that introduced it was deleted',
+            editorId: userId,
+          },
+        });
+      }
+    }
   }
 
   async update(
@@ -380,7 +554,7 @@ export class InitialNotesService {
     // DRAFT: no version snapshot (nothing is clinically committed yet), but the
     // save is still logged for transparency when it actually changed something.
     return this.prisma.$transaction(async (tx) => {
-      const updatedNote = await tx.initialNote.update({ where: { id }, data });
+      let updatedNote = await tx.initialNote.update({ where: { id }, data });
 
       const { changedFields, summary } = diffNoteFields(note, updatedNote);
       if (changedFields.length > 0) {
@@ -392,6 +566,28 @@ export class InitialNotesService {
           tx,
           id,
         );
+      }
+
+      // Only re-sync when this save actually touched the assessment or the
+      // medication snapshot — a plain narrative-field save shouldn't re-walk
+      // the whole Problem/Medication upsert for no reason.
+      if (
+        updateData.assessment !== undefined ||
+        updateData.medicationSnapshot !== undefined
+      ) {
+        const healedAssessment = await this.syncFromSnapshots(
+          patientId,
+          updatedNote.assessment as any[],
+          updatedNote.medicationSnapshot as any[],
+          userId,
+          tx,
+        );
+        if (healedAssessment) {
+          updatedNote = await tx.initialNote.update({
+            where: { id },
+            data: { assessment: healedAssessment as any },
+          });
+        }
       }
 
       return updatedNote;
@@ -588,6 +784,10 @@ export class InitialNotesService {
           tx,
           id,
         );
+      }
+
+      if (note.status === NoteStatus.DRAFT) {
+        await this.revertDraftSync(patientId, note, userId, tx);
       }
 
       // Hard delete for DRAFT and PUBLISHED

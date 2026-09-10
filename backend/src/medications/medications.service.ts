@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
-import { resolveMedicationMatches } from './medications.utils';
+import { resolveMedicationMatches, normalizeMedText } from './medications.utils';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -314,6 +314,15 @@ export class MedicationsService {
     userId: string,
     sourceNote: 'Initial Note' | 'Progress Note',
     client: PrismaTx | PrismaService = this.prisma,
+    // When false, an existing active medication absent from `items` is left
+    // alone instead of being discontinued (see the "Deactivate missing"
+    // loop below). Mirrors ProblemsService#upsertFromAssessment's
+    // `resolveMissing` option. Used by both note services' DRAFT-save sync:
+    // a draft's medication list is being actively edited and is often
+    // temporarily shorter than the master list, so absence must not be read
+    // as "discontinued" until the note is published. Defaults true — publish
+    // keeps today's behaviour.
+    options: { deactivateMissing?: boolean } = {},
   ): Promise<void> {
     const userRole = await this.getUserRole(userId, client);
 
@@ -548,8 +557,10 @@ export class MedicationsService {
     // Deactivate missing items. Guarded on a non-empty `items` — an empty (or
     // all-'past', which the caller's filter collapses to empty) snapshot must
     // never be read as "the patient has zero active medications now"; that
-    // would mass-discontinue every medication on the chart from one save.
-    for (const ext of items.length > 0 ? existing : []) {
+    // would mass-discontinue every medication on the chart from one save —
+    // and on `options.deactivateMissing` for the same reason at draft-save
+    // time (see the option's doc comment above).
+    for (const ext of options.deactivateMissing !== false && items.length > 0 ? existing : []) {
       if (!keptIds.has(ext.id) && ext.isActive) {
         promises.push(
           client.medication
@@ -582,5 +593,64 @@ export class MedicationsService {
     }
 
     await Promise.all(promises);
+  }
+
+  // ─────────────────────────────────────────────
+  // Discontinues exactly the named active medications — used for an
+  // explicit in-note removal (the clinician's trash icon), which is
+  // deliberately NOT treated as "this medication is deactivateMissing" by
+  // upsertFromNoteMedications' draft-save call (`{ deactivateMissing: false
+  // }`): a note's medicationSnapshot can legitimately be missing a
+  // medication for reasons that must not discontinue anything (mid-edit
+  // draft not yet showing a concurrently-added master medication, etc.).
+  // An explicit removal carries no such ambiguity, so it's applied here
+  // unconditionally rather than folded into that snapshot diff.
+  // ─────────────────────────────────────────────
+  async discontinueNamed(
+    patientId: string,
+    names: string[],
+    userId: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<void> {
+    const normalized = new Set(
+      names.map((n) => normalizeMedText(n)).filter(Boolean),
+    );
+    if (normalized.size === 0) return;
+
+    const userRole = await this.getUserRole(userId, client);
+    const active = await client.medication.findMany({
+      where: { patientId, isActive: true },
+    });
+    const toDiscontinue = active.filter((m) =>
+      normalized.has(normalizeMedText(m.name)),
+    );
+
+    await Promise.all(
+      toDiscontinue.map((med) =>
+        client.medication
+          .update({ where: { id: med.id }, data: { isActive: false } })
+          .then(async () => {
+            await client.medicationLog.create({
+              data: {
+                patientId,
+                medicationId: med.id,
+                action: 'Discontinued',
+                description: `Discontinued medication '${med.name}' — removed from the ${sourceNote}`,
+                editorId: userId,
+              },
+            });
+            await this.logAudit(
+              patientId,
+              userId,
+              userRole,
+              'UPDATE',
+              med.id,
+              med.name,
+              sourceNote,
+            );
+          }),
+      ),
+    );
   }
 }

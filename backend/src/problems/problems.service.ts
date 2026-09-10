@@ -878,7 +878,7 @@ export class ProblemsService {
     patientId: string,
     introducedProblemIds: string[],
     userId: string,
-    sourceNote: 'Progress Note',
+    sourceNote: 'Progress Note' | 'Initial Note',
     client: PrismaTx | PrismaService = this.prisma,
   ): Promise<void> {
     const userRole = await this.getUserRole(userId, client);

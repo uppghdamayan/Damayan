@@ -68,6 +68,11 @@ function invalidateInitialNote(
   qc.invalidateQueries({ queryKey: ['problem-logs', patientId] });
   qc.invalidateQueries({ queryKey: ['medications', patientId] });
   qc.invalidateQueries({ queryKey: ['medication-logs', patientId] });
+  // A draft save now syncs problems/medications into the master lists (see
+  // syncFromSnapshots on the backend), which useCopyForwardData composes from
+  // useProblems/useMedications into the note form's copy-forward fallbacks —
+  // without this, that composed cache goes stale after any note mutation.
+  qc.invalidateQueries({ queryKey: ['carry-forward', patientId] });
   qc.invalidateQueries({ queryKey: ['patient', patientId] });
   qc.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
   qc.invalidateQueries({ queryKey: ['audit-logs'] });
