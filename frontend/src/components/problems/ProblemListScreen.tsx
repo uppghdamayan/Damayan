@@ -29,6 +29,7 @@ import { useInitialNote } from '@/hooks/useInitialNote';
 import { useProgressNotes } from '@/hooks/useProgressNotes';
 import { usePatient } from '@/hooks/usePatients';
 import { buildProblemTree, isDescendant, getCreatorName, applyStagedPromotions } from '@/lib/problem-utils';
+import { problemDraftKey } from '@/lib/problem-drafts';
 import { zoomModifier } from '@/lib/dnd-utils';
 import { useProblemEditLock } from '@/hooks/useProblemEditLock';
 import { useAuthStore } from '@/stores/authStore';
@@ -122,7 +123,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
   // Ref to track which patient's draft has been restored (prevents double-restore)
   const lastRestoredPatientRef = useRef<string | null>(null);
 
-  const draftStorageKey = `damayan_problem_draft_${patientId}`;
+  const draftStorageKey = problemDraftKey(patientId);
 
   // Keep draftRef in sync so cleanup functions always see current values
   useEffect(() => {
@@ -260,7 +261,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
     setDraftDiagnosisDates(null);
     setDraftStatuses(null);
     setLastAutoSaved(null);
-    const saved = localStorage.getItem(`damayan_problem_draft_${patientId}`);
+    const saved = localStorage.getItem(draftStorageKey);
     if (!saved) return;
     try {
       const parsed = JSON.parse(saved) as { order?: string[]; parents?: Record<string, string | null>; titles?: Record<string, string>; diagnosisDates?: Record<string, string | null>; statuses?: Record<string, ProblemStatusValue>; savedAt: string };
@@ -283,16 +284,33 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         toast.info('Restored your unsaved draft. Publish or revert when ready.', { duration: 5000 });
       }
     } catch {
-      localStorage.removeItem(`damayan_problem_draft_${patientId}`);
+      localStorage.removeItem(draftStorageKey);
     }
-  }, [patientId, isLoading]);
+  }, [patientId, isLoading, draftStorageKey]);
+
+  // If the list becomes non-editable (e.g. the note the draft was made
+  // alongside got deleted, and no other note draft is in progress), drop
+  // any lingering overlay rather than let it keep reshaping the now-current
+  // server data or get restored later over a since-reverted master list.
+  useEffect(() => {
+    if (effectiveCanManage) return;
+    if (!isEditMode && !draftOrder && !draftParents && !draftTitles && !draftDiagnosisDates && !draftStatuses) return;
+    setIsEditMode(false);
+    setDraftOrder(null);
+    setDraftParents(null);
+    setDraftTitles(null);
+    setDraftDiagnosisDates(null);
+    setDraftStatuses(null);
+    setLastAutoSaved(null);
+    localStorage.removeItem(draftStorageKey);
+  }, [effectiveCanManage, draftStorageKey]);
 
   // Auto-save draft to localStorage every 10 seconds while in edit mode
   useEffect(() => {
     if (!isEditMode || (!draftOrder && !draftStatuses)) return;
     const interval = setInterval(() => {
       localStorage.setItem(
-        `damayan_problem_draft_${patientId}`,
+        draftStorageKey,
         JSON.stringify({ order: draftOrder, parents: draftParents, titles: draftTitles, diagnosisDates: draftDiagnosisDates, statuses: draftStatuses, savedAt: new Date().toISOString() })
       );
       setLastAutoSaved(new Date());
@@ -306,7 +324,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       const { isEditMode: editMode, draftOrder: order, draftParents: parents, draftTitles: titles, draftDiagnosisDates: diagnosisDates, draftStatuses: statuses } = draftRef.current;
       if (editMode && (order || statuses)) {
         localStorage.setItem(
-          `damayan_problem_draft_${patientId}`,
+          draftStorageKey,
           JSON.stringify({ order, parents, titles, diagnosisDates, statuses, savedAt: new Date().toISOString() })
         );
       }
@@ -316,7 +334,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
       window.removeEventListener('beforeunload', persistDraft);
       persistDraft(); // also runs when component unmounts (patient switch / navigation)
     };
-  }, [patientId]);
+  }, [patientId, draftStorageKey]);
 
   // Drag and drop state
   const [dragOverState, setDragOverState] = useState<DragOverState | null>(null);

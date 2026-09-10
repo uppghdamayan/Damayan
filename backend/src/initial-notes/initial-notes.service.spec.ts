@@ -339,7 +339,7 @@ describe('InitialNotesService — logs and version history', () => {
         medicationSnapshot: [
           { name: 'Abacavir/Lamivudine', dose: '600/300mg' },
           { name: 'Ibuprofen', dose: '400mg' },
-        ] as any,
+        ],
       });
       prisma.initialNote.findUnique.mockResolvedValue(original);
       tx.initialNoteVersion.count.mockResolvedValue(1);
@@ -359,9 +359,7 @@ describe('InitialNotesService — logs and version history', () => {
         PATIENT_ID,
         NOTE_ID,
         {
-          medicationSnapshot: [
-            { name: 'test', dose: '10mg', source: 'past' },
-          ],
+          medicationSnapshot: [{ name: 'test', dose: '10mg', source: 'past' }],
         },
         USER_ID,
       );

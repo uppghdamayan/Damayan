@@ -483,7 +483,8 @@ export class MedicationsService {
     // already holds every pass 1/2 claim), so it only ever matches a row
     // left over from that ambiguous case, and still carries the dose change
     // as its own 'Updated' log entry alongside the Created one.
-    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normalize = (s: string) =>
+      s.trim().toLowerCase().replace(/\s+/g, ' ');
     for (const itemIndex of creates) {
       const item = items[itemIndex];
       const doseChangedFrom = existing.find(
@@ -491,7 +492,8 @@ export class MedicationsService {
           m.isActive &&
           !keptIds.has(m.id) &&
           normalize(m.name) === normalize(item.name) &&
-          normalize(String(m.dose ?? '')) !== normalize(String(item.dose ?? '')),
+          normalize(String(m.dose ?? '')) !==
+            normalize(String(item.dose ?? '')),
       );
 
       promises.push(

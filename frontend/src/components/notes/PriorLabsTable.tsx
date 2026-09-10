@@ -12,27 +12,40 @@ interface PriorLabsTableProps {
 export function PriorLabsTable({ patientId, localAttachments = [], onRemoveLocalAttachment }: PriorLabsTableProps) {
   const { data: groupedLabs, isLoading } = usePriorLabs(patientId);
 
+  // Only consider attachments whose owning note is still live and PUBLISHED —
+  // a note that was deleted leaves its attachments orphaned (noteStatus null)
+  // so they stay listed under Documents, and an in-progress DRAFT note's own
+  // attachments aren't a settled "prior" result yet. Neither should hijack
+  // "most recently uploaded lab result".
+  const publishedAttachments = React.useMemo(() => {
+    if (!groupedLabs) return [];
+    return groupedLabs.flatMap((g: any) =>
+      g.attachments.filter((att: any) => att.noteStatus === 'PUBLISHED'),
+    );
+  }, [groupedLabs]);
+
   // Find the noteId of the most recently uploaded attachment across all tags.
   // We then only display attachments that belong to that same note, so the
   // section shows the full set of labs from the latest visit — not one-per-tag
   // from across all historical notes.
   const latestNoteId = React.useMemo(() => {
-    if (!groupedLabs) return null;
-    const allAttachments = groupedLabs.flatMap((g: any) => g.attachments);
-    if (allAttachments.length === 0) return null;
-    const newest = allAttachments.reduce((max: any, att: any) =>
+    if (publishedAttachments.length === 0) return null;
+    const newest = publishedAttachments.reduce((max: any, att: any) =>
       new Date(att.uploadedAt).getTime() > new Date(max.uploadedAt).getTime() ? att : max
     );
     return newest.noteId ?? null;
-  }, [groupedLabs]);
+  }, [publishedAttachments]);
 
-  // Only keep groups that have at least one attachment from the latest note.
+  // Only keep groups that have at least one published attachment from the
+  // latest note.
   const filteredGroups = React.useMemo(() => {
-    if (!groupedLabs || !latestNoteId) return groupedLabs ?? [];
+    if (!groupedLabs || !latestNoteId) return [];
     return groupedLabs
       .map((group: any) => ({
         ...group,
-        attachments: group.attachments.filter((att: any) => att.noteId === latestNoteId),
+        attachments: group.attachments.filter(
+          (att: any) => att.noteStatus === 'PUBLISHED' && att.noteId === latestNoteId,
+        ),
       }))
       .filter((group: any) => group.attachments.length > 0);
   }, [groupedLabs, latestNoteId]);

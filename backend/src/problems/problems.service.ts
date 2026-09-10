@@ -859,6 +859,100 @@ export class ProblemsService {
   }
 
   // ─────────────────────────────────────────────
+  // Post-revert cleanup used only by the note-delete path (see
+  // ProgressNotesService#revertProblemsToPreviousNote). upsertFromAssessment
+  // has just restored the master list to the previous published snapshot,
+  // but two things fall outside what a snapshot diff can express:
+  //
+  //  1. A problem the deleted note itself introduced is absent from the
+  //     *previous* snapshot too, so upsertFromAssessment's "missing item"
+  //     pass only marks it RESOLVED (still visible, still nested) — deleting
+  //     the note that introduced it should take it off the list entirely.
+  //  2. Any problem left pointing at a parent that is no longer ACTIVE
+  //     (because that parent was just REMOVED here, or by an earlier
+  //     delete) needs to be re-rooted rather than silently orphaned in the
+  //     tree.
+  // ─────────────────────────────────────────────
+
+  async removeIntroducedAndRerootOrphans(
+    patientId: string,
+    introducedProblemIds: string[],
+    userId: string,
+    sourceNote: 'Progress Note',
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<void> {
+    const userRole = await this.getUserRole(userId, client);
+
+    if (introducedProblemIds.length > 0) {
+      const introduced = await client.problem.findMany({
+        where: { id: { in: introducedProblemIds }, patientId },
+      });
+      for (const problem of introduced) {
+        await client.problem.update({
+          where: { id: problem.id },
+          data: {
+            status: ProblemStatus.REMOVED,
+            parent: { disconnect: true },
+            updatedByUser: { connect: { id: userId } },
+          },
+        });
+        await this.logAction(
+          patientId,
+          userId,
+          'Removed',
+          `Removed problem '${problem.title}' — the ${sourceNote} that introduced it was deleted`,
+          client,
+          problem.id,
+        );
+        await this.logAudit(
+          patientId,
+          userId,
+          userRole,
+          'UPDATE',
+          problem.id,
+          problem.title,
+          sourceNote,
+        );
+      }
+    }
+
+    // Re-root any ACTIVE problem whose parent is missing or no longer
+    // ACTIVE (e.g. just REMOVED above, or orphaned by an earlier delete).
+    const activeProblems = await client.problem.findMany({
+      where: { patientId, status: ProblemStatus.ACTIVE },
+    });
+    const activeIds = new Set(activeProblems.map((p) => p.id));
+    for (const problem of activeProblems) {
+      if (problem.parentId && !activeIds.has(problem.parentId)) {
+        await client.problem.update({
+          where: { id: problem.id },
+          data: {
+            parent: { disconnect: true },
+            updatedByUser: { connect: { id: userId } },
+          },
+        });
+        await this.logAction(
+          patientId,
+          userId,
+          'Updated',
+          `Un-nested '${problem.title}' — its parent is no longer active`,
+          client,
+          problem.id,
+        );
+        await this.logAudit(
+          patientId,
+          userId,
+          userRole,
+          'UPDATE',
+          problem.id,
+          problem.title,
+          sourceNote,
+        );
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────
 

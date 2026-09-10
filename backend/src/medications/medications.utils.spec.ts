@@ -1,11 +1,13 @@
 import { resolveMedicationMatches } from './medications.utils';
 
-function row(overrides: Partial<{
-  id: string;
-  name: string;
-  dose: string | null;
-  isActive: boolean;
-}> = {}) {
+function row(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    dose: string | null;
+    isActive: boolean;
+  }> = {},
+) {
   return {
     id: 'row-1',
     name: 'Amlodipine',

@@ -593,6 +593,16 @@ export class ProgressNotesService {
     excludeNoteId: string | null,
     userId: string,
     tx: Prisma.TransactionClient,
+    // The deleted note's own problemListSnapshot, when known — used to find
+    // problems that note introduced (present here, absent from the previous
+    // snapshot below) so they can be taken off the list entirely instead of
+    // just marked RESOLVED by upsertFromAssessment's "missing item" pass.
+    // NOTE: a *previous* snapshot with legacy items lacking a `parentId` key
+    // cannot restore nesting either way — mapAssessmentSnapshot/
+    // upsertFromAssessment treat a missing key as "leave nesting alone" (see
+    // problems.service.ts's parentId doc comment), so nesting is left as-is
+    // rather than reverted in that case.
+    deletedNoteSnapshot: any[] = [],
   ) {
     let prevSnapshotProblems: any[] = [];
     const carryForward = await this.resolveCarryForwardSource(
@@ -601,16 +611,12 @@ export class ProgressNotesService {
       tx,
     );
 
-    if (
-      carryForward.sourceKind === 'progress' &&
-      carryForward.sourceNoteId
-    ) {
+    if (carryForward.sourceKind === 'progress' && carryForward.sourceNoteId) {
       const prevProgress = await tx.progressNote.findUnique({
         where: { id: carryForward.sourceNoteId },
         select: { problemListSnapshot: true },
       });
-      prevSnapshotProblems =
-        (prevProgress?.problemListSnapshot as any[]) || [];
+      prevSnapshotProblems = (prevProgress?.problemListSnapshot as any[]) || [];
     } else if (
       carryForward.sourceKind === 'initial' &&
       carryForward.sourceNoteId
@@ -628,6 +634,21 @@ export class ProgressNotesService {
     await this.problemsService.upsertFromAssessment(
       patientId,
       validProblems,
+      userId,
+      'Progress Note',
+      tx,
+    );
+
+    const prevIds = new Set(
+      validProblems.map((p) => p.id).filter((id): id is string => !!id),
+    );
+    const introducedProblemIds = (deletedNoteSnapshot || [])
+      .map((p) => p?.id)
+      .filter((id): id is string => !!id && !prevIds.has(id));
+
+    await this.problemsService.removeIntroducedAndRerootOrphans(
+      patientId,
+      introducedProblemIds,
       userId,
       'Progress Note',
       tx,
@@ -678,7 +699,13 @@ export class ProgressNotesService {
           // "what's the previous note" resolution as note creation, so
           // deleting the latest note always reverts to exactly what the next
           // note would otherwise have inherited from.
-          await this.revertProblemsToPreviousNote(patientId, id, userId, tx);
+          await this.revertProblemsToPreviousNote(
+            patientId,
+            id,
+            userId,
+            tx,
+            (note.problemListSnapshot as any[]) || [],
+          );
 
           let prevSnapshotMeds: any[] = [];
           const carryForward = await this.resolveCarryForwardSource(
@@ -758,7 +785,8 @@ export class ProgressNotesService {
             visitDetails.vitalSigns.length === 0 &&
             visitDetails.documents.length === 0 &&
             !visitDetails.initialNote &&
-            (!visitDetails.deletedNotes || visitDetails.deletedNotes.length === 0)
+            (!visitDetails.deletedNotes ||
+              visitDetails.deletedNotes.length === 0)
           ) {
             await tx.visit.delete({ where: { id: note.visitId } });
           }
@@ -768,7 +796,13 @@ export class ProgressNotesService {
 
         // Hard delete for DRAFT — attachments are kept (see note above).
         // Revert Master Problem List to previous published note baseline.
-        await this.revertProblemsToPreviousNote(patientId, id, userId, tx);
+        await this.revertProblemsToPreviousNote(
+          patientId,
+          id,
+          userId,
+          tx,
+          (note.problemListSnapshot as any[]) || [],
+        );
 
         await tx.progressNote.delete({ where: { id } });
 
@@ -787,7 +821,8 @@ export class ProgressNotesService {
           draftVisitDetails.vitalSigns.length === 0 &&
           draftVisitDetails.documents.length === 0 &&
           !draftVisitDetails.initialNote &&
-          (!draftVisitDetails.deletedNotes || draftVisitDetails.deletedNotes.length === 0)
+          (!draftVisitDetails.deletedNotes ||
+            draftVisitDetails.deletedNotes.length === 0)
         ) {
           await tx.visit.delete({ where: { id: note.visitId } });
         }
@@ -812,13 +847,16 @@ export class ProgressNotesService {
               patientId,
             },
           },
-          select: { id: true, visitId: true },
+          select: { id: true, visitId: true, problemListSnapshot: true },
         });
 
         if (drafts.length === 0) return { count: 0 };
 
         const noteIds = drafts.map((d) => d.id);
         const visitIds = drafts.map((d) => d.visitId);
+        const combinedSnapshot = drafts.flatMap(
+          (d) => (d.problemListSnapshot as any[]) || [],
+        );
 
         // Attachments are intentionally kept (see deleteDraft above).
 
@@ -850,7 +888,13 @@ export class ProgressNotesService {
         }
 
         // Revert Master Problem List to baseline
-        await this.revertProblemsToPreviousNote(patientId, null, userId, tx);
+        await this.revertProblemsToPreviousNote(
+          patientId,
+          null,
+          userId,
+          tx,
+          combinedSnapshot,
+        );
 
         return { count: count.count };
       },

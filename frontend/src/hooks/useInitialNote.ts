@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
 import type { NoteVisit } from './useProgressNotes';
 import { clearProgressDrafts } from '@/lib/note-drafts';
+import { clearProblemDraft } from '@/lib/problem-drafts';
 import type {
   InitialNoteLogsResponse,
   InitialNoteVersionDetail,
@@ -243,9 +244,14 @@ export function useDeleteInitialNote(patientId: string) {
     onSuccess: () => {
       localStorage.removeItem(`damayan:draft:${patientId}:initial`);
       clearProgressDrafts(patientId);
+      clearProblemDraft(patientId);
       queryClient.setQueryData(['initial-note', patientId], null);
       invalidateInitialNote(queryClient, patientId);
       queryClient.invalidateQueries({ queryKey: ['deleted-notes', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['problems', patientId] });
+      // Same orphaning as a progress-note delete — its attachments' noteStatus
+      // flips to null server-side instead of disappearing.
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
     },
   });
 }

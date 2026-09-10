@@ -4,6 +4,7 @@ import { apiRequest } from '@/lib/api';
 import { useProblems } from './useProblems';
 import { useMedications } from './useMedications';
 import { progressDraftKey, clearProgressDrafts } from '@/lib/note-drafts';
+import { clearProblemDraft } from '@/lib/problem-drafts';
 
 export interface NoteVisit {
   id: string;
@@ -278,6 +279,11 @@ export function useDeleteProgressNote(patientId: string) {
       }),
     onSuccess: (_, deletedId) => {
       clearProgressDrafts(patientId);
+      // The Problem List's local edit overlay may describe nesting/order
+      // from the note just deleted — drop it so the server-side revert
+      // (which just ran in the DELETE handler) isn't masked by stale draft
+      // state on next render. See lib/problem-drafts.ts.
+      clearProblemDraft(patientId);
       queryClient.invalidateQueries({ queryKey: ['progress-notes', patientId] });
       queryClient.invalidateQueries({ queryKey: ['carry-forward', patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits-infinite', patientId] });
@@ -286,6 +292,10 @@ export function useDeleteProgressNote(patientId: string) {
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       queryClient.invalidateQueries({ queryKey: ['medications', patientId] });
       queryClient.invalidateQueries({ queryKey: ['initial-note', patientId] });
+      // The deleted note's attachments become orphaned (noteStatus flips to
+      // null server-side) rather than disappearing — refetch so Prior Labs/
+      // Documents stop treating them as belonging to a live note.
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
       queryClient.removeQueries({ queryKey: ['progress-note', deletedId] });
       queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
       queryClient.invalidateQueries({ queryKey: ['deleted-notes', patientId] });

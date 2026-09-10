@@ -224,12 +224,8 @@ export function diffNoteFields(
 
   for (const field of INITIAL_NOTE_CONTENT_FIELDS) {
     if (field === 'medicationSnapshot') {
-      const beforeList = Array.isArray(before[field])
-        ? (before[field] as any[])
-        : [];
-      const afterList = Array.isArray(after[field])
-        ? (after[field] as any[])
-        : [];
+      const beforeList = Array.isArray(before[field]) ? before[field] : [];
+      const afterList = Array.isArray(after[field]) ? after[field] : [];
 
       const beforePast = beforeList.filter(
         (m) => m && typeof m === 'object' && m.source === 'past',
@@ -256,7 +252,11 @@ export function diffNoteFields(
         changes.push({
           field: 'pmhMedications',
           kind: wasEmpty ? 'added' : isNowEmpty ? 'cleared' : 'edited',
-          detail: describeListDelta('medicationSnapshot', beforePast, afterPast),
+          detail: describeListDelta(
+            'medicationSnapshot',
+            beforePast,
+            afterPast,
+          ),
         });
       }
 

@@ -366,7 +366,7 @@ describe('ProgressNotesService.reconcileMedicationSnapshot', () => {
     expect(result[0].instructions).toBe('Take 1 tab daily');
   });
 
-  it('leaves a field alone when it is listed in the entry\'s own editedFields', async () => {
+  it("leaves a field alone when it is listed in the entry's own editedFields", async () => {
     const mockMedicationsService = {
       findActiveForPatient: jest
         .fn()
@@ -405,7 +405,9 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
   it('syncs problems to master when a draft is created by a doctor', async () => {
     const mockProblemsService = {
       findActiveForPatient: jest.fn().mockResolvedValue([]),
-      upsertFromAssessment: jest.fn().mockResolvedValue(new Map([['temp-1', 'prob-real-1']])),
+      upsertFromAssessment: jest
+        .fn()
+        .mockResolvedValue(new Map([['temp-1', 'prob-real-1']])),
     };
     const mockMedicationsService = {
       findActiveForPatient: jest.fn().mockResolvedValue([]),
@@ -429,7 +431,11 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
       },
       progressNote: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'progress-1', ...data })),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'progress-1', ...data }),
+          ),
       },
       $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
     };
@@ -451,10 +457,12 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
     const dto = {
       subjective: 'Test subjective',
       objective: 'Test objective',
-      problemListSnapshot: [{ tempId: 'temp-1', title: 'Hypertension stage 1' }],
+      problemListSnapshot: [
+        { tempId: 'temp-1', title: 'Hypertension stage 1' },
+      ],
     };
 
-    const result = await service.create('patient-1', dto as any, 'user-1');
+    const result = await service.create('patient-1', dto, 'user-1');
 
     expect(mockProblemsService.upsertFromAssessment).toHaveBeenCalledWith(
       'patient-1',
@@ -522,12 +530,15 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
 
     expect(mockProblemsService.upsertFromAssessment).toHaveBeenCalledWith(
       'patient-1',
-      expect.arrayContaining([expect.objectContaining({ title: 'Hypertension' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ title: 'Hypertension' }),
+      ]),
       'user-1',
       'Progress Note',
       mockPrisma,
     );
-    expect(mockPrisma.progressNote.delete).toHaveBeenCalledWith({ where: { id: 'draft-1' } });
+    expect(mockPrisma.progressNote.delete).toHaveBeenCalledWith({
+      where: { id: 'draft-1' },
+    });
   });
 });
-

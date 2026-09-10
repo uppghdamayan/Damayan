@@ -278,8 +278,13 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
 
   it('updates dose and another field together in one write when both change', async () => {
     const existing = [med({ name: 'Amlodipine', dose: '10 mg' })];
-    const { service, client, medicationCreate, medicationUpdate, medicationLogCreate } =
-      buildService(existing);
+    const {
+      service,
+      client,
+      medicationCreate,
+      medicationUpdate,
+      medicationLogCreate,
+    } = buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',
@@ -317,7 +322,9 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
   });
 
   it('creates instead of silently re-dosing an inactive row with the same name', async () => {
-    const existing = [med({ name: 'Amlodipine', dose: '10 mg', isActive: false })];
+    const existing = [
+      med({ name: 'Amlodipine', dose: '10 mg', isActive: false }),
+    ];
     const { service, client, medicationCreate, medicationUpdate } =
       buildService(existing);
 
@@ -339,9 +346,17 @@ describe('MedicationsService.upsertFromNoteMedications', () => {
   });
 
   it('is a no-op on an empty snapshot even with existing active medications', async () => {
-    const existing = [med(), med({ id: 'med-2', name: 'Losartan', dose: '50 mg' })];
-    const { service, client, medicationCreate, medicationUpdate, medicationLogCreate } =
-      buildService(existing);
+    const existing = [
+      med(),
+      med({ id: 'med-2', name: 'Losartan', dose: '50 mg' }),
+    ];
+    const {
+      service,
+      client,
+      medicationCreate,
+      medicationUpdate,
+      medicationLogCreate,
+    } = buildService(existing);
 
     await service.upsertFromNoteMedications(
       'patient-1',

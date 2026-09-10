@@ -95,7 +95,12 @@ export function normalizeMedText(s: string): string {
  * time instead of depending on unspecified DB row order.
  */
 export function resolveMedicationMatches(
-  existing: { id: string; name: string; dose: string | null; isActive: boolean }[],
+  existing: {
+    id: string;
+    name: string;
+    dose: string | null;
+    isActive: boolean;
+  }[],
   items: { name: string; dose: string }[],
 ): {
   exact: Map<number, string>;
@@ -149,7 +154,9 @@ export function resolveMedicationMatches(
   for (const [name, indices] of unresolvedByName) {
     const candidates = existing.filter(
       (m) =>
-        m.isActive && !claimedIds.has(m.id) && normalizeMedText(m.name) === name,
+        m.isActive &&
+        !claimedIds.has(m.id) &&
+        normalizeMedText(m.name) === name,
     );
     if (indices.length === 1 && candidates.length === 1) {
       doseChange.set(indices[0], candidates[0].id);
@@ -197,12 +204,16 @@ export function mergeActiveMedications(
     .filter((m: any) => {
       if (!m || typeof m !== 'object') return false;
       if (m.isNew) return true;
-      const name = String(m.name || '').trim().toLowerCase();
+      const name = String(m.name || '')
+        .trim()
+        .toLowerCase();
       return !!name && activeNames.has(name);
     })
     .map((m: any) => {
       if (!m || typeof m !== 'object' || m.isNew) return m;
-      const name = String(m.name || '').trim().toLowerCase();
+      const name = String(m.name || '')
+        .trim()
+        .toLowerCase();
       const live = name ? activeByName.get(name) : undefined;
       if (!live) return m;
       const { editedFields: _editedFields, ...rest } = m;
@@ -218,12 +229,18 @@ export function mergeActiveMedications(
 
   const existingNames = new Set(
     existing
-      .map((m: any) => String(m.name || '').trim().toLowerCase())
+      .map((m: any) =>
+        String(m.name || '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean),
   );
 
   for (const m of activeMedications || []) {
-    const name = String(m.name || '').trim().toLowerCase();
+    const name = String(m.name || '')
+      .trim()
+      .toLowerCase();
     if (!name) continue;
     if (!existingNames.has(name)) {
       existing.push({

@@ -111,7 +111,10 @@ describe('AttachmentsService', () => {
 
   describe('findByNote', () => {
     it('returns empty array immediately when noteId is __pending__', async () => {
-      const result = await service.findByNote(NoteType.PROGRESS_NOTE, '__pending__');
+      const result = await service.findByNote(
+        NoteType.PROGRESS_NOTE,
+        '__pending__',
+      );
       expect(result).toEqual([]);
     });
 
