@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ClipboardList, ArrowRight } from 'lucide-react';
+import { LockedOverlay } from '@/components/ui/LockedOverlay';
 import {
   DndContext,
   DragOverlay,
@@ -881,10 +882,20 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
           className={cn(
             "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
             isEditMode ? 'border-l-amber-500' : 'border-l-accent',
-            isMasterListLocked && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
+            isMasterListLocked && 'opacity-90 bg-surface-2/20 select-none',
             showActiveDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
+          {isMasterListLocked && (
+            <LockedOverlay
+              toastId="problem-list-locked"
+              message={
+                !hasPublishedInitialNote
+                  ? 'Read only — publish an Initial Note before editing the problem list.'
+                  : 'Editing locked — start or open a note draft to edit the problem list.'
+              }
+            />
+          )}
           {showActiveDropOverlay && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] pointer-events-none">
               <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2 shadow-sm">
@@ -932,7 +943,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                   Draft Mode (Unpublished)
                 </span>
               ) : isMasterListLocked ? (
-                <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
                   🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
                 </span>
               ) : (
@@ -979,10 +990,20 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
         <div 
           className={cn(
             "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200 min-h-[140px]",
-            isMasterListLocked && 'opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none',
+            isMasterListLocked && 'opacity-90 bg-surface-2/20 select-none',
             showResolvedDropOverlay && "outline-dashed outline-2 outline-green outline-offset-[-2px]"
           )}
         >
+          {isMasterListLocked && (
+            <LockedOverlay
+              toastId="problem-list-locked"
+              message={
+                !hasPublishedInitialNote
+                  ? 'Read only — publish an Initial Note before editing the problem list.'
+                  : 'Editing locked — start or open a note draft to edit the problem list.'
+              }
+            />
+          )}
           {showResolvedDropOverlay && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-surface/60 backdrop-blur-[3px] pointer-events-none">
               <div className="w-10 h-10 rounded-full bg-green-light border-2 border-green flex items-center justify-center text-green text-xl font-bold mb-2 shadow-sm">
@@ -1010,7 +1031,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
             {/* Right side */}
             <div className="flex items-center gap-2">
               {isMasterListLocked && (
-                <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
                   🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
                 </span>
               )}

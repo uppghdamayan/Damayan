@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ClipboardList, ArrowRight } from 'lucide-react';
+import { LockedOverlay } from '@/components/ui/LockedOverlay';
 import {
   useMedications,
   useCreateMedication,
@@ -532,10 +533,20 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       )}
 
       <div className={cn(
-        "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden transition-all duration-200",
+        "bg-surface border border-border border-l-[3px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden transition-all duration-200",
         isEditMode ? "border-l-amber-500" : "border-l-accent",
-        isMasterListLocked && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
+        isMasterListLocked && "opacity-90 bg-surface-2/20 select-none"
       )}>
+        {isMasterListLocked && (
+          <LockedOverlay
+            toastId="medication-list-locked"
+            message={
+              !hasPublishedInitialNote
+                ? 'Read only — publish an Initial Note before editing the medication list.'
+                : 'Editing locked — start or open a note draft to edit the medication list.'
+            }
+          />
+        )}
         <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3 px-4 py-3 bg-surface-2 border-b border-border">
           {/* Left side */}
           <div className="flex flex-col gap-1">
@@ -564,7 +575,7 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
           {/* Right side */}
           <div className="flex items-center gap-2">
             {isMasterListLocked && (
-              <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
                 🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
               </span>
             )}
@@ -682,15 +693,25 @@ export function MedicationsScreen({ patientId }: { patientId: string }) {
       </div>
 
       <div className={cn(
-        "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden",
-        isMasterListLocked && "opacity-65 grayscale-[30%] bg-surface-2/30 pointer-events-none select-none"
+        "bg-surface border border-border rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden",
+        isMasterListLocked && "opacity-90 bg-surface-2/20 select-none"
       )}>
+        {isMasterListLocked && (
+          <LockedOverlay
+            toastId="medication-list-locked"
+            message={
+              !hasPublishedInitialNote
+                ? 'Read only — publish an Initial Note before editing the medication list.'
+                : 'Editing locked — start or open a note draft to edit the medication list.'
+            }
+          />
+        )}
         <div className="flex items-center gap-[9px] px-[14px] py-[10px] bg-surface border-b border-border">
           <div className="w-[26px] h-[26px] rounded-[6px] bg-surface-2 flex items-center justify-center text-[12px] flex-shrink-0">🗒</div>
           <span className="text-[11px] font-bold uppercase tracking-[0.6px] text-text-secondary">Discontinued Medications</span>
           <div className="ml-auto flex items-center gap-2">
             {isMasterListLocked && (
-              <span className="text-[10px] font-medium text-text-muted bg-surface-3 border border-border px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1 rounded-[4px] flex items-center gap-1 select-none">
                 🔒 {hasPublishedInitialNote ? 'Locked — No Draft' : 'Read Only'}
               </span>
             )}
