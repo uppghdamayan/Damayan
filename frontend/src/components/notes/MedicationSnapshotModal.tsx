@@ -27,6 +27,7 @@ interface MedicationSnapshotModalProps {
   editing: MedicationSnapshotValues | null;
   nameOptions: string[];
   onSave: (values: MedicationSnapshotValues) => void;
+  showQuantity?: boolean;
 }
 
 const emptyValues: MedicationSnapshotFormValues = { name: '', dose: '', formulation: '', instructions: '', quantity: '' };
@@ -37,7 +38,7 @@ const emptyValues: MedicationSnapshotFormValues = { name: '', dose: '', formulat
  * MedicationFormModal (components/medications/MedicationForm.tsx), which
  * edits the patient's cumulative medication list — that flow is untouched.
  */
-export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, onSave }: MedicationSnapshotModalProps) {
+export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, onSave, showQuantity = true }: MedicationSnapshotModalProps) {
   const [values, setValues] = useState<MedicationSnapshotFormValues>(emptyValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -68,11 +69,13 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
 
     if (!nameStr) e.name = 'Medication name is required.';
     if (!doseStr) e.dose = 'Dose is required.';
-    if (!qtyStr) {
-      e.quantity = 'Quantity is required.';
-    } else {
-      const qtyNum = parseInt(qtyStr, 10);
-      if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
+    if (showQuantity) {
+      if (!qtyStr) {
+        e.quantity = 'Quantity is required.';
+      } else {
+        const qtyNum = parseInt(qtyStr, 10);
+        if (isNaN(qtyNum) || qtyNum <= 0) e.quantity = 'Quantity must be a whole number greater than 0.';
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -90,7 +93,7 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
       name: nameStr,
       dose: doseStr,
       formulation: formStr || undefined,
-      quantity: parseInt(qtyStr, 10),
+      quantity: showQuantity && qtyStr ? parseInt(qtyStr, 10) : undefined,
       instructions: instStr || undefined,
     });
   };
@@ -179,30 +182,32 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
-              Quantity <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
-            </label>
-            <input
-              type="number" step="1" min="1"
-              value={values.quantity}
-              onChange={(e) => {
-                const val = e.target.value;
-                setValues((v) => ({ ...v, quantity: val }));
-                let err = '';
-                if (!val.trim()) {
-                  err = 'Quantity is required.';
-                } else {
-                  const qtyNum = parseInt(val, 10);
-                  if (isNaN(qtyNum) || qtyNum <= 0) err = 'Quantity must be a whole number greater than 0.';
-                }
-                setErrors((er) => ({ ...er, quantity: err }));
-              }}
-              placeholder="e.g. 30"
-              className={inputCn(!!errors.quantity)}
-            />
-            {errors.quantity && <p className="text-[12px] text-red mt-1">{errors.quantity}</p>}
-          </div>
+          {showQuantity && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-[0.5px]">
+                Quantity <span className="text-red font-bold text-[11px] align-top ml-[2px]">*</span>
+              </label>
+              <input
+                type="number" step="1" min="1"
+                value={values.quantity}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setValues((v) => ({ ...v, quantity: val }));
+                  let err = '';
+                  if (!val.trim()) {
+                    err = 'Quantity is required.';
+                  } else {
+                    const qtyNum = parseInt(val, 10);
+                    if (isNaN(qtyNum) || qtyNum <= 0) err = 'Quantity must be a whole number greater than 0.';
+                  }
+                  setErrors((er) => ({ ...er, quantity: err }));
+                }}
+                placeholder="e.g. 30"
+                className={inputCn(!!errors.quantity)}
+              />
+              {errors.quantity && <p className="text-[12px] text-red mt-1">{errors.quantity}</p>}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 px-[18px] py-3 border-t border-border">

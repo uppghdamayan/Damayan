@@ -189,7 +189,6 @@ export function InitialNoteVersionView({
                     const medName = typeof med === 'string' ? med : med.name;
                     const dose = typeof med !== 'string' ? med.dose : '';
                     const formulation = typeof med !== 'string' ? med.formulation : '';
-                    const quantity = typeof med !== 'string' ? med.quantity : '';
                     const instructions = typeof med !== 'string' ? med.instructions : '';
 
                     return (
@@ -200,7 +199,6 @@ export function InitialNoteVersionView({
                             <span className="font-bold text-text-primary">{medName}</span>
                             {dose && <span className="font-mono font-semibold text-accent">{dose}</span>}
                             {formulation && <span className="text-text-secondary">({formulation})</span>}
-                            {quantity && <span className="text-text-muted">Qty: {quantity}</span>}
                           </div>
                           {instructions && (
                             <div className="text-[11px] text-text-muted mt-0.5">

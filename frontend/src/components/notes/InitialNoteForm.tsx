@@ -156,6 +156,7 @@ interface MedicationAddFormProps {
   nameOptions: string[];
   onAdd: (values: MedicationSnapshotValues) => void;
   addLabel?: string;
+  showQuantity?: boolean;
 }
 
 /**
@@ -163,7 +164,7 @@ interface MedicationAddFormProps {
  * list (Plan/Management) and the Past Medication list (History) — each call
  * site owns its own state so typing in one never leaks into the other.
  */
-function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }: MedicationAddFormProps) {
+function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication', showQuantity = true }: MedicationAddFormProps) {
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedFormulation, setNewMedFormulation] = useState('');
@@ -194,7 +195,7 @@ function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }
           className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
         />
       </div>
-      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+      <div className={cn("col-span-12 flex flex-col gap-1", showQuantity ? "@md:col-span-6" : "@md:col-span-12")}>
         <label className="text-[10px] font-bold text-text-secondary uppercase">Formulation</label>
         <input
           value={newMedFormulation}
@@ -203,16 +204,18 @@ function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }
           className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
         />
       </div>
-      <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
-        <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
-        <input
-          type="number"
-          value={newMedQuantity}
-          onChange={(e) => setNewMedQuantity(e.target.value)}
-          placeholder="e.g. 30"
-          className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
-        />
-      </div>
+      {showQuantity && (
+        <div className="col-span-12 @md:col-span-6 flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-text-secondary uppercase">Quantity</label>
+          <input
+            type="number"
+            value={newMedQuantity}
+            onChange={(e) => setNewMedQuantity(e.target.value)}
+            placeholder="e.g. 30"
+            className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
+          />
+        </div>
+      )}
       <div className="col-span-12 flex flex-col gap-1">
         <label className="text-[10px] font-bold text-text-secondary uppercase">Sig / Instructions</label>
         <input
@@ -243,7 +246,7 @@ function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication' }
                 name: newMedName.trim(),
                 dose: newMedDose.trim(),
                 formulation: newMedFormulation.trim() || undefined,
-                quantity: newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
+                quantity: showQuantity && newMedQuantity ? parseInt(newMedQuantity, 10) : undefined,
                 instructions: newMedInstructions.trim(),
               });
               setNewMedName('');
@@ -1179,7 +1182,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                             {pastMeds.map((med: any, idx: number) => {
                               const medName = typeof med === 'string' ? med : med.name;
                               const medDetails = typeof med !== 'string'
-                                ? [med.dose, med.formulation, med.quantity ? `Qty: ${med.quantity}` : ''].filter(Boolean).join(' · ')
+                                ? [med.dose, med.formulation].filter(Boolean).join(' · ')
                                 : '';
                               const instructions = typeof med !== 'string' ? med.instructions : '';
 
@@ -1734,9 +1737,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                 {typeof med !== 'string' && med.formulation && (
                                   <span className="text-text-secondary ml-1.5">{med.formulation}</span>
                                 )}
-                                {typeof med !== 'string' && med.quantity && (
-                                  <span className="text-text-secondary font-medium ml-1.5">Qty: {med.quantity}</span>
-                                )}
                                 {typeof med !== 'string' && med.instructions && (
                                   <span className="text-[10px] text-text-muted ml-2">{med.instructions}</span>
                                 )}
@@ -1755,7 +1755,6 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                                               name: med.name,
                                               dose: med.dose || '',
                                               formulation: med.formulation,
-                                              quantity: med.quantity,
                                               instructions: med.instructions,
                                             };
                                         appendMedication(values, 'prescribed', true);
@@ -1797,6 +1796,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
                         nameOptions={nameOptions}
                         onAdd={(values) => appendMedication(values, 'past')}
                         addLabel="+ Add Past Medication"
+                        showQuantity={false}
                       />
                     )}
                   </div>
@@ -2296,6 +2296,7 @@ export function InitialNoteForm({ patientId }: InitialNoteFormProps) {
         onClose={() => setEditMedIndex(null)}
         editing={editMedIndex !== null ? (form.getValues('medicationSnapshot') || [])[editMedIndex] ?? null : null}
         nameOptions={nameOptions}
+        showQuantity={editMedIndex !== null ? getMedSource((form.getValues('medicationSnapshot') || [])[editMedIndex]) !== 'past' : true}
         onSave={(values) => {
           if (editMedIndex === null) return;
           const current = form.getValues('medicationSnapshot') || [];
