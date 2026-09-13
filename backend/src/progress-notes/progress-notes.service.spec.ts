@@ -481,6 +481,7 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
     };
     const mockMedicationsService = {
       upsertFromNoteMedications: jest.fn(),
+      removeIntroducedMedications: jest.fn(),
     };
     const mockProgressNoteFindFirst = jest.fn().mockResolvedValue(null);
     const mockInitialNoteFindFirst = jest.fn().mockResolvedValue({
@@ -516,6 +517,18 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
       visit: {
         findUnique: jest.fn().mockResolvedValue(null),
         delete: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+      },
+      medication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      problemLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      medicationLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      deletedNote: {
+        create: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
     };
@@ -718,6 +731,7 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
     };
     const mockMedicationsService = {
       upsertFromNoteMedications: jest.fn(),
+      removeIntroducedMedications: jest.fn(),
     };
     const mockPrisma = {
       progressNote: {
@@ -749,6 +763,18 @@ describe('ProgressNotesService draft problem syncing & reverting', () => {
       visit: {
         findUnique: jest.fn().mockResolvedValue(null),
         delete: jest.fn().mockResolvedValue({ id: 'visit-1' }),
+      },
+      medication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      problemLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      medicationLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      deletedNote: {
+        create: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn().mockImplementation(async (cb) => cb(mockPrisma)),
     };

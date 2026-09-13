@@ -121,6 +121,7 @@ describe('InitialNotesService — logs and version history', () => {
           useValue: {
             findActiveForPatient: jest.fn().mockResolvedValue([]),
             upsertFromNoteMedications: jest.fn(),
+            removeIntroducedMedications: jest.fn(),
           },
         },
         { provide: StorageService, useValue: { delete: jest.fn() } },
@@ -597,17 +598,12 @@ describe('InitialNotesService — logs and version history', () => {
         'Initial Note',
         tx,
       );
-      expect(tx.medication.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['med-introduced-1'] }, isActive: true },
-        data: { isActive: false },
-      });
-      expect(tx.medicationLog.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            medicationId: 'med-introduced-1',
-            action: 'Discontinued',
-          }),
-        }),
+      expect((service as any).medicationsService.removeIntroducedMedications).toHaveBeenCalledWith(
+        PATIENT_ID,
+        ['med-introduced-1'],
+        USER_ID,
+        'Initial Note',
+        tx,
       );
     });
 

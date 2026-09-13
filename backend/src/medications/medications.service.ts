@@ -596,16 +596,44 @@ export class MedicationsService {
   }
 
   // ─────────────────────────────────────────────
-  // Discontinues exactly the named active medications — used for an
-  // explicit in-note removal (the clinician's trash icon), which is
-  // deliberately NOT treated as "this medication is deactivateMissing" by
-  // upsertFromNoteMedications' draft-save call (`{ deactivateMissing: false
-  // }`): a note's medicationSnapshot can legitimately be missing a
-  // medication for reasons that must not discontinue anything (mid-edit
-  // draft not yet showing a concurrently-added master medication, etc.).
-  // An explicit removal carries no such ambiguity, so it's applied here
-  // unconditionally rather than folded into that snapshot diff.
+  // HARD DELETE INTRODUCED — Post-revert cleanup used by the note-delete path.
+  // When a note that introduced a medication is deleted, that medication
+  // should be completely removed from the database instead of just being
+  // discontinued.
   // ─────────────────────────────────────────────
+  async removeIntroducedMedications(
+    patientId: string,
+    introducedMedicationIds: string[],
+    userId: string,
+    sourceNote: 'Initial Note' | 'Progress Note',
+    client: PrismaTx | PrismaService = this.prisma,
+  ): Promise<void> {
+    const userRole = await this.getUserRole(userId, client);
+
+    if (introducedMedicationIds.length > 0) {
+      const introduced = await client.medication.findMany({
+        where: { id: { in: introducedMedicationIds }, patientId },
+      });
+      for (const med of introduced) {
+        await client.medication.delete({
+          where: { id: med.id },
+        });
+
+        await client.medicationLog.create({
+          data: {
+            patientId,
+            medicationId: null, // Medication is physically deleted
+            action: 'Removed',
+            description: `Deleted medication '${med.name}' completely — the ${sourceNote} that introduced it was deleted`,
+            editorId: userId,
+          },
+        });
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Discontinues exactly the named active medications — used for an
   async discontinueNamed(
     patientId: string,
     names: string[],

@@ -736,9 +736,27 @@ export class ProgressNotesService {
     const prevIds = new Set(
       validProblems.map((p) => p.id).filter((id): id is string => !!id),
     );
-    const introducedProblemIds = (deletedNoteSnapshot || [])
-      .map((p) => p?.id)
+    const introducedProblemIdsFromSnapshot = (deletedNoteSnapshot || [])
+      .map((p) => p?.id || p?.tempId)
       .filter((id): id is string => !!id && !prevIds.has(id));
+
+    let introducedProblemIdsFromLog: string[] = [];
+    if (excludeNoteId) {
+      const deletedNote = await tx.progressNote.findUnique({ where: { id: excludeNoteId } });
+      if (deletedNote) {
+        const logs = await tx.problemLog.findMany({
+          where: {
+            patientId,
+            editorId: deletedNote.authorId ?? undefined,
+            action: 'Created',
+            createdAt: { gte: deletedNote.createdAt },
+          },
+          select: { problemId: true },
+        });
+        introducedProblemIdsFromLog = logs.map(l => l.problemId).filter((id): id is string => !!id);
+      }
+    }
+    const introducedProblemIds = Array.from(new Set([...introducedProblemIdsFromSnapshot, ...introducedProblemIdsFromLog]));
 
     await this.problemsService.removeIntroducedAndRerootOrphans(
       patientId,
@@ -759,6 +777,7 @@ export class ProgressNotesService {
     excludeNoteId: string | null,
     userId: string,
     tx: Prisma.TransactionClient,
+    deletedNoteSnapshot: any[] = [],
   ) {
     let prevSnapshotMeds: any[] = [];
     const carryForward = await this.resolveCarryForwardSource(
@@ -794,6 +813,46 @@ export class ProgressNotesService {
     await this.medicationsService.upsertFromNoteMedications(
       patientId,
       validMeds,
+      userId,
+      'Progress Note',
+      tx,
+    );
+
+    const prevMedNames = new Set(
+      validMeds.map((m) => m.name.toLowerCase().trim()),
+    );
+    const deletedNoteMeds = mapMedicationSnapshot(deletedNoteSnapshot || []);
+    const introducedMedNames = deletedNoteMeds
+      .map((m) => m.name)
+      .filter((name) => !!name && !prevMedNames.has(name.toLowerCase().trim()));
+    
+    const activeMeds = await tx.medication.findMany({ where: { patientId, isActive: true } });
+    const introducedMedicationIdsFromSnapshot = activeMeds
+      .filter(m => introducedMedNames.some(name => name.toLowerCase().trim() === m.name.toLowerCase().trim()))
+      .map(m => m.id);
+
+    let introducedMedicationIdsFromLog: string[] = [];
+    if (excludeNoteId) {
+      const deletedNote = await tx.progressNote.findUnique({ where: { id: excludeNoteId } });
+      if (deletedNote) {
+        const logs = await tx.medicationLog.findMany({
+          where: {
+            patientId,
+            editorId: deletedNote.authorId ?? undefined,
+            action: 'Created',
+            createdAt: { gte: deletedNote.createdAt },
+          },
+          select: { medicationId: true },
+        });
+        introducedMedicationIdsFromLog = logs.map(l => l.medicationId).filter((id): id is string => !!id);
+      }
+    }
+
+    const introducedMedicationIds = Array.from(new Set([...introducedMedicationIdsFromSnapshot, ...introducedMedicationIdsFromLog]));
+
+    await this.medicationsService.removeIntroducedMedications(
+      patientId,
+      introducedMedicationIds,
       userId,
       'Progress Note',
       tx,
@@ -852,7 +911,13 @@ export class ProgressNotesService {
             (note.problemListSnapshot as any[]) || [],
           );
 
-          await this.revertMedicationsToPreviousNote(patientId, id, userId, tx);
+          await this.revertMedicationsToPreviousNote(
+            patientId,
+            id,
+            userId,
+            tx,
+            (note.medicationSnapshot as any[]) || [],
+          );
 
           await tx.deletedNote.create({
             data: {

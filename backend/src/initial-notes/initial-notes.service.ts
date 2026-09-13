@@ -321,22 +321,13 @@ export class InitialNotesService {
     }
 
     if (introducedMedicationIds.length > 0) {
-      await tx.medication.updateMany({
-        where: { id: { in: introducedMedicationIds }, isActive: true },
-        data: { isActive: false },
-      });
-      for (const medicationId of introducedMedicationIds) {
-        await tx.medicationLog.create({
-          data: {
-            patientId,
-            medicationId,
-            action: 'Discontinued',
-            description:
-              'Discontinued medication — the Initial Note draft that introduced it was deleted',
-            editorId: userId,
-          },
-        });
-      }
+      await this.medicationsService.removeIntroducedMedications(
+        patientId,
+        introducedMedicationIds,
+        userId,
+        'Initial Note',
+        tx,
+      );
     }
   }
 

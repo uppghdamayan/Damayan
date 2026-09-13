@@ -888,21 +888,15 @@ export class ProblemsService {
         where: { id: { in: introducedProblemIds }, patientId },
       });
       for (const problem of introduced) {
-        await client.problem.update({
+        await client.problem.delete({
           where: { id: problem.id },
-          data: {
-            status: ProblemStatus.REMOVED,
-            parent: { disconnect: true },
-            updatedByUser: { connect: { id: userId } },
-          },
         });
         await this.logAction(
           patientId,
           userId,
           'Removed',
-          `Removed problem '${problem.title}' — the ${sourceNote} that introduced it was deleted`,
+          `Deleted problem '${problem.title}' completely — the ${sourceNote} that introduced it was deleted`,
           client,
-          problem.id,
         );
         await this.logAudit(
           patientId,
