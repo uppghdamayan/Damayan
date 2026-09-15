@@ -994,25 +994,11 @@ export class ProblemsService {
   // ─────────────────────────────────────────────
 
   async getLogs(patientId: string) {
-    await this.cleanupOldLogs(patientId);
     return this.prisma.problemLog.findMany({
       where: { patientId },
       orderBy: { createdAt: 'desc' },
       include: {
         editor: { select: { firstName: true, lastName: true, role: true } },
-      },
-    });
-  }
-
-  private async cleanupOldLogs(patientId: string) {
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-    await this.prisma.problemLog.deleteMany({
-      where: {
-        patientId,
-        createdAt: {
-          lt: twoWeeksAgo,
-        },
       },
     });
   }

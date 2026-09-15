@@ -826,9 +826,9 @@ export default function PatientLogsPage() {
       year: 'numeric',
     });
     const timeFormatted = date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: false,
+      hour12: true,
     });
     return { dateFormatted, timeFormatted };
   };

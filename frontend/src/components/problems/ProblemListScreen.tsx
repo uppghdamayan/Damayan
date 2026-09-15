@@ -1063,7 +1063,7 @@ export function ProblemListScreen({ patientId }: { patientId: string }) {
                 Master Problem List Logs
               </h3>
               <span className="ch-badge text-[9px] font-bold uppercase tracking-[0.5px] px-2 py-0.5 rounded border border-border text-text-secondary bg-surface-3">
-                14-Day History
+                {logsData?.data?.length ?? 0} {logsData?.data?.length === 1 ? 'Entry' : 'Entries'}
               </span>
             </div>
           </div>

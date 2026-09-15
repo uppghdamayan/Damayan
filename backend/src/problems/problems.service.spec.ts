@@ -455,4 +455,29 @@ describe('ProblemsService#remove / #update — parent promotion (Business rule 5
     expect(problems.find((x) => x.id === 'a')!.parentId).toBe('p');
     expect(problems.find((x) => x.id === 'p')!.title).toBe('P Renamed');
   });
+
+  describe('getLogs', () => {
+    it('reads newest-first and does not purge old entries', async () => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      const deleteMany = jest.fn();
+      const prisma = {
+        problemLog: {
+          findMany,
+          deleteMany,
+        },
+      };
+      (service as any).prisma = prisma;
+
+      await service.getLogs(PATIENT_ID);
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: { patientId: PATIENT_ID },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          editor: { select: { firstName: true, lastName: true, role: true } },
+        },
+      });
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+  });
 });
