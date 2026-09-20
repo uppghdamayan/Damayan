@@ -54,31 +54,59 @@ export default function LoginPage() {
 
     try {
       const authPromise = supabase.auth.signInWithPassword({ email, password });
-      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timed out. Please try again.')), 15000)
+      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+        setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), 8000)
       );
 
-      const { data, error: authError } = await Promise.race([authPromise, timeoutPromise]);
+      let data: any, authError: any;
+      try {
+        ({ data, error: authError } = await Promise.race([authPromise, timeoutPromise]));
+      } catch {
+        setError('Cannot reach the sign-in service. Check your network connection and try again.');
+        setLoading(false);
+        return;
+      }
 
-      if (authError || !data?.session) {
-        setError(authError?.message || 'Login failed. Check your credentials.');
+      if (authError) {
+        // A TypeError here means fetch itself failed (DNS/connection blocked),
+        // not that the server rejected the credentials.
+        const isNetworkError = authError instanceof TypeError || authError?.name === 'AuthRetryableFetchError';
+        setError(isNetworkError
+          ? 'Cannot reach the sign-in service. Check your network connection and try again.'
+          : authError?.message || 'Login failed. Check your credentials.');
+        setLoading(false);
+        return;
+      }
+      if (!data?.session) {
+        setError('Login failed. Check your credentials.');
         setLoading(false);
         return;
       }
 
       // Fetch user profile from the backend using the JWT
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+      const fetchTimeout = setTimeout(() => controller.abort(), 8000);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.session.access_token}` },
-        signal: controller.signal,
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+          signal: controller.signal,
+        });
+      } catch {
+        clearTimeout(fetchTimeout);
+        setError('Signed in, but cannot reach the server. Check your network connection and try again.');
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
 
       clearTimeout(fetchTimeout);
 
       if (!res.ok) {
-        setError('Account is inactive or not found. Contact your administrator.');
+        setError(res.status === 401 || res.status === 403
+          ? 'Account is inactive or not found. Contact your administrator.'
+          : `Server error (${res.status}). Please try again.`);
         await supabase.auth.signOut();
         setLoading(false);
         return;
