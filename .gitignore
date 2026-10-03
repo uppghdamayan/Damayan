@@ -129,3 +129,5 @@ Thumbs.db
 #graphify
 graph.json
 graphify-out/
+# frontend scripts
+frontend/scripts/
