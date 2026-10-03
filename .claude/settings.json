@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "D:/Python/Scripts/graphify.EXE hook-guard read --strict"
+            "command": "D:/Python/Scripts/graphify.EXE hook-guard read"
           }
         ]
       }

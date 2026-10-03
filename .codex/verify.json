@@ -1,0 +1,20 @@
+{
+  "checks": [
+    "npm --prefix backend run lint",
+    "npm --prefix backend test",
+    "npm --prefix backend run build",
+    "npm --prefix frontend run lint",
+    "npm --prefix frontend run build"
+  ],
+  "alignment": {
+    "model": "sonnet",
+    "effort": "medium",
+    "riskModel": "opus",
+    "riskPaths": [
+      "backend/prisma/schema.prisma",
+      "backend/prisma/migrations/**",
+      "backend/src/auth/**",
+      "backend/src/accounts/**"
+    ]
+  }
+}
