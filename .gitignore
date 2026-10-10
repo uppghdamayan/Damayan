@@ -131,9 +131,3 @@ graph.json
 graphify-out/
 # frontend scripts
 frontend/scripts/
-
-# Claude + Codex workflow
-.codex/verify/
-.codex/autopilot/
-plans/*
-!plans/_template.md

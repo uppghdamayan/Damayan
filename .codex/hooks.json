@@ -35,16 +35,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const cp=require('node:child_process');const path=require('node:path');const root=cp.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();require(path.join(root,'.codex','hooks','claude-verify.js'))\"",
-            "commandWindows": "node -e \"const cp=require('node:child_process');const path=require('node:path');const root=cp.execFileSync('git.exe',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();require(path.join(root,'.codex','hooks','claude-verify.js'))\"",
-            "statusMessage": "Queueing Claude verification"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "[ ! -f \".agents/skills/impeccable/scripts/impeccable\" ] || \".agents/skills/impeccable/scripts/impeccable\" hook",
             "commandWindows": "if exist \".agents/skills/impeccable/scripts/impeccable.cmd\" (\".agents/skills/impeccable/scripts/impeccable.cmd\" hook & exit /b)",
             "timeout": 30,
