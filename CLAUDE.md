@@ -166,8 +166,16 @@ Rules:
   Never commit impeccable's live-mode block (`impeccable-live-start` …
   `impeccable-live-end` in the root layout).
 
-Functional/manual testing stays with the user. Claude doesn't log in, drive the browser
-preview, or ask for credentials.
+Functional/manual testing stays with the user. By default Claude doesn't log in, drive the
+browser preview, or ask for credentials.
+
+Exception: when the user explicitly asks for it (for example, screenshots for the user
+manual), Claude may drive the browser preview, with these limits:
+- The user signs in themselves. Claude never asks for, types, or stores credentials.
+- Use a test or demo patient only. The app runs against a live medical database, so no real
+  patient data goes into screenshots or docs.
+- Read-only navigation and screenshots. Don't create, edit, publish or delete records.
+- The permission covers that one request, not later tasks.
 
 ### Closing a task
 
