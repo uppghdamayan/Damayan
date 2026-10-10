@@ -147,7 +147,8 @@ export class InitialNotesService {
     userId: string,
     tx: PrismaTx,
   ): Promise<any[] | null> {
-    const hasAssessment = Array.isArray(assessmentRaw) && assessmentRaw.length > 0;
+    const hasAssessment =
+      Array.isArray(assessmentRaw) && assessmentRaw.length > 0;
     const hasMedications =
       Array.isArray(medicationSnapshotRaw) && medicationSnapshotRaw.length > 0;
     if (!hasAssessment && !hasMedications) return null;
@@ -185,7 +186,7 @@ export class InitialNotesService {
     // Heal tempId's into real id's (and parentId references to them) so the
     // stored snapshot points at real Problem rows — see publish() for the
     // identical logic and full rationale.
-    return (assessmentRaw as any[]).map((item) => {
+    return assessmentRaw.map((item) => {
       if (!item || typeof item !== 'object') return item;
       const key = item.id || item.tempId;
       const healedParentId =
@@ -274,8 +275,8 @@ export class InitialNotesService {
     userId: string,
     tx: PrismaTx,
   ): Promise<void> {
-    const [introducedProblemLogs, introducedMedicationLogs] =
-      await Promise.all([
+    const [introducedProblemLogs, introducedMedicationLogs] = await Promise.all(
+      [
         tx.problemLog.findMany({
           where: {
             patientId,
@@ -301,7 +302,8 @@ export class InitialNotesService {
           },
           select: { medicationId: true },
         }),
-      ]);
+      ],
+    );
 
     const introducedProblemIds = introducedProblemLogs
       .map((l) => l.problemId)

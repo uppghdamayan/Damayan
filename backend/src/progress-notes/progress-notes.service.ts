@@ -346,6 +346,7 @@ export class ProgressNotesService {
             authorId: userId,
             subjective: dto.subjective ?? '',
             objective: dto.objective ?? '',
+            labs: dto.labs,
             // `??` only falls back when the client omits the field entirely
             // (undefined/null) — an intentionally blank '' from the form is
             // preserved as-is. Non-UI callers that omit these fields still
@@ -518,6 +519,7 @@ export class ProgressNotesService {
       ...(updateData.objective !== undefined && {
         objective: updateData.objective,
       }),
+      ...(updateData.labs !== undefined && { labs: updateData.labs }),
       ...(updateData.mgmtNonpharm !== undefined && {
         mgmtNonpharm: updateData.mgmtNonpharm,
       }),
@@ -742,7 +744,9 @@ export class ProgressNotesService {
 
     let introducedProblemIdsFromLog: string[] = [];
     if (excludeNoteId) {
-      const deletedNote = await tx.progressNote.findUnique({ where: { id: excludeNoteId } });
+      const deletedNote = await tx.progressNote.findUnique({
+        where: { id: excludeNoteId },
+      });
       if (deletedNote) {
         const logs = await tx.problemLog.findMany({
           where: {
@@ -753,10 +757,17 @@ export class ProgressNotesService {
           },
           select: { problemId: true },
         });
-        introducedProblemIdsFromLog = logs.map(l => l.problemId).filter((id): id is string => !!id);
+        introducedProblemIdsFromLog = logs
+          .map((l) => l.problemId)
+          .filter((id): id is string => !!id);
       }
     }
-    const introducedProblemIds = Array.from(new Set([...introducedProblemIdsFromSnapshot, ...introducedProblemIdsFromLog]));
+    const introducedProblemIds = Array.from(
+      new Set([
+        ...introducedProblemIdsFromSnapshot,
+        ...introducedProblemIdsFromLog,
+      ]),
+    );
 
     await this.problemsService.removeIntroducedAndRerootOrphans(
       patientId,
@@ -825,15 +836,23 @@ export class ProgressNotesService {
     const introducedMedNames = deletedNoteMeds
       .map((m) => m.name)
       .filter((name) => !!name && !prevMedNames.has(name.toLowerCase().trim()));
-    
-    const activeMeds = await tx.medication.findMany({ where: { patientId, isActive: true } });
+
+    const activeMeds = await tx.medication.findMany({
+      where: { patientId, isActive: true },
+    });
     const introducedMedicationIdsFromSnapshot = activeMeds
-      .filter(m => introducedMedNames.some(name => name.toLowerCase().trim() === m.name.toLowerCase().trim()))
-      .map(m => m.id);
+      .filter((m) =>
+        introducedMedNames.some(
+          (name) => name.toLowerCase().trim() === m.name.toLowerCase().trim(),
+        ),
+      )
+      .map((m) => m.id);
 
     let introducedMedicationIdsFromLog: string[] = [];
     if (excludeNoteId) {
-      const deletedNote = await tx.progressNote.findUnique({ where: { id: excludeNoteId } });
+      const deletedNote = await tx.progressNote.findUnique({
+        where: { id: excludeNoteId },
+      });
       if (deletedNote) {
         const logs = await tx.medicationLog.findMany({
           where: {
@@ -844,11 +863,18 @@ export class ProgressNotesService {
           },
           select: { medicationId: true },
         });
-        introducedMedicationIdsFromLog = logs.map(l => l.medicationId).filter((id): id is string => !!id);
+        introducedMedicationIdsFromLog = logs
+          .map((l) => l.medicationId)
+          .filter((id): id is string => !!id);
       }
     }
 
-    const introducedMedicationIds = Array.from(new Set([...introducedMedicationIdsFromSnapshot, ...introducedMedicationIdsFromLog]));
+    const introducedMedicationIds = Array.from(
+      new Set([
+        ...introducedMedicationIdsFromSnapshot,
+        ...introducedMedicationIdsFromLog,
+      ]),
+    );
 
     await this.medicationsService.removeIntroducedMedications(
       patientId,

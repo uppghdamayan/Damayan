@@ -178,6 +178,7 @@ export function MedicationSnapshotModal({ open, onClose, editing, nameOptions, o
               value={values.instructions}
               onChange={(e) => setValues((v) => ({ ...v, instructions: e.target.value }))}
               placeholder="e.g. 1 tab PO OD with meals"
+              maxLength={50}
               className={inputCn()}
             />
           </div>

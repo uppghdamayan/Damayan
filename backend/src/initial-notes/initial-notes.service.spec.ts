@@ -354,13 +354,15 @@ describe('InitialNotesService — logs and version history', () => {
         _max: { versionNumber: 1 },
       });
 
-      tx.initialNote.update.mockImplementation(({ data }: any) => {
-        const updatedState = makeNote({
-          ...original,
-          ...data,
-        });
-        return Promise.resolve(updatedState);
-      });
+      tx.initialNote.update.mockImplementation(
+        ({ data }: { data: Partial<InitialNote> }) => {
+          const updatedState = makeNote({
+            ...original,
+            ...data,
+          });
+          return Promise.resolve(updatedState);
+        },
+      );
 
       await service.update(
         PATIENT_ID,
@@ -422,7 +424,9 @@ describe('InitialNotesService — logs and version history', () => {
       const problemsService = (service as any).problemsService;
       const medicationsService = (service as any).medicationsService;
       const draftAssessment = [{ title: 'Migraine', tempId: 'temp-1' }];
-      const draftMeds = [{ name: 'Sumatriptan', dose: '50mg', source: 'prescribed' }];
+      const draftMeds = [
+        { name: 'Sumatriptan', dose: '50mg', source: 'prescribed' },
+      ];
       prisma.initialNote.findUnique.mockResolvedValue(
         makeNote({ status: 'DRAFT', assessment: [], medicationSnapshot: [] }),
       );
@@ -441,7 +445,10 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(
         PATIENT_ID,
         NOTE_ID,
-        { assessment: draftAssessment as any, medicationSnapshot: draftMeds as any },
+        {
+          assessment: draftAssessment,
+          medicationSnapshot: draftMeds as any,
+        },
         USER_ID,
       );
 
@@ -455,7 +462,9 @@ describe('InitialNotesService — logs and version history', () => {
       );
       expect(medicationsService.upsertFromNoteMedications).toHaveBeenCalledWith(
         PATIENT_ID,
-        expect.arrayContaining([expect.objectContaining({ name: 'Sumatriptan' })]),
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'Sumatriptan' }),
+        ]),
         USER_ID,
         'Initial Note',
         tx,
@@ -482,7 +491,9 @@ describe('InitialNotesService — logs and version history', () => {
       await service.update(PATIENT_ID, NOTE_ID, { hpi: 'Revised.' }, USER_ID);
 
       expect(problemsService.upsertFromAssessment).not.toHaveBeenCalled();
-      expect(medicationsService.upsertFromNoteMedications).not.toHaveBeenCalled();
+      expect(
+        medicationsService.upsertFromNoteMedications,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -518,8 +529,8 @@ describe('InitialNotesService — logs and version history', () => {
         PATIENT_ID,
         {
           visitDatetime: '2026-07-20T02:00:00Z',
-          assessment: [{ title: 'Migraine' }] as any,
-          medicationSnapshot: [{ name: 'Sumatriptan', dose: '50mg' }] as any,
+          assessment: [{ title: 'Migraine' }],
+          medicationSnapshot: [{ name: 'Sumatriptan', dose: '50mg' }],
         },
         USER_ID,
       );
@@ -591,14 +602,18 @@ describe('InitialNotesService — logs and version history', () => {
           }),
         }),
       );
-      expect(problemsService.removeIntroducedAndRerootOrphans).toHaveBeenCalledWith(
+      expect(
+        problemsService.removeIntroducedAndRerootOrphans,
+      ).toHaveBeenCalledWith(
         PATIENT_ID,
         ['problem-introduced-1'],
         USER_ID,
         'Initial Note',
         tx,
       );
-      expect((service as any).medicationsService.removeIntroducedMedications).toHaveBeenCalledWith(
+      expect(
+        (service as any).medicationsService.removeIntroducedMedications,
+      ).toHaveBeenCalledWith(
         PATIENT_ID,
         ['med-introduced-1'],
         USER_ID,
@@ -616,7 +631,9 @@ describe('InitialNotesService — logs and version history', () => {
 
       await service.remove(PATIENT_ID, NOTE_ID, USER_ID);
 
-      expect(problemsService.removeIntroducedAndRerootOrphans).not.toHaveBeenCalled();
+      expect(
+        problemsService.removeIntroducedAndRerootOrphans,
+      ).not.toHaveBeenCalled();
       expect(tx.medication.updateMany).not.toHaveBeenCalled();
     });
   });

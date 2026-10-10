@@ -193,10 +193,10 @@ export function MedicationFormModal({ open, onClose, editing, suggestions, savin
               onChange={(e) => { 
                 const val = e.target.value;
                 setValues((v) => ({ ...v, instructions: val })); 
-                setErrors((er) => ({ ...er, instructions: !val.trim() ? 'Instructions are required.' : val.length > 255 ? 'Max 255 characters.' : '' }));
+                setErrors((er) => ({ ...er, instructions: !val.trim() ? 'Instructions are required.' : val.length > 50 ? 'Max 50 characters.' : '' }));
               }}
               placeholder="e.g. Once daily with food"
-              maxLength={255}
+              maxLength={50}
               className={inputCn(!!errors.instructions)}
             />
             {errors.instructions && <p className="text-[12px] text-red mt-1">{errors.instructions}</p>}

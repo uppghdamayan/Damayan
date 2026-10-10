@@ -36,7 +36,7 @@
           {
             "type": "command",
             "command": "[ ! -f \".agents/skills/impeccable/scripts/impeccable\" ] || \".agents/skills/impeccable/scripts/impeccable\" hook",
-            "commandWindows": "if exist \".agents/skills/impeccable/scripts/impeccable.cmd\" (\".agents/skills/impeccable/scripts/impeccable.cmd\" hook & exit /b)",
+            "commandWindows": "cmd.exe /d /c \"if exist .agents\\skills\\impeccable\\scripts\\impeccable.cmd (call .agents\\skills\\impeccable\\scripts\\impeccable.cmd hook)\"",
             "timeout": 30,
             "statusMessage": "Design deep pass"
           }
@@ -50,7 +50,7 @@
           {
             "type": "command",
             "command": "[ ! -f \".agents/skills/impeccable/scripts/impeccable\" ] || \".agents/skills/impeccable/scripts/impeccable\" hook",
-            "commandWindows": "if exist \".agents/skills/impeccable/scripts/impeccable.cmd\" (\".agents/skills/impeccable/scripts/impeccable.cmd\" hook & exit /b)",
+            "commandWindows": "cmd.exe /d /c \"if exist .agents\\skills\\impeccable\\scripts\\impeccable.cmd (call .agents\\skills\\impeccable\\scripts\\impeccable.cmd hook)\"",
             "timeout": 5,
             "statusMessage": "Checking UI changes"
           }

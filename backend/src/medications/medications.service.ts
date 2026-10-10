@@ -8,7 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
-import { resolveMedicationMatches, normalizeMedText } from './medications.utils';
+import {
+  resolveMedicationMatches,
+  normalizeMedText,
+} from './medications.utils';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -560,7 +563,9 @@ export class MedicationsService {
     // would mass-discontinue every medication on the chart from one save —
     // and on `options.deactivateMissing` for the same reason at draft-save
     // time (see the option's doc comment above).
-    for (const ext of options.deactivateMissing !== false && items.length > 0 ? existing : []) {
+    for (const ext of options.deactivateMissing !== false && items.length > 0
+      ? existing
+      : []) {
       if (!keptIds.has(ext.id) && ext.isActive) {
         promises.push(
           client.medication

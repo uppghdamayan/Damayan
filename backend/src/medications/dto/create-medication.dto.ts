@@ -30,7 +30,7 @@ export class CreateMedicationDto {
   @ApiPropertyOptional({ example: 'Once daily with food' })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(50)
   instructions?: string;
 
   @ApiPropertyOptional({ example: 30 })

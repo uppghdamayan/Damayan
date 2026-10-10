@@ -222,6 +222,7 @@ function MedicationAddForm({ nameOptions, onAdd, addLabel = '+ Add Medication', 
           value={newMedInstructions}
           onChange={(e) => setNewMedInstructions(e.target.value)}
           placeholder="e.g. Take 1 tab daily"
+          maxLength={50}
           className="h-[28px] px-2 text-[12px] rounded border border-border-strong outline-none focus:border-accent w-full bg-white transition-all focus:shadow-[0_0_0_3px_rgba(10,110,95,0.12)]"
         />
       </div>
